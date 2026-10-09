@@ -64,7 +64,9 @@ const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3
 const lastName = (n: string) => n.split(' ').slice(1).join(' ');
 const awayLine = (j: number) => LN[away]?.units.find((u) => u.label === `L${j + 1}`);
 const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === label);
-const heat = (v: number | null) => (v === null ? '' : `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.5)}%, var(--sheet)); color: ${v >= 36 ? 'var(--sheet)' : 'var(--ink)'}`);
+// Box shading lives in blocks.css (it differs between light and dark mode); the page only passes the share.
+const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
+const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const homeMu = LN[home]?.matchups?.home;
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
 
@@ -224,7 +226,7 @@ const _ = ordinal;
                       <span class="strip">
                         {r.share.map((v, j) => {
                           const opp = (awayLine(j)?.players ?? []).map(lastName);
-                          return <span style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `At home, ${mine.join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time against opponents’ ${['first', 'second', 'third', 'fourth'][j]} lines. With no line matching it would be about ${r.expected[j]}%. Tonight that line is ${opp.join(', ') || `${place(away)}’s L${j + 1}`}.`}><i>{away} L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>;
+                          return <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `At home, ${mine.join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time against opponents’ ${['first', 'second', 'third', 'fourth'][j]} lines. With no line matching it would be about ${r.expected[j]}%. Tonight that line is ${opp.join(', ') || `${place(away)}’s L${j + 1}`}.`}><i>{away} L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>;
                         })}
                       </span>
                     </li>
