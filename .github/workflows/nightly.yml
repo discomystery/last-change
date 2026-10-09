@@ -1,0 +1,68 @@
+# Nightly update: fetch new games, rebuild every table and number, rebuild the site, publish it.
+# Data lives on the `data` branch between runs (restored at the start, saved at the end). Preview calls already
+# frozen at puck drop come back with it, so they are never rewritten.
+name: Nightly update
+
+on:
+  schedule:
+    - cron: "0 10 * * *"  # 10:00 UTC: after the last West Coast games are final
+    - cron: "0 16 * * *"  # 16:00 UTC: refresh before the day's games, so previews freeze on fresh numbers
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Restore data from the data branch
+        run: |
+          git fetch --depth=1 origin data
+          mkdir -p data
+          git archive FETCH_HEAD | tar -x -C data
+          if [ -d data/site_data/previews ]; then
+            mkdir -p site/public/data
+            rm -rf site/public/data/previews
+            cp -R data/site_data/previews site/public/data/previews
+          fi
+          rm -rf data/site_data
+
+      - name: Fetch new games and rebuild everything
+        run: uv run --project pipeline python -m pipeline.run update
+
+      - name: Run the pipeline tests
+        run: uv run --project pipeline pytest -q pipeline/tests
+
+      - name: Build the site
+        run: |
+          npm ci --prefix site
+          npm --prefix site run build
+
+      - name: Save data to the data branch
+        run: pipeline/save_data.sh "Data cache: nightly run $(date -u +%Y-%m-%dT%H:%MZ)"
+
+      - name: Publish the site
+        run: pipeline/deploy_site.sh "Nightly deploy $(date -u +%Y-%m-%dT%H:%MZ)"
