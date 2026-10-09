@@ -304,7 +304,6 @@ const _ = ordinal;
                         <div><dt><span class="term" tabindex="0" data-tip="Share of starts with a save percentage under .850.">Really bad starts</span></dt><dd>{x.rbs === null ? '–' : `${x.rbs}%`}</dd></div>
                         <div><dt>Overall save %</dt><dd>{svp(x.sv)}</dd></div>
                       </dl>
-                      <aside class="scout"><p class="mini-h">Scout’s note</p><p>Puck handling: no note yet. Public data doesn’t track it, so this space is for what people see watching him.</p></aside>
                     </div>
                   </details>
                 </div>
@@ -430,12 +429,10 @@ const _ = ordinal;
   .gline em { font-style: normal; color: var(--ink-3); }
   .lane.empty::before { opacity: 0.6; }
   .gnight { margin-top: 14px; display: grid; gap: 16px; }
-  @media (min-width: 900px) { .gnight { grid-template-columns: 1fr 1.6fr; align-items: center; } }
+  .gnight { max-width: 520px; }
   .gh { margin-top: 14px; padding: 14px 16px 12px; background: var(--ice); border-radius: 12px; }
   .gh .histo { max-width: none; }
   .chart-title { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
-  .scout { padding: 10px 12px; border-left: 3px solid var(--ink); background: var(--ice); border-radius: 0 6px 6px 0; font: italic 400 14px var(--body); }
-  .scout .mini-h { font-style: normal; }
   .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }
   .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stripcard { margin-top: 16px; }
