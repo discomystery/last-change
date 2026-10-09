@@ -92,6 +92,7 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Player names are styled as links everywhere (class `plink`) so they can open player pages later.
 - Folds that will be opened often are a full-width pill bar with clear show/hide wording (class `fold`), never a small text toggle.
 - Special teams is organised by matchup, not by team: "When X is on the power play" pairs X's power-play units with the opponent's penalty killers at equal weight (three columns: power-play units, shot map, penalty-kill units), under a row of stat tiles.
+- Special teams has a four-way picker: each team alone, then each power play against the other penalty kill (a matchup view opens by default). All four views share one layout. Cards in a row must end level: stretch them to equal height and split each units card evenly so PP2 and PK2 line up.
 - Matchup grids run the full page width, forwards and defense pairs side by side.
 - Preview density is handled by layout, not removal: section links stay pinned while scrolling; fingerprints show the six biggest differences first with all traits behind a tap; secondary tables (defense-pair matchups, previous meetings, backups, penalty killers) start collapsed.
 - On phones the settings strip (team, seasons, arena switch) collapses behind a single Settings button.

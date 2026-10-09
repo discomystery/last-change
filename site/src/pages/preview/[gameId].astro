@@ -30,6 +30,13 @@ const biggest = [...m.fpCards].sort((x, y) => Math.abs(y.CAR.blend.pct - y.EDM.b
 const other = (a: m.Abbr): m.Abbr => (a === 'CAR' ? 'EDM' : 'CAR');
 const stEnds: Record<string, [string, string]> = { 'Power play': ['Harmless', 'Lethal'], 'Penalty kill': ['Leaky', 'Airtight'], 'Power kill': ['Bunkered', 'Predatory'], Discipline: ['Reckless', 'Clean'] };
 const stName: Record<string, string> = { 'Power play': 'power play', 'Penalty kill': 'penalty kill', 'Power kill': 'shorthanded threat', Discipline: 'discipline' };
+const stViews = [
+  { id: 'away', label: teams[away].place, pp: away, pk: away },
+  { id: 'home', label: teams[home].place, pp: home, pk: home },
+  { id: 'away-pp', label: `${teams[away].place} power play vs ${teams[home].place} penalty kill`, pp: away, pk: home },
+  { id: 'home-pp', label: `${teams[home].place} power play vs ${teams[away].place} penalty kill`, pp: home, pk: away },
+];
+const stDefault = 2;
 const nav = [
   ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
   ['goalies', 'Goalies'], ['win', 'How they win'], ['players', 'Key players'], ['notes', 'Data notes'],
@@ -163,15 +170,20 @@ const nav = [
   </Section>
 
   <Section id="special" title="Special teams" takeaway="Edmonton’s power play is the most dangerous unit in the game, but Carolina’s penalty killers attack rather than sit back.">
-    {order.map((a) => {
-      const b = other(a);
-      const pp = m.specialTeams[a];
-      const pk = m.specialTeams[b];
-      const tiles = [{ team: a, r: pp.rates[0] }, { team: b, r: pk.rates[1] }, { team: b, r: pk.rates[2] }, { team: b, r: pk.rates[3] }];
+    <div class="stpick" role="tablist" aria-label="Special teams view">
+      {stViews.map((v, i) => <button type="button" role="tab" id={`sttab-${v.id}`} aria-controls={`stpanel-${v.id}`} aria-selected={String(i === stDefault)} tabindex={i === stDefault ? 0 : -1}>{v.label}</button>)}
+    </div>
+    {stViews.map((v, i) => {
+      const pp = m.specialTeams[v.pp];
+      const pk = m.specialTeams[v.pk];
+      const solo = v.pp === v.pk;
+      const tiles = solo
+        ? pp.rates.map((r) => ({ team: v.pp, r }))
+        : [{ team: v.pp, r: pp.rates[0] }, { team: v.pk, r: pk.rates[1] }, { team: v.pk, r: pk.rates[2] }, { team: v.pk, r: pk.rates[3] }];
       return (
-        <div class="stblock">
-          <h3 class="sub">When {teams[a].place} is on the power play</h3>
-          <p class="note">Projected {teams[a].place} power plays in this game: <strong>{pp.projectedOpps.toFixed(1)}</strong></p>
+        <div class="stblock" role="tabpanel" id={`stpanel-${v.id}`} aria-labelledby={`sttab-${v.id}`} hidden={i !== stDefault}>
+          <h3 class="sub">{solo ? `${teams[v.pp].place}’s special teams` : `When ${teams[v.pp].place} is on the power play`}</h3>
+          <p class="note">Projected {teams[v.pp].place} power plays in this game: <strong>{pp.projectedOpps.toFixed(1)}</strong></p>
           <ul class="tiles">
             {tiles.map(({ team, r }) => (
               <li class:list={['card', 'tile', `t-${team}`]}>
@@ -183,24 +195,24 @@ const nav = [
             ))}
           </ul>
           <div class="st3">
-            <div class:list={['card', `t-${a}`]}>
-              <h4 class="st-h"><i></i>{teams[a].place} power play</h4>
-              {pp.pp.map((u, i) => (
+            <div class:list={['card', `t-${v.pp}`]}>
+              <h4 class="st-h"><i></i>{teams[v.pp].place} power play</h4>
+              {pp.pp.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.ppUnitStats[a][i].xgf.toFixed(1)} <Pips pct={m.ppUnitStats[a][i].pct} tip={`Creates ${m.ppUnitStats[a][i].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[a][i].pct}% of ${i ? 'second' : 'top'} power-play units.`} /></span></p>
-                  <ul class="roles-list">{u.players.map((p) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{p.name}</span><span class="chip">{p.role}</span></li>)}</ul>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.ppUnitStats[v.pp][k].xgf.toFixed(1)} <Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></span></p>
+                  <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span><span class="chip">{pl.role}</span></li>)}</ul>
                 </div>
               ))}
             </div>
-            <div class="card">
-              <ShotMap team={a} shots={pp.shots} title={`Where ${teams[a].place}’s power play shoots from. Bigger dots are more dangerous shots.`} />
+            <div class="card mapcard">
+              <ShotMap team={v.pp} shots={pp.shots} title={`Where ${teams[v.pp].place}’s power play shoots from. Bigger dots are more dangerous shots.`} />
             </div>
-            <div class:list={['card', `t-${b}`]}>
-              <h4 class="st-h"><i></i>{teams[b].place} penalty kill</h4>
-              {pk.pk.map((u, i) => (
+            <div class:list={['card', `t-${v.pk}`]}>
+              <h4 class="st-h"><i></i>{teams[v.pk].place} penalty kill</h4>
+              {pk.pk.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.pkUnitStats[b][i].xga.toFixed(1)} <Pips pct={m.pkUnitStats[b][i].pct} tip={`Allows ${m.pkUnitStats[b][i].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[b][i].pct}% of ${i ? 'second' : 'top'} penalty-kill units.`} /></span></p>
-                  <ul class="roles-list">{u.players.map((n, k) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{k < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.pkUnitStats[v.pk][k].xga.toFixed(1)} <Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></span></p>
+                  <ul class="roles-list">{u.players.map((n, q) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{q < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
                 </div>
               ))}
             </div>
@@ -393,14 +405,21 @@ const nav = [
 
   .rate { margin-bottom: 12px; }
   .rate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; margin-bottom: 4px; }
-  .stblock + .stblock { margin-top: 28px; }
+  .stpick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .stpick button { font: 600 14px var(--ui); color: var(--ink); background: var(--sheet); border: 2px solid var(--ink); border-radius: 999px; padding: 9px 16px; cursor: pointer; }
+  .stpick button[aria-selected='true'] { background: var(--ink); color: var(--sheet); }
+  .stblock .sub { margin-top: 26px; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
-  .tile { display: grid; gap: 6px; align-content: start; }
+  .tile { display: grid; gap: 6px; grid-template-rows: 1fr auto auto auto; }
+  .tile-h { align-self: start; }
   .tile-h, .st-h { display: flex; align-items: center; gap: 8px; font: 600 14px var(--ui); margin: 0; }
   .tile-h i, .st-h i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
   .tile-v strong { font: 700 28px/1 var(--display); }
   .st3 { display: grid; gap: 12px; margin-top: 12px; }
-  @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; align-items: start; } }
+  @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
+  .st3 > .card { display: flex; flex-direction: column; }
+  .st3 .stunit { flex: 1; }
+  .mapcard { justify-content: center; }
   .st-h { font-size: 16px; margin-bottom: 4px; }
   .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .stunit-h { display: flex; align-items: center; gap: 10px; }
@@ -494,5 +513,25 @@ const nav = [
       });
     }, { rootMargin: '-25% 0px -70% 0px' });
     document.querySelectorAll('main section.sec').forEach((s) => seen.observe(s));
+  })();
+
+  // Special-teams view picker (tabs).
+  (() => {
+    const tabs = [...document.querySelectorAll('.stpick [role="tab"]')];
+    const pick = (t, focus) => {
+      tabs.forEach((x) => {
+        const on = x === t;
+        x.setAttribute('aria-selected', String(on));
+        x.tabIndex = on ? 0 : -1;
+        document.getElementById(x.getAttribute('aria-controls')).hidden = !on;
+      });
+      if (focus) t.focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => pick(t));
+      t.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') pick(tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length], true);
+      });
+    });
   })();
 </script>
