@@ -162,6 +162,7 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict) -> 
         "cite": f"Who plays against whom · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
         "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
                   "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
+                  "opp_lines": {u["label"]: u["ids"] for u in a["units"] if u["label"][0] == "L"},
                   "baseline": v, "threshold": r["expected"][j], "direction": "above",
                   "rule": "held if the share is at or above the home habit; partly if above the no-matching level; otherwise didn't happen"},
     }

@@ -47,6 +47,8 @@ def run(season: int) -> dict:
     export_goal_sources(season)
     from pipeline.export import previews
     previews.run()  # last: reads the JSON written above
+    from pipeline.export import recaps
+    recaps.run(season)  # grades the frozen preview calls of finished games
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 

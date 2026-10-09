@@ -1,75 +1,129 @@
 ---
+// Post-game page, one per finished game. The preview's calls are shown exactly as saved at puck drop, each graded by
+// the rule stored with it; then the game's numbers, what nobody saw coming, and the goalies.
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
-import * as m from '../../data/mock';
+import { matchupColours } from '../../lib/teams';
+import teamsData from '../../../public/data/teams.json';
+import recapIndex from '../../../public/data/recaps/index.json';
 
-export function getStaticPaths() {
-  return [{ params: { gameId: String(m.game.id) } }];
+type Call = { id: string; kind: string; head: string; body: string; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
+type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
+type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[] };
+
+export async function getStaticPaths() {
+  const files = import.meta.glob<{ default: Recap }>('../../../public/data/recaps/2*.json', { eager: true });
+  return Object.values(files).map((f) => ({ params: { gameId: String(f.default.game_id) }, props: { r: f.default } }));
 }
-const { teams, recap } = m;
-const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
-const mark = { held: '✓', partly: '≈', missed: '✕' } as const;
-const tally = (v: m.Verdict) => recap.claims.filter((c) => c.verdict === v).length;
-const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(m.game.startTimeUTC));
+const { r } = Astro.props as { r: Recap };
+const { away, home } = r;
+const order = [away, home];
+const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
+const place = (a: string) => T[a]?.place ?? a;
+const side = (a: string) => (a === away ? 'away' : 'home');
+const colours = matchupColours(away, home);
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
+const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(r.start));
+const endWord = r.end === 'OT' ? 'Final in overtime' : r.end === 'SO' ? 'Final in a shootout' : 'Final';
+const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge' } as const;
+const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
+const graded = r.calls.filter((c) => c.verdict && c.verdict !== 'na');
+const count = (v: string) => graded.filter((c) => c.verdict === v).length;
+const sayCount = (n: number, one: string) => `${n} ${one}`;
+const takeaway = graded.length
+  ? `Of the ${graded.length} calls the preview made, ${count('held')} held up, ${count('partly')} partly did, and ${count('missed')} didn’t happen.`
+  : r.preview ? 'None of the preview’s calls could be judged from this game.' : 'No preview was saved for this game.';
+const season = recapIndex.tally as Record<string, number>;
+const seasonTotal = season.held + season.partly + season.missed;
+const sgn = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+const rows: [string, string, (n: Nums) => string][] = [
+  ['Shots on goal', 'Every shot that reached the net, including goals.', (n) => String(n.shots)],
+  ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out.', (n) => n.xg.toFixed(1)],
+  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked.', (n) => String(n.cf5)],
+  ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
+];
 ---
-<Base title={`${m.away} at ${m.home} recap`}>
+<Base title={`${away} at ${home}, final`} mock={false}>
+  <style is:inline set:html={colourCss}></style>
   <section class="hero" aria-label="Final score">
-    <Rink score={recap.score} centre="final" />
-    <p class="when">{dateStr} · {m.game.venue}</p>
+    <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home }))} />
+    <p class="when">{endWord} · {dateStr} · {r.venue}</p>
   </section>
 
-  <Section id="scorecard" title="What we said, and what happened" takeaway={`Of the ${recap.claims.length} things the preview told you to watch, ${tally('held')} held up, ${tally('partly')} partly did, and ${tally('missed')} didn’t happen.`}>
-    <ol class="claims">
-      {recap.claims.map((c) => (
-        <li class="card claim">
-          <div class="claim-said">
-            <p class="eyebrow">Before the game</p>
-            <h3>{c.said}</h3>
-            <p class="detail">{c.detail}</p>
-          </div>
-          <div class="claim-did">
-            <p class:list={['verdict', c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span> {label[c.verdict]}</p>
-            <p>{c.happened}</p>
-            <dl class="compare">
-              <dt>{c.measure}</dt>
-              <div><dd>{c.usual}</dd><span>Coming in</span></div>
-              <div><dd>{c.tonight}</dd><span>In this game</span></div>
-            </dl>
-          </div>
-        </li>
-      ))}
-    </ol>
-    <p class="note">One game is a tiny sample. A miss doesn’t mean the preview was wrong about the team, and a hit doesn’t prove it right. The season-long record of how often these calls hold up is the real test.</p>
+  <Section id="scorecard" title="What the preview said, and what happened" placeholder={false} takeaway={takeaway}>
+    {r.calls.length > 0 ? (
+      <ol class="claims">
+        {r.calls.map((c) => (
+          <li class="card claim">
+            <div class="claim-said">
+              <p class="eyebrow">Before the game</p>
+              <h3>{c.head}</h3>
+              <p class="detail">{c.body}</p>
+            </div>
+            <div class="claim-did">
+              {c.verdict === null ? (
+                <>
+                  <p class="verdict note-only">Background, not a call</p>
+                  <p class="detail">This was context about the two teams, not a prediction, so it isn’t graded.</p>
+                </>
+              ) : (
+                <>
+                  <p class:list={['verdict', c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span> {label[c.verdict]}</p>
+                  <p>{c.happened}</p>
+                  {c.tonight && c.tonight !== '–' && (
+                    <dl class="compare">
+                      <div><dd>{c.usual}</dd><span>Coming in</span></div>
+                      <div><dd>{c.tonight}</dd><span>In this game</span></div>
+                      {c.league && <div><dd>{c.league}</dd><span>{c.kind === 'matchup' ? 'With no line matching' : 'League average'}</span></div>}
+                    </dl>
+                  )}
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    ) : (
+      <p class="note">Previews are saved at puck drop, starting with games on October 10, so there were no calls to check for this one.</p>
+    )}
+    <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better; <strong>partly</strong> means it beat the league average (or, for a matchup, the share with no line matching) but fell short of its usual level. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
+    {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls.</p>}
   </Section>
 
-  <Section id="surprises" title="What the preview didn’t see coming" takeaway="The parts of this game that were furthest from how these teams usually play.">
-    <ul class="two">
-      {recap.surprises.map((s) => <li class="card"><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}
-    </ul>
+  <Section id="numbers" title="The numbers" placeholder={false} takeaway="How the game went, beyond the score.">
+    <div class="card">
+      <table class="numbers">
+        <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{place(a)}</th>)}</tr></thead>
+        <tbody>
+          <tr><th scope="row">Goals</th>{order.map((a) => <td>{r.score[a]}</td>)}</tr>
+          {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>
+    {r.end === 'SO' && <p class="note">The shootout decides the result but is left out of every other number on this site.</p>}
   </Section>
 
-  <Section id="jobs" title="Did he do his job?" takeaway="Each player measured against what he normally does in the same amount of ice time.">
-    <ul class="jobs">
-      {recap.jobs.map((j) => (
-        <li class:list={['card', `t-${j.team}`]}>
-          <div class="job-top"><span class="job-name"><i></i>{j.name}</span><span class="chip">{j.role}</span><span class:list={['verdict', j.verdict]}><span aria-hidden="true">{mark[j.verdict]}</span> {j.verdict === 'held' ? 'Did his job' : j.verdict === 'partly' ? 'Mixed night' : 'Off night'}</span></div>
-          <p>{j.line}</p>
+  {r.surprises.length > 0 && (
+    <Section id="surprises" title="What the preview didn’t see coming" placeholder={false} takeaway="The parts of this game furthest from how these teams usually play.">
+      <ul class="two surp">{r.surprises.map((s) => <li class="card"><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
+    </Section>
+  )}
+
+  <Section id="goalies" title="In net" placeholder={false} takeaway="How many goals each goalie stopped beyond what the shots he faced were worth.">
+    <ul class="two gl">
+      {r.goalies.map((g) => (
+        <li class:list={['card', `t-${side(g.team)}`]}>
+          <div class="job-top"><span class="job-name"><i></i><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span></span><span class="gs"><strong>{sgn(g.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: the goals his shots were worth by this site’s model, minus the goals he let in. Positive is good.">goals saved above expected</span></span></div>
+          <p>{g.saves} saves on {g.shots} shots{g.sv !== null ? ` (${g.sv.toFixed(3).replace(/^0/, '')})` : ''} in {g.toi}{g.started ? '' : ' in relief'}. The shots were worth {g.xga.toFixed(1)} expected goals; he allowed {g.ga}.{g.high.shots > 0 ? ` Stopped ${g.high.shots - g.high.goals} of ${g.high.shots} high-danger shots.` : ''}</p>
         </li>
       ))}
     </ul>
+    <p class="note">Empty-net shots are left out. Expected-goal models can’t see passes before a shot, so a goalie beaten by cross-ice passes looks worse here than he really was.</p>
   </Section>
 
-  <Section id="goalies" title="In net">
-    <ul class="two">
-      {recap.goalies.map((g) => (
-        <li class:list={['card', `t-${g.team}`]}>
-          <div class="job-top"><span class="job-name"><i></i>{g.name}</span><span class="gs"><strong>{g.gsax}</strong> goals saved above expected</span></div>
-          <p>{g.line}</p>
-        </li>
-      ))}
-    </ul>
-  </Section>
+  <p class="note foot">Team pages: <a href={`${import.meta.env.BASE_URL}team/${away}/`}>{T[away]?.name ?? away}</a> · <a href={`${import.meta.env.BASE_URL}team/${home}/`}>{T[home]?.name ?? home}</a></p>
 </Base>
 
 <style>
@@ -77,23 +131,29 @@ const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long
   .when { margin-top: 14px; font: 400 14px var(--ui); color: var(--ink-2); }
   .claims { display: grid; gap: 16px; margin-top: 22px; }
   .claim { display: grid; gap: 16px; }
-  @media (min-width: 760px) { .claim { grid-template-columns: 1fr 1fr; gap: 28px; } .claim-did { border-left: 5px solid var(--line-red); padding-left: 24px; } }
+  @media (min-width: 760px) { .claim { grid-template-columns: 1fr 1fr; gap: 28px; } .claim-did { border-left: 1px solid var(--rule); padding-left: 24px; } }
   .eyebrow { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 4px; }
   .claim h3, .h { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
   .detail { color: var(--ink-2); font-size: 15px; }
   .verdict { display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; margin-bottom: 8px; }
   .verdict.held { background: var(--ink); color: var(--sheet); }
-  .verdict.missed { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
-  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
-  .compare dt { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); }
-  .compare dd { font: 700 24px/1.1 var(--display); }
-  .compare span { font-size: 12px; color: var(--ink-3); }
-  .jobs { display: grid; gap: 14px; margin-top: 22px; }
-  @media (min-width: 760px) { .jobs { grid-template-columns: 1fr 1fr; } }
-  .job-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 8px; }
-  .job-top .verdict { margin: 0 0 0 auto; }
+  .verdict.missed, .verdict.na, .verdict.note-only { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .compare { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .compare div { display: grid; gap: 2px; }
+  .compare dd { font: 700 22px/1.1 var(--display); }
+  .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
+  .numbers { width: 100%; border-collapse: collapse; font: 400 15px var(--ui); }
+  .numbers th, .numbers td { padding: 10px 6px; border-top: 1px solid var(--rule); text-align: right; }
+  .numbers thead th, .numbers thead td { border-top: 0; font-weight: 600; white-space: nowrap; }
+  .numbers thead th i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; }
+  .numbers tbody th { text-align: left; font-weight: 500; }
+  .numbers td { font-weight: 600; font-variant-numeric: tabular-nums; width: 22%; }
+  .numbers tr:first-child td { font: 700 22px/1 var(--display); }
+  .surp, .gl { margin-top: 18px; }
+  .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .job-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
   .gs { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); }
   .gs strong { font: 700 22px/1 var(--display); color: var(--ink); }
+  .foot { margin-top: 36px; }
 </style>

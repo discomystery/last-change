@@ -8,6 +8,7 @@ import lines from '../../../public/data/last_game_lines.json';
 import fpData from '../../../public/data/fingerprints.json';
 import goalieData from '../../../public/data/goalies.json';
 import previewIndex from '../../../public/data/previews/index.json';
+import recapIndex from '../../../public/data/recaps/index.json';
 import howData from '../../../public/data/goal_sources.json';
 import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
@@ -28,6 +29,7 @@ const team = teams.find((t) => t.abbr === abbr)!;
 const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const finals = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
+const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === abbr).map((g) => g.id);
 const previewIds = previewIndex.filter((p) => !finals.has(p.id) && (p.home === abbr || p.away === abbr)).map((p) => p.id);
 const last = lines.teams.find((t) => t.team === abbr);
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
@@ -408,6 +410,7 @@ const _ = ordinal;
   <script type="application/json" id="team-games" set:html={JSON.stringify(games)}></script>
   <script type="application/json" id="team-names" set:html={JSON.stringify(names)}></script>
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>
+  <script type="application/json" id="team-recaps" set:html={JSON.stringify(recapIds)}></script>
 </Base>
 
 <script is:inline>
@@ -419,6 +422,7 @@ const _ = ordinal;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    const RECAPS = new Set(JSON.parse(document.getElementById('team-recaps').textContent));
     const PREVIEWS = Object.fromEntries(JSON.parse(document.getElementById('team-previews').textContent).map((id) => [id, 'Preview']));
     const now = new Date();
     const next = games.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
@@ -446,7 +450,9 @@ const _ = ordinal;
       li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), el('span', 'g-title', `${g.home === me ? 'vs' : 'at'} ${names[opp] ?? opp}`));
       if (g.final) {
         const s = g.home === me ? [g.hs, g.as] : [g.as, g.hs];
-        li.append(el('span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`));
+        const sc = el(RECAPS.has(g.id) ? 'a' : 'span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`);
+        if (RECAPS.has(g.id)) { sc.href = `${base}recap/${g.id}/`; sc.title = 'How the game went, and how the preview held up'; }
+        li.append(sc);
       } else if (PREVIEWS[g.id]) { const a = el('a', 'g-link', PREVIEWS[g.id]); a.href = `${base}preview/${g.id}/`; li.append(a); }
       else li.append(el('span', 'g-soon', g.venue ?? ''));
       return li;
