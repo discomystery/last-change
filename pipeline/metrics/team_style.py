@@ -28,6 +28,7 @@ DIMS = {
     "discipline": (["pp_opps", "neg_short"], ["game_sec"], 3600, True),
     "physical": (["hits_adj"], ["close_sec"], 3600, True),
     "forecheck": (["fc_adj"], ["sec5"], 3600, True),
+    "depth": (["bottom6_sec"], ["fwd_sec"], 100, True),
     # The same two traits exactly as recorded, with no arena correction (shown when the visitor picks "Raw").
     "physical_raw": (["hits_close"], ["close_sec"], 3600, True),
     "forecheck_raw": (["fc_raw"], ["sec5"], 3600, True),
@@ -75,7 +76,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
         (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
-    ).join(disc, on=["game_id", "team_id"]).sort("team_id", "date", "game_id")
+    ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).sort("team_id", "date", "game_id")
 
 
 _ARENA = None

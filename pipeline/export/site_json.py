@@ -64,7 +64,7 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
 
 
 # Traits whose numbers are checked and ready to show.
-READY = ["volume", "quality", "rush", "rebounds", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "pp", "pk", "powerKill", "discipline"]
+READY = ["volume", "quality", "rush", "rebounds", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "depth", "pp", "pk", "powerKill", "discipline"]
 
 
 def export_fingerprints(season: int) -> int:
@@ -178,6 +178,15 @@ def export_lines(season: int) -> int:
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
             "notes": sorted(notes, key=lambda n: -abs(n["now"] - n["before"])),
         }
+    special = units.special_units(season)
+    for tid, sp in special.items():
+        if abbr[tid] not in out:
+            continue
+        for kind in ("pp", "pk"):
+            for u in sp[kind]:
+                u["players"] = [{"name": names.get(p, "?"), "role": u["roles"].get(str(p))} for p in u["players"]]
+                del u["roles"]
+        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"]} for s_ in sp["shots"]]}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)

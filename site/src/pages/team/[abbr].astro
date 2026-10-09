@@ -9,6 +9,7 @@ import fpData from '../../../public/data/fingerprints.json';
 import linesData from '../../../public/data/lines.json';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
+import ShotMap from '../../components/ShotMap.astro';
 import { fpInfo, fpGroups, ordinal } from '../../data/mock';
 
 export function getStaticPaths() {
@@ -27,10 +28,12 @@ const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }
 type Unit = { label: string; players: string[]; minutes: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+type SUnit = { label: string; players: { name: string; role: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
+const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; shots: { x: number; y: number; xg: number }[] } | undefined;
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['more', 'Still to come']];
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['more', 'Still to come']];
 const _ = ordinal;
 ---
 <Base title={team.name} mock={false}>
@@ -79,7 +82,7 @@ const _ = ordinal;
         </ul>
       </>
     ))}
-    <p class="note">Still to come here: depth. Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+    <p class="note">Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'}>
@@ -130,10 +133,40 @@ const _ = ordinal;
     )}
   </Section>
 
+  <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
+    {sp && (
+      <>
+        <p class="note">Units are the exact groups that have played together most over the last {linesData.window} games ({ln.games} so far). The number beside each is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Role tags are rules of thumb from two seasons of each player’s power-play shots and passes.</p>
+        <div class="st3">
+          <div class="card">
+            <h4 class="st-h">Power play</h4>
+            {sp.pp.map((u, k) => (
+              <div class="stunit">
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
+                <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span>{pl.role && <span class="chip">{pl.role}</span>}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+          <div class="card mapcard">
+            <ShotMap long team="one" shots={sp.shots} title={`Where ${team.place}’s last ${sp.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />
+          </div>
+          <div class="card">
+            <h4 class="st-h">Penalty kill</h4>
+            {sp.pk.map((u, k) => (
+              <div class="stunit">
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></span></p>
+                <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    )}
+  </Section>
+
   <Section id="more" title="Still to come on this page" placeholder={false}>
     <ul class="todo">
       <li><strong>Who plays against whom,</strong> home and road, and how tough each group’s opponents are.</li>
-      <li><strong>Special teams:</strong> power-play and penalty-kill units, who plays which role, and how dangerous the team is shorthanded.</li>
       <li><strong>Goalies:</strong> whether each one is helping or being hung out to dry, his workload, and how steady he is night to night.</li>
       <li><strong>Where the goals come from:</strong> rush, rebounds, power play, turnovers and zone time, for and against.</li>
       <li><strong>What tends to be true when they win.</strong></li>
@@ -230,6 +263,19 @@ const _ = ordinal;
   html[data-mode='season'] .fpc-line.m-blend { display: none; }
   .fpc-line em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
   .units2 { align-items: start; }
+  .st3 { display: grid; gap: 12px; margin-top: 16px; }
+  @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
+  .st3 > .card { display: flex; flex-direction: column; }
+  .st3 .stunit { flex: 1; }
+  .mapcard { justify-content: center; }
+  .st-h { font: 600 16px var(--ui); margin: 0 0 4px; }
+  .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .stunit-h { display: flex; align-items: center; gap: 10px; }
+  .stunit-v { margin-left: auto; font: 600 15px var(--ui); display: inline-flex; align-items: center; gap: 8px; }
+  .roles-list { margin-top: 8px; display: grid; gap: 6px; }
+  .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
+  .t-one { --team: var(--ink); }
+  .n { font: 400 12px var(--ui); color: var(--ink-3); }
   .units { display: grid; gap: 14px; }
   .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   .unit-label { font: 700 19px/1 var(--display); }

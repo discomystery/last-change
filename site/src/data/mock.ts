@@ -59,7 +59,7 @@ export const fingerprint: Dim[] = [
   { key: 'powerKill', label: 'Power kill', tip: 'How dangerous the team is while shorthanded.', CAR: 93, EDM: 38 },
   { key: 'discipline', label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per hour.', CAR: 66, EDM: 41 },
   { key: 'goalie', label: 'Goaltending', tip: 'Goals saved above expected per hour, all goalies combined.', CAR: 37, EDM: 52 },
-  { key: 'depth', label: 'Depth', tip: 'How much the bottom lines play and how well they do with it.', CAR: 92, EDM: 33 },
+  { key: 'depth', label: 'Depth', tip: 'How much of the forwards’ 5-on-5 ice time goes to the six least-used forwards each night. Higher means the coach spreads minutes more evenly.', CAR: 92, EDM: 33 },
 ];
 export const fingerprintBands = Object.fromEntries(
   fingerprint.map((d) => [d.key, { CAR: Math.round(between(9, 17)), EDM: Math.round(between(9, 17)) }]),
@@ -327,7 +327,7 @@ const fpMeta: Record<string, FpMeta> = {
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per hour, both teams combined` },
   forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per hour` },
   physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per hour` },
-  depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `${f1(v)}% of 5-on-5 ice time goes to depth players` },
+  depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `the bottom six get ${f1(v)}% of the forwards’ 5-on-5 ice time` },
   pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per hour on the power play` },
   pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per hour shorthanded` },
   powerKill: { group: 'Special teams', lo: 'Bunkered', hi: 'Predatory', at0: 0.3, at100: 1.4, say: (v) => `${f1(v)} expected goals created per hour shorthanded` },

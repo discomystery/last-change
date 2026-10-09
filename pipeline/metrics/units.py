@@ -161,3 +161,132 @@ def special_usage(season: int) -> pl.DataFrame:
             tot[k][f"team_{kind}"] += team.get((gid, tid), {}).get(kind, 0.0)
     return pl.DataFrame([{"team_id": k[0], "player_id": k[1], "gp": int(v["gp"]), "pp_share": v["pp"] / v["team_pp"] if v["team_pp"] else 0.0,
                           "pk_share": v["pk"] / v["team_pk"] if v["team_pk"] else 0.0, "pp_min": v["pp"] / 60, "pk_min": v["pk"] / 60} for k, v in tot.items()])
+
+
+def depth_table(season: int) -> pl.DataFrame:
+    """Per team-game: how much of the forwards' 5v5 ice time went to the six least-used forwards that night."""
+    d = TABLES / str(season)
+    st = pl.read_parquet(d / "stints.parquet").filter((pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null())
+    pos = pl.read_parquet(d / "players.parquet").select("game_id", "player_id", "team_id", "pos")
+    long = pl.concat([st.select("game_id", "duration", pl.col(c).alias("player_id")).explode("player_id") for c in ("home_skaters", "away_skaters")])
+    toi = long.group_by("game_id", "player_id").agg(pl.col("duration").sum().alias("sec")).join(pos, on=["game_id", "player_id"]).filter(pl.col("pos").is_in(["C", "L", "R"]))
+    toi = toi.with_columns(rank=pl.col("sec").rank("ordinal", descending=True).over("game_id", "team_id"))
+    out = toi.group_by("game_id", "team_id").agg(pl.col("sec").filter(pl.col("rank") > 6).sum().cast(pl.Float64).alias("bottom6_sec"), pl.col("sec").sum().cast(pl.Float64).alias("fwd_sec"))
+    out.write_parquet(d / "depth.parquet")
+    return out
+
+
+def special_units(season: int) -> dict[int, dict]:
+    """Power-play and penalty-kill units over the recent window, with player roles and a shot map."""
+    seasons = [season - 1, season]
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
+    order = games.sort("date", "game_id")
+    recent = {}
+    for tid in set(games["home_id"]) | set(games["away_id"]):
+        built = order.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid))["game_id"].to_list()
+        recent[tid] = set(built)
+    have = set(pl.read_parquet(d / "stints.parquet")["game_id"].unique().to_list())
+    recent = {t: set(sorted(g & have)[-WINDOW_GAMES:]) for t, g in recent.items()}
+
+    unit = defaultdict(lambda: defaultdict(float))  # (team, kind, players) -> sums
+    team_sec = defaultdict(float)
+    for s in pl.read_parquet(d / "stints.parquet").iter_rows(named=True):
+        gid = s["game_id"]
+        if gid not in ids or not (s["home_goalie"] and s["away_goalie"]):
+            continue
+        for home in (True, False):
+            own, opp = (s["n_home"], s["n_away"]) if home else (s["n_away"], s["n_home"])
+            kind = "pp" if (own, opp) == (5, 4) else "pk" if (own, opp) == (4, 5) else None
+            tid = ids[gid][0 if home else 1]
+            if kind is None or gid not in recent[tid]:
+                continue
+            key = (tid, kind, tuple(s["home_skaters"] if home else s["away_skaters"]))
+            unit[key]["sec"] += s["duration"]
+            team_sec[(tid, kind)] += s["duration"]
+
+    # Shots during 5v4: unit results this season, plus individual tendencies over two seasons for role tags.
+    ind = defaultdict(lambda: defaultdict(float))
+    shots = defaultdict(list)
+    for yr in seasons:
+        dd = TABLES / str(yr)
+        g2 = pl.read_parquet(dd / "games.parquet").filter(pl.col("game_type") == REGULAR)
+        id2 = {g["game_id"]: (g["home_id"], g["away_id"]) for g in g2.iter_rows(named=True)}
+        ppos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(dd / "players.parquet").iter_rows(named=True)}
+        ev = pl.read_parquet(dd / "events.parquet").filter(pl.col("type").is_in([*UNBLOCKED, "blocked-shot"])).join(pl.read_parquet(dd / "shots_xg_own.parquet"), on=["game_id", "event_id"], how="left").sort("game_id", "sort")
+        for e in ev.iter_rows(named=True):
+            gid, home = e["game_id"], e["is_home"]
+            if gid not in id2 or home is None or not (e["home_goalie"] and e["away_goalie"]):
+                continue
+            own, opp = (e["home_on"], e["away_on"]) if home else (e["away_on"], e["home_on"])
+            if (len(own), len(opp)) != (5, 4):
+                continue
+            tid, opp_tid = id2[gid][0 if home else 1], id2[gid][1 if home else 0]
+            xg = e["xg"] or 0.0
+            p = ind[e["p1"]]
+            p["att"] += 1
+            p["ixg"] += xg
+            if e["x_norm"] is not None:
+                dist = ((89 - e["x_norm"]) ** 2 + e["y_norm"] ** 2) ** 0.5
+                p["close"] += dist <= 15
+                p["dist"] += dist
+                p["absy"] += abs(e["y_norm"])
+                p["located"] += 1
+            p["is_d"] = ppos.get((gid, e["p1"])) == "D"
+            if e["type"] == "goal" and e["p2"]:
+                ind[e["p2"]]["a1"] += 1
+            if e["type"] in UNBLOCKED and e["x_norm"] is not None:
+                shots[tid].append({"x": int(e["x_norm"]), "y": int(e["y_norm"]), "xg": round(xg, 3), "game_id": gid})
+            if yr == season and gid in recent.get(tid, ()) and e["type"] in UNBLOCKED:
+                unit[(tid, "pp", tuple(own))]["xg"] += xg
+            if yr == season and gid in recent.get(opp_tid, ()) and e["type"] in UNBLOCKED:
+                unit[(opp_tid, "pk", tuple(opp))]["xg"] += xg
+
+    def role(pid: int, taken: set) -> str | None:
+        p = ind.get(pid)
+        if not p or p["att"] < 8:
+            return None
+        if p.get("is_d"):
+            return "Point"
+        if p["located"] and p["close"] / p["located"] >= 0.4:
+            return "Net-front"
+        return None
+
+    league = {k: [0.0, 0.0] for k in ("pp", "pk")}
+    for (tid, kind, _), v in unit.items():
+        league[kind][0] += v.get("xg", 0.0)
+        league[kind][1] += v["sec"]
+    out = {}
+    for tid in recent:
+        entry = {"games": len(recent[tid]), "pp": [], "pk": [], "shots": sorted(shots.get(tid, []), key=lambda s: s["game_id"])[-140:]}
+        for kind, count in (("pp", 2), ("pk", 2)):
+            rows = pl.DataFrame([{"unit": "-".join(map(str, k[2])), "sec": v["sec"], "xg": v.get("xg", 0.0)} for k, v in unit.items() if k[0] == tid and k[1] == kind] or [{"unit": "", "sec": 0.0, "xg": 0.0}])
+            mean = league[kind][0] / league[kind][1] * 3600
+            for i, u in enumerate(_pick(rows.filter(pl.col("sec") > 0), count)):
+                players = [int(x) for x in u["unit"].split("-")]
+                m = u["sec"] / 60
+                rate = (u["xg"] / m * 60 * m + mean * 20) / (m + 20)  # pulled toward the league average: 20 minutes of weight
+                roles = {}
+                if kind == "pp":
+                    rated = sorted(players, key=lambda p: -(ind.get(p, {}).get("ixg", 0.0)))
+                    if ind.get(rated[0], {}).get("att", 0) >= 8:
+                        roles[rated[0]] = "Trigger"
+                    passers = sorted((p for p in players if p not in roles), key=lambda p: -(ind.get(p, {}).get("a1", 0.0)))
+                    if passers and ind.get(passers[0], {}).get("a1", 0) >= 3:
+                        roles[passers[0]] = "Distributor"
+                    for p in players:
+                        if p not in roles and (r := role(p, set())):
+                            roles[p] = r
+                entry[kind].append({"label": f"{kind.upper()}{i + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "minutes": round(m, 1),
+                                    "share": round(100 * u["sec"] / team_sec[(tid, kind)]) if team_sec[(tid, kind)] else 0, "rate": round(rate, 2)})
+        out[tid] = entry
+    for kind, higher in (("pp", True), ("pk", False)):
+        for i in range(2):
+            vals = [e[kind][i]["rate"] for e in out.values() if len(e[kind]) > i]
+            for e in out.values():
+                if len(e[kind]) > i:
+                    v = e[kind][i]["rate"]
+                    below = sum(x < v for x in vals) if higher else sum(x > v for x in vals)
+                    e[kind][i]["pct"] = round(100 * (below + 0.5) / len(vals))
+    return out
