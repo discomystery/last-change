@@ -1,0 +1,19 @@
+---
+// Offensive zone seen from above, net at the top. Dot size grows with shot danger.
+interface Props { team: string; shots: { x: number; y: number; xg: number }[]; title: string }
+const { team, shots, title } = Astro.props;
+const sx = (y: number) => y + 42.5;
+const sy = (x: number) => 100 - x;
+---
+<figure class:list={['shotmap', `t-${team}`]}>
+  <svg viewBox="-1 -1 87 78" role="img" aria-label={title}>
+    <path class="rk-board" d="M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76" />
+    <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
+    <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
+    <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
+    <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
+    <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
+    {shots.map((s) => <circle class="shot" cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`Shot worth ${s.xg.toFixed(2)} expected goals`} />)}
+  </svg>
+  <figcaption>{title}</figcaption>
+</figure>

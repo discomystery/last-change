@@ -1,0 +1,64 @@
+# Hockey Matchup Analysis Site
+
+Fan-facing site that explains how NHL teams differ in style and strategy and previews upcoming matchups. Default home team is the Carolina Hurricanes (CAR); every metric must work for all 32 teams.
+
+**Full spec: [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).** Read the relevant section before building any metric, page, or pipeline step. This file holds only the durable rules.
+
+## Working agreement
+
+- The user does not code and will not. Do all engineering. Never ask them to write, read, or run code or terminal commands.
+- The user is the product owner and hockey expert (Hurricanes fan). Ask them hockey and product questions. Make technical decisions yourself and explain each in one plain-English sentence.
+- Their eye test is part of validation. When a number contradicts what they see, check the data for a bug first, then report honestly. Their beliefs (H1-H6, brief Section 1) are hypotheses. Never tune a model to agree with them.
+- Show, don't describe: deliver a deployed page (a URL), not code or diffs. Keep updates short and non-technical.
+- Things only they can do (account settings, approvals) need click-by-click instructions, one step at a time.
+- End of each phase: deploy, send the URL with a 3-5 line plain-English summary, ask at most one or two hockey or product questions.
+
+## Architecture
+
+- Nightly batch pipeline (Python) pulls games, builds derived tables, computes metrics, exports JSON to `site/public/data/`.
+- Static Astro site reads that JSON. No server or database at runtime.
+- GitHub hosts everything: repo, Actions (scheduled pipeline, ~10:00 and ~16:00 UTC), Pages (site).
+- Processed Parquet and gzipped raw responses live on an orphan `data` branch, partitioned by season. Files under 50 MB.
+- Pipeline is idempotent and incremental; never refetch final games.
+
+## Stack
+
+- Pipeline: Python 3.12 via `uv`, `httpx`, `polars`, `duckdb`, `pyarrow`, `scikit-learn`, `statsmodels`, `pydantic`, `pytest`.
+- Site: Astro (static) with TypeScript, Observable Plot for charts, D3 only where Plot can't do it.
+- Layout: `pipeline/{ingest,build,metrics,export,tests}`, `content/{scouting,overrides}`, `site/`, `.github/workflows/`.
+
+## Environment notes
+
+- Checked 2026-10-09 from this machine: `api-web.nhle.com`, `api.nhle.com`, and the MoneyPuck download host are all reachable, so fixtures-via-Actions is not required for local development.
+- GitHub CLI is signed in as `discomystery`.
+- `uv` is not installed yet; system Python is 3.9. Install `uv` before pipeline work (Phase 2).
+
+## Data rules
+
+- NHL API is unofficial: verify field names against live responses. Rate-limit to ~2 requests/second, descriptive User-Agent, cache everything.
+- MoneyPuck: non-commercial use only, download only files listed on their data page, and credit MoneyPuck.com wherever xG-derived numbers appear.
+- Do not scrape Natural Stat Trick or Evolving-Hockey. Manual spot checks only.
+- Never hardcode rosters or player names; pull from the API.
+- Exclude shootouts from everything; exclude empty-net time from 5v5 and goalie stats; exclude penalty shots from on-ice stats.
+- Derive shooting team for blocked shots from `shootingPlayerId`, and zones from normalized coordinates, not from `eventOwnerTeamId` / `zoneCode`.
+
+## Analytical conventions
+
+- Score-and-venue adjust shot metrics; use game-state filters (tied, close, pre-first-goal) for behavioral metrics. Never compare raw full-game rates.
+- Rates per 60; show for and against separately, not just percentages.
+- Split every deployment and matchup metric by home vs. road (last change).
+- Every displayed metric carries sample size, shrinkage toward a prior, and an 80% interval. Grey out tiny samples.
+- Rink-adjust hits, giveaways, takeaways, blocks.
+- Recipe findings are tendencies. Never write that something causes wins.
+
+## Site conventions
+
+- Audience is fans: every number gets a plain-English tooltip, every chart a one-line takeaway.
+- Mobile-first, light and dark mode. Percentile bars, not radar charts.
+- No NHL or team logos; abbreviations and subtle team colors only.
+- Footer on every page: "Expected goals data from MoneyPuck.com", "Game data: NHL", and a "not affiliated with the NHL" disclaimer.
+- "What to watch" insights are rules-based templates citing metric and sample size. No free-text generation at runtime.
+
+## Phases
+
+0. Setup. 1. Mock preview with placeholder numbers. 2. Data pipeline and validation suite. 3. Real preview. 4. Deeper analysis. Details in brief Section 9; validation targets in Section 8.

@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import * as m from '../data/mock';
+const base = import.meta.env.BASE_URL;
+const when = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(m.game.startTimeUTC));
+---
+<Base title="Last Change">
+  <section class="home">
+    <h1>How two teams play, before they play.</h1>
+    <p>Matchup previews for the Carolina Hurricanes and the rest of the league. Only one mock-up preview exists so far.</p>
+    <a class="game card" href={`${base}preview/${m.game.id}/`}>
+      <span class="g-teams">{m.away} at {m.home}</span>
+      <span class="g-meta">{when} · {m.game.venue}</span>
+      <span class="g-go">Open the mock-up preview</span>
+    </a>
+  </section>
+</Base>
+
+<style>
+  .home { margin-top: 28px; display: grid; gap: 14px; max-width: 640px; }
+  h1 { font: 800 clamp(40px, 9vw, 64px) / 0.95 var(--display); text-transform: uppercase; }
+  .home > p { color: var(--ink-2); }
+  .game { display: grid; gap: 2px; text-decoration: none; margin-top: 8px; }
+  .game:hover { border-color: var(--ink); }
+  .g-teams { font: 700 34px/1 var(--display); text-transform: uppercase; }
+  .g-meta { color: var(--ink-2); font-size: 14px; }
+  .g-go { margin-top: 8px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+</style>

@@ -1,0 +1,171 @@
+---
+interface Props { title: string; description?: string }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.' } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="mockbar" role="note">
+      <strong>Mock-up.</strong> Names, records, date and venue are real. Every statistic, line combination and insight is a placeholder.
+    </div>
+    <header class="site-head">
+      <a class="wordmark" href={base}>Last Change</a>
+      <span class="wordmark-note">working title</span>
+    </header>
+    <main><slot /></main>
+    <footer class="site-foot">
+      <p>Expected goals data from <a href="https://moneypuck.com">MoneyPuck.com</a>. Game data: NHL.</p>
+      <p>A fan project. Not affiliated with the NHL or any of its teams.</p>
+    </footer>
+    <div id="tip" role="tooltip" hidden></div>
+    <script is:inline>
+      (() => {
+        const tip = document.getElementById('tip');
+        let current = null;
+        const show = (el) => {
+          current = el;
+          tip.textContent = el.dataset.tip;
+          tip.hidden = false;
+          const r = el.getBoundingClientRect();
+          const t = tip.getBoundingClientRect();
+          const left = Math.max(8, Math.min(window.innerWidth - t.width - 8, r.left + r.width / 2 - t.width / 2));
+          const above = r.top - t.height - 8;
+          tip.style.left = left + 'px';
+          tip.style.top = (above > 8 ? above : r.bottom + 8) + 'px';
+        };
+        const hide = () => { current = null; tip.hidden = true; };
+        const target = (e) => (e.target instanceof Element ? e.target.closest('[data-tip]') : null);
+        document.addEventListener('pointerover', (e) => { const el = target(e); if (el && e.pointerType !== 'touch') show(el); });
+        document.addEventListener('pointerout', (e) => { if (target(e) && e.pointerType !== 'touch') hide(); });
+        document.addEventListener('focusin', (e) => { const el = target(e); if (el) show(el); });
+        document.addEventListener('focusout', hide);
+        document.addEventListener('click', (e) => { const el = target(e); if (!el) return hide(); current === el && !tip.hidden && e.pointerType === 'touch' ? hide() : show(el); });
+        window.addEventListener('scroll', hide, { passive: true });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      })();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --ice: #edf2f6;
+    --sheet: #ffffff;
+    --ink: #0f1c2b;
+    --ink-2: #48586a;
+    --ink-3: #6f7e8e;
+    --rule: #d2dce5;
+    --track: #e4ebf1;
+    --CAR: #c8102e;
+    --EDM: #1f4e9e;
+    --line-red: rgba(200, 16, 46, 0.32);
+    --line-blue: rgba(31, 78, 158, 0.32);
+    --display: 'Saira Condensed', 'Arial Narrow', sans-serif;
+    --body: 'Hanken Grotesk', system-ui, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ice: #0a121a;
+      --sheet: #111c27;
+      --ink: #e6edf3;
+      --ink-2: #a9b6c3;
+      --ink-3: #7c8a98;
+      --rule: #25333f;
+      --track: #1b2835;
+      --CAR: #ee5a70;
+      --EDM: #5a90ea;
+      --line-red: rgba(238, 90, 112, 0.38);
+      --line-blue: rgba(90, 144, 234, 0.38);
+    }
+  }
+  .t-CAR { --team: var(--CAR); }
+  .t-EDM { --team: var(--EDM); }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--ice); color: var(--ink); font: 400 16px/1.5 var(--body); font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+  h1, h2, h3, p, figure, ul, ol, dl, dd { margin: 0; padding: 0; }
+  ul, ol { list-style: none; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 3px; }
+
+  .mockbar {
+    position: sticky; top: 0; z-index: 20; padding: 8px 16px; font-size: 13px; line-height: 1.35; text-align: center;
+    color: var(--ink); border-bottom: 1px solid var(--rule);
+    background: repeating-linear-gradient(-45deg, var(--sheet) 0 10px, var(--track) 10px 20px);
+  }
+  .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
+  .site-head { display: flex; align-items: baseline; gap: 10px; padding-block: 18px 6px; }
+  .wordmark { font: 800 26px/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; }
+  .wordmark-note { font-size: 12px; color: var(--ink-3); }
+  .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
+
+  /* Sections */
+  .sec { margin-top: 44px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border-bottom: 2px solid var(--ink); padding-bottom: 6px; }
+  .sec-head h2 { font: 700 30px/1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+  .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
+  .takeaway { margin-top: 10px; color: var(--ink-2); max-width: 62ch; }
+  .sub { font: 700 19px/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin: 26px 0 10px; }
+  .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; }
+  .two { display: grid; gap: 16px; margin-top: 16px; }
+  @media (min-width: 820px) { .two { grid-template-columns: 1fr 1fr; } }
+  .team-h { display: flex; align-items: center; gap: 8px; font: 700 20px/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+  .team-h::before, .key i { content: ''; width: 12px; height: 12px; border-radius: 3px; background: var(--team); display: inline-block; }
+  .note { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .term { text-decoration: underline dotted var(--ink-3); text-underline-offset: 3px; cursor: help; }
+  .key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin-top: 14px; align-items: center; }
+  .key span { display: inline-flex; align-items: center; gap: 6px; }
+  .key .avg::before { content: ''; width: 2px; height: 14px; background: var(--ink); display: inline-block; }
+  .key .rng::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: inline-block; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
+  .chip.solid { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+
+  #tip { position: fixed; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--sheet); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 6px; pointer-events: none; }
+
+  /* Percentile bars */
+  .bar { display: grid; grid-template-columns: 34px 1fr 26px; align-items: center; gap: 8px; font-size: 12px; }
+  .bar-team { font-weight: 600; color: var(--ink-2); letter-spacing: 0.03em; }
+  .bar-val { text-align: right; font-weight: 600; }
+  .bar-track { position: relative; height: 8px; background: var(--track); border-radius: 4px; }
+  .bar-track::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.55; }
+  .bar-fill { position: absolute; inset: 0 auto 0 0; background: var(--team); border-radius: 4px; }
+  .bar-band { position: absolute; top: 3px; height: 2px; background: var(--ink); z-index: 1; }
+
+  /* Rink vocabulary shared by the hero and shot maps */
+  .rk-board { fill: var(--sheet); stroke: var(--ink-3); stroke-width: 0.6; }
+  .rk-blue { stroke: var(--line-blue); stroke-width: 1.4; }
+  .rk-red { stroke: var(--line-red); stroke-width: 0.6; }
+  .rk-thin { fill: none; stroke: var(--line-red); stroke-width: 0.5; }
+  .rk-crease { fill: var(--line-blue); stroke: none; }
+  .rk-net { fill: none; stroke: var(--ink-3); stroke-width: 0.5; }
+  .shotmap svg { width: 100%; height: auto; display: block; }
+  .shotmap figcaption { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+  .shot { fill: var(--team); fill-opacity: 0.5; stroke: var(--sheet); stroke-width: 0.35; }
+
+  .histo { width: 100%; max-width: 260px; height: auto; display: block; }
+  .histo-bar { fill: var(--team); }
+  .histo-axis { stroke: var(--rule); stroke-width: 1; }
+  .histo-zero { stroke: var(--ink); stroke-width: 1; opacity: 0.55; }
+  .histo text, .quad text { font: 500 9px var(--body); fill: var(--ink-3); }
+
+  .quad { width: 100%; height: auto; display: block; }
+  .q-axis { stroke: var(--rule); stroke-width: 1; }
+  .q-lg { fill: var(--ink-3); opacity: 0.3; }
+  .q-hi { fill: var(--team); stroke: var(--sheet); stroke-width: 2; }
+  .q-hi.backup { fill: var(--sheet); stroke: var(--team); stroke-width: 2.5; }
+  .quad .q-name { font: 600 11px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 3px; }
+  .quad .q-corner { font-size: 9.5px; fill: var(--ink-2); }
+</style>

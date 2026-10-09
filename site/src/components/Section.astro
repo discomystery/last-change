@@ -1,0 +1,12 @@
+---
+interface Props { id: string; title: string; takeaway?: string; placeholder?: boolean }
+const { id, title, takeaway, placeholder = true } = Astro.props;
+---
+<section class="sec" id={id} aria-labelledby={`${id}-h`}>
+  <header class="sec-head">
+    <h2 id={`${id}-h`}>{title}</h2>
+    {placeholder && <span class="ph">Placeholder numbers</span>}
+  </header>
+  {takeaway && <p class="takeaway">{takeaway}</p>}
+  <slot />
+</section>
