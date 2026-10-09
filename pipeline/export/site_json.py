@@ -184,9 +184,9 @@ def export_lines(season: int) -> int:
             continue
         for kind in ("pp", "pk"):
             for u in sp[kind]:
-                u["players"] = [{"name": names.get(p, "?"), "role": u["roles"].get(str(p))} for p in u["players"]]
+                u["players"] = [{"id": p, "name": names.get(p, "?"), "role": u["roles"].get(str(p))} for p in u["players"]]
                 del u["roles"]
-        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"]} for s_ in sp["shots"]]}
+        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)

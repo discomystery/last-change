@@ -1,7 +1,7 @@
 ---
 // Offensive zone seen from above, net at the top. Dot size grows with shot danger.
 // With `long`, wide screens get a taller drawing that carries on through the neutral zone to centre ice.
-interface Props { team: string; shots: { x: number; y: number; xg: number }[]; title: string; long?: boolean }
+interface Props { team: string; shots: { x: number; y: number; xg: number; p?: number; who?: string }[]; title: string; long?: boolean }
 const { team, shots, title, long = false } = Astro.props;
 const sx = (y: number) => y + 42.5;
 const sy = (x: number) => 100 - x;
@@ -33,7 +33,7 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
             <circle class="rk-dot blue" cx="42.5" cy="100" r="1" />
           </>
         )}
-        {shots.map((s) => <circle class="shot" cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`Shot worth ${s.xg.toFixed(2)} expected goals`} />)}
+        {shots.map((s) => <circle class="shot" data-p={s.p} cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`${s.who ? s.who + ': ' : 'Shot: '}${Math.round(s.xg * 100)}% chance`} />)}
       </g>
     </svg>
   ))}
@@ -46,6 +46,9 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
     .shotmap.long svg.zone { display: none; }
     .shotmap.long svg.full { display: block; }
   }
+  .shotmap.picking .shot { fill-opacity: 0.08; stroke-opacity: 0; }
+  .shotmap.picking .shot.hl { fill-opacity: 0.9; stroke-opacity: 1; }
+  .shotmap .shot { transition: fill-opacity 0.15s; }
   .rk-dot { fill: var(--line-red); }
   .rk-dot.blue { fill: var(--line-blue); }
   .rk-centre { stroke: var(--line-red); stroke-width: 1.4; }

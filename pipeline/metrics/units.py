@@ -177,22 +177,26 @@ def depth_table(season: int) -> pl.DataFrame:
 
 
 def special_units(season: int) -> dict[int, dict]:
-    """Power-play and penalty-kill units over the recent window, with player roles and a shot map."""
+    """Power-play and penalty-kill units over the recent window, with player roles and a shot map.
+
+    Coaches swap a player or two constantly, so the exact same five are rarely out together for long. A unit is
+    therefore the players with the most ice time in that situation (top five and next five on the power play, top four
+    and next four on the kill), and each moment is credited to whichever unit has more of its members on the ice.
+    """
     seasons = [season - 1, season]
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
-    order = games.sort("date", "game_id")
+    stints = pl.read_parquet(d / "stints.parquet")
+    have = set(stints["game_id"].unique().to_list())
     recent = {}
     for tid in set(games["home_id"]) | set(games["away_id"]):
-        built = order.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid))["game_id"].to_list()
-        recent[tid] = set(built)
-    have = set(pl.read_parquet(d / "stints.parquet")["game_id"].unique().to_list())
-    recent = {t: set(sorted(g & have)[-WINDOW_GAMES:]) for t, g in recent.items()}
+        mine = games.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid)).sort("date", "game_id")["game_id"].to_list()
+        recent[tid] = set([g for g in mine if g in have][-WINDOW_GAMES:])
 
-    unit = defaultdict(lambda: defaultdict(float))  # (team, kind, players) -> sums
-    team_sec = defaultdict(float)
-    for s in pl.read_parquet(d / "stints.parquet").iter_rows(named=True):
+    is_d = {r["player_id"]: r["pos"] == "D" for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
+    spans = defaultdict(list)  # (team, kind) -> [(seconds, skaters)]
+    for s in stints.iter_rows(named=True):
         gid = s["game_id"]
         if gid not in ids or not (s["home_goalie"] and s["away_goalie"]):
             continue
@@ -200,15 +204,12 @@ def special_units(season: int) -> dict[int, dict]:
             own, opp = (s["n_home"], s["n_away"]) if home else (s["n_away"], s["n_home"])
             kind = "pp" if (own, opp) == (5, 4) else "pk" if (own, opp) == (4, 5) else None
             tid = ids[gid][0 if home else 1]
-            if kind is None or gid not in recent[tid]:
-                continue
-            key = (tid, kind, tuple(s["home_skaters"] if home else s["away_skaters"]))
-            unit[key]["sec"] += s["duration"]
-            team_sec[(tid, kind)] += s["duration"]
+            if kind and gid in recent[tid]:
+                spans[(tid, kind)].append((s["duration"], frozenset(s["home_skaters"] if home else s["away_skaters"])))
 
-    # Shots during 5v4: unit results this season, plus individual tendencies over two seasons for role tags.
     ind = defaultdict(lambda: defaultdict(float))
     shots = defaultdict(list)
+    chances = defaultdict(list)  # (team, kind) -> [(xg, skaters)] in the window
     for yr in seasons:
         dd = TABLES / str(yr)
         g2 = pl.read_parquet(dd / "games.parquet").filter(pl.col("game_type") == REGULAR)
@@ -228,60 +229,76 @@ def special_units(season: int) -> dict[int, dict]:
             p["att"] += 1
             p["ixg"] += xg
             if e["x_norm"] is not None:
-                dist = ((89 - e["x_norm"]) ** 2 + e["y_norm"] ** 2) ** 0.5
-                p["close"] += dist <= 15
-                p["dist"] += dist
-                p["absy"] += abs(e["y_norm"])
+                p["close"] += ((89 - e["x_norm"]) ** 2 + e["y_norm"] ** 2) ** 0.5 <= 15
                 p["located"] += 1
             p["is_d"] = ppos.get((gid, e["p1"])) == "D"
             if e["type"] == "goal" and e["p2"]:
                 ind[e["p2"]]["a1"] += 1
             if e["type"] in UNBLOCKED and e["x_norm"] is not None:
-                shots[tid].append({"x": int(e["x_norm"]), "y": int(e["y_norm"]), "xg": round(xg, 3), "game_id": gid})
-            if yr == season and gid in recent.get(tid, ()) and e["type"] in UNBLOCKED:
-                unit[(tid, "pp", tuple(own))]["xg"] += xg
-            if yr == season and gid in recent.get(opp_tid, ()) and e["type"] in UNBLOCKED:
-                unit[(opp_tid, "pk", tuple(opp))]["xg"] += xg
+                shots[tid].append({"x": int(e["x_norm"]), "y": int(e["y_norm"]), "xg": round(xg, 3), "game_id": gid, "p": e["p1"]})
+            if yr == season and e["type"] in UNBLOCKED:
+                if gid in recent.get(tid, ()):
+                    chances[(tid, "pp")].append((xg, frozenset(own)))
+                if gid in recent.get(opp_tid, ()):
+                    chances[(opp_tid, "pk")].append((xg, frozenset(opp)))
 
-    def role(pid: int, taken: set) -> str | None:
-        p = ind.get(pid)
-        if not p or p["att"] < 8:
-            return None
-        if p.get("is_d"):
-            return "Point"
-        if p["located"] and p["close"] / p["located"] >= 0.4:
-            return "Net-front"
-        return None
+    def owner(members: list[frozenset], on: frozenset) -> int | None:
+        counts = [len(m & on) for m in members]
+        return None if not members or max(counts) == 0 else counts.index(max(counts))
 
-    league = {k: [0.0, 0.0] for k in ("pp", "pk")}
-    for (tid, kind, _), v in unit.items():
-        league[kind][0] += v.get("xg", 0.0)
-        league[kind][1] += v["sec"]
-    out = {}
+    out, pool = {}, {"pp": [0.0, 0.0], "pk": [0.0, 0.0]}
     for tid in recent:
         entry = {"games": len(recent[tid]), "pp": [], "pk": [], "shots": sorted(shots.get(tid, []), key=lambda s: s["game_id"])[-140:]}
-        for kind, count in (("pp", 2), ("pk", 2)):
-            rows = pl.DataFrame([{"unit": "-".join(map(str, k[2])), "sec": v["sec"], "xg": v.get("xg", 0.0)} for k, v in unit.items() if k[0] == tid and k[1] == kind] or [{"unit": "", "sec": 0.0, "xg": 0.0}])
-            mean = league[kind][0] / league[kind][1] * 3600
-            for i, u in enumerate(_pick(rows.filter(pl.col("sec") > 0), count)):
-                players = [int(x) for x in u["unit"].split("-")]
-                m = u["sec"] / 60
-                rate = (u["xg"] / m * 60 * m + mean * 20) / (m + 20)  # pulled toward the league average: 20 minutes of weight
+        for kind, size in (("pp", 5), ("pk", 4)):
+            toi = defaultdict(float)
+            for sec, on in spans[(tid, kind)]:
+                for pid in on:
+                    toi[pid] += sec
+            ranked = sorted(toi, key=lambda p: -toi[p])
+            if kind == "pk":
+                # A kill is two forwards and two defensemen, so rank each position separately.
+                fwd = [p for p in ranked if not is_d.get(p, False)]
+                dmen = [p for p in ranked if is_d.get(p, False)]
+                members = [frozenset(fwd[i * 2:(i + 1) * 2] + dmen[i * 2:(i + 1) * 2]) for i in range(2) if len(fwd) >= (i + 1) * 2 and len(dmen) >= (i + 1) * 2]
+            else:
+                members = [frozenset(ranked[i * size:(i + 1) * size]) for i in range(2) if len(ranked) >= (i + 1) * size]
+            total = sum(sec for sec, _ in spans[(tid, kind)])
+            secs, xgs = [0.0] * len(members), [0.0] * len(members)
+            for sec, on in spans[(tid, kind)]:
+                if (k := owner(members, on)) is not None:
+                    secs[k] += sec
+            for xg, on in chances[(tid, kind)]:
+                if (k := owner(members, on)) is not None:
+                    xgs[k] += xg
+            pool[kind][0] += sum(xgs)
+            pool[kind][1] += sum(secs)
+            for k, m in enumerate(members):
+                players = sorted(m, key=lambda p: (is_d.get(p, False) if kind == "pk" else False, -toi[p]))
                 roles = {}
                 if kind == "pp":
-                    rated = sorted(players, key=lambda p: -(ind.get(p, {}).get("ixg", 0.0)))
-                    if ind.get(rated[0], {}).get("att", 0) >= 8:
-                        roles[rated[0]] = "Trigger"
+                    shooters = sorted(players, key=lambda p: -(ind.get(p, {}).get("ixg", 0.0)))
+                    if ind.get(shooters[0], {}).get("att", 0) >= 8:
+                        roles[shooters[0]] = "Trigger"
                     passers = sorted((p for p in players if p not in roles), key=lambda p: -(ind.get(p, {}).get("a1", 0.0)))
                     if passers and ind.get(passers[0], {}).get("a1", 0) >= 3:
                         roles[passers[0]] = "Distributor"
-                    for p in players:
-                        if p not in roles and (r := role(p, set())):
-                            roles[p] = r
-                entry[kind].append({"label": f"{kind.upper()}{i + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "minutes": round(m, 1),
-                                    "share": round(100 * u["sec"] / team_sec[(tid, kind)]) if team_sec[(tid, kind)] else 0, "rate": round(rate, 2)})
+                    for pid in players:
+                        q = ind.get(pid)
+                        if pid in roles or not q or q["att"] < 8:
+                            continue
+                        if q.get("is_d"):
+                            roles[pid] = "Point"
+                        elif q["located"] and q["close"] / q["located"] >= 0.4:
+                            roles[pid] = "Net-front"
+                entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "minutes": round(secs[k] / 60, 1),
+                                    "share": round(100 * secs[k] / total) if total else 0, "_xg": xgs[k], "_sec": secs[k]})
         out[tid] = entry
     for kind, higher in (("pp", True), ("pk", False)):
+        mean = pool[kind][0] / pool[kind][1] * 3600
+        for e in out.values():
+            for u in e[kind]:
+                m = u.pop("_sec") / 60
+                u["rate"] = round((u.pop("_xg") + mean / 60 * 20) / (m + 20) * 60, 2)  # 20 minutes of league-average weight
         for i in range(2):
             vals = [e[kind][i]["rate"] for e in out.values() if len(e[kind]) > i]
             for e in out.values():

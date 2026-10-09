@@ -28,7 +28,13 @@ const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }
 type Unit = { label: string; players: string[]; minutes: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
-type SUnit = { label: string; players: { name: string; role: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
+const roleTip: Record<string, string> = {
+  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
+  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
+  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
+  Point: 'Point: a defenseman working from the blue line.',
+};
+type SUnit = { label: string; players: { id: number; name: string; role: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; shots: { x: number; y: number; xg: number }[] } | undefined;
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
@@ -136,30 +142,35 @@ const _ = ordinal;
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
-        <p class="note">Units are the exact groups that have played together most over the last {linesData.window} games ({ln.games} so far). The number beside each is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Role tags are rules of thumb from two seasons of each player’s power-play shots and passes.</p>
+        <p class="note">Units are the players used most in each situation over the last {linesData.window} games ({ln.games} so far). The number beside each unit is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
         <div class="st3">
           <div class="card">
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
-                <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span>{pl.role && <span class="chip">{pl.role}</span>}</li>)}</ul>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time when most of this group was on the ice. Coaches swap a player or two constantly, so a unit is the five who play the power play most (PP1) and the next five (PP2).">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
+                <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
           </div>
-          <div class="card mapcard">
+          <div class="card mapcard" id="ppmap">
+            <p class="map-who" id="map-who" aria-live="polite">&nbsp;</p>
             <ShotMap long team="one" shots={sp.shots} title={`Where ${team.place}’s last ${sp.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />
           </div>
           <div class="card">
             <h4 class="st-h">Penalty kill</h4>
             {sp.pk.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></span></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></span></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
               </div>
             ))}
           </div>
         </div>
+        <dl class="tagkey">
+          <dt>What the tags mean</dt>
+          {Object.entries(roleTip).map(([k, v]) => <dd><span class="chip">{k}</span>{v.slice(k.length + 2)}</dd>)}
+        </dl>
       </>
     )}
   </Section>
@@ -275,6 +286,13 @@ const _ = ordinal;
   .roles-list { margin-top: 8px; display: grid; gap: 6px; }
   .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
   .t-one { --team: var(--ink); }
+  .chip.tag { cursor: help; }
+  .roles-list .plink[data-shooter]:hover, .roles-list .plink.on { text-decoration-color: var(--ink); }
+  .map-who { font: 600 13px var(--ui); color: var(--ink-2); min-height: 20px; margin-bottom: 6px; }
+  .tagkey { margin-top: 16px; display: grid; gap: 8px; font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
+  .tagkey dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .tagkey dd { display: grid; grid-template-columns: 108px 1fr; gap: 10px; align-items: baseline; }
+  .tagkey .chip { justify-self: start; }
   .n { font: 400 12px var(--ui); color: var(--ink-3); }
   .units { display: grid; gap: 14px; }
   .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
@@ -300,3 +318,32 @@ const _ = ordinal;
   .lt tbody tr:last-child > * { border-bottom: 0; }
   .todo { margin-top: 16px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 </style>
+
+<script is:inline>
+  // Point at (or tap) a power-play name to light up his shots on the map.
+  (() => {
+    const card = document.getElementById('ppmap');
+    if (!card) return;
+    const fig = card.querySelector('.shotmap');
+    const label = document.getElementById('map-who');
+    let pinned = null;
+    const show = (el) => {
+      document.querySelectorAll('[data-shooter].on').forEach((x) => x.classList.remove('on'));
+      fig.querySelectorAll('.shot.hl').forEach((c) => c.classList.remove('hl'));
+      if (!el) { fig.classList.remove('picking'); label.innerHTML = '&nbsp;'; return; }
+      const mine = fig.querySelectorAll(`svg:not([style*="display: none"]) .shot[data-p="${el.dataset.shooter}"]`);
+      fig.querySelectorAll(`.shot[data-p="${el.dataset.shooter}"]`).forEach((c) => c.classList.add('hl'));
+      fig.classList.add('picking');
+      el.classList.add('on');
+      const n = fig.querySelectorAll(`svg.full .shot[data-p="${el.dataset.shooter}"]`).length;
+      label.textContent = n ? `${el.textContent}: ${n} of these shots` : `${el.textContent}: none of these shots`;
+    };
+    document.querySelectorAll('[data-shooter]').forEach((el) => {
+      el.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') show(el); });
+      el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') show(pinned); });
+      el.addEventListener('focus', () => show(el));
+      el.addEventListener('blur', () => show(pinned));
+      el.addEventListener('click', () => { pinned = pinned === el ? null : el; show(pinned); });
+    });
+  })();
+</script>
