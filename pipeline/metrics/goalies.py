@@ -95,7 +95,7 @@ def run(season: int) -> dict:
                 v = goalies[gid][mode][field]
                 enough = gid in ok and v is not None and len(vals) > 1
                 goalies[gid][mode].setdefault("pct", {})[trait] = round(100 * (float((vals < v).sum()) + 0.5) / len(vals)) if enough else None
-    league = [{"id": gid, "x": m["blend"]["xga60"], "y": m["blend"]["gsax60"]} for gid, m in goalies.items() if "blend" in m and m["blend"]["starts"] >= MIN_STARTS["blend"]]
+    league = [{"id": gid, "x": m["blend"]["xga60"], "y": m["blend"]["gsax60"]} for gid, m in sorted(goalies.items()) if "blend" in m and m["blend"]["starts"] >= MIN_STARTS["blend"]]
     # This season's goalies per team, most-used first.
     by_team = defaultdict(list)
     use = current.group_by("team_id", "goalie_id").agg(pl.col("sec").sum(), pl.col("started").sum().alias("starts"), pl.col("date").max()).sort("sec", descending=True)
