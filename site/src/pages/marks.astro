@@ -1,0 +1,91 @@
+---
+// Temporary comparison page: puck-style quality meter and options for the neutral "how much" marker.
+import Base from '../layouts/Base.astro';
+const quality = [['Creates', '3.16', 5], ['Allows', '2.16', 4], ['Share', '59.4%', 5]] as const;
+const neutral = [['Ice time', '13.4', 62], ['Off. starts', '48%', 18], ['Competition', '87', 88]] as const;
+const word = (p: number) => (p < 33 ? 'Low' : p < 67 ? 'Typical' : 'High');
+const opts = [
+  { id: 'a', name: 'A. Capped line', why: 'The same tick, but the line now has an end stop on each side and a faint centre mark, so it reads as a scale with edges.' },
+  { id: 'b', name: 'B. Slider', why: 'A rounded outline with a dot inside, like a volume slider. The outline is the bounding box.' },
+  { id: 'c', name: 'C. Tiny rink', why: 'The box is a little rink with a centre line. The dot sits toward the low end or the high end of the ice.' },
+  { id: 'd', name: 'D. A word', why: 'No drawing at all: just “Low”, “Typical” or “High”. The clearest to read, the least precise.' },
+  { id: 'now', name: 'What’s live now', why: 'For comparison.' },
+];
+---
+<Base title="Meter options">
+  <h1 class="page-h">Pucks, and ways to show “how much”</h1>
+  <p class="lede">Every example below already uses round pucks for the good-or-bad stats. The options differ in how the neutral stats (ice time, offensive starts, competition) are drawn.</p>
+
+  <section class="opt">
+    <h2>Pucks: two ways to draw them</h2>
+    <p class="why">Solid pucks with outlined empties, or solid pucks with faint empties. The first is used in the examples below.</p>
+    <div class="card puckrow">
+      <span><span class="pk">{[1, 2, 3, 4, 5].map((i) => <i class:list={{ on: i <= 4 }}></i>)}</span> Outlined empties</span>
+      <span><span class="pk faint">{[1, 2, 3, 4, 5].map((i) => <i class:list={{ on: i <= 4 }}></i>)}</span> Faint empties</span>
+    </div>
+  </section>
+
+  {opts.map((o) => (
+    <section class={`opt v-${o.id}`}>
+      <h2>{o.name}</h2>
+      <p class="why">{o.why}</p>
+      <div class="card t-CAR">
+        <p class="top"><span class="lbl">L1</span><span class="chip">Shutdown</span></p>
+        <dl class="stats">
+          {quality.map(([l, v, n]) => <div><dt>{l}</dt><dd>{v}</dd><span class="pk">{[1, 2, 3, 4, 5].map((i) => <i class:list={{ on: i <= n }}></i>)}</span></div>)}
+          {neutral.map(([l, v, p]) => (
+            <div><dt>{l}</dt><dd>{v}</dd>
+              {o.id === 'd' ? <span class="wd">{word(p)}</span> : <span class="mk"><i style={`left:${p}%`}></i></span>}
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  ))}
+</Base>
+
+<style>
+  .page-h { font: 700 clamp(30px, 6vw, 44px) / 1.1 var(--display); margin-top: 24px; }
+  .lede { color: var(--ink-2); margin-top: 8px; }
+  .opt { margin-top: 44px; padding-top: 18px; border-top: 5px solid var(--line-blue); }
+  .opt h2 { font: 700 24px/1.1 var(--display); }
+  .why { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 6px 0 16px; }
+  .card { max-width: 620px; }
+  .puckrow { display: flex; flex-wrap: wrap; gap: 12px 36px; font: 400 14px var(--ui); align-items: center; }
+  .puckrow > span { display: inline-flex; align-items: center; gap: 10px; }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .lbl { font: 700 19px/1 var(--display); color: var(--team); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  @media (min-width: 560px) { .stats { grid-template-columns: repeat(6, 1fr); } }
+  .stats > div { display: grid; gap: 4px; justify-items: start; }
+  .stats dt { font-size: 12px; color: var(--ink-2); }
+  .stats dd { font-weight: 600; font-size: 15px; }
+
+  .pk { display: inline-flex; gap: 3px; }
+  .pk i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-3); }
+  .pk i.on { background: var(--ink); border-color: var(--ink); }
+  .pk.faint i { border: 0; background: var(--rule); }
+  .pk.faint i.on { background: var(--ink); }
+
+  .mk { position: relative; display: inline-block; width: 62px; height: 12px; }
+  .mk i { position: absolute; }
+
+  /* A: capped line */
+  .v-a .mk { border-inline: 2px solid var(--ink-3); background: linear-gradient(var(--ink-3), var(--ink-3)) center / 100% 2px no-repeat, linear-gradient(var(--ink-3), var(--ink-3)) center / 1px 6px no-repeat; }
+  .v-a .mk i { top: 0; width: 4px; height: 12px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
+
+  /* B: slider */
+  .v-b .mk { border: 1.5px solid var(--ink-3); border-radius: 999px; height: 14px; }
+  .v-b .mk i { top: 1.5px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--ink); }
+
+  /* C: tiny rink */
+  .v-c .mk { height: 22px; width: 62px; border: 1.5px solid var(--ink-3); border-radius: 8px; background: linear-gradient(var(--line-red), var(--line-red)) center / 2px 100% no-repeat, linear-gradient(var(--line-blue), var(--line-blue)) 33% / 2px 100% no-repeat, linear-gradient(var(--line-blue), var(--line-blue)) 67% / 2px 100% no-repeat, var(--sheet); }
+  .v-c .mk i { top: 5.5px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--ink); }
+
+  /* D: a word */
+  .wd { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 8px; }
+
+  /* Live now */
+  .v-now .mk { width: 43px; background: linear-gradient(var(--ink-3), var(--ink-3)) center / 100% 2px no-repeat; }
+  .v-now .mk i { top: 0; width: 3px; height: 12px; margin-left: -1.5px; border-radius: 1.5px; background: var(--ink); }
+</style>
