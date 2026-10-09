@@ -29,7 +29,7 @@ const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].r
   .dot-circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
   .side { position: relative; padding: 28px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
   .side.is-home { text-align: right; align-items: flex-end; }
-  .abbr { font: 800 clamp(42px, 12.5vw, 112px) / 0.9 var(--display); font-variation-settings: 'SOFT' 100; letter-spacing: -0.02em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
+  .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
   .is-home .abbr { flex-direction: row-reverse; }
   .score { color: var(--ink); font-weight: 600; }
   @media (max-width: 620px) {

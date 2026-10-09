@@ -64,7 +64,7 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 
 ## Decisions since the brief (user feedback, 2026-10-09)
 
-- Look: bookish rounded serif (Fraunces display with SOFT 100, Literata body, Hanken Grotesk for data and labels) on the cool "ice" palette, keeping the rink motifs. Keep pages airy; the first mock was too dense.
+- Look: bookish rounded serif (Fraunces display with SOFT 100, Literata body, Hanken Grotesk for data and labels) on the cool "ice" palette, keeping the rink motifs. Bold Fraunces headings are approved; the big team abbreviations in the rink header are set in the sans (Hanken Grotesk 700), not the serif. Keep pages airy; the first mock was too dense.
 - No full-width bar charts. Fingerprint dimensions are cards: a short two-lane scale (one dot per team, likely-range whisker, league-average tick), a one-word label at each extreme (e.g. Sieve / Wall; the user may rename these), and a plain-language sentence per team with the actual stat and league rank.
 - Arena-scorer adjustment needs a real explainer: what it is, the exact calculation, and a table of all 32 arenas with their factors per event type.
 - Season switch: every metric is exported twice (blended with prior seasons, and current season only) and the site toggles between them client-side. Blended is the default.
