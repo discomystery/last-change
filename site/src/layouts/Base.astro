@@ -37,7 +37,8 @@ const teamList = teams as { abbr: string; name: string }[];
           <a href={`${base}check/`}>Real lines</a>
         </nav>
       </div>
-      <div class="prefs" aria-label="Your settings">
+      <button type="button" class="prefs-toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs">Settings</button>
+      <div class="prefs" id="prefs" aria-label="Your settings">
         <label class="pref">
           <span>Your team</span>
           <select id="team-pick">
@@ -88,6 +89,11 @@ const teamList = teams as { abbr: string; name: string }[];
         Object.keys(defaults).forEach((k) => apply(k, read(k)));
         document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
         document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
+        const toggle = document.getElementById('prefs-toggle');
+        toggle.addEventListener('click', () => {
+          const open = document.getElementById('prefs').classList.toggle('open');
+          toggle.setAttribute('aria-expanded', String(open));
+        });
       })();
     </script>
     <script is:inline>
@@ -178,6 +184,13 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-nav a { text-decoration: none; }
   .site-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
   .prefs { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; padding: 10px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; font: 400 13px var(--ui); color: var(--ink-2); }
+  .prefs-toggle { display: none; justify-self: start; font: 600 13px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+  .prefs-toggle::after { content: ' ▾'; }
+  .prefs-toggle[aria-expanded='true']::after { content: ' ▴'; }
+  @media (max-width: 719px) {
+    .prefs-toggle { display: inline-block; }
+    .prefs:not(.open) { display: none; }
+  }
   .pref { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .pref > span { font-weight: 600; }
   .prefs select { font: 600 13px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 6px 10px; max-width: 100%; }

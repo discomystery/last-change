@@ -86,7 +86,8 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Home-team picker: any visitor chooses their team; the choice is remembered in the browser (localStorage) and drives the home page and defaults. No team is assumed for a new visitor.
 - Arena-adjusted stats (hits, giveaways, takeaways, blocks and anything built on them) are shown as a SCORE (an index against league average), never as an adjusted count, so the site never appears to report events that were not recorded. A site-wide switch shows raw recorded numbers instead; arena-adjusted is the default.
 - Team page order: the team's next game is at the very top, then form and schedule, then fingerprint, lines, special teams, goalies, goal sources, win conditions.
-- Player pages: before designing them, talk with the user about showing what a player entering or leaving the lineup does to the team (with-or-without-him results, who moves up or down the lineup, which matchups change). The user raised this on 2026-10-09 and wants a discussion first, not a finished design.
+- Player pages: before designing them, talk with the user about showing what a player entering or leaving the lineup does to the team (with-or-without-him results, who moves up or down the lineup, which matchups change). The user raised this on 2026-10-09 and wants a discussion first, not a finished design. They want all three angles, with the team's results when he is out as the most important.
+- On phones the settings strip (team, seasons, arena switch) collapses behind a single Settings button.
 - Build order: launch with home, preview, post-game (calls and goalies), team, methods and the switches, verified on Hurricanes games first, then all teams. Second wave: player/goalie pages, league, track record, report cards, win conditions. Optional later: EDGE, AllThreeZones, in-house xG.
 - Out of scope: live in-game updates, win predictions or odds, accounts, comments, logos, anything commercial.
 
