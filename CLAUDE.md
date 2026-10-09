@@ -34,7 +34,11 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Repo: `discomystery/last-change` (public). Live site: https://discomystery.github.io/last-change/ ("Last Change" is a working title the user has not confirmed).
 - Deploy today: `npm --prefix site run build`, then force-push `site/dist` (plus `.nojekyll`) to the `gh-pages` branch. The GitHub token lacks the `workflow` scope, so Actions workflow files cannot be pushed yet; the user must approve that scope before the nightly pipeline (Phase 2).
 - Phase 1 mock: real names, records, date and venue come from `site/scripts/fetch-mock-context.mjs`; every statistic in `site/src/data/mock.ts` is invented.
-- `uv` is not installed yet; system Python is 3.9. Install `uv` before pipeline work (Phase 2).
+- `uv` is installed at `/Users/katherine/Library/Python/3.9/bin/uv` (not on PATH). Run pipeline steps from the repo root: `uv run --project pipeline python -m pipeline.run {ingest|build|validate|export} --season YYYY`; tests with `uv run --project pipeline pytest -q pipeline/tests`.
+- Local data cache is `data/` (gitignored): `data/raw/{season}/{pbp,box,shifts,shifts_html}/` and `data/tables/{season}/*.parquet`. It is not yet published to a `data` branch.
+- The shift-chart API returns nothing for some games (11 of the first 65 in 2026-27). `pipeline/ingest/html_shifts.py` falls back to the official HTML TOI reports (URL pattern verified); with it, 100% of player-games match boxscore TOI within 5 s.
+- MoneyPuck shot columns in the brief are all confirmed present; `game_id` + season*1,000,000 gives the NHL game id. Join match rate is 99.6% overall. The brief's 99%-per-game target is not reachable (one re-scored shot in an 80-shot game is 98.75%), so the check is on the season-wide rate.
+- Running `astro build` can knock over the local dev preview; restart it with preview_start before screenshots.
 
 ## Data rules
 

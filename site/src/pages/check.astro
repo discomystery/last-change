@@ -1,0 +1,59 @@
+---
+// Phase 2 check page: real lines and pairs from each team's most recent game, for the eye test.
+import Base from '../layouts/Base.astro';
+import data from '../../public/data/last_game_lines.json';
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const day = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
+const c = data.checks;
+---
+<Base title="Real data check" mock={false}>
+  <h1>Real lines from each team’s last game</h1>
+  <p class="lede">The first real output of the data pipeline: who actually played together at 5-on-5, for how long, and what happened while they were out there. Find a game you watched and see if it matches.</p>
+  <ul class="checks">
+    <li><strong>{c.games}</strong> games this season processed</li>
+    <li><strong>{c.toi_within_5s_pct}%</strong> of players’ ice time matches the official boxscore within 5 seconds</li>
+    <li><strong>{c.xg_match_rate_pct}%</strong> of {c.xg_shots.toLocaleString('en-US')} expected-goal shots matched to NHL events</li>
+  </ul>
+  <nav class="jump" aria-label="Teams">{data.teams.map((t) => <a href={`#${t.team}`}>{t.team}</a>)}</nav>
+  {data.teams.map((t) => (
+    <section class="team" id={t.team}>
+      <h2>{t.team}</h2>
+      <p class="game">{day(t.date)} {t.at_home ? 'vs' : 'at'} {t.opponent}, {t.score[0]}–{t.score[1]} · {clock(t.five_on_five_seconds)} of 5-on-5 play</p>
+      <div class="card">
+        <table>
+          <thead><tr><th scope="col">Together at 5-on-5</th><th scope="col">Ice time</th><th scope="col">Shot attempts for–against</th><th scope="col">Expected goals for–against</th><th scope="col">Goals</th></tr></thead>
+          <tbody>
+            {[...t.lines, ...t.pairs].map((u, i) => (
+              <tr class:list={{ gap: i === t.lines.length }}>
+                <th scope="row">{u.players.join(' · ')}</th>
+                <td>{clock(u.seconds)}</td><td>{u.cf}–{u.ca}</td><td>{u.xgf.toFixed(2)}–{u.xga.toFixed(2)}</td><td>{u.gf}–{u.ga}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  ))}
+  <p class="note">One game is a tiny sample: these show who played with whom, not who is good. Lines are the four forward trios and three defense pairs with the most 5-on-5 time together, so mid-game shuffles appear as extra combinations with less time.</p>
+</Base>
+
+<style>
+  h1 { font: 700 clamp(30px, 6vw, 44px) / 1.1 var(--display); margin-top: 24px; }
+  .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 18px; font: 400 14px var(--ui); color: var(--ink-2); }
+  .checks strong { font: 700 22px/1 var(--display); color: var(--ink); margin-right: 4px; }
+  .jump { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 22px; font-family: var(--ui); }
+  .jump a { font-size: 13px; font-weight: 600; text-decoration: none; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
+  .jump a:hover { border-color: var(--ink); }
+  .team { margin-top: 48px; scroll-margin-top: 48px; }
+  .team h2 { font: 700 30px/1 var(--ui); letter-spacing: -0.03em; border-bottom: 5px solid var(--line-blue); padding-bottom: 8px; }
+  .game { font: 400 14px var(--ui); color: var(--ink-2); margin: 10px 0 12px; }
+  .card { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+  th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); white-space: normal; }
+  th:first-child { text-align: left; }
+  tbody th { font-weight: 600; }
+  tr.gap > * { border-top: 3px solid var(--line-red); }
+  tbody tr:last-child > * { border-bottom: 0; }
+</style>

@@ -1,6 +1,6 @@
 ---
-interface Props { title: string; description?: string }
-const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.' } = Astro.props;
+interface Props { title: string; description?: string; mock?: boolean }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 <!doctype html>
@@ -16,9 +16,13 @@ const base = import.meta.env.BASE_URL;
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Young+Serif&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div class="mockbar" role="note">
-      <strong>Mock-up.</strong> Names, records, date and venue are real. Every statistic, line combination and insight is a placeholder.
-    </div>
+    {mock ? (
+      <div class="mockbar" role="note">
+        <strong>Mock-up.</strong> Names, records, date and venue are real. Every statistic, line combination and insight is a placeholder.
+      </div>
+    ) : (
+      <div class="mockbar real" role="note"><strong>Real data.</strong> Everything on this page is computed from actual games.</div>
+    )}
     <header class="site-head">
       <a class="wordmark" href={base}>Last Change</a>
       <span class="wordmark-note">working title</span>
@@ -109,6 +113,7 @@ const base = import.meta.env.BASE_URL;
     color: var(--ink); border-bottom: 1px solid var(--rule);
     background: repeating-linear-gradient(-45deg, var(--sheet) 0 10px, var(--track) 10px 20px);
   }
+  .mockbar.real { background: var(--sheet); }
   .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
   .site-head { display: flex; align-items: baseline; gap: 10px; padding-block: 18px 6px; }
   .wordmark { font: 700 26px/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }

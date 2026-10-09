@@ -2,3 +2,9 @@ node_modules/
 dist/
 .astro/
 .DS_Store
+
+# Local data cache (published to the data branch, not main)
+/data/
+.venv/
+__pycache__/
+.pytest_cache/
