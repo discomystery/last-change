@@ -1,0 +1,29 @@
+---
+// One fingerprint trait for a two-team matchup: a short scale with a dot per team, plus the real stat in words.
+import { order, teams } from '../data/mock';
+const { c } = Astro.props;
+---
+<li class="card fpc">
+  <div class="fpc-top">
+    <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
+    {c.clash && <span class="chip solid">Clash</span>}
+  </div>
+  <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
+  <div class="lanes">
+    {order.map((a) => (
+      <div class:list={['lane', `t-${a}`]} style={`--b:${c[a].blend.pct};--bb:${c[a].blend.band};--c:${c[a].season.pct};--cb:${c[a].season.band}`}>
+        <span class="whisk"></span><span class="dot"></span>
+      </div>
+    ))}
+  </div>
+  <ul class="fpc-stats">
+    {order.map((a) => (
+      <li class={`t-${a}`}>
+        <i></i>
+        {(['blend', 'season'] as const).map((mode) => (
+          <span class={`m-${mode}`}><span><b>{teams[a].place}:</b> {c[a][mode].raw ? (<><span class="a-adj">{c[a][mode].text}</span><span class="a-raw">{c[a][mode].raw}</span></>) : c[a][mode].text}</span><em>{c[a][mode].rank} of 32</em></span>
+        ))}
+      </li>
+    ))}
+  </ul>
+</li>
