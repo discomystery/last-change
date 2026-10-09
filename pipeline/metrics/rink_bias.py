@@ -33,3 +33,29 @@ def factors(seasons: list[int] = FULL_SEASONS) -> pl.DataFrame:
                     e: round(1 + (raw - 1) * home.height / (home.height + SHRINK_GAMES), 3)}
         rows.append(row)
     return pl.DataFrame(rows).sort("team")
+
+
+def home_road(seasons: list[int] = FULL_SEASONS) -> dict[str, dict[str, float]]:
+    """League-wide gap between what home teams and visitors are credited with, per event type.
+
+    Home teams are credited with more hits, giveaways and takeaways everywhere. Whether that is scorers
+    watching the home side more closely or teams really playing differently at home cannot be told apart,
+    and it does not need to be: the weights simply put home and road games on the same footing.
+    (A building-by-building version was tested and rejected: it does not repeat from year to year.)
+    """
+    home = {e: 0.0 for e in EVENTS} | {"sec": 0.0}
+    away = dict(home)
+    for s in seasons:
+        d = TABLES / str(s)
+        g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)["game_id"].to_list()
+        t = pl.read_parquet(d / "team_game.parquet").filter(pl.col("game_id").is_in(g))
+        for side, is_home in ((home, True), (away, False)):
+            part = t.filter(pl.col("is_home") == is_home)
+            for c in side:
+                side[c] += part[c].sum()
+    out = {}
+    for e in EVENTS:
+        h, a = home[e] / home["sec"] * 3600, away[e] / away["sec"] * 3600
+        mid = (h + a) / 2
+        out[e] = {"home_rate": round(h, 2), "away_rate": round(a, 2), "w_home": round(mid / h, 4), "w_away": round(mid / a, 4)}
+    return out

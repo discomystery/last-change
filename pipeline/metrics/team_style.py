@@ -47,7 +47,15 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     t = adjust.apply(pl.read_parquet(d / "team_game.parquet"), w).join(games, on="game_id")
     close = (pl.col("strength") == "5v5") & (pl.col("score_state").abs() <= 1)
     fc_raw = pl.col("oz_hits") + pl.col("oz_takes") + pl.col("forced_gives")
-    fc_adj = pl.col("oz_hits") / pl.col("f_hits") + pl.col("oz_takes") / pl.col("f_takes") + pl.col("forced_gives") / pl.col("f_gives")
+    hr = rink_bias.home_road()
+
+    def venue(event: str, own: bool = True):
+        # Weight for an event credited to this team (own) or to its opponent, given who is at home.
+        at_home = pl.col("is_home") if own else ~pl.col("is_home")
+        return pl.when(at_home).then(hr[event]["w_home"]).otherwise(hr[event]["w_away"])
+
+    fc_adj = (pl.col("oz_hits") / pl.col("f_hits") * venue("hits") + pl.col("oz_takes") / pl.col("f_takes") * venue("takes")
+              + pl.col("forced_gives") / pl.col("f_gives") * venue("gives", own=False))
     disc = pl.read_parquet(d / "discipline.parquet")
     opp = disc.join(games.select("game_id", "home_id", "away_id"), on="game_id").with_columns(
         team_id=pl.when(pl.col("team_id") == pl.col("home_id")).then(pl.col("away_id")).otherwise(pl.col("home_id"))).select("game_id", "team_id", pl.col("times_short").alias("pp_opps"))
@@ -65,7 +73,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
-        (pl.when(close).then(pl.col("hits") / pl.col("f_hits")).otherwise(0.0).sum()).alias("hits_adj"),
+        (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
     ).join(disc, on=["game_id", "team_id"]).sort("team_id", "date", "game_id")
 

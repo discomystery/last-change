@@ -10,6 +10,7 @@ const arenas = (data.arenas as Row[]).filter((a) => (a.home_games as number) >= 
 const pct = (f: number) => { const p = Math.round((f - 1) * 100); return p === 0 ? 'even' : `${p > 0 ? '+' : '−'}${Math.abs(p)}%`; };
 const ex = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number))[0];
 const sample = 30;
+const hr = (data as any).home_road as Record<string, { home_rate: number; away_rate: number }>;
 const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
 const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', rush: 'Rush offense', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
 ---
@@ -23,6 +24,12 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
       <p><strong>How it’s calculated.</strong> For each arena, we take every game played there over three seasons ({data.seasons}) and work out how often each event is recorded per hour, for both teams combined. Then we do the same for that home team’s road games. Dividing the first by the second gives the arena’s factor. Because even three seasons is a limited sample, each factor is pulled a little of the way back toward 1.00.</p>
       <p><strong>A worked example.</strong> At {ex.venue}, scorers recorded <strong>{ex.hits_here}</strong> hits per hour. In {ex.team}’s road games, the same team and its opponents were credited with <strong>{ex.hits_elsewhere}</strong>. {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong>, which settles at <strong>{(ex.hits as number).toFixed(2)}</strong> after the pull toward 1.00. So a night with {sample} recorded hits there counts as <strong>{(sample / (ex.hits as number)).toFixed(1)}</strong>.</p>
       <p><strong>How it’s shown.</strong> We never display an adjusted count, because that would look like a number of hits that nobody recorded. Instead, arena-adjusted stats appear as a <em>score</em>, where 100 is league average. The “Hits and takeaways” switch at the top of every page flips to the raw numbers exactly as recorded.</p>
+    </div>
+    <h3 class="sub">Home and road</h3>
+    <div class="card explain">
+      <p>Separately from any one building, home teams are credited with more of these events everywhere in the league. Over three seasons, home teams were given <strong>{hr.hits.home_rate}</strong> hits per hour to visitors’ <strong>{hr.hits.away_rate}</strong>, <strong>{hr.takes.home_rate}</strong> takeaways to <strong>{hr.takes.away_rate}</strong>, and also more giveaways: <strong>{hr.gives.home_rate}</strong> to <strong>{hr.gives.away_rate}</strong>.</p>
+      <p>That could be scorers watching the home side more closely, or teams genuinely having the puck more at home; public data can’t separate the two. Either way, it would flatter a team in the middle of a long homestand. So events are weighted to put home and road games on the same footing, the same way shots are.</p>
+      <p>We also tested whether particular buildings favour their home team more than others do. The differences were there in any single season but did not repeat from one season to the next, which means they are noise rather than a habit. Correcting for them would make the numbers worse, so we don’t.</p>
     </div>
     <h3 class="sub">Every arena’s factors</h3>
     <p class="note">How much more or less each building records than its home team’s road games do. “+19%” means 19% more.</p>
