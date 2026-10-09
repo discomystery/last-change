@@ -10,6 +10,7 @@ import linesData from '../../../public/data/lines.json';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import ShotMap from '../../components/ShotMap.astro';
+import { clock as mmss } from '../../lib/format';
 import { fpInfo, fpGroups, ordinal } from '../../data/mock';
 
 export function getStaticPaths() {
@@ -25,8 +26,8 @@ type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index
 const rawWords: Record<string, string> = { physical: 'hits recorded per hour', forecheck: 'forecheck plays recorded per hour' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
-type Unit = { label: string; players: string[]; minutes: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
-const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
+type Unit = { label: string; players: string[]; minutes: number; seconds: number; toi_sec: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
+const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; seconds: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
 const roleTip: Record<string, string> = {
   Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
@@ -35,9 +36,9 @@ const roleTip: Record<string, string> = {
   'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
   Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
 };
-type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
+type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; seconds: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string; player: string } | null; shots: { x: number; y: number; xg: number }[] } | undefined;
-type MRow = { label: string; minutes: number; share: (number | null)[]; expected: number[] };
+type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
 const mu = (ln as any)?.matchups as Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }> | undefined;
 const venues = [['all', 'in all games'], ['home', 'at home'], ['road', 'on the road']] as const;
 const oppName = ['first', 'second', 'third', 'fourth'];
@@ -121,7 +122,7 @@ const _ = ordinal;
                 <li class="card unit">
                   <div class="unit-top">
                     <span class="unit-label">{u.label}</span>
-                    <span class="unit-toi"><strong>{u.toi.toFixed(1)}</strong> min a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${u.minutes} minutes together in all.`} /></span>
+                    <span class="unit-toi"><strong>{mmss(u.toi_sec)}</strong> a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${mmss(u.seconds)} together in all.`} /></span>
                   </div>
                   <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
                   <dl class="stats">
@@ -141,7 +142,7 @@ const _ = ordinal;
           : (
             <div class="card worth">
               <p class="mini-h">{ln.last.at_home ? 'Against' : 'At'} {names[ln.last.opponent]}, these groups were different from the usual</p>
-              <ul>{lastDiff.map((u) => <li><strong>{u.label}:</strong> {u.players.join(' · ')} ({u.minutes.toFixed(1)} minutes)</li>)}</ul>
+              <ul>{lastDiff.map((u) => <li><strong>{u.label}:</strong> {u.players.join(' · ')} ({mmss(u.seconds)})</li>)}</ul>
             </div>
           )}
       </>
@@ -173,7 +174,7 @@ const _ = ordinal;
                     <ul class="strips">
                       {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
                         <li class:list={{ thin: r.minutes < 10 }}>
-                          <span class="lab" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}><b>{r.label}</b>{lastNames(r.label).join(' · ')}</span>
+                          <span class="lab" data-tip={`${unitNames(r.label)}. ${mmss(r.seconds)} of 5-on-5 ${label}.`}><b>{r.label}</b>{lastNames(r.label).join(' · ')}</span>
                           <span class="strip">
                             {r.share.map((v, j) => <span style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
                           </span>
@@ -207,7 +208,7 @@ const _ = ordinal;
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name} once play is under way. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
@@ -220,7 +221,7 @@ const _ = ordinal;
             <h4 class="st-h">Penalty kill</h4>
             {sp.pk.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
               </div>
             ))}

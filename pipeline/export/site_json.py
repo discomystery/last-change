@@ -133,6 +133,12 @@ def export_xg_check(season: int) -> int:
     return len(out)
 
 
+def clock(seconds: float) -> str:
+    """Ice time as minutes:seconds, the way hockey writes it."""
+    s = round(seconds)
+    return f"{s // 60}:{s % 60:02d}"
+
+
 def export_lines(season: int) -> int:
     """Usual lines and pairs for every team, how the last game differed, and notes on changed special-teams roles."""
     from pipeline.metrics import units
@@ -174,7 +180,7 @@ def export_lines(season: int) -> int:
         diff = n["now_min"] - n["old_min"]
         if abs(diff) >= 1.0:
             group = "line" if kind == "F" else "pair"
-            text += f' That {group} is getting {n["now_min"]} minutes a game at 5-on-5, {"down" if diff < 0 else "up"} from {n["old_min"]} with {who.split(" ", 1)[-1]}.'
+            text += f' That {group} is getting {clock(n["now_sec"])} a game at 5-on-5, {"down" if diff < 0 else "up"} from {clock(n["old_sec"])} with {who.split(" ", 1)[-1]}.'
         if "chain" in n:
             old = " and ".join(names.get(x, "?") for x in n["fill_old_partners"])
             text += f' {names.get(n["chain"], "?")} has moved into {sub.split(" ", 1)[-1]}\u2019s old spot beside {old}.'
@@ -206,11 +212,11 @@ def export_lines(season: int) -> int:
         fmt = lambda unit: [names.get(int(i), "?") for i in unit.split("-")]
         out[place] = {
             "games": e["games"],
-            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "toi": round(u["sec_pg"] / 60, 1),
+            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": round(u["sec_pg"] / 60, 1), "toi_sec": round(u["sec_pg"]),
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
-                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
+                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
             "notes": sorted(notes, key=lambda n: (n["kind"] != "absence", n.get("order", 0), -abs(n["now"] - n["before"]))),
         }
     for tid, m in units.matchups(season, usual).items():

@@ -437,7 +437,7 @@ def special_units(season: int) -> dict[int, dict]:
                             roles[pid] = "Net-front"
                 both = [p for p in players if kind == "pp" and sum(p in mm for mm in members) > 1]
                 entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "both": both,
-                                    "after_draw": {str(p): stand_for[(k, p)] for p in players if kind == "pp" and (k, p) in stand_for}, "minutes": round(secs[k] / 60, 1),
+                                    "after_draw": {str(p): stand_for[(k, p)] for p in players if kind == "pp" and (k, p) in stand_for}, "minutes": round(secs[k] / 60, 1), "seconds": round(secs[k]),
                                     "share": round(100 * secs[k] / total) if total else 0, "_xg": xgs[k], "_sec": secs[k]})
         out[tid] = entry
     for kind, higher in (("pp", True), ("pk", False)):
@@ -514,7 +514,7 @@ def matchups(season: int, usual_units: dict[int, dict]) -> dict[int, dict]:
                 expected = [sum(v for (own, opp), v in cells.items() if own[0] == kind and opp == c) / total * 100 if total else 0.0 for c in cols]
                 for r in rows:
                     row_sec = sum(cells.get((r, c), 0.0) for c in cols)
-                    block["rows"].append({"label": r, "minutes": round(row_sec / 60, 1), "share": [round(100 * cells.get((r, c), 0.0) / row_sec) if row_sec else None for c in cols],
+                    block["rows"].append({"label": r, "minutes": round(row_sec / 60, 1), "seconds": round(row_sec), "share": [round(100 * cells.get((r, c), 0.0) / row_sec) if row_sec else None for c in cols],
                                           "expected": [round(x) for x in expected]})
             entry[venue] = block
         out[tid] = entry

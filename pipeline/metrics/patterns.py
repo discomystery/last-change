@@ -27,7 +27,8 @@ def _current_team(player_id: int, today: str) -> str | None:
         if cached.get("checked") == today:
             return cached.get("team")
     data = get(f"{NHL_WEB}/v1/player/{player_id}/landing").json()
-    out = {"checked": today, "team": data.get("currentTeamAbbrev"), "active": data.get("isActive")}
+    # A player no longer active in the league (retired, overseas) counts as having no club.
+    out = {"checked": today, "team": data.get("currentTeamAbbrev") if data.get("isActive") else None, "active": data.get("isActive")}
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt") as f:
         json.dump(out, f)
@@ -107,11 +108,11 @@ def absences(season: int, today: str) -> dict[int, list[dict]]:
                 continue
             partners, old_sec, _ = usual
             missed = len(now_games) - gp_now.get(pid, 0)
-            note = {"player": pid, "missed": missed, "of": len(now_games), "partners": list(partners), "kind": kind, "old_min": round(old_sec / 60, 1), "rank": rank.get(pid)}
+            note = {"player": pid, "missed": missed, "of": len(now_games), "partners": list(partners), "kind": kind, "old_min": round(old_sec / 60, 1), "old_sec": round(old_sec), "rank": rank.get(pid)}
             cover = [c for c in _with(u_now, tid, now_games, partners, kind) if c[0] != pid]
             if cover:
                 sub, sec, n = cover[0]
-                note |= {"fill_in": sub, "now_min": round(sec / 60, 1), "fill_games": n, "fill_rank": rank.get(sub)}
+                note |= {"fill_in": sub, "now_min": round(sec / 60, 1), "now_sec": round(sec), "fill_games": n, "fill_rank": rank.get(sub)}
                 # Second link in the chain: who is covering the fill-in's own old spot?
                 was = _mates(u_old, tid, old_games, sub, kind)
                 if was and set(was[0]) != set(partners):

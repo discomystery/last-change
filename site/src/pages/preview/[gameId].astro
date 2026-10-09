@@ -6,6 +6,7 @@ import ShotMap from '../../components/ShotMap.astro';
 import Histogram from '../../components/Histogram.astro';
 import Quadrant from '../../components/Quadrant.astro';
 import Rink from '../../components/Rink.astro';
+import { clock as mmss } from '../../lib/format';
 import FpCard from '../../components/FpCard.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
@@ -124,7 +125,7 @@ const nav = [
                   <div class="unit-top">
                     <span class="unit-label">{u.label}</span>
                     <span class="chip">{u.role}</span>
-                    <span class="unit-toi"><strong>{u.toi.toFixed(1)}</strong> min a game <Marker pct={pr.toi} tip={`More 5-on-5 ice time than ${pr.toi}% of ${grp} around the league.`} /></span>
+                    <span class="unit-toi"><strong>{mmss(u.toi * 60)}</strong> a game <Marker pct={pr.toi} tip={`More 5-on-5 ice time than ${pr.toi}% of ${grp} around the league.`} /></span>
                   </div>
                   <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
                   <dl class="stats">
