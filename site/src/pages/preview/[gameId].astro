@@ -171,14 +171,15 @@ const nav = [
 
   <Section id="special" title="Special teams" takeaway="Edmonton’s power play is the most dangerous unit in the game, but Carolina’s penalty killers attack rather than sit back.">
     <div class="stpick">
-      <div class="stteams" role="group" aria-label="Team">
-        {order.map((a) => <button type="button" data-st-team={a === away ? 'away' : 'home'} data-abbr={a} aria-pressed={String(a === away)}>{teams[a].place}</button>)}
-      </div>
-      <div class="mode stsit" role="group" aria-label="Situation">
-        <button type="button" data-st-sit="all" aria-pressed="false">All special teams</button>
-        <button type="button" data-st-sit="pp" aria-pressed="true">On the power play</button>
-        <button type="button" data-st-sit="pk" aria-pressed="false">On the penalty kill</button>
-      </div>
+      <span>Show</span>
+      <select id="st-team" aria-label="Team">
+        {order.map((a) => <option value={a === away ? 'away' : 'home'} data-abbr={a}>{teams[a].place}</option>)}
+      </select>
+      <select id="st-sit" aria-label="Situation">
+        <option value="all">across all special teams</option>
+        <option value="pp" selected>on the power play</option>
+        <option value="pk">on the penalty kill</option>
+      </select>
     </div>
     {stViews.map((v, i) => {
       const pp = m.specialTeams[v.pp];
@@ -412,11 +413,8 @@ const nav = [
 
   .rate { margin-bottom: 12px; }
   .rate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; margin-bottom: 4px; }
-  .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 20px; }
-  .stteams { display: flex; gap: 8px; }
-  .stteams button { font: 700 15px var(--ui); color: var(--ink); background: var(--sheet); border: 2px solid var(--ink); border-radius: 999px; padding: 9px 18px; cursor: pointer; }
-  .stteams button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
-  .stsit button { padding: 7px 13px; }
+  .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
   .tile { display: grid; gap: 6px; grid-template-rows: 1fr auto auto auto; }
@@ -524,21 +522,19 @@ const nav = [
     document.querySelectorAll('main section.sec').forEach((s) => seen.observe(s));
   })();
 
-  // Special-teams picker: a team, then a situation. "On the penalty kill" shows the other team's power play against them.
+  // Special-teams picker: "Show [team] [situation]". "On the penalty kill" shows the other team's power play against them.
   (() => {
-    const teamBtns = [...document.querySelectorAll('[data-st-team]')];
-    const sitBtns = [...document.querySelectorAll('[data-st-sit]')];
-    const mine = teamBtns.find((b) => b.dataset.abbr === window.lcPrefs?.get('team'));
-    const state = { team: (mine ?? teamBtns[0]).dataset.stTeam, sit: 'pp' };
+    const team = document.getElementById('st-team');
+    const sit = document.getElementById('st-sit');
+    const mine = [...team.options].find((o) => o.dataset.abbr === window.lcPrefs?.get('team'));
+    if (mine) team.value = mine.value;
     const show = () => {
-      const otherTeam = state.team === 'away' ? 'home' : 'away';
-      const id = state.sit === 'all' ? state.team : state.sit === 'pp' ? `${state.team}-pp` : `${otherTeam}-pp`;
+      const otherTeam = team.value === 'away' ? 'home' : 'away';
+      const id = sit.value === 'all' ? team.value : sit.value === 'pp' ? `${team.value}-pp` : `${otherTeam}-pp`;
       document.querySelectorAll('.stblock').forEach((p) => { p.hidden = p.id !== `stpanel-${id}`; });
-      teamBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.stTeam === state.team)));
-      sitBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.stSit === state.sit)));
     };
-    teamBtns.forEach((b) => b.addEventListener('click', () => { state.team = b.dataset.stTeam; show(); }));
-    sitBtns.forEach((b) => b.addEventListener('click', () => { state.sit = b.dataset.stSit; show(); }));
+    team.addEventListener('change', show);
+    sit.addEventListener('change', show);
     show();
   })();
 </script>
