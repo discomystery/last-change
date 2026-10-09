@@ -38,6 +38,7 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Local data cache is `data/` (gitignored): `data/raw/{season}/{pbp,box,shifts,shifts_html}/` and `data/tables/{season}/*.parquet`. It is not yet published to a `data` branch.
 - The shift-chart API returns nothing for some games (11 of the first 65 in 2026-27). `pipeline/ingest/html_shifts.py` falls back to the official HTML TOI reports (URL pattern verified); with it, 100% of player-games match boxscore TOI within 5 s.
 - MoneyPuck shot columns in the brief are all confirmed present; `game_id` + season*1,000,000 gives the NHL game id. Join match rate is 99.6% overall. The brief's 99%-per-game target is not reachable (one re-scored shot in an 80-shot game is 98.75%), so the check is on the season-wide rate.
+- Backfill finished 2026-10-09: seasons 2023, 2024, 2025 (regular season and playoffs, 4,192 games) plus 2026 to date are ingested and built locally. Boxscore TOI match 99.78-99.90% per season (target 99); MoneyPuck join 99.74-99.92%. `team_game.parquet` exists for all four seasons. Re-run a crash-safe backfill with `pipeline/backfill.sh` (detached with nohup; writes `data/backfill.log` and `data/backfill.done`). Next pipeline step: score-and-venue weights from the three pooled seasons, then real team fingerprints in blended and season-only modes.
 - Running `astro build` can knock over the local dev preview; restart it with preview_start before screenshots.
 
 ## Data rules
