@@ -153,6 +153,8 @@ const _ = ordinal;
       <>
         <div class="pick"><span>Show {team.place}</span>
           <select id="mu-venue" aria-label="Which games">{venues.map(([k, label]) => <option value={k}>{label} ({mu[k].games} {mu[k].games === 1 ? 'game' : 'games'})</option>)}</select>
+          <span>with boxes</span>
+          <select id="mu-size" aria-label="Box sizes"><option value="share">sized by ice time</option><option value="even">in even columns</option></select>
         </div>
         {venues.map(([k, label], vi) => {
           const top = standouts(mu[k].rows);
@@ -164,28 +166,27 @@ const _ = ordinal;
                   <ul>{top.map((x) => <li><strong>{lastNames(x.r.label).join(', ')}</strong> ({x.r.label}) {x.r.label[0] === 'L' ? 'have' : 'have'} spent {x.v}% of their time against opponents’ {oppName[x.j]} lines. With no line matching it would be about {x.r.expected[x.j]}%.</li>)}</ul>
                 </div>
               )}
-              <div class="two grids">
+              <div class="card stripcard">
                 {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
-                  <div class="card">
+                  <>
                     <h4 class="mini-h">{title} against opposing forward lines</h4>
-                    <table class="heat">
-                      <thead><tr><td></td>{oppName.map((n, j) => <th scope="col">Opp. L{j + 1}</th>)}</tr></thead>
-                      <tbody>
-                        {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
-                          <tr class:list={{ thin: r.minutes < 10 }}>
-                            <th scope="row" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}><b>{r.label}</b><span class="who">{lastNames(r.label).join(' · ')}</span></th>
-                            {r.share.map((v, j) => <td style={heat(v)} data-tip={v === null ? 'No ice time yet.' : `${r.label} (${unitNames(r.label)}) has spent ${v}% of its 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}>{v === null ? '–' : `${v}%`}</td>)}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                    <ul class="strips">
+                      {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
+                        <li class:list={{ thin: r.minutes < 10 }}>
+                          <span class="lab" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}><b>{r.label}</b>{lastNames(r.label).join(' · ')}</span>
+                          <span class="strip">
+                            {r.share.map((v, j) => <span style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 ))}
               </div>
             </div>
           );
         })}
-        <p class="note">Each row adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes.</p>
+        <p class="note">Each strip adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. Sized by ice time, a wider box means more time against that line; even columns line the boxes up so you can compare groups straight down. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes.</p>
         <p class="note"><strong>What “with no line matching” means:</strong> if a coach just rolled his lines and took whoever was out there, each of his groups would face the opponent’s first line about as often as that line is on the ice. If opposing first lines play a third of the time against {team.place}, every {team.place} group would see them for about a third of its shifts. A number well above that means the coach is sending that group out against them on purpose; well below means he is keeping it away.</p>
       </>
     )}
@@ -333,15 +334,23 @@ const _ = ordinal;
   .units2 { align-items: start; }
   .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }
   .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
-  .grids { align-items: stretch; margin-top: 16px; }
-  .heat { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 13px; table-layout: fixed; }
-  .heat th { font-weight: 600; font-size: 11px; color: var(--ink-2); padding: 4px 2px; white-space: nowrap; }
-  .heat tbody th { text-align: left; width: 46%; font-size: 14px; color: var(--ink); cursor: help; white-space: normal; line-height: 1.25; padding-right: 8px; }
-  .heat tbody th b { margin-right: 8px; }
-  .heat tbody th .who { font: 400 13px var(--ui); color: var(--ink-2); }
-  @media (max-width: 560px) { .heat tbody th { width: 34%; } .heat tbody th .who { display: block; font-size: 12px; } }
-  .heat tbody td { text-align: center; padding: 11px 0; border-radius: 4px; font-weight: 600; }
-  .heat tr.thin td { opacity: 0.45; }
+  .stripcard { margin-top: 16px; }
+  .strips { display: grid; gap: 8px; margin-bottom: 20px; }
+  .strips:last-child { margin-bottom: 0; }
+  .strips li { display: grid; grid-template-columns: minmax(150px, 290px) 1fr; align-items: center; gap: 14px; }
+  .strips li.thin .strip { opacity: 0.45; }
+  .lab { font: 400 14px var(--ui); color: var(--ink-2); cursor: help; }
+  .lab b { font-weight: 700; color: var(--ink); margin-right: 8px; }
+  .strip { display: flex; gap: 2px; height: 40px; }
+  /* --even runs from 0 (sized by share) to 1 (even columns); every box slides in a straight line between the two. */
+  .strip > span { flex: calc(var(--f) * (1 - var(--even)) + 25 * var(--even)) 1 0; min-width: 44px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; font: 600 13px/1.1 var(--ui); overflow: hidden; }
+  @property --even { syntax: '<number>'; inherits: true; initial-value: 0; }
+  #matchups { --even: 0; transition: --even 0.5s cubic-bezier(0.3, 0.7, 0.2, 1); }
+  #matchups.even { --even: 1; }
+  .strip i { font: 500 10px var(--ui); font-style: normal; opacity: 0.75; white-space: nowrap; }
+  @media (max-width: 640px) { .strips li { grid-template-columns: 1fr; gap: 4px; } }
+  @media (prefers-reduced-motion: reduce) { #matchups { transition: none; } }
+
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
   .st3 > .card { display: flex; flex-direction: column; }
@@ -422,5 +431,12 @@ const _ = ordinal;
     const sel = document.getElementById('mu-venue');
     if (!sel) return;
     sel.addEventListener('change', () => document.querySelectorAll('[data-venue]').forEach((b) => { b.hidden = b.dataset.venue !== sel.value; }));
+    const size = document.getElementById('mu-size');
+    const section = document.getElementById('matchups');
+    let saved = 'share';
+    try { saved = localStorage.getItem('lc-mu-size') || 'share'; } catch {}
+    const apply = (v) => { section.classList.toggle('even', v === 'even'); size.value = v; };
+    apply(saved);
+    size.addEventListener('change', () => { apply(size.value); try { localStorage.setItem('lc-mu-size', size.value); } catch {} });
   })();
 </script>
