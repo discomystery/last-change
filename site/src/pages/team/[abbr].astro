@@ -43,6 +43,7 @@ const venues = [['all', 'in all games'], ['home', 'at home'], ['road', 'on the r
 const oppName = ['first', 'second', 'third', 'fourth'];
 const heat = (v: number | null) => (v === null ? '' : `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.5)}%, var(--sheet)); color: ${v >= 36 ? 'var(--sheet)' : 'var(--ink)'}`);
 const unitNames = (label: string) => ln.units.find((u) => u.label === label)?.players.join(', ') ?? '';
+const lastNames = (label: string) => (ln.units.find((u) => u.label === label)?.players ?? []).map((n) => n.split(' ').slice(1).join(' '));
 const standouts = (rows: MRow[]) => rows.filter((r) => r.minutes >= 15).flatMap((r) => r.share.map((v, j) => ({ r, j, v: v ?? 0, gap: (v ?? 0) - r.expected[j] }))).filter((x) => x.gap >= 10).sort((a, b) => b.gap - a.gap).slice(0, 3);
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
@@ -160,7 +161,7 @@ const _ = ordinal;
               {top.length > 0 && (
                 <div class="card worth">
                   <p class="mini-h">Standing out {label}</p>
-                  <ul>{top.map((x) => <li><strong>{x.r.label}</strong> ({unitNames(x.r.label)}) has spent {x.v}% of its time against opponents’ {oppName[x.j]} lines. Ordinary line rotation would give about {x.r.expected[x.j]}%.</li>)}</ul>
+                  <ul>{top.map((x) => <li><strong>{lastNames(x.r.label).join(', ')}</strong> ({x.r.label}) {x.r.label[0] === 'L' ? 'have' : 'have'} spent {x.v}% of their time against opponents’ {oppName[x.j]} lines. With no line matching it would be about {x.r.expected[x.j]}%.</li>)}</ul>
                 </div>
               )}
               <div class="two grids">
@@ -172,8 +173,8 @@ const _ = ordinal;
                       <tbody>
                         {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
                           <tr class:list={{ thin: r.minutes < 10 }}>
-                            <th scope="row" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}>{r.label}</th>
-                            {r.share.map((v, j) => <td style={heat(v)} data-tip={v === null ? 'No ice time yet.' : `${r.label} (${unitNames(r.label)}) has spent ${v}% of its 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. Rotation alone would give about ${r.expected[j]}%.`}>{v === null ? '–' : `${v}%`}</td>)}
+                            <th scope="row" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}><b>{r.label}</b><span class="who">{lastNames(r.label).join(' · ')}</span></th>
+                            {r.share.map((v, j) => <td style={heat(v)} data-tip={v === null ? 'No ice time yet.' : `${r.label} (${unitNames(r.label)}) has spent ${v}% of its 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}>{v === null ? '–' : `${v}%`}</td>)}
                           </tr>
                         ))}
                       </tbody>
@@ -184,7 +185,8 @@ const _ = ordinal;
             </div>
           );
         })}
-        <p class="note">Each row adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes. “Ordinary rotation” is how much each opposing line plays against {team.place} overall.</p>
+        <p class="note">Each row adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes.</p>
+        <p class="note"><strong>What “with no line matching” means:</strong> if a coach just rolled his lines and took whoever was out there, each of his groups would face the opponent’s first line about as often as that line is on the ice. If opposing first lines play a third of the time against {team.place}, every {team.place} group would see them for about a third of its shifts. A number well above that means the coach is sending that group out against them on purpose; well below means he is keeping it away.</p>
       </>
     )}
   </Section>
@@ -334,7 +336,10 @@ const _ = ordinal;
   .grids { align-items: stretch; margin-top: 16px; }
   .heat { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 13px; table-layout: fixed; }
   .heat th { font-weight: 600; font-size: 11px; color: var(--ink-2); padding: 4px 2px; white-space: nowrap; }
-  .heat tbody th { text-align: left; width: 44px; font-size: 14px; color: var(--ink); cursor: help; }
+  .heat tbody th { text-align: left; width: 46%; font-size: 14px; color: var(--ink); cursor: help; white-space: normal; line-height: 1.25; padding-right: 8px; }
+  .heat tbody th b { margin-right: 8px; }
+  .heat tbody th .who { font: 400 13px var(--ui); color: var(--ink-2); }
+  @media (max-width: 560px) { .heat tbody th { width: 34%; } .heat tbody th .who { display: block; font-size: 12px; } }
   .heat tbody td { text-align: center; padding: 11px 0; border-radius: 4px; font-weight: 600; }
   .heat tr.thin td { opacity: 0.45; }
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
