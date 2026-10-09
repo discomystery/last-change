@@ -242,7 +242,7 @@ const nav = [
       {[away, null, home].map((a) => a === null ? (
         <div class="card gmid">
           <p class="mini-h"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are the rest of the league; filled dots are probable starters, outlined dots are backups.">Helping, or hung out to dry?</span></p>
-          <Quadrant league={m.leagueGoalies} highlights={quadHighlights} />
+          <Quadrant tall league={m.leagueGoalies} highlights={quadHighlights} />
         </div>
       ) : m.goalies[a].map((g, i) => (
         <div class:list={['card', 'gcard', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0}>
@@ -296,33 +296,31 @@ const nav = [
   <Section id="win" title="How they win" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton scores on the power play and off the rush.">
     <h3 class="sub">Where the goals come from</h3>
     <div class="key">
-      {order.map((a) => <span class={`t-${a}`}><i></i>{a}</span>)}
+      {order.map((a) => <span class={`t-${a}`}><i></i>{teams[a].place}</span>)}
       <span class="avg">League average</span>
     </div>
-    <ul class="src card">
-      {m.goalSources.map((s) => (
-        <li>
-          <span class="term src-label" tabindex="0" data-tip={s.tip}>{s.label}</span>
-          <div class="src-bars">
-            {order.map((a) => (
-              <div class:list={['srcbar', `t-${a}`]} data-tip={`${teams[a].place}: ${s[a]}% of goals. League average: ${s.lg}%.`}>
-                <span class="bar-team">{a}</span>
-                <span class="src-track"><span class="src-fill" style={`width:${(s[a] / maxSource) * 100}%`}></span><span class="src-lg" style={`left:${(s.lg / maxSource) * 100}%`}></span></span>
-                <span class="bar-val">{s[a]}%</span>
-              </div>
-            ))}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div class="card">
+      <ul class="srows">
+        {m.goalSources.map((s) => (
+          <li>
+            <span class="term srow-name" tabindex="0" data-tip={s.tip}>{s.label}</span>
+            <span class="sline" data-tip={`${teams[away].place} ${s[away]}%, ${teams[home].place} ${s[home]}%. League average ${s.lg}%.`}>
+              <span class="slg" style={`left:${(s.lg / maxSource) * 100}%`}></span>
+              <span class="sspan" style={`left:${(Math.min(s.CAR, s.EDM) / maxSource) * 100}%;width:${(Math.abs(s.CAR - s.EDM) / maxSource) * 100}%`}></span>
+              {order.map((a) => <span class={`sdot t-${a}`} style={`left:${(s[a] / maxSource) * 100}%`}></span>)}
+            </span>
+            <span class="snums">{order.map((a) => <span class={`t-${a}`}><i></i>{s[a]}%</span>)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+    <p class="note">Share of each team’s goals that come from each source. The further apart the dots, the more the two teams differ.</p>
     <h3 class="sub">What tends to be true when they win</h3>
-    <div class="two">
+    <div class="two wins">
       {order.map((a) => (
-        <div class={`t-${a}`}>
-          <h3 class="team-h">{full(a)}</h3>
-          <ul class="recipe">
-            {m.recipes[a].map((r) => <li class="card"><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}
-          </ul>
+        <div class:list={['card', `t-${a}`]}>
+          <p class="gname"><i></i>When {teams[a].place} wins</p>
+          <ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul>
         </div>
       ))}
     </div>
@@ -395,7 +393,7 @@ const nav = [
   @media (min-width: 720px) { .clashes { grid-template-columns: repeat(3, 1fr); } }
   .clashes p { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
   .clashes p strong { margin-right: 4px; }
-  .clashes .vs { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 2px 0; }
+  .clashes .vs { font-family: var(--ui); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 2px 0; }
   .big { font: 700 30px/1 var(--display); margin-left: auto; }
 
   .units, .players, .recipe, .meet { display: grid; gap: 14px; }
@@ -435,6 +433,22 @@ const nav = [
   .gkv dt { color: var(--ink-2); }
   .gkv dd { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }
   .gmore { margin-top: 14px; align-items: stretch; }
+  .srows li { display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto; align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid var(--rule); }
+  .srows li:first-child { border-top: 0; }
+  .srow-name { font: 600 14px var(--ui); justify-self: start; }
+  .sline { position: relative; height: 14px; margin-inline: 7px; }
+  .sline::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .slg { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; }
+  .sspan { position: absolute; top: 5px; height: 4px; background: var(--ink-3); }
+  .sdot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
+  .snums { display: inline-flex; gap: 14px; font: 600 13px var(--ui); }
+  .snums span { display: inline-flex; align-items: center; gap: 5px; min-width: 48px; }
+  .snums i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }
+  .wins { align-items: stretch; }
+  .rec { display: grid; gap: 14px; }
+  .rec li + li { border-top: 1px solid var(--rule); padding-top: 14px; }
+  .rec .cite { margin-top: 4px; }
   .gsay { display: inline !important; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
   .tile { display: grid; gap: 6px; grid-template-rows: 1fr auto auto auto; }
@@ -475,7 +489,7 @@ const nav = [
   .work.tight { margin-top: 0; }
   .cons { display: grid; gap: 12px; margin-top: 14px; }
   @media (min-width: 480px) { .cons { grid-template-columns: 1fr 1fr; align-items: end; } }
-  .mini-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 6px; }
+  .mini-h { font-family: var(--ui); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 6px; }
   .scout { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--ink); background: var(--ice); border-radius: 0 6px 6px 0; font-size: 14px; font-style: italic; }
   .scout .mini-h { font-style: normal; }
 
