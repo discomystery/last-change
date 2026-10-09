@@ -62,6 +62,14 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Footer on every page: "Expected goals data from MoneyPuck.com", "Game data: NHL", and a "not affiliated with the NHL" disclaimer.
 - "What to watch" insights are rules-based templates citing metric and sample size. No free-text generation at runtime.
 
+## Decisions since the brief (user feedback, 2026-10-09)
+
+- Look: bookish rounded serif (Fraunces display with SOFT 100, Literata body, Hanken Grotesk for data and labels) on the cool "ice" palette, keeping the rink motifs. Keep pages airy; the first mock was too dense.
+- No full-width bar charts. Fingerprint dimensions are cards: a short two-lane scale (one dot per team, likely-range whisker, league-average tick), a one-word label at each extreme (e.g. Sieve / Wall; the user may rename these), and a plain-language sentence per team with the actual stat and league rank.
+- Arena-scorer adjustment needs a real explainer: what it is, the exact calculation, and a table of all 32 arenas with their factors per event type.
+- Season switch: every metric is exported twice (blended with prior seasons, and current season only) and the site toggles between them client-side. Blended is the default.
+- Post-game page compares the preview with what happened. Each "What to watch" insight must be stored as a structured, checkable claim (metric, team, baseline, direction, threshold) in a preview snapshot frozen at puck drop; the recap grades each claim by rule (held up / partly / didn't happen) and never rewrites the preview. Keep a season-long tally of how often claims hold. This moves the recap's preview-vs-result part into Phase 3; player report cards stay in Phase 4.
+
 ## Phases
 
 0. Setup. 1. Mock preview with placeholder numbers. 2. Data pipeline and validation suite. 3. Real preview. 4. Deeper analysis. Details in brief Section 9; validation targets in Section 8.

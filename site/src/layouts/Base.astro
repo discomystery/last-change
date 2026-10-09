@@ -13,7 +13,7 @@ const base = import.meta.env.BASE_URL;
     <meta name="robots" content="noindex" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,500..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div class="mockbar" role="note">
@@ -71,8 +71,9 @@ const base = import.meta.env.BASE_URL;
     --EDM: #1f4e9e;
     --line-red: rgba(200, 16, 46, 0.32);
     --line-blue: rgba(31, 78, 158, 0.32);
-    --display: 'Saira Condensed', 'Arial Narrow', sans-serif;
-    --body: 'Hanken Grotesk', system-ui, sans-serif;
+    --display: 'Fraunces', Georgia, serif;
+    --body: 'Literata', Georgia, serif;
+    --ui: 'Hanken Grotesk', system-ui, sans-serif;
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -95,7 +96,9 @@ const base = import.meta.env.BASE_URL;
 
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--ice); color: var(--ink); font: 400 16px/1.5 var(--body); font-variant-numeric: tabular-nums; }
+  body { margin: 0; background: var(--ice); color: var(--ink); font: 400 17px/1.6 var(--body); font-variant-numeric: lining-nums tabular-nums; }
+  h1, h2, h3, h4, .wordmark { font-variation-settings: 'SOFT' 100; }
+  .mockbar, .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
   a { color: inherit; }
   h1, h2, h3, p, figure, ul, ol, dl, dd { margin: 0; padding: 0; }
   ul, ol { list-style: none; }
@@ -108,23 +111,23 @@ const base = import.meta.env.BASE_URL;
   }
   .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
   .site-head { display: flex; align-items: baseline; gap: 10px; padding-block: 18px 6px; }
-  .wordmark { font: 800 26px/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; }
+  .wordmark { font: 700 26px/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }
   .wordmark-note { font-size: 12px; color: var(--ink-3); }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
 
   /* Sections */
-  .sec { margin-top: 44px; }
-  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border-bottom: 2px solid var(--ink); padding-bottom: 6px; }
-  .sec-head h2 { font: 700 30px/1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+  .sec { margin-top: 72px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; }
+  .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
-  .takeaway { margin-top: 10px; color: var(--ink-2); max-width: 62ch; }
-  .sub { font: 700 19px/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin: 26px 0 10px; }
-  .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; }
-  .two { display: grid; gap: 16px; margin-top: 16px; }
+  .takeaway { margin-top: 14px; color: var(--ink-2); max-width: 58ch; font-size: 18px; }
+  .sub { font: 600 23px/1.15 var(--display); margin: 40px 0 12px; }
+  .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px; padding: 18px; }
+  .two { display: grid; gap: 28px 24px; margin-top: 22px; }
   @media (min-width: 820px) { .two { grid-template-columns: 1fr 1fr; } }
-  .team-h { display: flex; align-items: center; gap: 8px; font: 700 20px/1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
-  .team-h::before, .key i { content: ''; width: 12px; height: 12px; border-radius: 3px; background: var(--team); display: inline-block; }
-  .note { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .team-h { display: flex; align-items: center; gap: 8px; font: 700 22px/1 var(--display); margin-bottom: 14px; }
+  .team-h::before, .key i { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--team); display: inline-block; }
+  .note { font-size: 14px; line-height: 1.5; color: var(--ink-2); margin-top: 12px; max-width: 64ch; }
   .term { text-decoration: underline dotted var(--ink-3); text-underline-offset: 3px; cursor: help; }
   .key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin-top: 14px; align-items: center; }
   .key span { display: inline-flex; align-items: center; gap: 6px; }
@@ -133,7 +136,10 @@ const base = import.meta.env.BASE_URL;
   .chip { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
   .chip.solid { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
 
-  #tip { position: fixed; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--sheet); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 6px; pointer-events: none; }
+  details > summary { cursor: pointer; font: 600 14px var(--ui); color: var(--ink-2); padding: 6px 0; }
+  details[open] > summary { margin-bottom: 8px; }
+
+  #tip { font-family: var(--ui); position: fixed; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--sheet); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 6px; pointer-events: none; }
 
   /* Percentile bars */
   .bar { display: grid; grid-template-columns: 34px 1fr 26px; align-items: center; gap: 8px; font-size: 12px; }

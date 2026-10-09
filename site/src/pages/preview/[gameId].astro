@@ -5,6 +5,7 @@ import Bar from '../../components/Bar.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import Histogram from '../../components/Histogram.astro';
 import Quadrant from '../../components/Quadrant.astro';
+import Rink from '../../components/Rink.astro';
 import * as m from '../../data/mock';
 
 export function getStaticPaths() {
@@ -29,24 +30,21 @@ const nav = [
 ---
 <Base title={`${away} at ${home} preview`}>
   <section class="hero" aria-label="Matchup">
-    <div class="rink">
-      <span class="rl goal l"></span><span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span><span class="rl goal r"></span>
-      <span class="dot-circle"><span>at</span></span>
-      {order.map((a) => (
-        <div class:list={['side', `t-${a}`, a === home ? 'is-home' : 'is-away']}>
-          <p class="abbr">{a}</p>
-          <p class="fullname">{full(a)}</p>
-          <p class="rec">{rec(a)}</p>
-          {a === home && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
-        </div>
-      ))}
-    </div>
+    <Rink />
     <dl class="meta">
       <div><dt>When</dt><dd>{dateStr}, {timeStr}</dd></div>
       <div><dt>Where</dt><dd>{m.game.venue}</dd></div>
       <div><dt>Probable goalies</dt><dd>{m.goalies[away][0].name} · {m.goalies[home][0].name}</dd></div>
       <div><dt>Data as of</dt><dd>{asOf}</dd></div>
     </dl>
+    <div class="mode-row">
+      <span class="mode-label">Numbers based on</span>
+      <div class="mode" role="group" aria-label="Which seasons the numbers use">
+        <button type="button" data-mode-btn="blend" aria-pressed="true">This season and last</button>
+        <button type="button" data-mode-btn="season" aria-pressed="false">This season only</button>
+      </div>
+      <span class="mode-note">In this mock-up the switch changes the style fingerprints only.</span>
+    </div>
     <nav class="jump" aria-label="Sections">
       {nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}
     </nav>
@@ -68,21 +66,42 @@ const nav = [
     <div class="key">
       {order.map((a) => <span class={`t-${a}`}><i></i>{full(a)}</span>)}
       <span class="avg">League average</span>
-      <span class="rng">Likely range (wide this early in the season)</span>
+      <span class="rng">Likely range</span>
     </div>
-    <ul class="fp card">
-      {m.fingerprint.map((d) => (
-        <li class:list={{ clash: m.clashKeys.has(d.key) }}>
-          <div class="fp-label">
-            <span class="term" tabindex="0" data-tip={d.tip}>{d.label}</span>
-            {m.clashKeys.has(d.key) && <span class="chip solid">Clash</span>}
-          </div>
-          <div class="fp-bars">
-            {order.map((a) => <Bar team={a} pct={d[a]} band={m.fingerprintBands[d.key][a]} label={`${teams[a].place}, ${d.label.toLowerCase()}`} />)}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {teams[away].record.gp} or {teams[home].record.gp} games played so far.</p>
+    <p class="note m-season">This season only: {teams[away].record.gp} games for {teams[away].place}, {teams[home].record.gp} for {teams[home].place}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
+    {m.fpGroups.map((g) => (
+      <>
+        <h3 class="sub">{g}</h3>
+        <ul class="fpgrid">
+          {m.fpCards.filter((c) => c.group === g).map((c) => (
+            <li class="card fpc">
+              <div class="fpc-top">
+                <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
+                {c.clash && <span class="chip solid">Clash</span>}
+              </div>
+              <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
+              <div class="lanes">
+                {order.map((a) => (
+                  <div class:list={['lane', `t-${a}`]} style={`--b:${c[a].blend.pct};--bb:${c[a].blend.band};--c:${c[a].season.pct};--cb:${c[a].season.band}`}>
+                    <span class="whisk"></span><span class="dot"></span>
+                  </div>
+                ))}
+              </div>
+              <ul class="fpc-stats">
+                {order.map((a) => (
+                  <li class={`t-${a}`}>
+                    <i></i>
+                    <span class="m-blend"><b>{teams[a].place}:</b> {c[a].blend.text}. <em>{c[a].blend.rank} of 32</em></span>
+                    <span class="m-season"><b>{teams[a].place}:</b> {c[a].season.text}. <em>{c[a].season.rank} of 32</em></span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </>
+    ))}
     <h3 class="sub">Where the styles collide</h3>
     <ul class="clashes">
       {m.clashes.map((c) => (
@@ -93,6 +112,7 @@ const nav = [
         </li>
       ))}
     </ul>
+    <p class="note">The big numbers are league percentiles: 90 means better than 90% of the league at that thing.</p>
   </Section>
 
   <Section id="lines" title="Lines and deployment" takeaway={`${teams[home].place} is at home, so ${teams[home].coach ?? 'its coach'} chooses who plays against whom.`}>
@@ -179,12 +199,15 @@ const nav = [
                     <ul>{u.players.map((p) => <li><span>{p.name}</span><span class="chip">{p.role}</span></li>)}</ul>
                   </div>
                 ))}
-                {s.pk.map((u) => (
-                  <div class="ppunit">
-                    <p class="unit-label">{u.label} <span class="n">{u.share}% of penalty-kill time</span></p>
-                    <p class="pk-names">{u.players.join(' · ')}</p>
-                  </div>
-                ))}
+                <details>
+                  <summary>Penalty killers</summary>
+                  {s.pk.map((u) => (
+                    <div class="ppunit">
+                      <p class="unit-label">{u.label} <span class="n">{u.share}% of penalty-kill time</span></p>
+                      <p class="pk-names">{u.players.join(' · ')}</p>
+                    </div>
+                  ))}
+                </details>
                 <p class="note">Role tags are rules of thumb based on where each player shoots and passes from.</p>
               </div>
             </div>
@@ -217,6 +240,8 @@ const nav = [
                 <span class:list={['chip', { solid: g.probable }]}>{g.probable ? 'Probable starter' : 'Backup'}</span>
               </header>
               <p class="gsax"><strong>{signed(g.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> <span class="n">in {g.starts} starts</span></p>
+              <details open={g.probable}>
+              <summary>{g.probable ? 'His numbers' : 'Show his numbers'}</summary>
               <table class="tiers">
                 <thead><tr><td></td><th scope="col">Save %</th><th scope="col">Saved above expected</th></tr></thead>
                 <tbody>{g.tiers.map((t) => <tr><th scope="row">{t.tier}</th><td>{t.sv.toFixed(3).slice(1)}</td><td>{signed(t.gsax)}</td></tr>)}</tbody>
@@ -239,6 +264,7 @@ const nav = [
                 <p class="mini-h">Scout’s note</p>
                 <p>Puck handling: no note yet. This space is for what you see watching him, since public data doesn’t track it.</p>
               </aside>
+              </details>
             </article>
           ))}
         </div>
@@ -313,56 +339,44 @@ const nav = [
       <li><strong>Early season.</strong> Each team has played only {teams[away].record.gp} or {teams[home].record.gp} games, so the real page will blend this season with last season and show wide ranges until samples grow.</li>
       <li><strong>Percentiles</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
       <li><strong>Blind spot.</strong> Public shot data doesn’t record passes before a shot or where defenders are standing.</li>
-      <li><strong>Hits, giveaways, takeaways and blocks</strong> are counted by each arena’s scorer, and some arenas count more generously than others. The real page corrects for that.</li>
+      <li><strong>Hits, giveaways, takeaways and blocks</strong> are counted by each arena’s scorer, and some arenas count more generously than others. Anything marked “arena-adjusted” corrects for that.</li>
     </ul>
+    <details class="card explain">
+      <summary>How the arena adjustment works, with an example</summary>
+      <p>Take {m.arenaExample.event} at {m.arenaExample.arena}. Over three seasons, games played there averaged <strong>{m.arenaExample.here}</strong> {m.arenaExample.event} per hour for both teams combined. The same teams, in every other building, averaged <strong>{m.arenaExample.elsewhere}</strong>.</p>
+      <p>{m.arenaExample.here} ÷ {m.arenaExample.elsewhere} = <strong>{m.arenaExample.raw.toFixed(2)}</strong>, so this scorer counts about 20% more {m.arenaExample.event} than those teams get elsewhere. Because a few seasons is still a limited sample, that figure is pulled part of the way back toward 1.00, landing at <strong>{m.arenaExample.shrunk.toFixed(2)}</strong>.</p>
+      <p>Every {m.arenaExample.event.slice(0, -1)} recorded in that building is then divided by {m.arenaExample.shrunk.toFixed(2)}. A night with {m.arenaExample.rawCount} recorded {m.arenaExample.event} counts as <strong>{(m.arenaExample.rawCount / m.arenaExample.shrunk).toFixed(1)}</strong>.</p>
+      <p class="note">These numbers are invented. The real site will have a page listing all 32 arenas with their actual figures for hits, giveaways, takeaways and blocks.</p>
+    </details>
+    <p class="after"><a href={`${import.meta.env.BASE_URL}recap/${m.game.id}/`}>After the game: see how this preview held up (mock-up)</a></p>
   </Section>
 </Base>
 
 <style>
   .hero { margin-top: 10px; }
-  .rink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 2px solid var(--ink); border-radius: 44px; overflow: hidden; min-height: 210px; }
-  .rl { position: absolute; top: 0; bottom: 0; }
-  .rl.red { left: 50%; width: 5px; margin-left: -2.5px; background: var(--line-red); }
-  .rl.blue { width: 5px; background: var(--line-blue); }
-  .rl.blue.l { left: 37.5%; } .rl.blue.r { right: 37.5%; }
-  .rl.goal { width: 1px; background: var(--line-red); }
-  .rl.goal.l { left: 5.5%; } .rl.goal.r { right: 5.5%; }
-  .dot-circle { position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: 600 22px/1 var(--display); text-transform: uppercase; color: var(--ink-2); }
-  .side { position: relative; padding: 26px clamp(22px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-  .side.is-home { text-align: right; align-items: flex-end; }
-  .abbr { font: 800 clamp(64px, 17vw, 132px) / 0.86 var(--display); letter-spacing: -0.01em; color: var(--team); }
-  .fullname { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 8px; }
-  .rec { color: var(--ink-2); font-size: 14px; }
-  .lc { font-size: 13px; font-weight: 600; margin-top: 4px; }
   .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
-  .meta dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
+  .meta dt { font-family: var(--ui); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
   .meta dd { font-weight: 500; }
-  .jump { display: flex; gap: 6px; overflow-x: auto; margin: 18px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
+  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 18px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
   .jump a:hover { border-color: var(--ink); }
 
   .n, .cite { font-size: 12px; color: var(--ink-3); font-weight: 400; }
-  .watch { display: grid; gap: 12px; margin-top: 16px; }
+  .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
-  .watch h3 { font: 700 21px/1.1 var(--display); letter-spacing: 0.01em; margin-bottom: 6px; }
+  .watch h3 { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
   .watch .cite { margin-top: 8px; }
 
-  .fp { margin-top: 12px; padding: 4px 14px; }
-  .fp li { display: grid; gap: 6px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
-  .fp li:last-child { border-bottom: 0; }
-  .fp-label { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
-  .fp-bars { display: grid; gap: 5px; }
-  @media (min-width: 720px) { .fp li { grid-template-columns: 230px 1fr; align-items: center; gap: 16px; } }
   .clashes { display: grid; gap: 12px; }
   @media (min-width: 720px) { .clashes { grid-template-columns: repeat(3, 1fr); } }
   .clashes p { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
   .clashes p strong { margin-right: 4px; }
   .clashes .vs { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 2px 0; }
-  .big { font: 700 28px/1 var(--display); margin-left: auto; }
+  .big { font: 700 30px/1 var(--display); margin-left: auto; }
 
-  .units, .players, .recipe, .meet { display: grid; gap: 10px; }
+  .units, .players, .recipe, .meet { display: grid; gap: 14px; }
   .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-  .unit-label { font: 700 18px/1 var(--display); color: var(--team, var(--ink)); letter-spacing: 0.03em; }
+  .unit-label { font: 700 19px/1 var(--display); color: var(--team, var(--ink)); }
   .unit-names { font-weight: 600; flex: 1 1 auto; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; margin-top: 10px; }
   @media (min-width: 480px) { .stats { grid-template-columns: repeat(6, 1fr); } }
@@ -388,11 +402,14 @@ const nav = [
   .quad-wrap { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 820px) { .quad-wrap { grid-template-columns: 1fr 1.25fr; align-items: center; } }
   .sub.first { margin-top: 0; }
-  .goalie { margin-bottom: 12px; }
+  .goalie { margin-bottom: 14px; }
+  .explain { margin-top: 18px; max-width: 70ch; }
+  .explain p { margin-top: 10px; font-size: 16px; }
+  .after { margin-top: 28px; font-weight: 600; }
   .goalie header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .goalie h4 { font: 700 22px/1 var(--display); margin: 0; letter-spacing: 0.02em; }
+  .goalie h4 { font: 700 24px/1 var(--display); margin: 0; }
   .gsax { margin-top: 8px; font-size: 14px; }
-  .gsax strong { font: 700 34px/1 var(--display); margin-right: 4px; }
+  .gsax strong { font: 700 38px/1 var(--display); margin-right: 4px; }
   .tiers { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
   .tiers th, .tiers td { padding: 5px 0; border-bottom: 1px solid var(--rule); text-align: right; font-weight: 500; }
   .tiers thead th { font-size: 11px; color: var(--ink-3); font-weight: 600; }
@@ -407,11 +424,11 @@ const nav = [
   .scout { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--ink); background: var(--ice); border-radius: 0 6px 6px 0; font-size: 14px; font-style: italic; }
   .scout .mini-h { font-style: normal; }
 
-  .src { margin-top: 12px; padding: 4px 14px; }
+  .src { margin-top: 12px; padding: 6px 18px; max-width: 720px; }
   .src li { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
   .src li:last-child { border-bottom: 0; }
   .src-label { font-weight: 600; font-size: 14px; justify-self: start; }
-  @media (min-width: 720px) { .src li { grid-template-columns: 230px 1fr; align-items: center; gap: 16px; } }
+  @media (min-width: 720px) { .src li { grid-template-columns: 200px 1fr; align-items: center; gap: 16px; } }
   .src-bars { display: grid; gap: 5px; }
   .srcbar { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 8px; font-size: 12px; }
   .src-track { position: relative; height: 8px; }
@@ -422,3 +439,47 @@ const nav = [
   .players .rate:last-child { margin-bottom: 0; }
   .notes { margin-top: 14px; display: grid; gap: 10px; max-width: 70ch; font-size: 15px; }
 </style>
+
+<style is:global>
+  /* Season switch: the page carries both sets of numbers and shows one. */
+  .m-season { display: none; }
+  html[data-mode='season'] .m-season { display: revert; }
+  html[data-mode='season'] .m-blend { display: none; }
+  .mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 20px; font-family: var(--ui); font-size: 13px; color: var(--ink-2); }
+  .mode-label { font-weight: 600; }
+  .mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--sheet); }
+  .mode button { font: 600 13px var(--ui); color: var(--ink); background: none; border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .mode button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
+
+  /* Fingerprint cards */
+  .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .fpc { display: grid; gap: 10px; align-content: start; }
+  .fpc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .fpc-name { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
+  .ends { display: flex; justify-content: space-between; gap: 8px; font: italic 400 14px var(--body); color: var(--ink-2); margin-bottom: -4px; }
+  .lanes { position: relative; display: grid; gap: 4px; padding: 4px 7px; }
+  .lanes::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; border-radius: 1px; }
+  .lane { position: relative; height: 14px; --v: var(--b); --w: var(--bb); }
+  html[data-mode='season'] .lane { --v: var(--c); --w: var(--cb); }
+  .lane::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(max(0, var(--v) - var(--w)) * 1%); width: calc((min(100, var(--v) + var(--w)) - max(0, var(--v) - var(--w))) * 1%); transition: left 0.35s, width 0.35s; }
+  .dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; transition: left 0.35s; }
+  @media (prefers-reduced-motion: reduce) { .dot, .whisk { transition: none; } }
+  .fpc-stats { display: grid; gap: 6px; font: 400 14px/1.4 var(--ui); }
+  .fpc-stats li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
+  .fpc-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .fpc-stats em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+</style>
+<script is:inline>
+  (() => {
+    const set = (mode) => {
+      document.documentElement.dataset.mode = mode;
+      document.querySelectorAll('[data-mode-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modeBtn === mode)));
+      try { localStorage.setItem('mode', mode); } catch {}
+    };
+    let saved = 'blend';
+    try { saved = localStorage.getItem('mode') || 'blend'; } catch {}
+    set(saved);
+    document.querySelectorAll('[data-mode-btn]').forEach((b) => b.addEventListener('click', () => set(b.dataset.modeBtn)));
+  })();
+</script>

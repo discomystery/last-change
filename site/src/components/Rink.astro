@@ -1,0 +1,42 @@
+---
+// The matchup drawn as a rink seen from above: visitors on the left, home team on the right.
+import { order, home, teams, type Abbr } from '../data/mock';
+interface Props { score?: Record<Abbr, number>; centre?: string }
+const { score, centre = 'at' } = Astro.props;
+const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].record.otl}`;
+---
+<div class="rink">
+  <span class="rl goal l"></span><span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span><span class="rl goal r"></span>
+  <span class="dot-circle"><span>{centre}</span></span>
+  {order.map((a) => (
+    <div class:list={['side', `t-${a}`, a === home ? 'is-home' : 'is-away']}>
+      <p class="abbr">{a}{score && <span class="score">{score[a]}</span>}</p>
+      <p class="fullname">{teams[a].place} {teams[a].name}</p>
+      {!score && <p class="rec">{rec(a)}</p>}
+      {a === home && !score && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
+    </div>
+  ))}
+</div>
+
+<style>
+  .rink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 2px solid var(--ink); border-radius: 56px; overflow: hidden; min-height: 220px; }
+  .rl { position: absolute; top: 0; bottom: 0; }
+  .rl.red { left: 50%; width: 5px; margin-left: -2.5px; background: var(--line-red); }
+  .rl.blue { width: 5px; background: var(--line-blue); }
+  .rl.blue.l { left: 37.5%; } .rl.blue.r { right: 37.5%; }
+  .rl.goal { width: 1px; background: var(--line-red); }
+  .rl.goal.l { left: 5.5%; } .rl.goal.r { right: 5.5%; }
+  .dot-circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
+  .side { position: relative; padding: 28px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
+  .side.is-home { text-align: right; align-items: flex-end; }
+  .abbr { font: 800 clamp(42px, 12.5vw, 112px) / 0.9 var(--display); font-variation-settings: 'SOFT' 100; letter-spacing: -0.02em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
+  .is-home .abbr { flex-direction: row-reverse; }
+  .score { color: var(--ink); font-weight: 600; }
+  @media (max-width: 620px) {
+    .abbr:has(.score) { flex-direction: column; align-items: inherit; gap: 6px; }
+    .is-home .abbr:has(.score) { flex-direction: column; align-items: flex-end; }
+  }
+  .fullname { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
+  .rec { color: var(--ink-2); font: 400 14px var(--ui); }
+  .lc { font: 600 13px var(--ui); margin-top: 4px; }
+</style>

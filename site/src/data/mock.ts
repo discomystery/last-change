@@ -308,3 +308,113 @@ export function ordinal(n: number) {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+// ---------- Fingerprint cards: plain-language stats, end labels, and the season switch ----------
+type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: number; say: (v: number) => string; rankWord?: string };
+const f1 = (v: number) => v.toFixed(1);
+export const fpGroups = ['Offense', 'Defense', 'Tempo and edge', 'Special teams'];
+const fpMeta: Record<string, FpMeta> = {
+  volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `${f1(v)} shot attempts per hour` },
+  quality: { group: 'Offense', lo: 'Perimeter', hi: 'Point-blank', at0: 0.062, at100: 0.092, say: (v) => `one expected goal for every ${f1(1 / v)} shots` },
+  rush: { group: 'Offense', lo: 'Cycle', hi: 'Rush', at0: 6, at100: 18, say: (v) => `${f1(v)}% of chances come off the rush` },
+  rebounds: { group: 'Offense', lo: 'One-and-done', hi: 'Crashers', at0: 5, at100: 13, say: (v) => `${f1(v)}% of chances come from rebounds` },
+  turnover: { group: 'Offense', lo: 'Patient', hi: 'Opportunist', at0: 5, at100: 14, say: (v) => `${f1(v)}% of chances come right after a turnover` },
+  point: { group: 'Offense', lo: 'Down low', hi: 'Point-heavy', at0: 26, at100: 44, say: (v) => `${f1(v)}% of shot attempts come from the point` },
+  suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per hour` },
+  qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `opponents need ${f1(1 / v)} shots for one expected goal` },
+  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${f1(v)} breakdown chances allowed per hour` },
+  goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per hour` },
+  pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} unblocked shots per hour, both teams combined` },
+  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 9, at100: 21, say: (v) => `${f1(v)} forecheck plays per hour, arena-adjusted` },
+  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 16, at100: 32, say: (v) => `${f1(v)} hits per hour, arena-adjusted` },
+  depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `${f1(v)}% of 5-on-5 ice time goes to the bottom two lines and third pair` },
+  pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per hour on the power play` },
+  pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per hour shorthanded` },
+  powerKill: { group: 'Special teams', lo: 'Bunkered', hi: 'Predatory', at0: 0.3, at100: 1.4, say: (v) => `${f1(v)} expected goals created per hour shorthanded` },
+  discipline: { group: 'Special teams', lo: 'Reckless', hi: 'Clean', at0: -0.6, at100: 0.6, say: (v) => `${Math.abs(v).toFixed(2)} ${v >= 0 ? 'more penalties drawn than taken' : 'more penalties taken than drawn'} per hour` },
+};
+const fpView = (key: string, pct: number, band: number) => {
+  const meta = fpMeta[key];
+  const value = meta.at0 + (pct / 100) * (meta.at100 - meta.at0);
+  const rank = Math.max(1, Math.min(32, Math.round(32 - (pct / 100) * 31)));
+  return { pct, band, text: meta.say(value), rank: ordinal(rank) };
+};
+export const fpCards = fingerprint.map((d) => {
+  const meta = fpMeta[d.key];
+  const per = (a: Abbr) => ({
+    blend: fpView(d.key, d[a], fingerprintBands[d.key][a]),
+    season: fpView(d.key, clamp(d[a] + between(-24, 24)), Math.round(between(26, 34))),
+  });
+  return { key: d.key, label: d.label, tip: d.tip, group: meta.group, lo: meta.lo, hi: meta.hi, clash: clashKeys.has(d.key), CAR: per('CAR'), EDM: per('EDM') };
+});
+
+// Worked example for the arena-scorer explainer (invented numbers).
+export const arenaExample = {
+  arena: game.venue,
+  event: 'hits',
+  here: 46.8,
+  elsewhere: 39.0,
+  raw: 1.2,
+  shrunk: 1.15,
+  rawCount: 31,
+};
+
+// ---------- Post-game recap (invented result for layout review) ----------
+export type Verdict = 'held' | 'partly' | 'missed';
+export const recap = {
+  score: { CAR: 3, EDM: 4, note: 'Final' },
+  claims: [
+    {
+      said: insights[0].head,
+      detail: insights[0].body,
+      verdict: 'held' as Verdict,
+      measure: 'Edmonton rush chances',
+      usual: '6.1 per game',
+      tonight: '9',
+      happened: 'Edmonton got nine chances off the rush worth 1.4 expected goals, and scored twice on them.',
+    },
+    {
+      said: insights[1].head,
+      detail: insights[1].body,
+      verdict: 'missed' as Verdict,
+      measure: 'Edmonton shots per expected goal',
+      usual: '11.3',
+      tonight: '14.1',
+      happened: 'Carolina kept Edmonton to the outside at even strength. Edmonton’s shots were less dangerous than usual, not more.',
+    },
+    {
+      said: insights[2].head,
+      detail: insights[2].body,
+      verdict: 'partly' as Verdict,
+      measure: 'Edmonton top line against Carolina third line',
+      usual: '46% of its time',
+      tonight: '38%',
+      happened: 'The matchup was there in the first period and faded as Carolina changed lines faster after icings and whistles.',
+    },
+    {
+      said: insights[3].head,
+      detail: insights[3].body,
+      verdict: 'held' as Verdict,
+      measure: 'Edmonton power play / Carolina shorthanded',
+      usual: '9.4 and 1.3 expected goals per hour',
+      tonight: '10.4 and 3.5',
+      happened: 'Edmonton scored once in three power plays. Carolina answered with three shorthanded shot attempts and a goal of its own.',
+    },
+  ],
+  surprises: [
+    { head: 'Carolina won the rebound battle by a mile', body: 'Seven rebound chances to Edmonton’s one. Carolina averages 3.2 a game.' },
+    { head: 'Almost no hitting', body: 'The teams combined for 24 arena-adjusted hits, the fewest in any Carolina game this season.' },
+  ],
+  jobs: [
+    { team: 'CAR' as Abbr, name: teams.CAR && lines.CAR.fwd[0].players[0], role: 'Playmaker', verdict: 'held' as Verdict, line: '2 primary assists against about 0.4 expected for his ice time.' },
+    { team: 'CAR' as Abbr, name: lines.CAR.def[0].players[1], role: 'Shutdown', verdict: 'held' as Verdict, line: 'Carolina allowed 0.3 expected goals in his 14 minutes against Edmonton’s top line.' },
+    { team: 'CAR' as Abbr, name: lines.CAR.fwd[1].players[0], role: 'Hitter', verdict: 'missed' as Verdict, line: '1 hit against about 4 expected for his ice time.' },
+    { team: 'EDM' as Abbr, name: lines.EDM.fwd[0].players[0], role: 'Rush threat', verdict: 'held' as Verdict, line: '5 rush shots against about 2 expected.' },
+    { team: 'EDM' as Abbr, name: lines.EDM.def[0].players[1], role: 'Puck-mover', verdict: 'partly' as Verdict, line: '2 dangerous giveaways against about 0.8 expected, but 3 shot assists.' },
+    { team: 'EDM' as Abbr, name: lines.EDM.fwd[1].players[0], role: 'Forechecker', verdict: 'missed' as Verdict, line: 'No takeaways or hits in the offensive zone; usually about 3.' },
+  ],
+  goalies: [
+    { team: 'CAR' as Abbr, name: goalies.CAR[0].name, line: 'Allowed 4 on 2.9 expected goals. Three of the four came off breakdown chances.', gsax: '−1.1' },
+    { team: 'EDM' as Abbr, name: goalies.EDM[0].name, line: 'Allowed 3 on 3.4 expected goals while facing 38 shots.', gsax: '+0.4' },
+  ],
+};
