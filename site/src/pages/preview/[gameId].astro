@@ -7,6 +7,8 @@ import Histogram from '../../components/Histogram.astro';
 import Quadrant from '../../components/Quadrant.astro';
 import Rink from '../../components/Rink.astro';
 import FpCard from '../../components/FpCard.astro';
+import Pips from '../../components/Pips.astro';
+import Marker from '../../components/Marker.astro';
 import * as m from '../../data/mock';
 
 export function getStaticPaths() {
@@ -25,6 +27,9 @@ const maxSource = Math.max(...m.goalSources.flatMap((s) => [s.CAR, s.EDM, s.lg])
 const quadHighlights = order.flatMap((a) => m.goalies[a].map((g) => ({ team: a, name: g.name, probable: g.probable, x: g.xga60, y: g.gsax60 })));
 const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
 const biggest = [...m.fpCards].sort((x, y) => Math.abs(y.CAR.blend.pct - y.EDM.blend.pct) - Math.abs(x.CAR.blend.pct - x.EDM.blend.pct)).slice(0, 6);
+const other = (a: m.Abbr): m.Abbr => (a === 'CAR' ? 'EDM' : 'CAR');
+const stEnds: Record<string, [string, string]> = { 'Power play': ['Harmless', 'Lethal'], 'Penalty kill': ['Leaky', 'Airtight'], 'Power kill': ['Bunkered', 'Predatory'], Discipline: ['Reckless', 'Clean'] };
+const stName: Record<string, string> = { 'Power play': 'power play', 'Penalty kill': 'penalty kill', 'Power kill': 'shorthanded threat', Discipline: 'discipline' };
 const nav = [
   ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
   ['goalies', 'Goalies'], ['win', 'How they win'], ['players', 'Key players'], ['notes', 'Data notes'],
@@ -68,8 +73,8 @@ const nav = [
     <ul class="fpgrid">
       {biggest.map((c) => <FpCard c={c} />)}
     </ul>
-    <details class="all-traits">
-      <summary>Show all {m.fpCards.length} traits</summary>
+    <details class="fold">
+      <summary><span class="closed">Show all {m.fpCards.length} traits</span><span class="opened">Hide the full set</span></summary>
       {m.fpGroups.map((g) => (
         <>
           <h3 class="sub">{g}</h3>
@@ -93,30 +98,37 @@ const nav = [
   </Section>
 
   <Section id="lines" title="Lines and deployment" takeaway={`${teams[home].place} is at home, so ${teams[home].coach ?? 'its coach'} chooses who plays against whom.`}>
+    <div class="key">
+      <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
+      <span><span class="marker demo"><i style="left:65%"></i></span>How much, low to high (not good or bad)</span>
+    </div>
     <p class="note">Players are those who dressed in each team’s most recent game. How they are grouped here is a placeholder.</p>
     <div class="two">
       {order.map((a) => (
         <div class={`t-${a}`}>
           <h3 class="team-h">{full(a)}</h3>
           <ul class="units">
-            {[...m.lines[a].fwd, ...m.lines[a].def].map((u) => (
-              <li class="card unit">
-                <div class="unit-top">
-                  <span class="unit-label">{u.label}</span>
-                  <span class="unit-names">{u.players.join(' · ')}</span>
-                  <span class="chip">{u.role}</span>
-                </div>
-                <dl class="stats">
-                  <div><dt><span class="term" tabindex="0" data-tip="Average 5-on-5 minutes per game for this group.">Ice time</span></dt><dd>{u.toi.toFixed(1)}</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per hour: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf.toFixed(2)}</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per hour: how much the team gives up with this group on the ice.">Allows</span></dt><dd>{u.xga.toFixed(2)}</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.xgfPct.toFixed(1)}%</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Of the shifts the coach starts with a faceoff at either end, the share that start in the offensive zone.">Off. starts</span></dt><dd>{u.ozs}%</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="How tough their opponents are, as a league percentile. The spread between players is naturally narrow.">Competition</span></dt><dd>{u.qoc}</dd></div>
-                </dl>
-                <p class="n">{u.minutes} minutes together this season</p>
-              </li>
-            ))}
+            {[...m.lines[a].fwd, ...m.lines[a].def].map((u) => {
+              const pr = m.peers[a][u.label];
+              const grp = m.peerName[u.label];
+              return (
+                <li class="card unit">
+                  <div class="unit-top">
+                    <span class="unit-label">{u.label}</span>
+                    <span class="chip">{u.role}</span>
+                    <span class="unit-toi"><strong>{u.toi.toFixed(1)}</strong> min a game <Marker pct={pr.toi} tip={`More 5-on-5 ice time than ${pr.toi}% of ${grp} around the league.`} /></span>
+                  </div>
+                  <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
+                  <dl class="stats">
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per hour: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf.toFixed(2)}</dd><Pips pct={pr.xgf} tip={`Creates more than ${pr.xgf}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per hour: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga.toFixed(2)}</dd><Pips pct={pr.xga} tip={`Stingier than ${pr.xga}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.xgfPct.toFixed(1)}%</dd><Pips pct={pr.share} tip={`A better share than ${pr.share}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Of the shifts the coach starts with a faceoff at either end, the share that start in the offensive zone.">Off. starts</span></dt><dd>{u.ozs}%</dd><Marker pct={pr.ozs} tip={`More offensive-zone starts than ${pr.ozs}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="How tough the opponents they face are.">Competition</span></dt><dd>{u.qoc}</dd><Marker pct={pr.qoc} tip={`Tougher opponents than ${pr.qoc}% of ${grp}.`} /></div>
+                  </dl>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}
@@ -124,74 +136,79 @@ const nav = [
 
     <h3 class="sub">Who {teams[home].place} is likely to send against whom</h3>
     <p class="takeaway">Each row shows how one {teams[home].place} group’s 5-on-5 time is split across {teams[away].place}’s four forward lines, based on {teams[home].coach ?? 'the coach'}’s habits at home.</p>
-    {[{ title: 'Forward lines', rows: m.lines[home].fwd, data: m.matchupMatrix, open: true }, { title: 'Defense pairs', rows: m.lines[home].def, data: m.pairMatrix, open: false }].map((h) => (
-      <details class="card heatwrap" open={h.open}>
-        <summary>{teams[home].place} {h.title.toLowerCase()} against {teams[away].place} forward lines</summary>
-        <table class="heat">
-          <thead><tr><td></td>{m.lines[away].fwd.map((l) => <th scope="col">{away} {l.label}</th>)}</tr></thead>
-          <tbody>
-            {h.rows.map((r, i) => (
-              <tr>
-                <th scope="row">{home} {r.label}</th>
-                {h.data[i].map((v, j) => <td style={heat(v)} data-tip={`${home} ${r.label} (${r.players.join(', ')}) spends ${v}% of its 5-on-5 time against ${away} ${m.lines[away].fwd[j].label} (${m.lines[away].fwd[j].players.join(', ')})`}>{v}%</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
-    ))}
-
-    <details class="card heatwrap">
-      <summary>Previous meetings</summary>
-      <ul class="meet">
-        {m.meetings.map((g) => <li><p><strong>{g.score}</strong> <span class="n">{g.date}, {g.site}</span></p><p class="note">{g.note}</p></li>)}
+    <div class="two">
+      {[{ title: 'forward lines', rows: m.lines[home].fwd, data: m.matchupMatrix }, { title: 'defense pairs', rows: m.lines[home].def, data: m.pairMatrix }].map((h) => (
+        <div class="card">
+          <h4 class="mini-h">{teams[home].place} {h.title} against {teams[away].place} forward lines</h4>
+          <table class="heat">
+            <thead><tr><td></td>{m.lines[away].fwd.map((l) => <th scope="col">{away} {l.label}</th>)}</tr></thead>
+            <tbody>
+              {h.rows.map((r, i) => (
+                <tr>
+                  <th scope="row">{home} {r.label}</th>
+                  {h.data[i].map((v, j) => <td style={heat(v)} data-tip={`${home} ${r.label} (${r.players.join(', ')}) spends ${v}% of its 5-on-5 time against ${away} ${m.lines[away].fwd[j].label} (${m.lines[away].fwd[j].players.join(', ')})`}>{v}%</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+    <details class="fold">
+      <summary><span class="closed">Show previous meetings</span><span class="opened">Hide previous meetings</span></summary>
+      <ul class="two meet">
+        {m.meetings.map((g) => <li class="card"><p><strong>{g.score}</strong> <span class="n">{g.date}, {g.site}</span></p><p class="note">{g.note}</p></li>)}
       </ul>
     </details>
   </Section>
 
   <Section id="special" title="Special teams" takeaway="Edmonton’s power play is the most dangerous unit in the game, but Carolina’s penalty killers attack rather than sit back.">
-    <div class="two">
-      {order.map((a) => {
-        const s = m.specialTeams[a];
-        return (
-          <div class={`t-${a}`}>
-            <h3 class="team-h">{full(a)}</h3>
-            <div class="card">
-              {s.rates.map((r) => (
-                <div class="rate">
-                  <div class="rate-top"><span class="term" tabindex="0" data-tip={r.tip}>{r.label}</span><span><strong>{r.value}</strong> <span class="n">{r.unit}</span></span></div>
-                  <Bar team={a} pct={r.pct} band={12} label={`${teams[a].place}, ${r.label.toLowerCase()}`} />
+    {order.map((a) => {
+      const b = other(a);
+      const pp = m.specialTeams[a];
+      const pk = m.specialTeams[b];
+      const tiles = [{ team: a, r: pp.rates[0] }, { team: b, r: pk.rates[1] }, { team: b, r: pk.rates[2] }, { team: b, r: pk.rates[3] }];
+      return (
+        <div class="stblock">
+          <h3 class="sub">When {teams[a].place} is on the power play</h3>
+          <p class="note">Projected {teams[a].place} power plays in this game: <strong>{pp.projectedOpps.toFixed(1)}</strong></p>
+          <ul class="tiles">
+            {tiles.map(({ team, r }) => (
+              <li class:list={['card', 'tile', `t-${team}`]}>
+                <p class="tile-h"><i></i><span class="term" tabindex="0" data-tip={r.tip}>{teams[team].place} {stName[r.label]}</span></p>
+                <p class="tile-v"><strong>{r.value}</strong> <span class="n">{r.unit}</span></p>
+                <div class="ends"><span>{stEnds[r.label][0]}</span><span>{stEnds[r.label][1]}</span></div>
+                <div class="lanes"><div class="lane" style={`--b:${r.pct};--bb:10;--c:${r.pct};--cb:10`} data-tip={`${teams[team].place}: ${r.pct}th percentile`}><span class="whisk"></span><span class="dot"></span></div></div>
+              </li>
+            ))}
+          </ul>
+          <div class="st3">
+            <div class:list={['card', `t-${a}`]}>
+              <h4 class="st-h"><i></i>{teams[a].place} power play</h4>
+              {pp.pp.map((u, i) => (
+                <div class="stunit">
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.ppUnitStats[a][i].xgf.toFixed(1)} <Pips pct={m.ppUnitStats[a][i].pct} tip={`Creates ${m.ppUnitStats[a][i].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[a][i].pct}% of ${i ? 'second' : 'top'} power-play units.`} /></span></p>
+                  <ul class="roles-list">{u.players.map((p) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{p.name}</span><span class="chip">{p.role}</span></li>)}</ul>
                 </div>
               ))}
-              <p class="note">Projected power plays in this game: <strong>{s.projectedOpps.toFixed(1)}</strong></p>
             </div>
-            <div class="st-grid">
-              <div class="card">
-                <ShotMap team={a} shots={s.shots} title={`Where ${teams[a].place}’s power play shoots from. Bigger dots are more dangerous shots.`} />
-              </div>
-              <div class="card">
-                {s.pp.map((u) => (
-                  <div class="ppunit">
-                    <p class="unit-label">{u.label} <span class="n">{u.share}% of power-play time</span></p>
-                    <ul>{u.players.map((p) => <li><span>{p.name}</span><span class="chip">{p.role}</span></li>)}</ul>
-                  </div>
-                ))}
-                <details>
-                  <summary>Penalty killers</summary>
-                  {s.pk.map((u) => (
-                    <div class="ppunit">
-                      <p class="unit-label">{u.label} <span class="n">{u.share}% of penalty-kill time</span></p>
-                      <ul class="pk-names">{u.players.map((n) => <li>{n}</li>)}</ul>
-                    </div>
-                  ))}
-                </details>
-              </div>
+            <div class="card">
+              <ShotMap team={a} shots={pp.shots} title={`Where ${teams[a].place}’s power play shoots from. Bigger dots are more dangerous shots.`} />
             </div>
-            <p class="note">Role tags are rules of thumb based on where each player shoots and passes from.</p>
+            <div class:list={['card', `t-${b}`]}>
+              <h4 class="st-h"><i></i>{teams[b].place} penalty kill</h4>
+              {pk.pk.map((u, i) => (
+                <div class="stunit">
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.pkUnitStats[b][i].xga.toFixed(1)} <Pips pct={m.pkUnitStats[b][i].pct} tip={`Allows ${m.pkUnitStats[b][i].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[b][i].pct}% of ${i ? 'second' : 'top'} penalty-kill units.`} /></span></p>
+                  <ul class="roles-list">{u.players.map((n, k) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{k < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
+                </div>
+              ))}
+            </div>
           </div>
-        );
-      })}
-    </div>
+        </div>
+      );
+    })}
+    <p class="note">Role tags are rules of thumb based on where each player shoots and passes from. The number beside each unit is expected goals per hour: created, for a power play; allowed, for a penalty kill.</p>
   </Section>
 
   <Section id="goalies" title="Goaltending" takeaway="Carolina’s goalies see fewer shots, but the ones that get through are more dangerous and arrive after long quiet stretches.">
@@ -340,10 +357,7 @@ const nav = [
   .jump a:hover { border-color: var(--ink); }
   .jump.sticky { position: sticky; top: var(--bar-h, 34px); z-index: 15; background: var(--ice); margin-top: 14px; padding-block: 8px; }
   .jump a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
-  .all-traits { margin-top: 18px; }
-  .all-traits > summary, .heatwrap > summary { font-size: 15px; color: var(--ink); }
-  .heatwrap { margin-top: 14px; max-width: 640px; }
-  .heatwrap .meet { gap: 14px; }
+
 
   .n, .cite { font-size: 12px; color: var(--ink-3); font-weight: 400; }
   .watch { display: grid; gap: 16px; margin-top: 22px; }
@@ -360,10 +374,13 @@ const nav = [
 
   .units, .players, .recipe, .meet { display: grid; gap: 14px; }
   .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .unit-toi { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+  .unit-toi strong { font-size: 15px; color: var(--ink); }
   .unit-label { font: 700 19px/1 var(--display); color: var(--team, var(--ink)); }
-  .unit-names { font-weight: 600; flex: 1 1 auto; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; margin-top: 10px; }
-  @media (min-width: 480px) { .stats { grid-template-columns: repeat(6, 1fr); } }
+  .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  @media (min-width: 480px) { .stats { grid-template-columns: repeat(5, 1fr); } }
+  .stats > div { display: grid; gap: 3px; justify-items: start; }
   .stats dt, .work dt { font-size: 12px; color: var(--ink-2); }
   .stats dd { font-weight: 600; font-size: 15px; }
   .unit .n { margin-top: 8px; }
@@ -376,12 +393,20 @@ const nav = [
 
   .rate { margin-bottom: 12px; }
   .rate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; margin-bottom: 4px; }
-  .st-grid { display: grid; gap: 12px; margin-top: 12px; grid-template-columns: 1fr; }
-  @media (min-width: 480px) { .st-grid { grid-template-columns: 1fr 1fr; } }
-  .ppunit { margin-bottom: 14px; }
-  .ppunit ul { margin-top: 6px; display: grid; gap: 5px; }
-  .ppunit li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
-  .ppunit ul.pk-names { font-size: 14px; margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .stblock + .stblock { margin-top: 28px; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
+  .tile { display: grid; gap: 6px; align-content: start; }
+  .tile-h, .st-h { display: flex; align-items: center; gap: 8px; font: 600 14px var(--ui); margin: 0; }
+  .tile-h i, .st-h i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
+  .tile-v strong { font: 700 28px/1 var(--display); }
+  .st3 { display: grid; gap: 12px; margin-top: 12px; }
+  @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; align-items: start; } }
+  .st-h { font-size: 16px; margin-bottom: 4px; }
+  .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .stunit-h { display: flex; align-items: center; gap: 10px; }
+  .stunit-v { margin-left: auto; font: 600 15px var(--ui); display: inline-flex; align-items: center; gap: 8px; }
+  .roles-list { margin-top: 8px; display: grid; gap: 6px; }
+  .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
 
   .quad-wrap { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 820px) { .quad-wrap { grid-template-columns: 1fr 1.25fr; align-items: center; } }

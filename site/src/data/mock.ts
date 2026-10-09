@@ -430,3 +430,25 @@ export function teamFingerprint(abbr: string) {
       blend: fpView(d.key, pct, Math.round(9 + r() * 8)), season: fpView(d.key, season, Math.round(26 + r() * 8)) };
   });
 }
+
+// ---------- Peer comparisons for lines and pairs (placeholder) ----------
+// Where each number sits among the same-numbered units around the league (all first lines, all top pairs...).
+export const peerName: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+const span = (v: number, lo: number, hi: number) => clamp(((v - lo) / (hi - lo)) * 100);
+export const peers = Object.fromEntries(
+  (['CAR', 'EDM'] as Abbr[]).map((a) => [
+    a,
+    Object.fromEntries(
+      [...lines[a].fwd, ...lines[a].def].map((u) => [
+        u.label,
+        { toi: clamp(between(15, 90)), xgf: span(u.xgf, 1.7, 3.4), xga: span(u.xga, 3.2, 1.8), share: span(u.xgfPct, 42, 60), ozs: span(u.ozs, 36, 66), qoc: clamp(between(20, 85)) },
+      ]),
+    ),
+  ]),
+) as Record<Abbr, Record<string, { toi: number; xgf: number; xga: number; share: number; ozs: number; qoc: number }>>;
+export const pkUnitStats = Object.fromEntries(
+  (['CAR', 'EDM'] as Abbr[]).map((a) => [a, specialTeams[a].pk.map(() => ({ xga: round(a === 'CAR' ? between(5.0, 6.6) : between(7.0, 8.8), 1), pct: clamp(a === 'CAR' ? between(70, 95) : between(25, 55)) }))]),
+) as Record<Abbr, { xga: number; pct: number }[]>;
+export const ppUnitStats = Object.fromEntries(
+  (['CAR', 'EDM'] as Abbr[]).map((a) => [a, specialTeams[a].pp.map(() => ({ xgf: round(a === 'EDM' ? between(8.4, 10.4) : between(6.2, 7.9), 1), pct: clamp(a === 'EDM' ? between(75, 98) : between(40, 70)) }))]),
+) as Record<Abbr, { xgf: number; pct: number }[]>;

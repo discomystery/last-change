@@ -1,0 +1,9 @@
+---
+// Quality meter: five pips, more filled = better than more of the comparison group. Ink only, no red or green.
+interface Props { pct: number; tip: string }
+const { pct, tip } = Astro.props;
+const filled = Math.max(1, Math.min(5, Math.ceil(pct / 20)));
+---
+<span class="pips" role="img" aria-label={tip} data-tip={tip} tabindex="0">
+  {[1, 2, 3, 4, 5].map((i) => <i class:list={{ on: i <= filled }}></i>)}
+</span>

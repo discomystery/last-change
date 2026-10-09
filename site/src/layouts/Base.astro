@@ -237,6 +237,25 @@ const teamList = teams as { abbr: string; name: string }[];
   .chip { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
   .chip.solid { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
 
+  /* The obvious fold: a full-width bar that opens and closes a longer set. */
+  .fold { margin-top: 18px; }
+  .fold > summary { list-style: none; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 14px 18px; border: 2px solid var(--ink); border-radius: 999px; background: var(--sheet); font: 700 15px var(--ui); color: var(--ink); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '+'; font: 700 22px/0.8 var(--ui); }
+  .fold[open] > summary::after { content: '–'; }
+  .fold > summary:hover { background: var(--ink); color: var(--sheet); }
+  .fold .opened, .fold[open] .closed { display: none; }
+  .fold[open] .opened { display: inline; }
+  .fold[open] > summary { margin-bottom: 18px; }
+  /* Quality meter and neutral marker */
+  .pips { display: inline-flex; gap: 2px; vertical-align: middle; cursor: help; }
+  .pips i { width: 7px; height: 12px; border-radius: 2px; border: 1.5px solid var(--ink-3); }
+  .pips i.on { background: var(--ink); border-color: var(--ink); }
+  .marker { position: relative; display: inline-block; width: 43px; height: 12px; vertical-align: middle; cursor: help; }
+  .marker::before { content: ''; position: absolute; left: 0; right: 0; top: 5px; height: 2px; border-radius: 1px; background: var(--ink-3); opacity: 0.6; }
+  .marker i { position: absolute; top: 0; width: 3px; height: 12px; margin-left: -1.5px; border-radius: 1.5px; background: var(--ink); }
+  .plink { text-decoration: underline; text-decoration-color: var(--ink-3); text-underline-offset: 3px; cursor: pointer; }
+  .plink:hover { text-decoration-color: var(--ink); }
   details > summary { cursor: pointer; font: 600 14px var(--ui); color: var(--ink-2); padding: 6px 0; }
   details[open] > summary { margin-bottom: 8px; }
 

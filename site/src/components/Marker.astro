@@ -1,0 +1,6 @@
+---
+// Neutral position marker: where a number sits from low to high among its peers. Not a judgement.
+interface Props { pct: number; tip: string }
+const { pct, tip } = Astro.props;
+---
+<span class="marker" role="img" aria-label={tip} data-tip={tip} tabindex="0"><i style={`left:${Math.max(4, Math.min(96, pct))}%`}></i></span>
