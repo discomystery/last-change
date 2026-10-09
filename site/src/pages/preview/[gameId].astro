@@ -208,7 +208,7 @@ const nav = [
               <h4 class="st-h"><i></i>{teams[v.pp].place} power play</h4>
               {pp.pp.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.ppUnitStats[v.pp][k].xgf.toFixed(1)} <Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></span></p>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{m.ppUnitStats[v.pp][k].xgf.toFixed(1)}</strong> expected goals per hour</span><Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></p>
                   <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span><span class="chip">{pl.role}</span></li>)}</ul>
                 </div>
               ))}
@@ -220,7 +220,7 @@ const nav = [
               <h4 class="st-h"><i></i>{teams[v.pk].place} penalty kill</h4>
               {pk.pk.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span><span class="stunit-v">{m.pkUnitStats[v.pk][k].xga.toFixed(1)} <Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></span></p>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{m.pkUnitStats[v.pk][k].xga.toFixed(1)}</strong> expected goals per hour</span><Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></p>
                   <ul class="roles-list">{u.players.map((n, q) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{q < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
                 </div>
               ))}
@@ -229,7 +229,7 @@ const nav = [
         </div>
       );
     })}
-    <p class="note">Role tags are rules of thumb based on where each player shoots and passes from. The number beside each unit is expected goals per hour: created, for a power play; allowed, for a penalty kill.</p>
+    <p class="note">Role tags are rules of thumb based on where each player shoots and passes from. </p>
   </Section>
 
   <Section id="goalies" title="Goaltending" takeaway="Carolina’s goalies see fewer shots, but the ones that get through are more dangerous and arrive after long quiet stretches.">
@@ -475,7 +475,8 @@ const nav = [
   .st-h { font-size: 16px; margin-bottom: 4px; }
   .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .stunit-h { display: flex; align-items: center; gap: 10px; }
-  .stunit-v { margin-left: auto; font: 600 15px var(--ui); display: inline-flex; align-items: center; gap: 8px; }
+  .stunit-rate { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; font: 400 13px var(--ui); color: var(--ink-2); }
+  .stunit-rate strong { font-size: 15px; color: var(--ink); }
   .roles-list { margin-top: 8px; display: grid; gap: 6px; }
   .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
 

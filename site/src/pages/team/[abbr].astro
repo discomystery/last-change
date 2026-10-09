@@ -143,7 +143,7 @@ const _ = ordinal;
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
-        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. The number beside each unit is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
+        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. Each unit’s expected goals per hour are pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
         {sp.faceoff && (
           <div class="card worth">
             <p class="mini-h">Worth knowing</p>
@@ -155,7 +155,7 @@ const _ = ordinal;
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name} once play is under way. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
@@ -168,7 +168,7 @@ const _ = ordinal;
             <h4 class="st-h">Penalty kill</h4>
             {sp.pk.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></span></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${u.minutes} minutes together.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
               </div>
             ))}
@@ -289,7 +289,8 @@ const _ = ordinal;
   .st-h { font: 600 16px var(--ui); margin: 0 0 4px; }
   .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .stunit-h { display: flex; align-items: center; gap: 10px; }
-  .stunit-v { margin-left: auto; font: 600 15px var(--ui); display: inline-flex; align-items: center; gap: 8px; }
+  .stunit-rate { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; font: 400 13px var(--ui); color: var(--ink-2); }
+  .stunit-rate strong { font-size: 15px; color: var(--ink); }
   .roles-list { margin-top: 8px; display: grid; gap: 6px; }
   .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
   .t-one { --team: var(--ink); }
