@@ -41,6 +41,7 @@ def run(season: int) -> dict:
     SITE_DATA.mkdir(parents=True, exist_ok=True)
     (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
     n_teams, n_games = export_teams_and_schedule(season)
+    export_fingerprints(season)
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 
@@ -59,3 +60,21 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
              for g in nhl.season_games(season) if g["game_type"] == 2]
     (SITE_DATA / "schedule.json").write_text(json.dumps({"season": season, "games": games}, separators=(",", ":")))
     return len(teams), len(games)
+
+
+# Traits whose numbers are checked and ready to show. Second chances is held back: MoneyPuck's 2026-27
+# file values rebound shots about half as highly as its earlier-season files, so seasons cannot be blended yet.
+READY = ["volume", "quality", "rush", "turnover", "point", "suppression", "qualityAllowed", "goalie", "pace", "pp", "pk", "powerKill"]
+
+
+def export_fingerprints(season: int) -> int:
+    from pipeline.metrics import team_style
+
+    out = team_style.run(season)
+    g = pl.read_parquet(TABLES / str(season) / "games.parquet")
+    abbr = {**dict(zip(g["home_id"], g["home"])), **dict(zip(g["away_id"], g["away"]))}
+    teams = {abbr[tid]: {"games": t["games"], "dims": {d: t["dims"][d] for d in READY}} for tid, t in out["teams"].items()}
+    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "ready": READY,
+               "stabilization": {d: out["stabilization"][d] for d in READY}, "teams": teams}
+    (SITE_DATA / "fingerprints.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
+    return len(teams)

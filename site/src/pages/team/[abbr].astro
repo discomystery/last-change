@@ -5,7 +5,8 @@ import Section from '../../components/Section.astro';
 import teams from '../../../public/data/teams.json';
 import schedule from '../../../public/data/schedule.json';
 import lines from '../../../public/data/last_game_lines.json';
-import { teamFingerprint, fpGroups } from '../../data/mock';
+import fpData from '../../../public/data/fingerprints.json';
+import { fpInfo, fpGroups, ordinal } from '../../data/mock';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -16,11 +17,15 @@ const team = teams.find((t) => t.abbr === abbr)!;
 const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const last = lines.teams.find((t) => t.team === abbr);
-const fp = teamFingerprint(abbr!);
+type Est = { v: number; pct: number; lo: number; hi: number; rank: number };
+const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
+const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['more', 'Still to come']];
+const _ = ordinal;
 ---
-<Base title={team.name} mock="mixed">
+<Base title={team.name} mock={false}>
   <header class="team-top">
     <h1>{team.name}</h1>
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
@@ -38,9 +43,11 @@ const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 
     </div>
   </Section>
 
-  <Section id="style" title="Style fingerprint" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league. These numbers are placeholders until the real ones are ready.`}>
+  <Section id="style" title="Style fingerprint" placeholder={false} takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
     <div class="key"><span class="one"><i></i>{team.name}</span><span class="avg">League average</span><span class="rng">Likely range</span></div>
-    {fpGroups.map((g) => (
+    <p class="note m-blend">Real numbers through {asOf}: {mine.games} games this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
+    <p class="note m-season">Real numbers through {asOf}, from this season’s {mine.games} games only. Expect these to swing a lot this early, which is why the likely ranges are so wide.</p>
+    {fpGroups.map((g) => fp.some((c) => c.group === g) && (
       <>
         <h3 class="sub">{g}</h3>
         <ul class="fpgrid">
@@ -48,18 +55,16 @@ const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 
             <li class="card fpc">
               <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
               <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
-              <div class="lanes"><div class="lane" style={`--b:${c.blend.pct};--bb:${c.blend.band};--c:${c.season.pct};--cb:${c.season.band}`}><span class="whisk"></span><span class="dot"></span></div></div>
-              {(['blend', 'season'] as const).map((m) => (
-                <p class={`fpc-line m-${m}`}>
-                  <span>{c[m].raw ? (<><span class="a-adj">{c[m].text}</span><span class="a-raw">{c[m].raw}</span></>) : c[m].text}</span>
-                  <em>{c[m].rank} of 32</em>
-                </p>
+              <div class="lanes"><div class="lane" style={`--b:${c.blend.pct};--blo:${c.blend.lo};--bhi:${c.blend.hi};--c:${c.season.pct};--clo:${c.season.lo};--chi:${c.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
+              {(['blend', 'season'] as const).map((mode) => (
+                <p class={`fpc-line m-${mode}`}><span>{c.say(c[mode].v)}</span><em>{ordinal(c[mode].rank)} of 32</em></p>
               ))}
             </li>
           ))}
         </ul>
       </>
     ))}
+    <p class="note">Still to come here: second chances, forecheck pressure, physicality, breakdowns avoided, discipline and depth.</p>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={last ? `Who played together at 5-on-5 in the most recent game, ${last.at_home ? 'against' : 'at'} ${names[last.opponent]}.` : 'No games played yet.'}>
@@ -168,10 +173,10 @@ const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 
   .ends { display: flex; justify-content: space-between; gap: 8px; font: italic 400 14px var(--body); color: var(--ink-2); margin-bottom: -4px; }
   .lanes { position: relative; padding: 4px 7px; }
   .lanes::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; border-radius: 1px; }
-  .lane { position: relative; height: 14px; --team: var(--ink); --v: var(--b); --w: var(--bb); }
-  html[data-mode='season'] .lane { --v: var(--c); --w: var(--cb); }
+  .lane { position: relative; height: 14px; --team: var(--ink); --v: var(--b); --lo: var(--blo); --hi: var(--bhi); }
+  html[data-mode='season'] .lane { --v: var(--c); --lo: var(--clo); --hi: var(--chi); }
   .lane::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
-  .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(max(0, var(--v) - var(--w)) * 1%); width: calc((min(100, var(--v) + var(--w)) - max(0, var(--v) - var(--w))) * 1%); transition: left 0.35s, width 0.35s; }
+  .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(min(var(--lo), var(--v)) * 1%); width: calc((max(var(--hi), var(--v)) - min(var(--lo), var(--v))) * 1%); transition: left 0.35s, width 0.35s; }
   .dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; transition: left 0.35s; }
   @media (prefers-reduced-motion: reduce) { .dot, .whisk { transition: none; } }
   .fpc-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; font: 400 14px/1.4 var(--ui); }

@@ -14,6 +14,7 @@ from pipeline.config import TABLES
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
 ATTEMPTS = UNBLOCKED | {"blocked-shot"}
 TURNOVER_WINDOW = 5  # seconds from a turnover to a shot for it to count as off-turnover
+RUSH_WINDOW = 4  # seconds from an event outside the offensive zone to a shot for it to count as a rush shot
 POINT_DISTANCE = 50  # feet
 COUNTS = ["cf", "ff", "sf", "gf", "xgf", "rush_xgf", "reb_xgf", "to_xgf", "point_cf", "hits", "gives", "takes", "blocks"]
 
@@ -49,14 +50,15 @@ def build(season: int) -> dict:
             rows[key]["sec"] += s["duration"]
 
     last_turnover: dict[bool, int] = {}
+    prev = None  # (second, was a home-team event, x toward that team's attacking end) of the last live-play event
     current = None
     for e in events.iter_rows(named=True):
         gid = e["game_id"]
         if gid != current:
-            current, last_turnover = gid, {}
+            current, last_turnover, prev = gid, {}, None
         typ, home = e["type"], e["is_home"]
         if typ in ("stoppage", "faceoff", "period-start", "period-end"):
-            last_turnover = {}
+            last_turnover, prev = {}, None
             continue
         if home is None or gid not in ids:
             continue
@@ -78,6 +80,12 @@ def build(season: int) -> dict:
             far = e["x_norm"] is not None and math.hypot(89 - e["x_norm"], e["y_norm"]) > POINT_DISTANCE
             point = pos.get((gid, e["p1"])) == "D" or far
             off_turnover = home in last_turnover and e["sec"] - last_turnover[home] <= TURNOVER_WINDOW
+            # Rush: the previous live-play event was moments ago and outside the shooter's offensive zone.
+            # MoneyPuck's own shotRush flag is almost never set (0.06% of shots), so it is not used.
+            rush = False
+            if prev is not None and e["sec"] - prev[0] <= RUSH_WINDOW:
+                prev_x = prev[2] if prev[1] == home else -prev[2]
+                rush = prev_x <= 25
             for side, sfx in ((home, "f"), (not home, "a")):
                 bump(side, "c" + sfx)
                 if point:
@@ -85,7 +93,7 @@ def build(season: int) -> dict:
                 if typ in UNBLOCKED:
                     bump(side, "f" + sfx)
                     bump(side, "xg" + sfx, xg)
-                    if e["shotRush"]:
+                    if rush:
                         bump(side, "rush_xg" + sfx, xg)
                     if e["shotRebound"]:
                         bump(side, "reb_xg" + sfx, xg)
@@ -97,7 +105,11 @@ def build(season: int) -> dict:
                     bump(side, "g" + sfx)
             if typ == "blocked-shot":
                 bump(not home, "blocks")
-        elif typ == "hit":
+        if e["x_norm"] is not None:
+            prev = (e["sec"], home, e["x_norm"])
+        if typ in ATTEMPTS:
+            continue
+        if typ == "hit":
             bump(home, "hits")
         elif typ == "giveaway":
             bump(home, "gives")
