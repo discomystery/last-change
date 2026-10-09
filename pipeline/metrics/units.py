@@ -176,10 +176,45 @@ def depth_table(season: int) -> pl.DataFrame:
     return out
 
 
-def _quarterback_units(spans: list, toi: dict, is_d: dict, *, total_sec: float) -> tuple[list[frozenset], list[int]]:
-    """Two power-play units, each anchored on its quarterback. Returns (member sets, anchors)."""
+def _faceoff_specialist(draws: dict, stays: dict, swaps: list, toi: dict) -> dict | None:
+    """A player sent out mainly to take power-play draws, who then changes for a regular.
+
+    He must take a large share of the team's power-play faceoffs, stay out for much shorter stretches than the
+    regulars, and usually be replaced one-for-one in the middle of the power play.
+    """
+    total = sum(draws.values())
+    if total < 8:
+        return None
+    regulars = sorted(toi, key=lambda p: -toi[p])[:6]
+    # Check every heavy draw-taker, not just the busiest: over a full season the top centre takes the most draws
+    # and is a regular, while the specialist sits second.
+    for pid in sorted(draws, key=lambda p: -draws[p]):
+        if draws[pid] / total < 0.25:
+            break
+        mine = [x for x in stays.get(pid, []) if x > 0]
+        others = [x for p in regulars if p != pid for x in stays.get(p, []) if x > 0]
+        exits = [on for off, on, _ in swaps if off == pid]
+        if not mine or not others or len(exits) < max(3, 0.3 * len(mine)):
+            continue
+        avg, usual = sum(mine) / len(mine), sum(others) / len(others)
+        if avg > 0.65 * usual:
+            continue
+        by = defaultdict(int)
+        for on in exits:
+            by[on] += 1
+        return {"player": pid, "draw_pct": round(100 * draws[pid] / total), "draws": draws[pid], "avg_stay": round(avg), "usual_stay": round(usual),
+                "replaced_by": sorted(by.items(), key=lambda kv: -kv[1])[:3], "exits": len(exits)}
+    return None
+
+
+def _quarterback_units(spans: list, toi: dict, is_d: dict, *, total_sec: float, specialist: dict | None = None, swaps: list = ()) -> tuple[list[frozenset], list[int], dict]:
+    """Two power-play units, each anchored on its quarterback. Returns (member sets, anchors, stand-ins).
+
+    If the team uses a faceoff specialist, his time is credited to the regular who replaces him with each unit,
+    and he is reported alongside that player rather than as a member.
+    """
     if not toi:
-        return [], []
+        return [], [], {}
 
     def pick_anchor(times: dict, pool_sec: float, exclude: set) -> int | None:
         cands = {p: t for p, t in times.items() if p not in exclude}
@@ -201,7 +236,8 @@ def _quarterback_units(spans: list, toi: dict, is_d: dict, *, total_sec: float) 
                 off[p] += sec
     a2 = pick_anchor(off, off_sec, {a1}) if off_sec else None
     anchors = [a for a in (a1, a2) if a is not None]
-    members = []
+    spec = specialist["player"] if specialist else None
+    members, stand_for = [], {}
     for k, a in enumerate(anchors):
         other = anchors[1 - k] if len(anchors) == 2 else None
         shared = defaultdict(float)
@@ -210,9 +246,22 @@ def _quarterback_units(spans: list, toi: dict, is_d: dict, *, total_sec: float) 
                 for p in on:
                     if p != a:
                         shared[p] += sec
+        if spec is not None and spec in shared:
+            # Who comes on for the specialist while this quarterback is out?
+            incoming = defaultdict(int)
+            for off_p, on_p, after in swaps:
+                if off_p == spec and a in after and other not in after:
+                    incoming[on_p] += 1
+            if incoming:
+                heir = max(incoming, key=incoming.get)
+                shared[heir] += shared.pop(spec)
+                stand_for[(k, heir)] = spec
+            else:
+                shared.pop(spec)
         mates = sorted((p for p in shared if p not in anchors), key=lambda p: -shared[p])[:4]
         members.append(frozenset([a, *mates]))
-    return members, anchors
+    stand_for = {key: v for key, v in stand_for.items() if key[1] in members[key[0]]}
+    return members, anchors, stand_for
 
 
 def special_units(season: int) -> dict[int, dict]:
@@ -237,9 +286,14 @@ def special_units(season: int) -> dict[int, dict]:
 
     is_d = {r["player_id"]: r["pos"] == "D" for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
     spans = defaultdict(list)  # (team, kind) -> [(seconds, skaters)]
-    for s in stints.iter_rows(named=True):
+    swaps = defaultdict(list)  # team -> [(player off, player on, skaters after)] for one-for-one changes mid power play
+    stays = defaultdict(lambda: defaultdict(list))  # team -> player -> lengths of each unbroken power-play appearance
+    open_run, last_pp = {}, {}
+    for s in stints.sort("game_id", "start").iter_rows(named=True):
         gid = s["game_id"]
         if gid not in ids or not (s["home_goalie"] and s["away_goalie"]):
+            last_pp.pop(ids.get(gid, (None, None))[0], None)
+            last_pp.pop(ids.get(gid, (None, None))[1], None)
             continue
         for home in (True, False):
             own, opp = (s["n_home"], s["n_away"]) if home else (s["n_away"], s["n_home"])
@@ -247,6 +301,43 @@ def special_units(season: int) -> dict[int, dict]:
             tid = ids[gid][0 if home else 1]
             if kind and gid in recent[tid]:
                 spans[(tid, kind)].append((s["duration"], frozenset(s["home_skaters"] if home else s["away_skaters"])))
+            if gid not in recent[tid]:
+                continue
+            now = frozenset(s["home_skaters"] if home else s["away_skaters"]) if kind == "pp" else None
+            prev = last_pp.get(tid)
+            carried = prev is not None and prev[0] == gid and prev[1] == s["start"]
+            runs = open_run.setdefault(tid, {})
+            if now is None or not carried:
+                for pid, sec in runs.items():
+                    stays[tid][pid].append(sec)
+                runs.clear()
+            if now is not None:
+                if carried:
+                    off, on = prev[2] - now, now - prev[2]
+                    if len(off) == 1 and len(on) == 1:
+                        swaps[tid].append((next(iter(off)), next(iter(on)), now))
+                    for pid in off:
+                        stays[tid][pid].append(runs.pop(pid, 0.0))
+                for pid in now:
+                    runs[pid] = runs.get(pid, 0.0) + s["duration"]
+                last_pp[tid] = (gid, s["end"], now)
+            else:
+                last_pp.pop(tid, None)
+
+    # Who takes the power-play faceoffs.
+    draws = defaultdict(lambda: defaultdict(int))
+    fo = pl.read_parquet(d / "events.parquet").filter(pl.col("type") == "faceoff")
+    for e in fo.iter_rows(named=True):
+        gid = e["game_id"]
+        if gid not in ids or not (e["home_goalie"] and e["away_goalie"]):
+            continue
+        for home in (True, False):
+            own, opp = (e["home_on"], e["away_on"]) if home else (e["away_on"], e["home_on"])
+            tid = ids[gid][0 if home else 1]
+            if (len(own), len(opp)) == (5, 4) and gid in recent[tid]:
+                taker = e["p1"] if e["p1"] in own else e["p2"] if e["p2"] in own else None
+                if taker:
+                    draws[tid][taker] += 1
 
     ind = defaultdict(lambda: defaultdict(float))
     shots = defaultdict(list)
@@ -296,14 +387,16 @@ def special_units(season: int) -> dict[int, dict]:
                 for pid in on:
                     toi[pid] += sec
             ranked = sorted(toi, key=lambda p: -toi[p])
-            anchors = []
+            anchors, stand_for = [], {}
             if kind == "pk":
                 # A kill is two forwards and two defensemen, so rank each position separately.
                 fwd = [p for p in ranked if not is_d.get(p, False)]
                 dmen = [p for p in ranked if is_d.get(p, False)]
                 members = [frozenset(fwd[i * 2:(i + 1) * 2] + dmen[i * 2:(i + 1) * 2]) for i in range(2) if len(fwd) >= (i + 1) * 2 and len(dmen) >= (i + 1) * 2]
             else:
-                members, anchors = _quarterback_units(spans[(tid, kind)], toi, is_d, total_sec=sum(sec for sec, _ in spans[(tid, kind)]))
+                specialist = _faceoff_specialist(draws[tid], stays[tid], swaps[tid], toi)
+                members, anchors, stand_for = _quarterback_units(spans[(tid, kind)], toi, is_d, total_sec=sum(sec for sec, _ in spans[(tid, kind)]), specialist=specialist, swaps=swaps[tid])
+                entry["faceoff"] = specialist
             total = sum(sec for sec, _ in spans[(tid, kind)])
             secs, xgs = [0.0] * len(members), [0.0] * len(members)
 
@@ -343,7 +436,8 @@ def special_units(season: int) -> dict[int, dict]:
                         elif q["located"] and q["close"] / q["located"] >= 0.4:
                             roles[pid] = "Net-front"
                 both = [p for p in players if kind == "pp" and sum(p in mm for mm in members) > 1]
-                entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "both": both, "minutes": round(secs[k] / 60, 1),
+                entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "both": both,
+                                    "after_draw": {str(p): stand_for[(k, p)] for p in players if kind == "pp" and (k, p) in stand_for}, "minutes": round(secs[k] / 60, 1),
                                     "share": round(100 * secs[k] / total) if total else 0, "_xg": xgs[k], "_sec": secs[k]})
         out[tid] = entry
     for kind, higher in (("pp", True), ("pk", False)):

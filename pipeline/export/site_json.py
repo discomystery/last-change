@@ -182,12 +182,23 @@ def export_lines(season: int) -> int:
     for tid, sp in special.items():
         if abbr[tid] not in out:
             continue
+        fo = sp.get("faceoff")
+        shown = bool(fo) and fo["draws"] >= 10 and fo["exits"] >= 5  # enough to call it a habit
+        faceoff = None
+        if shown:
+            who = names.get(fo["player"], "?")
+            heir = names.get(fo["replaced_by"][0][0], "?")
+            faceoff = {"player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
+                       "text": f'{who} is sent out to take power-play faceoffs, then changes. He has taken {fo["draw_pct"]}% of the team\u2019s power-play draws but stays on for about {fo["avg_stay"]} seconds at a time, against {fo["usual_stay"]} for the regulars, and is most often replaced by {heir} ({fo["replaced_by"][0][1]} of {fo["exits"]} changes).'}
         for kind in ("pp", "pk"):
             for u in sp[kind]:
-                u["players"] = [{"id": p, "name": names.get(p, "?"), "role": u["roles"].get(str(p)), "both": p in u.get("both", [])} for p in u["players"]]
+                after = u.pop("after_draw", {}) if shown else {}
+                u.pop("after_draw", None)
+                u["players"] = [{"id": p, "name": names.get(p, "?"), "role": u["roles"].get(str(p)), "both": p in u.get("both", []),
+                                 "after": names.get(after[str(p)]) if str(p) in after else None} for p in u["players"]]
                 u.pop("both", None)
                 del u["roles"]
-        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
+        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "faceoff": faceoff, "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)
