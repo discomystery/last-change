@@ -29,8 +29,12 @@ def build(season: int) -> dict:
     games = pl.read_parquet(d / "games.parquet")
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
     pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
-    xg_cols = ["event_id", "game_id", "xGoal", "shotRush", "shotRebound"]
-    events = pl.read_parquet(d / "events.parquet").join(pl.read_parquet(d / "shots_xg.parquet").select(xg_cols), on=["game_id", "event_id"], how="left").sort("game_id", "sort")
+    # Expected goals come from the in-house model (one model for every season). A rebound is an unblocked shot
+    # within 3 seconds of a teammate's shot on goal.
+    own = pl.read_parquet(d / "shots_xg_own.parquet").rename({"xg": "xGoal"})
+    feats = pl.read_parquet(d / "shot_features.parquet").select(
+        "game_id", "event_id", ((pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3)).alias("shotRebound"))
+    events = pl.read_parquet(d / "events.parquet").join(own, on=["game_id", "event_id"], how="left").join(feats, on=["game_id", "event_id"], how="left").sort("game_id", "sort")
     stints = pl.read_parquet(d / "stints.parquet")
 
     rows: dict[tuple, dict] = defaultdict(lambda: defaultdict(float))

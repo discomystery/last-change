@@ -42,6 +42,7 @@ def run(season: int) -> dict:
     (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
     n_teams, n_games = export_teams_and_schedule(season)
     export_fingerprints(season)
+    export_lines(season)
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 
@@ -62,9 +63,8 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
     return len(teams), len(games)
 
 
-# Traits whose numbers are checked and ready to show. Second chances is held back: MoneyPuck's 2026-27
-# file values rebound shots about half as highly as its earlier-season files, so seasons cannot be blended yet.
-READY = ["volume", "quality", "rush", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "pp", "pk", "powerKill", "discipline"]
+# Traits whose numbers are checked and ready to show.
+READY = ["volume", "quality", "rush", "rebounds", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "pp", "pk", "powerKill", "discipline"]
 
 
 def export_fingerprints(season: int) -> int:
@@ -130,4 +130,54 @@ def export_xg_check(season: int) -> int:
                       "mp": round(s.filter(pl.col("is_home") == (side == "home"))["mp"].sum() or 0.0, 2)} for side in ("home", "away")}
         out.append({"id": gid, "date": g["date"], "home": g["home"], "away": g["away"], "hs": g["home_score"], "as": g["away_score"], "totals": tot, "shots": rows})
     (SITE_DATA / "xg_check.json").write_text(json.dumps({"games": out}, separators=(",", ":")))
+    return len(out)
+
+
+def export_lines(season: int) -> int:
+    """Usual lines and pairs for every team, how the last game differed, and notes on changed special-teams roles."""
+    from pipeline.metrics import units
+
+    d = TABLES / str(season)
+    units.game_units(season)
+    usual = units.usual(season)
+    games = pl.read_parquet(d / "games.parquet")
+    abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
+    info = {g["game_id"]: g for g in games.iter_rows(named=True)}
+    names = {}
+    for s_ in (season - 1, season):
+        for r in pl.read_parquet(TABLES / str(s_) / "players.parquet").iter_rows(named=True):
+            names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
+    now = units.special_usage(season)
+    before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum())
+    usage = now.join(before, on="player_id", how="left", suffix="_last")
+    words = {"pk": ("killing penalties", "shorthanded"), "pp": ("playing on the power play", "power-play")}
+    out = {}
+    for tid, e in usual.items():
+        place = abbr[tid]
+        notes = []
+        for r in usage.filter((pl.col("team_id") == tid) & (pl.col("gp") >= 3) & (pl.col("gp_last").fill_null(0) >= 20)).iter_rows(named=True):
+            for kind, started, stopped in (("pk", 0.25, 0.30), ("pp", 0.40, 0.45)):
+                cur, old = r[f"{kind}_share"], r[f"{kind}_share_last"]
+                doing, label = words[kind]
+                if cur >= started and old < 0.08:
+                    notes.append({"player": names[r["player_id"]], "kind": kind, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                                  "text": f'{names[r["player_id"]]} has started {doing}: on the ice for {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, up from {round(100 * old)}% last season.'})
+                elif old >= stopped and cur < 0.05:
+                    notes.append({"player": names[r["player_id"]], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                                  "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% last season.'})
+        g = info[e["last_game"]]
+        usual_sets = {u["label"]: u["unit"] for u in e["units"]}
+        last_sets = {u["unit"] for u in e["last"]}
+        fmt = lambda unit: [names.get(int(i), "?") for i in unit.split("-")]
+        out[place] = {
+            "games": e["games"],
+            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "toi": round(u["sec_pg"] / 60, 1),
+                       "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
+                       "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
+            "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
+                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
+            "notes": sorted(notes, key=lambda n: -abs(n["now"] - n["before"])),
+        }
+    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
+    (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)

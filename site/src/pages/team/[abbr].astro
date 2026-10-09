@@ -6,6 +6,9 @@ import teams from '../../../public/data/teams.json';
 import schedule from '../../../public/data/schedule.json';
 import lines from '../../../public/data/last_game_lines.json';
 import fpData from '../../../public/data/fingerprints.json';
+import linesData from '../../../public/data/lines.json';
+import Pips from '../../components/Pips.astro';
+import Marker from '../../components/Marker.astro';
 import { fpInfo, fpGroups, ordinal } from '../../data/mock';
 
 export function getStaticPaths() {
@@ -21,6 +24,10 @@ type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index
 const rawWords: Record<string, string> = { physical: 'hits recorded per hour', forecheck: 'forecheck plays recorded per hour' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
+type Unit = { label: string; players: string[]; minutes: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
+const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
+const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['more', 'Still to come']];
@@ -72,30 +79,60 @@ const _ = ordinal;
         </ul>
       </>
     ))}
-    <p class="note">Still to come here: second chances and depth. Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+    <p class="note">Still to come here: depth. Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
-  <Section id="lines" title="Lines" placeholder={false} takeaway={last ? `Who played together at 5-on-5 in the most recent game, ${last.at_home ? 'against' : 'at'} ${names[last.opponent]}.` : 'No games played yet.'}>
-    {last && (
-      <div class="card tablecard">
-        <table class="lt">
-          <thead><tr><th scope="col">Together at 5-on-5</th><th scope="col">Ice time</th><th scope="col">Shot attempts for–against</th><th scope="col">Expected goals for–against</th><th scope="col">Goals</th></tr></thead>
-          <tbody>
-            {[...last.lines, ...last.pairs].map((u, i) => (
-              <tr class:list={{ gap: i === last.lines.length }}>
-                <th scope="row">{u.players.join(' · ')}</th>
-                <td>{clock(u.seconds)}</td><td>{u.cf}–{u.ca}</td><td>{u.xgf.toFixed(2)}–{u.xga.toFixed(2)}</td><td>{u.gf}–{u.ga}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'}>
+    {ln && (
+      <>
+        <div class="key">
+          <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
+          <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
+        </div>
+        <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over the team’s last {linesData.window} games ({ln.games} so far this season). With so few games, each group’s results are pulled toward the average for its line number.</p>
+        {ln.notes.length > 0 && (
+          <div class="card worth">
+            <p class="mini-h">Worth knowing</p>
+            <ul>{ln.notes.map((n) => <li>{n.text}</li>)}</ul>
+          </div>
+        )}
+        <div class="two units2">
+          {[ln.units.filter((u) => u.label[0] === 'L'), ln.units.filter((u) => u.label[0] === 'P')].map((group) => (
+            <ul class="units">
+              {group.map((u) => (
+                <li class="card unit">
+                  <div class="unit-top">
+                    <span class="unit-label">{u.label}</span>
+                    <span class="unit-toi"><strong>{u.toi.toFixed(1)}</strong> min a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${u.minutes} minutes together in all.`} /></span>
+                  </div>
+                  <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
+                  <dl class="stats">
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per hour: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per hour: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`A better share than ${u.pct.share}% of ${peer[u.label]}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`More offensive-zone faceoffs than ${u.pct.oz}% of ${peer[u.label]}.`} />}</div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+        <h3 class="sub">Last game</h3>
+        {lastDiff.length === 0
+          ? <p class="note">{ln.last.at_home ? 'Against' : 'At'} {names[ln.last.opponent]}, the team used the same lines and pairs as above.</p>
+          : (
+            <div class="card worth">
+              <p class="mini-h">{ln.last.at_home ? 'Against' : 'At'} {names[ln.last.opponent]}, these groups were different from the usual</p>
+              <ul>{lastDiff.map((u) => <li><strong>{u.label}:</strong> {u.players.join(' · ')} ({u.minutes.toFixed(1)} minutes)</li>)}</ul>
+            </div>
+          )}
+      </>
     )}
-    <p class="note">Real numbers from one game, so they show who played with whom rather than who is good. The usual lines over the last ten games, split by home and road, will sit here too.</p>
   </Section>
 
   <Section id="more" title="Still to come on this page" placeholder={false}>
     <ul class="todo">
+      <li><strong>Who plays against whom,</strong> home and road, and how tough each group’s opponents are.</li>
       <li><strong>Special teams:</strong> power-play and penalty-kill units, who plays which role, and how dangerous the team is shorthanded.</li>
       <li><strong>Goalies:</strong> whether each one is helping or being hung out to dry, his workload, and how steady he is night to night.</li>
       <li><strong>Where the goals come from:</strong> rush, rebounds, power play, turnovers and zone time, for and against.</li>
@@ -192,6 +229,21 @@ const _ = ordinal;
   html[data-mode='season'] .fpc-line.m-season { display: flex; }
   html[data-mode='season'] .fpc-line.m-blend { display: none; }
   .fpc-line em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .units2 { align-items: start; }
+  .units { display: grid; gap: 14px; }
+  .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .unit-label { font: 700 19px/1 var(--display); }
+  .unit-toi { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+  .unit-toi strong { font-size: 15px; color: var(--ink); }
+  .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  @media (min-width: 480px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+  .stats > div { display: grid; gap: 3px; justify-items: start; }
+  .stats dt { font-size: 12px; color: var(--ink-2); }
+  .stats dd { font-weight: 600; font-size: 15px; }
+  .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 8px; }
+  .worth { margin-top: 16px; }
+  .worth ul { display: grid; gap: 8px; font: 400 15px/1.5 var(--ui); }
   .tablecard { overflow-x: auto; margin-top: 18px; }
   .lt { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
   .lt th, .lt td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }

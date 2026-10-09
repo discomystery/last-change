@@ -12,7 +12,7 @@ const ex = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number))[0
 const sample = 30;
 const hr = (data as any).home_road as Record<string, { home_rate: number; away_rate: number }>;
 const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
-const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', rush: 'Rush offense', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
+const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', rush: 'Rush offense', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
 ---
 <Base title="Methods" mock={false}>
   <h1 class="page-h">How the numbers are made</h1>
@@ -60,11 +60,24 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
     </div>
   </Section>
 
+  <Section id="xg" title="How dangerous a chance is" placeholder={false} takeaway="Every shot gets a rating: how often shots like it go in.">
+    <div class="card explain">
+      <p>The site uses its own expected-goals model, trained on about 360,000 shots from three seasons. For each shot it looks at where it was taken from, what kind of shot it was, what happened just before (a save, a turnover, a faceoff) and how long ago, and the manpower on the ice. It deliberately doesn’t know who shot or who was in net.</p>
+      <p>Tested on a full season it had never seen, a rating of 10% meant the puck went in 10.0% of the time. Because one model rates every season, numbers from different years can be compared fairly. <a href={`${import.meta.env.BASE_URL}xg-check/`}>See how it rated the chances in recent games.</a></p>
+    </div>
+  </Section>
+
+  <Section id="lines" title="Numbering the lines" placeholder={false} takeaway="First line, second line and so on are decided by ice time, not reputation.">
+    <div class="card explain">
+      <p>A team’s lines and defense pairs are numbered by how much 5-on-5 ice time each group has played together over its last ten games. The group with the most is the first line. That means a line can be numbered lower than fans expect if its players have been shuffled between different linemates.</p>
+      <p>Each line’s ratings compare it with the same-numbered line on the other 31 teams: first lines with first lines, third pairs with third pairs.</p>
+    </div>
+  </Section>
+
   <Section id="limits" title="Blind spots" placeholder={false}>
     <ul class="limits">
       <li><strong>Passes before a shot</strong> aren’t in public data, so expected-goal numbers can’t see a cross-ice feed. Goalies behind teams that allow those look worse than they are.</li>
       <li><strong>Rush chances</strong> are identified from the timing of recorded events, which catches only some of them. Treat rush numbers as a way to compare teams, not a full count.</li>
-      <li><strong>Second chances</strong> are held back for now: this season’s expected-goal file values rebounds differently from earlier seasons, so the two can’t be blended fairly yet.</li>
       <li><strong>Defender positions</strong> aren’t tracked publicly, so “breakdowns” are inferred from dangerous rush and turnover chances.</li>
     </ul>
   </Section>
