@@ -1,0 +1,67 @@
+---
+// Type comparison for the user to choose a heading style. Not linked from the site.
+import Base from '../layouts/Base.astro';
+const options = [
+  { id: 'now', name: 'Current: bold Fraunces', note: 'What the site uses today, for comparison.', font: "'Fraunces'", hero: 800, head: 700, sub: 600, num: 700, soft: 100 },
+  { id: 'a', name: 'A. Regular Fraunces', note: 'Same typeface, no bold anywhere. Size and team colour do the work that weight was doing.', font: "'Fraunces'", hero: 400, head: 400, sub: 400, num: 400, soft: 100 },
+  { id: 'b', name: 'B. Light and large', note: 'Fraunces at its lightest for the big moments, regular for headings. The airiest of the four.', font: "'Fraunces'", hero: 300, head: 400, sub: 400, num: 300, soft: 100 },
+  { id: 'c', name: 'C. Young Serif', note: 'A different rounded book face that only exists in one regular weight. Sturdier than A without being bold.', font: "'Young Serif'", hero: 400, head: 400, sub: 400, num: 400, soft: 0 },
+  { id: 'd', name: 'D. One typeface throughout', note: 'Headings in Literata, the same face as the reading text. The quietest and most book-like.', font: "'Literata'", hero: 400, head: 500, sub: 500, num: 400, soft: 0 },
+];
+---
+<Base title="Heading styles">
+  <h1 class="page-h">Heading styles to choose from</h1>
+  <p class="lede">The same pieces of the page, set five ways. Reading text stays the same in all of them.</p>
+  {options.map((o) => (
+    <section class="spec" style={`--f:${o.font}, Georgia, serif; --hero:${o.hero}; --head:${o.head}; --sub:${o.sub}; --num:${o.num}; --soft:${o.soft}`}>
+      <header class="spec-head"><h2>{o.name}</h2><p>{o.note}</p></header>
+      <div class="rink">
+        <span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span>
+        <span class="circle">at</span>
+        <div class="side t-CAR"><p class="abbr">CAR</p><p class="full">Carolina Hurricanes</p></div>
+        <div class="side t-EDM home"><p class="abbr">EDM</p><p class="full">Edmonton Oilers</p></div>
+      </div>
+      <div class="sec-line"><span class="h2">Style fingerprints</span><span class="ph">Placeholder numbers</span></div>
+      <p class="take">Carolina floods the net with shots from everywhere; Edmonton takes fewer and better ones.</p>
+      <div class="pair">
+        <div class="card">
+          <p class="h3">Shot suppression</p>
+          <p class="ends"><span>Porous</span><span>Stingy</span></p>
+          <p class="body"><span class="nm">Carolina:</span> 49.1 shot attempts allowed per hour. <span class="rk">2nd of 32</span></p>
+        </div>
+        <div class="card t-EDM">
+          <p class="h3">D. Levi</p>
+          <p class="body"><span class="big">+7.7</span> goals saved above expected in 24 starts</p>
+        </div>
+      </div>
+    </section>
+  ))}
+</Base>
+
+<style>
+  .page-h { font: 400 clamp(30px, 6vw, 44px) / 1.1 var(--display); margin-top: 24px; }
+  .lede { color: var(--ink-2); margin-top: 8px; max-width: 60ch; }
+  .spec { margin-top: 56px; padding-top: 20px; border-top: 5px solid var(--line-blue); display: grid; gap: 16px; }
+  .spec-head h2 { font: 600 15px var(--ui); letter-spacing: 0.02em; }
+  .spec-head p { font: 400 15px/1.45 var(--ui); color: var(--ink-2); max-width: 64ch; }
+  .rink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 2px solid var(--ink); border-radius: 48px; overflow: hidden; min-height: 170px; }
+  .rl { position: absolute; top: 0; bottom: 0; width: 5px; }
+  .rl.red { left: 50%; margin-left: -2.5px; background: var(--line-red); }
+  .rl.blue { background: var(--line-blue); } .rl.blue.l { left: 37.5%; } .rl.blue.r { right: 37.5%; }
+  .circle { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 20px/1 var(--body); color: var(--ink-2); }
+  .side { padding: 22px clamp(20px, 7vw, 72px); display: flex; flex-direction: column; justify-content: center; position: relative; }
+  .side.home { align-items: flex-end; text-align: right; }
+  .abbr { font-family: var(--f); font-weight: var(--hero); font-variation-settings: 'SOFT' var(--soft); font-size: clamp(42px, 12.5vw, 104px); line-height: 0.9; letter-spacing: -0.02em; color: var(--team); }
+  .full { font: 500 clamp(13px, 2.6vw, 16px) / 1.3 var(--body); margin-top: 10px; }
+  .sec-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+  .h2 { font-family: var(--f); font-weight: var(--head); font-variation-settings: 'SOFT' var(--soft); font-size: 34px; line-height: 1.05; letter-spacing: -0.01em; }
+  .take { color: var(--ink-2); font-size: 18px; max-width: 58ch; }
+  .pair { display: grid; gap: 14px; }
+  @media (min-width: 640px) { .pair { grid-template-columns: 1fr 1fr; } }
+  .h3 { font-family: var(--f); font-weight: var(--sub); font-variation-settings: 'SOFT' var(--soft); font-size: 21px; line-height: 1.15; margin-bottom: 8px; }
+  .ends { display: flex; justify-content: space-between; font: italic 400 14px var(--body); color: var(--ink-2); border-bottom: 4px solid var(--track); padding-bottom: 6px; margin-bottom: 10px; }
+  .body { font: 400 14px/1.45 var(--ui); }
+  .nm { font-weight: 500; }
+  .rk { color: var(--ink-3); }
+  .big { font-family: var(--f); font-weight: var(--num); font-variation-settings: 'SOFT' var(--soft); font-size: 40px; line-height: 1; margin-right: 6px; }
+</style>
