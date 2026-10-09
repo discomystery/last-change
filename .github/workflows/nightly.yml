@@ -62,7 +62,9 @@ jobs:
           npm --prefix site run build
 
       - name: Save data to the data branch
-        run: pipeline/save_data.sh "Data cache: nightly run $(date -u +%Y-%m-%dT%H:%MZ)"
+        run: |
+          pipeline/save_data.sh "Data cache, nightly run $(date -u +%Y-%m-%dT%H:%MZ)"
 
       - name: Publish the site
-        run: pipeline/deploy_site.sh "Nightly deploy $(date -u +%Y-%m-%dT%H:%MZ)"
+        run: |
+          pipeline/deploy_site.sh "Nightly deploy $(date -u +%Y-%m-%dT%H:%MZ)"
