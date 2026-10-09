@@ -418,3 +418,15 @@ export const recap = {
     { team: 'EDM' as Abbr, name: goalies.EDM[0].name, line: 'Allowed 3 on 3.4 expected goals while facing 38 shots.', gsax: '+0.4' },
   ],
 };
+
+// Placeholder fingerprint for any one team (team page layout review). Seeded by the abbreviation.
+export function teamFingerprint(abbr: string) {
+  const r = mulberry32([...abbr].reduce((h, ch) => h * 31 + ch.charCodeAt(0), 7));
+  return fingerprint.map((d) => {
+    const meta = fpMeta[d.key];
+    const pct = clamp(4 + r() * 92);
+    const season = clamp(pct + (r() - 0.5) * 44);
+    return { key: d.key, label: d.label, tip: d.tip, group: meta.group, lo: meta.lo, hi: meta.hi,
+      blend: fpView(d.key, pct, Math.round(9 + r() * 8)), season: fpView(d.key, season, Math.round(26 + r() * 8)) };
+  });
+}
