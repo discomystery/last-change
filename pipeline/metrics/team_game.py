@@ -16,6 +16,7 @@ ATTEMPTS = UNBLOCKED | {"blocked-shot"}
 TURNOVER_WINDOW = 5  # seconds from a turnover to a shot for it to count as off-turnover
 RUSH_WINDOW = 4  # seconds from an event outside the offensive zone to a shot for it to count as a rush shot
 POINT_DISTANCE = 50  # feet
+BREAKDOWN_XG = 0.15  # a rush or off-turnover shot at least this dangerous counts as a breakdown chance
 COUNTS = ["cf", "ff", "sf", "gf", "xgf", "rush_xgf", "reb_xgf", "to_xgf", "point_cf", "hits", "gives", "takes", "blocks"]
 
 
@@ -99,6 +100,8 @@ def build(season: int) -> dict:
                         bump(side, "reb_xg" + sfx, xg)
                     if off_turnover:
                         bump(side, "to_xg" + sfx, xg)
+                    if (rush or off_turnover) and xg >= BREAKDOWN_XG:
+                        bump(side, "bd_" + sfx)
                 if typ in ("shot-on-goal", "goal"):
                     bump(side, "s" + sfx)
                 if typ == "goal":
@@ -111,15 +114,41 @@ def build(season: int) -> dict:
             continue
         if typ == "hit":
             bump(home, "hits")
+            if e["zone"] == "O":
+                bump(home, "oz_hits")
         elif typ == "giveaway":
             bump(home, "gives")
+            if e["zone"] == "D":
+                bump(not home, "forced_gives")  # coughed up in their own end: credit the forechecking team
         elif typ == "takeaway":
             bump(home, "takes")
+            if e["zone"] == "O":
+                bump(home, "oz_takes")
 
     cols = ["sec", "cf", "ca", "ff", "fa", "sf", "sa", "gf", "ga", "xgf", "xga", "rush_xgf", "rush_xga", "reb_xgf", "reb_xga",
-            "to_xgf", "to_xga", "point_cf", "point_ca", "hits", "gives", "takes", "blocks"]
+            "to_xgf", "to_xga", "point_cf", "point_ca", "hits", "gives", "takes", "blocks", "bd_f", "bd_a", "oz_hits", "oz_takes", "forced_gives"]
     table = pl.DataFrame(
         [{"game_id": k[0], "team_id": k[1], "is_home": k[2], "strength": k[3], "score_state": k[4], **{c: float(v.get(c, 0.0)) for c in cols}} for k, v in rows.items()]
     )
     table.write_parquet(d / "team_game.parquet")
+
+    # Discipline: count each stretch a team spends shorthanded (from who is actually on the ice), not penalty calls,
+    # so offsetting minors and misconducts that change nothing are ignored.
+    short = defaultdict(int)
+    seconds = defaultdict(int)
+    was = {}
+    for s in stints.sort("game_id", "start").iter_rows(named=True):
+        gid = s["game_id"]
+        if gid not in ids:
+            continue
+        hg, ag = s["home_goalie"] is not None, s["away_goalie"] is not None
+        for home in (True, False):
+            own, opp = (s["n_home"], s["n_away"]) if home else (s["n_away"], s["n_home"])
+            down = strength(own, opp, hg if home else ag, ag if home else hg) in ("4v5", "3v5", "3v4")
+            key = (gid, ids[gid][0 if home else 1])
+            seconds[key] += s["duration"]
+            if down and not was.get(key, False):
+                short[key] += 1
+            was[key] = down
+    pl.DataFrame([{"game_id": k[0], "team_id": k[1], "times_short": short.get(k, 0), "game_sec": v} for k, v in seconds.items()]).write_parquet(d / "discipline.parquet")
     return {"season": season, "rows": table.height}

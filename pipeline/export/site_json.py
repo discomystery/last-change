@@ -64,7 +64,7 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
 
 # Traits whose numbers are checked and ready to show. Second chances is held back: MoneyPuck's 2026-27
 # file values rebound shots about half as highly as its earlier-season files, so seasons cannot be blended yet.
-READY = ["volume", "quality", "rush", "turnover", "point", "suppression", "qualityAllowed", "goalie", "pace", "pp", "pk", "powerKill"]
+READY = ["volume", "quality", "rush", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "pp", "pk", "powerKill", "discipline"]
 
 
 def export_fingerprints(season: int) -> int:
@@ -73,7 +73,17 @@ def export_fingerprints(season: int) -> int:
     out = team_style.run(season)
     g = pl.read_parquet(TABLES / str(season) / "games.parquet")
     abbr = {**dict(zip(g["home_id"], g["home"])), **dict(zip(g["away_id"], g["away"]))}
-    teams = {abbr[tid]: {"games": t["games"], "dims": {d: t["dims"][d] for d in READY}} for tid, t in out["teams"].items()}
+    from pipeline.metrics.team_style import INDEXED
+
+    def dim(t, d):
+        est = t["dims"][d]
+        if d in INDEXED:  # carry the as-recorded rate alongside the arena-adjusted score
+            est = {mode: {**est[mode], "raw": t["dims"][INDEXED[d]][mode]["v"], "raw_rank": t["dims"][INDEXED[d]][mode]["rank"]} for mode in est}
+        return est
+
+    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY}} for tid, t in out["teams"].items()}
+    from pipeline.metrics import rink_bias
+    (SITE_DATA / "arena_factors.json").write_text(json.dumps({"seasons": "2023-24 to 2025-26", "arenas": rink_bias.factors().to_dicts()}, separators=(",", ":")))
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "ready": READY,
                "stabilization": {d: out["stabilization"][d] for d in READY}, "teams": teams}
     (SITE_DATA / "fingerprints.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))

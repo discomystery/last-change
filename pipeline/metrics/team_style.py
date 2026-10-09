@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
-from pipeline.metrics import adjust
+from pipeline.metrics import adjust, rink_bias
 
 # name -> (numerator columns, denominator columns, multiplier, higher is "more/better" for the percentile)
 DIMS = {
@@ -24,7 +24,15 @@ DIMS = {
     "pk": (["pk_xga"], ["pk_sec"], 3600, False),
     "powerKill": (["pk_xgf"], ["pk_sec"], 3600, True),
     "goalie": (["g_saved"], ["g_sec"], 3600, True),
+    "breakdowns": (["bd_a"], ["sec5"], 3600, False),
+    "discipline": (["pp_opps", "neg_short"], ["game_sec"], 3600, True),
+    "physical": (["hits_adj"], ["close_sec"], 3600, True),
+    "forecheck": (["fc_adj"], ["sec5"], 3600, True),
+    # The same two traits exactly as recorded, with no arena correction (shown when the visitor picks "Raw").
+    "physical_raw": (["hits_close"], ["close_sec"], 3600, True),
+    "forecheck_raw": (["fc_raw"], ["sec5"], 3600, True),
 }
+INDEXED = {"physical": "physical_raw", "forecheck": "forecheck_raw"}  # shown as a score against league average
 COLS = sorted({c for num, den, _, _ in DIMS.values() for c in num + den})
 BOOTSTRAPS = 300
 MAX_K = 400.0
@@ -33,8 +41,17 @@ MAX_K = 400.0
 def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     """One row per team per regular-season game with every sum the fingerprint needs."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date", "home_id", "away_id")
+    arena = _arena().select(pl.col("team_id").alias("home_id"), pl.col("hits").alias("f_hits"), pl.col("gives").alias("f_gives"), pl.col("takes").alias("f_takes"))
+    games = games.join(arena, on="home_id", how="left").with_columns(pl.col("f_hits", "f_gives", "f_takes").fill_null(1.0))
     t = adjust.apply(pl.read_parquet(d / "team_game.parquet"), w).join(games, on="game_id")
+    close = (pl.col("strength") == "5v5") & (pl.col("score_state").abs() <= 1)
+    fc_raw = pl.col("oz_hits") + pl.col("oz_takes") + pl.col("forced_gives")
+    fc_adj = pl.col("oz_hits") / pl.col("f_hits") + pl.col("oz_takes") / pl.col("f_takes") + pl.col("forced_gives") / pl.col("f_gives")
+    disc = pl.read_parquet(d / "discipline.parquet")
+    opp = disc.join(games.select("game_id", "home_id", "away_id"), on="game_id").with_columns(
+        team_id=pl.when(pl.col("team_id") == pl.col("home_id")).then(pl.col("away_id")).otherwise(pl.col("home_id"))).select("game_id", "team_id", pl.col("times_short").alias("pp_opps"))
+    disc = disc.join(opp, on=["game_id", "team_id"]).with_columns(pl.col("pp_opps", "game_sec").cast(pl.Float64), neg_short=-pl.col("times_short").cast(pl.Float64)).drop("times_short")
     s5, pp, pk, net = pl.col("strength") == "5v5", pl.col("strength") == "5v4", pl.col("strength") == "4v5", pl.col("strength") != "EA"
 
     def tot(col, cond):
@@ -47,7 +64,20 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
-    ).sort("team_id", "date", "game_id")
+        tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
+        (pl.when(close).then(pl.col("hits") / pl.col("f_hits")).otherwise(0.0).sum()).alias("hits_adj"),
+        (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
+    ).join(disc, on=["game_id", "team_id"]).sort("team_id", "date", "game_id")
+
+
+_ARENA = None
+
+
+def _arena() -> pl.DataFrame:
+    global _ARENA
+    if _ARENA is None:
+        _ARENA = rink_bias.factors()
+    return _ARENA
 
 
 def _value(sums: dict, dim: str) -> float:
@@ -118,6 +148,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 lo, hi = np.nanpercentile(draws, [10, 90])
                 p_lo, p_hi = sorted((_pct(lo, league, higher), _pct(hi, league, higher)))
                 better = (league > v).sum() if higher else (league < v).sum()
-                dims[dim][mode] = {"v": round(v, 4), "pct": round(100 * (len(league) - better - 0.5) / len(league)), "lo": round(p_lo), "hi": round(p_hi), "rank": int(better) + 1}
+                dims[dim][mode] = {"v": round(v, 4), "pct": round(100 * (len(league) - better - 0.5) / len(league)), "lo": round(p_lo), "hi": round(p_hi), "rank": int(better) + 1,
+                                   "index": round(100 * v / float(np.mean(league)))}
         teams[tid] = {"games": len(mat), "dims": dims}
     return {"season": season, "stabilization": k, "weights": w.to_dicts(), "teams": teams}

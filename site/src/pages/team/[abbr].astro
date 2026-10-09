@@ -17,7 +17,8 @@ const team = teams.find((t) => t.abbr === abbr)!;
 const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const last = lines.teams.find((t) => t.team === abbr);
-type Est = { v: number; pct: number; lo: number; hi: number; rank: number };
+type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
+const rawWords: Record<string, string> = { physical: 'hits recorded per hour', forecheck: 'forecheck plays recorded per hour' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
@@ -57,14 +58,21 @@ const _ = ordinal;
               <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
               <div class="lanes"><div class="lane" style={`--b:${c.blend.pct};--blo:${c.blend.lo};--bhi:${c.blend.hi};--c:${c.season.pct};--clo:${c.season.lo};--chi:${c.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
               {(['blend', 'season'] as const).map((mode) => (
-                <p class={`fpc-line m-${mode}`}><span>{c.say(c[mode].v)}</span><em>{ordinal(c[mode].rank)} of 32</em></p>
+                <p class={`fpc-line m-${mode}`}>
+                  {c[mode].raw === undefined
+                    ? <><span>{c.say(c[mode].v)}</span><em>{ordinal(c[mode].rank)} of 32</em></>
+                    : <>
+                        <span class="a-adj">{c.say(c[mode].index)}</span><em class="a-adj">{ordinal(c[mode].rank)} of 32</em>
+                        <span class="a-raw">{c[mode].raw!.toFixed(1)} {rawWords[c.key]}</span><em class="a-raw">{ordinal(c[mode].raw_rank!)} of 32</em>
+                      </>}
+                </p>
               ))}
             </li>
           ))}
         </ul>
       </>
     ))}
-    <p class="note">Still to come here: second chances, forecheck pressure, physicality, breakdowns avoided, discipline and depth.</p>
+    <p class="note">Still to come here: second chances and depth. Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={last ? `Who played together at 5-on-5 in the most recent game, ${last.at_home ? 'against' : 'at'} ${names[last.opponent]}.` : 'No games played yet.'}>
