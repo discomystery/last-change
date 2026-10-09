@@ -1,19 +1,53 @@
 ---
 // Offensive zone seen from above, net at the top. Dot size grows with shot danger.
-interface Props { team: string; shots: { x: number; y: number; xg: number }[]; title: string }
-const { team, shots, title } = Astro.props;
+// With `long`, wide screens get a taller drawing that carries on through the neutral zone to centre ice.
+interface Props { team: string; shots: { x: number; y: number; xg: number }[]; title: string; long?: boolean }
+const { team, shots, title, long = false } = Astro.props;
 const sx = (y: number) => y + 42.5;
 const sy = (x: number) => 100 - x;
+const versions = long ? [{ h: 76, cls: 'zone' }, { h: 119, cls: 'full' }] : [{ h: 76, cls: '' }];
+const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
 ---
-<figure class:list={['shotmap', `t-${team}`]}>
-  <svg viewBox="-1 -1 87 78" role="img" aria-label={title}>
-    <path class="rk-board" d="M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76" />
-    <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
-    <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
-    <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
-    <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
-    <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
-    {shots.map((s) => <circle class="shot" cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`Shot worth ${s.xg.toFixed(2)} expected goals`} />)}
-  </svg>
+<figure class:list={['shotmap', `t-${team}`, { long }]}>
+  {versions.map((v) => (
+    <svg class={v.cls} viewBox={`-1 -1 87 ${v.h + 2}`} role="img" aria-label={title}>
+      {v.cls === 'full' && (
+        <defs>
+          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1"><stop offset="0.86" stop-color="#fff" /><stop offset="1" stop-color="#000" /></linearGradient>
+          <mask id={`${fadeId}-m`} maskUnits="userSpaceOnUse" x="-1" y="-1" width="87" height={v.h + 2}><rect x="-1" y="-1" width="87" height={v.h + 2} fill={`url(#${fadeId})`} /></mask>
+        </defs>
+      )}
+      <g mask={v.cls === 'full' ? `url(#${fadeId}-m)` : undefined}>
+        <path class="rk-board" d={`M0 ${v.h} V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V${v.h}`} />
+        <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
+        <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
+        <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
+        <circle class="rk-dot" cx="20.5" cy="31" r="1" /><circle class="rk-dot" cx="64.5" cy="31" r="1" />
+        <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
+        <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
+        {v.cls === 'full' && (
+          <>
+            <circle class="rk-dot" cx="20.5" cy="80" r="1" /><circle class="rk-dot" cx="64.5" cy="80" r="1" />
+            <line class="rk-centre" x1="0" x2="85" y1="100" y2="100" />
+            <circle class="rk-thin blue" cx="42.5" cy="100" r="15" />
+            <circle class="rk-dot blue" cx="42.5" cy="100" r="1" />
+          </>
+        )}
+        {shots.map((s) => <circle class="shot" cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`Shot worth ${s.xg.toFixed(2)} expected goals`} />)}
+      </g>
+    </svg>
+  ))}
   <figcaption>{title}</figcaption>
 </figure>
+
+<style is:global>
+  .shotmap.long svg.full { display: none; }
+  @media (min-width: 900px) {
+    .shotmap.long svg.zone { display: none; }
+    .shotmap.long svg.full { display: block; }
+  }
+  .rk-dot { fill: var(--line-red); }
+  .rk-dot.blue { fill: var(--line-blue); }
+  .rk-centre { stroke: var(--line-red); stroke-width: 1.4; }
+  .rk-thin.blue { stroke: var(--line-blue); }
+</style>
