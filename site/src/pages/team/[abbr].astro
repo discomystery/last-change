@@ -26,7 +26,7 @@ const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const last = lines.teams.find((t) => t.team === abbr);
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
-const rawWords: Record<string, string> = { physical: 'hits recorded per hour', forecheck: 'forecheck plays recorded per hour' };
+const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
 type Unit = { label: string; players: string[]; minutes: number; seconds: number; toi_sec: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
@@ -61,9 +61,9 @@ const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}
 const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
-  busy: (g) => `${g.sa60} shots faced per hour`,
+  busy: (g) => `${g.sa60} shots faced per 60`,
   danger: (g) => `the average shot against is worth ${(g.danger ?? 0).toFixed(3)} expected goals`,
-  breakdowns: (g) => `${g.bd60} dangerous rush or turnover chances per hour`,
+  breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots; ${g.long_wait}% come after three quiet minutes`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
 };
@@ -148,8 +148,8 @@ const _ = ordinal;
                   </div>
                   <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
                   <dl class="stats">
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per hour: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per hour: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`A better share than ${u.pct.share}% of ${peer[u.label]}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`More offensive-zone faceoffs than ${u.pct.oz}% of ${peer[u.label]}.`} />}</div>
                   </dl>
@@ -218,7 +218,7 @@ const _ = ordinal;
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
-        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. Each unit’s expected goals per hour are pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
+        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. Each unit’s expected goals per 60 are pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
         {sp.faceoff && (
           <div class="card worth">
             <p class="mini-h">Worth knowing</p>
@@ -230,7 +230,7 @@ const _ = ordinal;
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per 60, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name} once play is under way. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
@@ -243,7 +243,7 @@ const _ = ordinal;
             <h4 class="st-h">Penalty kill</h4>
             {sp.pk.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per hour</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per hour, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per 60, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
               </div>
             ))}
@@ -273,17 +273,17 @@ const _ = ordinal;
                   <div class="g2">
                     <div class="card gcard">
                       <p class="gname"><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
-                      <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Better than ${x.pct.gsax}% of goalies at stopping more than expected, per hour.`} />}</p>
+                      <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Better than ${x.pct.gsax}% of goalies at stopping more than expected, per 60.`} />}</p>
                       <dl class="gkv">
                         {(['low', 'medium', 'high'] as const).map((t) => <div><dt>{t[0].toUpperCase() + t.slice(1)}-danger save %</dt><dd>{svp(x.tiers[t].sv)} <span class="n">{x.tiers[t].shots} shots</span></dd></div>)}
-                        <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per hour.">Shots faced per hour</span></dt><dd>{x.sa60} {!few && <Marker pct={x.pct.busy!} tip={`Busier than ${x.pct.busy}% of goalies.`} />}</dd></div>
-                        <div><dt><span class="term" tabindex="0" data-tip="Dangerous rush or turnover chances he faces per hour. A stand-in for chances faced alone; public data cannot see where defenders are.">Breakdown chances per hour</span></dt><dd>{x.bd60} {!few && <Marker pct={x.pct.breakdowns!} tip={`Faces more breakdowns than ${x.pct.breakdowns}% of goalies.`} />}</dd></div>
+                        <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60} {!few && <Marker pct={x.pct.busy!} tip={`Busier than ${x.pct.busy}% of goalies.`} />}</dd></div>
+                        <div><dt><span class="term" tabindex="0" data-tip="Dangerous rush or turnover chances the team gives up in front of him, per 60 minutes. A stand-in for chances he faces alone; public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60} {!few && <Marker pct={x.pct.breakdowns!} tip={`His team breaks down in front of him more than ${x.pct.breakdowns}% of goalies’ teams do.`} />}</dd></div>
                         <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`Steadier than ${x.pct.steady}% of goalies.`} />}</dd></div>
                       </dl>
-                      <div class="gh"><p class="mini-h">Night to night: goals saved above expected in each start</p><Histogram team="one" bins={x.bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} /></div>
+                      <div class="gh"><p class="mini-h">Night to night: goals saved above expected in each start</p><Histogram wide team="one" bins={x.bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} /></div>
                     </div>
                     <div class="card gmid">
-                      <p class="mini-h"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are every goalie with at least ten starts over this season and last. Outlined dots have fewer than ten starts.">Helping, or hung out to dry?</span></p>
+                      <p class="chart-title"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are every goalie with at least ten starts over this season and last; point at one to see who it is. Outlined dots have fewer than ten starts.">Helping, or hung out to dry?</span></p>
                       <Quadrant tall league={lg} xDomain={xDom} yDomain={[-yMax, yMax]} xMid={xMid} highlights={goalies.filter((o) => o.blend.xga60 !== null && o.blend.gsax60 !== null).map((o) => ({ team: 'one', name: o.name, probable: o.blend.starts >= goalieData.min_starts.blend, x: o.blend.xga60!, y: o.blend.gsax60! }))} />
                     </div>
                   </div>
@@ -431,8 +431,9 @@ const _ = ordinal;
   .lane.empty::before { opacity: 0.6; }
   .gnight { margin-top: 14px; display: grid; gap: 16px; }
   @media (min-width: 900px) { .gnight { grid-template-columns: 1fr 1.6fr; align-items: center; } }
-  .gh { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule); }
-  .gh .histo { max-width: 320px; }
+  .gh { margin-top: 14px; padding: 14px 16px 12px; background: var(--ice); border-radius: 12px; }
+  .gh .histo { max-width: none; }
+  .chart-title { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
   .scout { padding: 10px 12px; border-left: 3px solid var(--ink); background: var(--ice); border-radius: 0 6px 6px 0; font: italic 400 14px var(--body); }
   .scout .mini-h { font-style: normal; }
   .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }

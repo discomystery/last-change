@@ -42,23 +42,23 @@ export const teams = Object.fromEntries(
 // ---------- Style fingerprint ----------
 export type Dim = { key: string; label: string; tip: string; CAR: number; EDM: number; neutral?: boolean };
 export const fingerprint: Dim[] = [
-  { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts the team takes per hour of 5-on-5 play.', CAR: 96, EDM: 71 },
+  { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts the team takes per 60 minutes of 5-on-5 play.', CAR: 96, EDM: 71 },
   { key: 'quality', label: 'Shot quality', tip: 'How dangerous the average unblocked shot is, by expected goals.', CAR: 22, EDM: 88 },
   { key: 'suppression', label: 'Shot suppression', tip: 'How few shot attempts the team allows. Further right means fewer allowed.', CAR: 94, EDM: 48 },
   { key: 'qualityAllowed', label: 'Quality allowed', tip: 'How dangerous the average shot against is. Further right means safer shots against.', CAR: 31, EDM: 55 },
-  { key: 'pace', label: 'Pace', tip: 'Total shots both ways per hour. High-pace teams play track meets.', CAR: 78, EDM: 66, neutral: true },
+  { key: 'pace', label: 'Pace', tip: 'Total shots both ways per 60. High-pace teams play track meets.', CAR: 78, EDM: 66, neutral: true },
   { key: 'rush', label: 'Rush offense', tip: 'Share of scoring chances that come off the rush rather than from zone time.', CAR: 35, EDM: 91, neutral: true },
   { key: 'rebounds', label: 'Second chances', tip: 'Share of scoring chances that come from rebounds.', CAR: 74, EDM: 52, neutral: true },
   { key: 'turnover', label: 'Off-turnover offense', tip: 'Share of scoring chances within five seconds of forcing a turnover.', CAR: 81, EDM: 63, neutral: true },
   { key: 'point', label: 'Point-shot reliance', tip: 'Share of shot attempts taken by defensemen or from long range.', CAR: 85, EDM: 30, neutral: true },
   { key: 'forecheck', label: 'Forecheck pressure', tip: 'Hits, takeaways and forced giveaways in the offensive zone. A rough stand-in for forechecking, adjusted for each arena’s scorer.', CAR: 97, EDM: 44 },
-  { key: 'physical', label: 'Physicality', tip: 'Hits per hour in close games, adjusted for each arena’s scorer.', CAR: 62, EDM: 58, neutral: true },
+  { key: 'physical', label: 'Physicality', tip: 'Hits per 60 in close games, adjusted for each arena’s scorer.', CAR: 62, EDM: 58, neutral: true },
   { key: 'breakdowns', label: 'Breakdowns avoided', tip: 'How rarely the team gives up a dangerous rush or turnover chance. Further right means fewer breakdowns.', CAR: 28, EDM: 40 },
-  { key: 'pp', label: 'Power play', tip: 'Expected goals per hour with the man advantage.', CAR: 58, EDM: 95 },
-  { key: 'pk', label: 'Penalty kill', tip: 'Expected goals allowed per hour shorthanded. Further right means stingier.', CAR: 90, EDM: 45 },
+  { key: 'pp', label: 'Power play', tip: 'Expected goals per 60 with the man advantage.', CAR: 58, EDM: 95 },
+  { key: 'pk', label: 'Penalty kill', tip: 'Expected goals allowed per 60 shorthanded. Further right means stingier.', CAR: 90, EDM: 45 },
   { key: 'powerKill', label: 'Power kill', tip: 'How dangerous the team is while shorthanded.', CAR: 93, EDM: 38 },
-  { key: 'discipline', label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per hour.', CAR: 66, EDM: 41 },
-  { key: 'goalie', label: 'Goaltending', tip: 'Goals saved above expected per hour, all goalies combined.', CAR: 37, EDM: 52 },
+  { key: 'discipline', label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per 60.', CAR: 66, EDM: 41 },
+  { key: 'goalie', label: 'Goaltending', tip: 'Goals saved above expected per 60, all goalies combined.', CAR: 37, EDM: 52 },
   { key: 'depth', label: 'Depth', tip: 'How much of the forwards’ 5-on-5 ice time goes to the six least-used forwards each night. Higher means the coach spreads minutes more evenly.', CAR: 92, EDM: 33 },
 ];
 export const fingerprintBands = Object.fromEntries(
@@ -152,10 +152,10 @@ function special(a: Abbr) {
     })),
     pk: chunk([f[8], f[9], d[2], d[3], f[10], f[11], d[4], d[5]], 4).map((u, i) => ({ label: `PK${i + 1}`, share: i === 0 ? 54 : 46, players: u.map((p) => p.name) })),
     rates: [
-      { label: 'Power play', tip: 'Expected goals per hour at 5-on-4.', value: strong ? '9.4' : '7.1', unit: 'xGF/60', pct: strong ? 95 : 58 },
-      { label: 'Penalty kill', tip: 'Expected goals allowed per hour at 4-on-5. Further right means stingier.', value: strong ? '7.9' : '5.8', unit: 'xGA/60', pct: strong ? 45 : 90 },
-      { label: 'Power kill', tip: 'Expected goals the team creates per hour while shorthanded.', value: strong ? '0.5' : '1.3', unit: 'SH xGF/60', pct: strong ? 38 : 93 },
-      { label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per hour.', value: strong ? '−0.21' : '+0.18', unit: 'net/60', pct: strong ? 41 : 66 },
+      { label: 'Power play', tip: 'Expected goals per 60 at 5-on-4.', value: strong ? '9.4' : '7.1', unit: 'xGF/60', pct: strong ? 95 : 58 },
+      { label: 'Penalty kill', tip: 'Expected goals allowed per 60 at 4-on-5. Further right means stingier.', value: strong ? '7.9' : '5.8', unit: 'xGA/60', pct: strong ? 45 : 90 },
+      { label: 'Power kill', tip: 'Expected goals the team creates per 60 while shorthanded.', value: strong ? '0.5' : '1.3', unit: 'SH xGF/60', pct: strong ? 38 : 93 },
+      { label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per 60.', value: strong ? '−0.21' : '+0.18', unit: 'net/60', pct: strong ? 41 : 66 },
     ],
     projectedOpps: strong ? 2.6 : 3.4,
     shots: shotCloud(strong ? [0.34, 0.18, 0.2, 0.2, 0.08] : [0.2, 0.2, 0.16, 0.14, 0.3]),
@@ -207,9 +207,9 @@ function goalie(a: Abbr, i: number) {
       { tier: 'High danger', sv: round(between(0.78, 0.84), 3), gsax: round(gsax60 * 24 * 0.47 + between(-0.6, 0.6), 1) },
     ],
     workload: [
-      { label: 'Shots faced per 60', tip: 'Shots on goal he faces per hour.', value: round(a === 'CAR' ? between(24, 26.5) : between(28, 31), 1) },
+      { label: 'Shots faced per 60', tip: 'Shots on goal he faces per 60.', value: round(a === 'CAR' ? between(24, 26.5) : between(28, 31), 1) },
       { label: 'Danger per shot', tip: 'Average expected-goal value of an unblocked shot against him.', value: round(a === 'CAR' ? between(0.078, 0.086) : between(0.066, 0.074), 3) },
-      { label: 'Breakdown chances per 60', tip: 'Dangerous rush or turnover chances he faces per hour. A stand-in for chances faced alone; public data cannot see where defenders are.', value: round(between(2.2, 3.6), 1) },
+      { label: 'Defensive breakdowns per 60', tip: 'Dangerous rush or turnover chances he faces per 60. A stand-in for chances faced alone; public data cannot see where defenders are.', value: round(between(2.2, 3.6), 1) },
       { label: 'Median gap between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', value: `${Math.round(a === 'CAR' ? between(62, 78) : between(44, 56))} s` },
       { label: 'Shots after 3+ quiet minutes', tip: 'Share of shots that arrive after he has gone at least three minutes without one.', value: `${Math.round(a === 'CAR' ? between(11, 16) : between(5, 9))}%` },
       { label: 'Rebounds above expected', tip: 'Positive means he gives up fewer rebounds than a typical goalie would on the same shots.', value: (between(-4, 5) > 0 ? '+' : '−') + round(Math.abs(between(0.5, 4.5)), 1) },
@@ -247,11 +247,11 @@ export const recipes: Record<Abbr, { text: string; sample: string }[]> = {
 
 // ---------- Key players ----------
 const sigPool = [
-  ['Shot attempts', 'Individual shot attempts per hour at 5-on-5.'],
-  ['Primary assists', 'Passes that directly set up a goal, per hour.'],
-  ['Hits', 'Hits per hour, adjusted for each arena’s scorer.'],
-  ['Takeaways', 'Takeaways per hour, adjusted for each arena’s scorer.'],
-  ['Blocks', 'Blocked shots per hour, adjusted for each arena’s scorer.'],
+  ['Shot attempts', 'Individual shot attempts per 60 at 5-on-5.'],
+  ['Primary assists', 'Passes that directly set up a goal, per 60.'],
+  ['Hits', 'Hits per 60, adjusted for each arena’s scorer.'],
+  ['Takeaways', 'Takeaways per 60, adjusted for each arena’s scorer.'],
+  ['Blocks', 'Blocked shots per 60, adjusted for each arena’s scorer.'],
   ['Defensive-zone starts', 'How often the coach starts his shift in the defensive zone.'],
   ['Shorthanded ice time', 'Penalty-kill minutes per game.'],
   ['Rush shots', 'Share of his own shots that come off the rush.'],
@@ -314,24 +314,24 @@ type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: numbe
 const f1 = (v: number) => v.toFixed(1);
 export const fpGroups = ['Offense', 'Defense', 'Tempo and edge', 'Special teams'];
 const fpMeta: Record<string, FpMeta> = {
-  volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `${f1(v)} shot attempts per hour` },
+  volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `${f1(v)} shot attempts per 60` },
   quality: { group: 'Offense', lo: 'Perimeter', hi: 'Point-blank', at0: 0.062, at100: 0.092, say: (v) => `one expected goal for every ${f1(1 / v)} shots` },
   rush: { group: 'Offense', lo: 'Cycle', hi: 'Rush', at0: 6, at100: 18, say: (v) => `${f1(v)}% of chances come off the rush` },
   rebounds: { group: 'Offense', lo: 'One-and-done', hi: 'Crashers', at0: 5, at100: 13, say: (v) => `${f1(v)}% of chances come from rebounds` },
   turnover: { group: 'Offense', lo: 'Patient', hi: 'Opportunist', at0: 5, at100: 14, say: (v) => `${f1(v)}% of chances come right after a turnover` },
   point: { group: 'Offense', lo: 'Down low', hi: 'Point-heavy', at0: 26, at100: 44, say: (v) => `${f1(v)}% of shot attempts come from the point` },
-  suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per hour` },
+  suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per 60` },
   qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `opponents need ${f1(1 / v)} shots per expected goal` },
-  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${f1(v)} breakdown chances allowed per hour` },
-  goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per hour` },
-  pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per hour, both teams combined` },
-  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per hour` },
-  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per hour` },
+  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${f1(v)} breakdown chances allowed per 60` },
+  goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
+  pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per 60, both teams combined` },
+  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
+  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per 60` },
   depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `the bottom six get ${f1(v)}% of the forwards’ 5-on-5 ice time` },
-  pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per hour on the power play` },
-  pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per hour shorthanded` },
-  powerKill: { group: 'Special teams', lo: 'Bunkered', hi: 'Predatory', at0: 0.3, at100: 1.4, say: (v) => `${f1(v)} expected goals created per hour shorthanded` },
-  discipline: { group: 'Special teams', lo: 'Reckless', hi: 'Clean', at0: -0.6, at100: 0.6, say: (v) => `${Math.abs(v).toFixed(2)} ${v >= 0 ? 'more penalties drawn than taken' : 'more penalties taken than drawn'} per hour` },
+  pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per 60 on the power play` },
+  pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per 60 shorthanded` },
+  powerKill: { group: 'Special teams', lo: 'Bunkered', hi: 'Predatory', at0: 0.3, at100: 1.4, say: (v) => `${f1(v)} expected goals created per 60 shorthanded` },
+  discipline: { group: 'Special teams', lo: 'Reckless', hi: 'Clean', at0: -0.6, at100: 0.6, say: (v) => `${Math.abs(v).toFixed(2)} ${v >= 0 ? 'more penalties drawn than taken' : 'more penalties taken than drawn'} per 60` },
 };
 const fpView = (key: string, pct: number, band: number) => {
   const meta = fpMeta[key];
@@ -396,7 +396,7 @@ export const recap = {
       detail: insights[3].body,
       verdict: 'held' as Verdict,
       measure: 'Edmonton power play / Carolina shorthanded',
-      usual: '9.4 and 1.3 expected goals per hour',
+      usual: '9.4 and 1.3 expected goals per 60',
       tonight: '10.4 and 3.5',
       happened: 'Edmonton scored once in three power plays. Carolina answered with three shorthanded shot attempts and a goal of its own.',
     },
@@ -459,9 +459,9 @@ const gsign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0
 type Goalie = (typeof goalies)['CAR'][number];
 export const goalieTraits = [
   { key: 'gsax', label: 'Stopping more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall', pct: (g: Goalie) => clamp(50 + g.gsax60 * 110), say: (g: Goalie) => `${gsign(g.gsax)} goals saved above expected in ${g.starts} starts` },
-  { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per hour.', lo: 'Quiet', hi: 'Under siege', pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per hour` },
+  { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per 60.', lo: 'Quiet', hi: 'Under siege', pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per 60` },
   { key: 'danger', label: 'How dangerous the shots are', tip: 'Average expected-goal value of an unblocked shot against him.', lo: 'Sheltered', hi: 'Exposed', pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
-  { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous rush or turnover chances he faces per hour. A stand-in for chances faced alone.', lo: 'Rare', hi: 'Constant', pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous rush or turnover chances per hour` },
+  { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous rush or turnover chances he faces per 60. A stand-in for chances faced alone.', lo: 'Rare', hi: 'Constant', pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous rush or turnover chances per 60` },
   { key: 'gaps', label: 'Waiting between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', lo: 'Steady work', hi: 'Long waits', pct: (g: Goalie) => clamp((gnum(g.workload[3].value) - 40) * 2.4), say: (g: Goalie) => `a typical wait of ${g.workload[3].value} between shots` },
   { key: 'steady', label: 'Night-to-night steadiness', tip: 'How often he gives his team a fair chance to win.', lo: 'Streaky', hi: 'Steady', pct: (g: Goalie) => clamp((g.consistency.qs - 40) * 3.6), say: (g: Goalie) => `a quality start ${g.consistency.qs}% of the time` },
 ];

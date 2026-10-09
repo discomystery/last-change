@@ -1,8 +1,9 @@
 ---
-interface Props { team: string; bins: { lo: number; n: number }[]; name: string }
-const { team, bins, name } = Astro.props;
+interface Props { team: string; bins: { lo: number; n: number }[]; name: string; wide?: boolean }
+const { team, bins, name, wide = false } = Astro.props;
 const max = Math.max(...bins.map((b) => b.n), 1);
-const W = 180, H = 64, bw = W / bins.length;
+// `wide` is a flatter drawing for full-width slots, so the labels stay small when it is stretched.
+const W = wide ? 420 : 180, H = 64, bw = W / bins.length;
 const sign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
 ---
 <svg class:list={['histo', `t-${team}`]} viewBox={`0 0 ${W} ${H + 16}`} role="img" aria-label={`${name}: goals saved above expected, game by game`}>

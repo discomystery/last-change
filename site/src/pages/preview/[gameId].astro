@@ -129,8 +129,8 @@ const nav = [
                   </div>
                   <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
                   <dl class="stats">
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per hour: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf.toFixed(2)}</dd><Pips pct={pr.xgf} tip={`Creates more than ${pr.xgf}% of ${grp}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per hour: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga.toFixed(2)}</dd><Pips pct={pr.xga} tip={`Stingier than ${pr.xga}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf.toFixed(2)}</dd><Pips pct={pr.xgf} tip={`Creates more than ${pr.xgf}% of ${grp}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga.toFixed(2)}</dd><Pips pct={pr.xga} tip={`Stingier than ${pr.xga}% of ${grp}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.xgfPct.toFixed(1)}%</dd><Pips pct={pr.share} tip={`A better share than ${pr.share}% of ${grp}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="Of the shifts the coach starts with a faceoff at either end, the share that start in the offensive zone.">Off. starts</span></dt><dd>{u.ozs}%</dd><Marker pct={pr.ozs} tip={`More offensive-zone starts than ${pr.ozs}% of ${grp}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="How tough the opponents they face are.">Competition</span></dt><dd>{u.qoc}</dd><Marker pct={pr.qoc} tip={`Tougher opponents than ${pr.qoc}% of ${grp}.`} /></div>
@@ -209,7 +209,7 @@ const nav = [
               <h4 class="st-h"><i></i>{teams[v.pp].place} power play</h4>
               {pp.pp.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{m.ppUnitStats[v.pp][k].xgf.toFixed(1)}</strong> expected goals per hour</span><Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per hour, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></p>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{m.ppUnitStats[v.pp][k].xgf.toFixed(1)}</strong> expected goals per 60</span><Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per 60, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></p>
                   <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span><span class="chip">{pl.role}</span></li>)}</ul>
                 </div>
               ))}
@@ -221,7 +221,7 @@ const nav = [
               <h4 class="st-h"><i></i>{teams[v.pk].place} penalty kill</h4>
               {pk.pk.map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{m.pkUnitStats[v.pk][k].xga.toFixed(1)}</strong> expected goals per hour</span><Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per hour, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></p>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{m.pkUnitStats[v.pk][k].xga.toFixed(1)}</strong> expected goals per 60</span><Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per 60, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></p>
                   <ul class="roles-list">{u.players.map((n, q) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{q < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
                 </div>
               ))}
@@ -252,8 +252,8 @@ const nav = [
           <p class="gbig"><strong>{signed(g.gsax)}</strong> <span class="term" tabindex="0" data-tip={m.goalieTraits[0].tip}>goals saved above expected</span> <Pips pct={m.goalieTraits[0].pct(g)} tip={`Better than ${m.goalieTraits[0].pct(g)}% of goalies at stopping more than expected.`} /></p>
           <dl class="gkv">
             {g.tiers.map((t) => <div><dt>{t.tier} save %</dt><dd>{t.sv.toFixed(3).slice(1)}</dd></div>)}
-            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[1].tip}>Shots faced per hour</span></dt><dd>{g.workload[0].value} <Marker pct={m.goalieTraits[1].pct(g)} tip={`Busier than ${m.goalieTraits[1].pct(g)}% of goalies.`} /></dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[3].tip}>Breakdown chances per hour</span></dt><dd>{g.workload[2].value} <Marker pct={m.goalieTraits[3].pct(g)} tip={`Faces more breakdowns than ${m.goalieTraits[3].pct(g)}% of goalies.`} /></dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[1].tip}>Shots faced per 60</span></dt><dd>{g.workload[0].value} <Marker pct={m.goalieTraits[1].pct(g)} tip={`Busier than ${m.goalieTraits[1].pct(g)}% of goalies.`} /></dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[3].tip}>Defensive breakdowns per 60</span></dt><dd>{g.workload[2].value} <Marker pct={m.goalieTraits[3].pct(g)} tip={`Faces more breakdowns than ${m.goalieTraits[3].pct(g)}% of goalies.`} /></dd></div>
             <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[5].tip}>Quality starts</span></dt><dd>{g.consistency.qs}% <Pips pct={m.goalieTraits[5].pct(g)} tip={`Steadier than ${m.goalieTraits[5].pct(g)}% of goalies.`} /></dd></div>
           </dl>
         </div>
@@ -373,7 +373,7 @@ const nav = [
     </ul>
     <details class="card explain">
       <summary>How the arena adjustment works, with an example</summary>
-      <p>Take {m.arenaExample.event} at {m.arenaExample.arena}. Over three seasons, games played there averaged <strong>{m.arenaExample.here}</strong> {m.arenaExample.event} per hour for both teams combined. The same teams, in every other building, averaged <strong>{m.arenaExample.elsewhere}</strong>.</p>
+      <p>Take {m.arenaExample.event} at {m.arenaExample.arena}. Over three seasons, games played there averaged <strong>{m.arenaExample.here}</strong> {m.arenaExample.event} per 60 for both teams combined. The same teams, in every other building, averaged <strong>{m.arenaExample.elsewhere}</strong>.</p>
       <p>{m.arenaExample.here} ÷ {m.arenaExample.elsewhere} = <strong>{m.arenaExample.raw.toFixed(2)}</strong>, so this scorer counts about 20% more {m.arenaExample.event} than those teams get elsewhere. Because a few seasons is still a limited sample, that figure is pulled part of the way back toward 1.00, landing at <strong>{m.arenaExample.shrunk.toFixed(2)}</strong>.</p>
       <p>Every {m.arenaExample.event.slice(0, -1)} recorded in that building is then divided by {m.arenaExample.shrunk.toFixed(2)}. A night with {m.arenaExample.rawCount} recorded {m.arenaExample.event} counts as <strong>{(m.arenaExample.rawCount / m.arenaExample.shrunk).toFixed(1)}</strong>.</p>
       <p class="note">These numbers are invented. The real site will have a page listing all 32 arenas with their actual figures for hits, giveaways, takeaways and blocks.</p>

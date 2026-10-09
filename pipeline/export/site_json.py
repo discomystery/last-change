@@ -255,7 +255,16 @@ def export_goalies(season: int) -> int:
     out = goalies.run(season)
     games = pl.read_parquet(TABLES / str(season) / "games.parquet")
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
-    names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(TABLES / str(season) / "players.parquet").filter(pl.col("pos") == "G").iter_rows(named=True)}
+    names, last_team = {}, {}
+    for yr in (season - 1, season):
+        g_ = pl.read_parquet(TABLES / str(yr) / "games.parquet")
+        ab_ = {**dict(zip(g_["home_id"], g_["home"])), **dict(zip(g_["away_id"], g_["away"]))}
+        for r in pl.read_parquet(TABLES / str(yr) / "players.parquet").filter(pl.col("pos") == "G").sort("game_id").iter_rows(named=True):
+            names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
+            last_team[r["player_id"]] = ab_.get(r["team_id"])
+    for pt in out["league"]:
+        gid = pt.pop("id")
+        pt["name"], pt["team"] = names.get(gid, "?"), last_team.get(gid)
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "min_starts": out["min_starts"], "league": out["league"],
                "teams": {abbr[tid]: [{"id": gid, "name": names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()}}
     (SITE_DATA / "goalies.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))

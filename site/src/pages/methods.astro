@@ -21,13 +21,13 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
   <Section id="arena" title="The arena adjustment" placeholder={false} takeaway="Hits, giveaways, takeaways and blocked shots are counted by people, and some buildings count more generously than others.">
     <div class="card explain">
       <p><strong>What it is.</strong> Every NHL arena has its own off-ice scorers. A bump along the boards might be a hit in one building and nothing in another. Left alone, that makes teams look more or less physical just because of where they play half their games.</p>
-      <p><strong>How it’s calculated.</strong> For each arena, we take every game played there over three seasons ({data.seasons}) and work out how often each event is recorded per hour, for both teams combined. Then we do the same for that home team’s road games. Dividing the first by the second gives the arena’s factor. Because even three seasons is a limited sample, each factor is pulled a little of the way back toward 1.00.</p>
-      <p><strong>A worked example.</strong> At {ex.venue}, scorers recorded <strong>{ex.hits_here}</strong> hits per hour. In {ex.team}’s road games, the same team and its opponents were credited with <strong>{ex.hits_elsewhere}</strong>. {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong>, which settles at <strong>{(ex.hits as number).toFixed(2)}</strong> after the pull toward 1.00. So a night with {sample} recorded hits there counts as <strong>{(sample / (ex.hits as number)).toFixed(1)}</strong>.</p>
+      <p><strong>How it’s calculated.</strong> For each arena, we take every game played there over three seasons ({data.seasons}) and work out how often each event is recorded per 60 minutes of play, for both teams combined. Then we do the same for that home team’s road games. Dividing the first by the second gives the arena’s factor. Because even three seasons is a limited sample, each factor is pulled a little of the way back toward 1.00.</p>
+      <p><strong>A worked example.</strong> At {ex.venue}, scorers recorded <strong>{ex.hits_here}</strong> hits per 60. In {ex.team}’s road games, the same team and its opponents were credited with <strong>{ex.hits_elsewhere}</strong>. {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong>, which settles at <strong>{(ex.hits as number).toFixed(2)}</strong> after the pull toward 1.00. So a night with {sample} recorded hits there counts as <strong>{(sample / (ex.hits as number)).toFixed(1)}</strong>.</p>
       <p><strong>How it’s shown.</strong> We never display an adjusted count, because that would look like a number of hits that nobody recorded. Instead, arena-adjusted stats appear as a <em>score</em>, where 100 is league average. The “Hits and takeaways” switch at the top of every page flips to the raw numbers exactly as recorded.</p>
     </div>
     <h3 class="sub">Home and road</h3>
     <div class="card explain">
-      <p>Separately from any one building, home teams are credited with more of these events everywhere in the league. Over three seasons, home teams were given <strong>{hr.hits.home_rate}</strong> hits per hour to visitors’ <strong>{hr.hits.away_rate}</strong>, <strong>{hr.takes.home_rate}</strong> takeaways to <strong>{hr.takes.away_rate}</strong>, and also more giveaways: <strong>{hr.gives.home_rate}</strong> to <strong>{hr.gives.away_rate}</strong>.</p>
+      <p>Separately from any one building, home teams are credited with more of these events everywhere in the league. Over three seasons, home teams were given <strong>{hr.hits.home_rate}</strong> hits per 60 to visitors’ <strong>{hr.hits.away_rate}</strong>, <strong>{hr.takes.home_rate}</strong> takeaways to <strong>{hr.takes.away_rate}</strong>, and also more giveaways: <strong>{hr.gives.home_rate}</strong> to <strong>{hr.gives.away_rate}</strong>.</p>
       <p>That could be scorers watching the home side more closely, or teams genuinely having the puck more at home; public data can’t separate the two. Either way, it would flatter a team in the middle of a long homestand. So events are weighted to put home and road games on the same footing, the same way shots are.</p>
       <p>We also tested whether particular buildings favour their home team more than others do. The differences were there in any single season but did not repeat from one season to the next, which means they are noise rather than a habit. Correcting for them would make the numbers worse, so we don’t.</p>
     </div>
@@ -38,7 +38,7 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
         <thead><tr><th scope="col">Arena</th><th scope="col">Home team</th>{events.map(([, l]) => <th scope="col">{l}</th>)}</tr></thead>
         <tbody>
           {arenas.map((a) => (
-            <tr><th scope="row">{a.venue}</th><td>{a.team}</td>{events.map(([k]) => <td data-tip={`${a[`${k}_here`]} per hour here, ${a[`${k}_elsewhere`]} in ${a.team}’s road games. Factor ${(a[k] as number).toFixed(2)}.`}>{pct(a[k] as number)}</td>)}</tr>
+            <tr><th scope="row">{a.venue}</th><td>{a.team}</td>{events.map(([k]) => <td data-tip={`${a[`${k}_here`]} per 60 here, ${a[`${k}_elsewhere`]} in ${a.team}’s road games. Factor ${(a[k] as number).toFixed(2)}.`}>{pct(a[k] as number)}</td>)}</tr>
           ))}
         </tbody>
       </table>
@@ -71,6 +71,12 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
     <div class="card explain">
       <p>A team’s lines and defense pairs are numbered by how much 5-on-5 ice time each group has played together over its last ten games. The group with the most is the first line. That means a line can be numbered lower than fans expect if its players have been shuffled between different linemates.</p>
       <p>Each line’s ratings compare it with the same-numbered line on the other 31 teams: first lines with first lines, third pairs with third pairs.</p>
+    </div>
+  </Section>
+
+  <Section id="per60" title="What “per 60” means" placeholder={false} takeaway="Most rates on the site are per 60 minutes of ice time.">
+    <div class="card explain">
+      <p>A top line plays far more than a fourth line, and a team with a lot of power plays gets far more power-play shots than one with few. To compare them fairly, almost every rate on the site is scaled to 60 minutes of ice time in that situation: “2.9 expected goals per 60” means what the group would produce in a full hour at its current pace. Ice time itself is written as minutes and seconds, like 9:15.</p>
     </div>
   </Section>
 

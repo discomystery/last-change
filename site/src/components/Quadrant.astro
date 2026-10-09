@@ -1,5 +1,5 @@
 ---
-interface Pt { x: number; y: number }
+interface Pt { x: number; y: number; name?: string; team?: string }
 interface Hi extends Pt { team: string; name: string; probable: boolean }
 interface Props { league: Pt[]; highlights: Hi[]; tall?: boolean; xDomain?: [number, number]; yDomain?: [number, number]; xMid?: number }
 const { league, highlights, tall = false, xDomain = [1.9, 3.25], yDomain = [-0.75, 0.75], xMid = 2.575 } = Astro.props;
@@ -17,11 +17,16 @@ const cx = X(xMid), cy = Y(0);
   <text class="q-corner" x={m.l} y={H - m.b + 14}>Goalie giving back what the system earns</text>
   <text class="q-corner" x={W - m.r} y={H - m.b + 14} text-anchor="end">Trouble everywhere</text>
   <text class="q-axis-label" x={W / 2} y={H - 3} text-anchor="middle">Team allows fewer chances ← → more chances</text>
-  {league.map((p) => <circle class="q-lg" cx={X(p.x)} cy={Y(p.y)} r="3" />)}
+  {league.map((p) => (
+    <g class="q-pt" data-tip={p.name ? `${p.name}${p.team ? ` (${p.team})` : ''}: ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per 60; his team allows ${p.x.toFixed(2)} expected goals per 60 in front of him.` : undefined}>
+      <circle class="q-hit" cx={X(p.x)} cy={Y(p.y)} r="8" />
+      <circle class="q-lg" cx={X(p.x)} cy={Y(p.y)} r="3" />
+    </g>
+  ))}
   {highlights.map((p, i) => {
     const right = X(p.x) < W - 110;
     return (
-      <g class={`t-${p.team}`} data-tip={`${p.name} (${p.team}): ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per hour; team allows ${p.x.toFixed(2)} expected goals per hour in front of him`}>
+      <g class={`t-${p.team}`} data-tip={`${p.name} (${p.team}): ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per 60; team allows ${p.x.toFixed(2)} expected goals per 60 in front of him`}>
         <circle class:list={['q-hi', { backup: !p.probable }]} cx={X(p.x)} cy={Y(p.y)} r="6.5" />
         <text class="q-name" x={X(p.x) + (right ? 11 : -11)} y={Y(p.y) + 4} text-anchor={right ? 'start' : 'end'}>{p.name}</text>
       </g>
