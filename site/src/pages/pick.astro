@@ -1,0 +1,140 @@
+---
+// Temporary comparison page: ways to format the special-teams picker. Not linked from the site.
+import Base from '../layouts/Base.astro';
+const T = [{ k: 'CAR', n: 'Carolina' }, { k: 'EDM', n: 'Edmonton' }];
+const S = [{ k: 'all', n: 'All special teams', short: 'Everything' }, { k: 'pp', n: 'On the power play', short: 'Power play' }, { k: 'pk', n: 'On the penalty kill', short: 'Penalty kill' }];
+---
+<Base title="Picker options">
+  <h1 class="page-h">Ways to format the special-teams picker</h1>
+  <p class="lede">Each one works: click around and the line underneath says what the section would show.</p>
+
+  <section class="opt" data-opt>
+    <h2>A. Tabs, book-style</h2>
+    <p class="why">No pills at all. Team names are large serif tabs with an underline in the team’s colour; the situation is a quieter row of text tabs beneath.</p>
+    <div class="demo">
+      <div class="a-teams">{T.map((t, i) => <button type="button" class={`t-${t.k}`} data-team={t.k} aria-pressed={String(i === 0)}>{t.n}</button>)}</div>
+      <div class="a-sits">{S.map((s) => <button type="button" data-sit={s.k} aria-pressed={String(s.k === 'pp')}>{s.n}</button>)}</div>
+    </div>
+    <p class="out"></p>
+  </section>
+
+  <section class="opt" data-opt>
+    <h2>B. A sentence you fill in</h2>
+    <p class="why">Reads like plain English, takes one line, and works the same on a phone. Each blank is a small menu.</p>
+    <div class="demo b-row">
+      <span>Show</span>
+      <select data-team-sel aria-label="Team">{T.map((t) => <option value={t.k}>{t.n}</option>)}</select>
+      <select data-sit-sel aria-label="Situation">
+        <option value="all">across all special teams</option><option value="pp" selected>on the power play</option><option value="pk">on the penalty kill</option>
+      </select>
+    </div>
+    <p class="out"></p>
+  </section>
+
+  <section class="opt" data-opt>
+    <h2>C. A small grid</h2>
+    <p class="why">Teams down the side, situations across the top, and every button the same size. One click instead of two.</p>
+    <div class="demo">
+      <table class="c-grid">
+        <thead><tr><td></td>{S.map((s) => <th scope="col">{s.short}</th>)}</tr></thead>
+        <tbody>
+          {T.map((t, i) => (
+            <tr class={`t-${t.k}`}>
+              <th scope="row"><i></i>{t.n}</th>
+              {S.map((s) => <td><button type="button" data-team={t.k} data-sit={s.k} aria-pressed={String(i === 0 && s.k === 'pp')} aria-label={`${t.n}, ${s.n.toLowerCase()}`}></button></td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="out"></p>
+  </section>
+
+  <section class="opt" data-opt>
+    <h2>D. Four equal cards</h2>
+    <p class="why">Your original four views, but each is a same-sized card with a short top line and a smaller second line, so the lengths no longer fight.</p>
+    <div class="demo d-cards">
+      {T.map((t, i) => <button type="button" class={`t-${t.k}`} data-team={t.k} data-sit="all" aria-pressed="false"><b><i></i>{t.n}</b><span>all special teams</span></button>)}
+      {T.map((t, i) => <button type="button" class={`t-${t.k}`} data-team={t.k} data-sit="pp" aria-pressed={String(i === 0)}><b><i></i>{t.n} power play</b><span>against {T[1 - i].n}’s penalty kill</span></button>)}
+    </div>
+    <p class="out"></p>
+  </section>
+
+  <section class="opt" data-opt>
+    <h2>E. What’s live now, for comparison</h2>
+    <p class="why">Team pills with a joined sub-pill.</p>
+    <div class="demo e-row">
+      <div class="e-teams">{T.map((t, i) => <button type="button" data-team={t.k} aria-pressed={String(i === 0)}>{t.n}</button>)}</div>
+      <div class="mode">{S.map((s) => <button type="button" data-sit={s.k} aria-pressed={String(s.k === 'pp')}>{s.n}</button>)}</div>
+    </div>
+    <p class="out"></p>
+  </section>
+</Base>
+
+<script is:inline>
+  document.querySelectorAll('[data-opt]').forEach((opt) => {
+    const names = { CAR: 'Carolina', EDM: 'Edmonton' };
+    const state = { team: 'CAR', sit: 'pp' };
+    const out = opt.querySelector('.out');
+    const render = () => {
+      const other = state.team === 'CAR' ? 'EDM' : 'CAR';
+      out.textContent = 'Showing: ' + (state.sit === 'all' ? `${names[state.team]}’s special teams`
+        : state.sit === 'pp' ? `${names[state.team]} power play against ${names[other]} penalty kill`
+        : `${names[other]} power play against ${names[state.team]} penalty kill`);
+      opt.querySelectorAll('button').forEach((b) => {
+        const t = b.dataset.team, s = b.dataset.sit;
+        b.setAttribute('aria-pressed', String((t === undefined || t === state.team) && (s === undefined || s === state.sit)));
+      });
+    };
+    opt.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.team) state.team = b.dataset.team;
+      if (b.dataset.sit) state.sit = b.dataset.sit;
+      render();
+    }));
+    opt.querySelector('[data-team-sel]')?.addEventListener('change', (e) => { state.team = e.target.value; render(); });
+    opt.querySelector('[data-sit-sel]')?.addEventListener('change', (e) => { state.sit = e.target.value; render(); });
+    render();
+  });
+</script>
+
+<style>
+  .page-h { font: 700 clamp(30px, 6vw, 44px) / 1.1 var(--display); margin-top: 24px; }
+  .lede { color: var(--ink-2); margin-top: 8px; }
+  .opt { margin-top: 48px; padding-top: 18px; border-top: 5px solid var(--line-blue); }
+  .opt h2 { font: 700 24px/1.1 var(--display); }
+  .why { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin-top: 6px; }
+  .demo { margin-top: 20px; padding: 22px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px; }
+  .out { font: 600 14px var(--ui); margin-top: 12px; color: var(--ink-2); }
+  button { cursor: pointer; color: var(--ink); }
+
+  .a-teams { display: flex; gap: 28px; border-bottom: 1px solid var(--rule); }
+  .a-teams button { font: 700 26px/1 var(--display); font-variation-settings: 'SOFT' 100; background: none; border: 0; padding: 0 0 10px; border-bottom: 5px solid transparent; margin-bottom: -1px; color: var(--ink-3); }
+  .a-teams button[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--team); }
+  .a-sits { display: flex; flex-wrap: wrap; gap: 6px 24px; margin-top: 14px; }
+  .a-sits button { font: 600 15px var(--ui); background: none; border: 0; padding: 4px 0; color: var(--ink-3); border-bottom: 2px solid transparent; }
+  .a-sits button[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
+
+  .b-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font: 600 20px var(--display); }
+  .b-row select { font: 600 17px var(--ui); color: var(--ink); background: var(--ice); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; }
+
+  .c-grid { border-collapse: separate; border-spacing: 8px; margin: -8px; font-family: var(--ui); }
+  .c-grid thead th { font: 600 13px var(--ui); color: var(--ink-2); padding-bottom: 2px; }
+  .c-grid tbody th { text-align: left; font: 700 16px var(--ui); padding-right: 10px; white-space: nowrap; }
+  .c-grid tbody th i, .d-cards i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 8px; }
+  .c-grid button { display: block; width: clamp(72px, 16vw, 132px); height: 44px; border-radius: 12px; border: 2px solid var(--ink); background: var(--sheet); }
+  .c-grid button[aria-pressed='true'] { background: var(--ink); }
+  .c-grid button:hover { background: var(--track); }
+  .c-grid button[aria-pressed='true']:hover { background: var(--ink); }
+
+  .d-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
+  .d-cards button { display: grid; gap: 4px; text-align: left; padding: 14px 16px; border-radius: 14px; border: 2px solid var(--ink); background: var(--sheet); }
+  .d-cards b { font: 700 16px var(--ui); }
+  .d-cards span { font: 400 13px var(--ui); color: var(--ink-2); }
+  .d-cards button[aria-pressed='true'] { background: var(--ink); }
+  .d-cards button[aria-pressed='true'] b, .d-cards button[aria-pressed='true'] span { color: var(--sheet); }
+
+  .e-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .e-teams { display: flex; gap: 8px; }
+  .e-teams button { font: 700 15px var(--ui); background: var(--sheet); border: 2px solid var(--ink); border-radius: 999px; padding: 9px 18px; }
+  .e-teams button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
+</style>
