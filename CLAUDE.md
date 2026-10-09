@@ -2,7 +2,7 @@
 
 Fan-facing site that explains how NHL teams differ in style and strategy and previews upcoming matchups. The site is for fans of any team: every metric and page must work for all 32 teams, and nothing in the product is Hurricanes-specific.
 
-**Full spec: [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).** Read the relevant section before building any metric, page, or pipeline step. This file holds only the durable rules.
+**Full spec: `private/PROJECT_BRIEF.md`, kept on the user's computer only (gitignored, and scrubbed from the public history on 2026-10-09 because it contains the user's private theories). Never commit it or quote those theories in anything public.** Read the relevant section before building any metric, page, or pipeline step. This file holds only the durable rules.
 
 ## Working agreement
 
