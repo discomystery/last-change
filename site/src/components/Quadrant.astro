@@ -1,13 +1,13 @@
 ---
 interface Pt { x: number; y: number }
 interface Hi extends Pt { team: string; name: string; probable: boolean }
-interface Props { league: Pt[]; highlights: Hi[]; tall?: boolean }
-const { league, highlights, tall = false } = Astro.props;
+interface Props { league: Pt[]; highlights: Hi[]; tall?: boolean; xDomain?: [number, number]; yDomain?: [number, number]; xMid?: number }
+const { league, highlights, tall = false, xDomain = [1.9, 3.25], yDomain = [-0.75, 0.75], xMid = 2.575 } = Astro.props;
 // `tall` draws a near-square chart for narrow, tall slots.
 const W = 360, H = tall ? 400 : 300, m = { l: 14, r: 14, t: 26, b: 34 };
-const X = (v: number) => m.l + ((v - 1.9) / (3.25 - 1.9)) * (W - m.l - m.r);
-const Y = (v: number) => m.t + ((0.75 - v) / 1.5) * (H - m.t - m.b);
-const cx = X(2.575), cy = Y(0);
+const X = (v: number) => m.l + ((v - xDomain[0]) / (xDomain[1] - xDomain[0])) * (W - m.l - m.r);
+const Y = (v: number) => m.t + ((yDomain[1] - v) / (yDomain[1] - yDomain[0])) * (H - m.t - m.b);
+const cx = X(xMid), cy = Y(0);
 ---
 <svg class="quad" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Goalie performance against the workload his team gives him">
   <line class="q-axis" x1={m.l} x2={W - m.r} y1={cy} y2={cy} />

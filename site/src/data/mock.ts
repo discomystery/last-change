@@ -468,3 +468,6 @@ export const goalieTraits = [
 
 // Labels, tooltips, scale ends and plain-language wording for each fingerprint trait. Shared by real pages.
 export const fpInfo = Object.fromEntries(fingerprint.map((d) => [d.key, { label: d.label, tip: d.tip, ...fpMeta[d.key] }])) as Record<string, { label: string; tip: string } & FpMeta>;
+
+// Labels, tooltips and scale ends for goalie traits. Shared by real pages.
+export const goalieTraitInfo = goalieTraits.map((t) => ({ key: t.key, label: t.label, tip: t.tip, lo: t.lo, hi: t.hi }));

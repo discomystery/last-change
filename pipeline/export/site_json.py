@@ -43,6 +43,7 @@ def run(season: int) -> dict:
     n_teams, n_games = export_teams_and_schedule(season)
     export_fingerprints(season)
     export_lines(season)
+    export_goalies(season)
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 
@@ -246,3 +247,16 @@ def export_lines(season: int) -> int:
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)
+
+
+def export_goalies(season: int) -> int:
+    from pipeline.metrics import goalies
+
+    out = goalies.run(season)
+    games = pl.read_parquet(TABLES / str(season) / "games.parquet")
+    abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
+    names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(TABLES / str(season) / "players.parquet").filter(pl.col("pos") == "G").iter_rows(named=True)}
+    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "min_starts": out["min_starts"], "league": out["league"],
+               "teams": {abbr[tid]: [{"id": gid, "name": names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()}}
+    (SITE_DATA / "goalies.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
+    return len(payload["teams"])
