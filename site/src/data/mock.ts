@@ -310,7 +310,7 @@ export function ordinal(n: number) {
 }
 
 // ---------- Fingerprint cards: plain-language stats, end labels, and the season switch ----------
-type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: number; say: (v: number) => string; rankWord?: string };
+type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: number; say: (v: number) => string; raw?: (pct: number) => string };
 const f1 = (v: number) => v.toFixed(1);
 export const fpGroups = ['Offense', 'Defense', 'Tempo and edge', 'Special teams'];
 const fpMeta: Record<string, FpMeta> = {
@@ -325,8 +325,8 @@ const fpMeta: Record<string, FpMeta> = {
   breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${f1(v)} breakdown chances allowed per hour` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per hour` },
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per hour, both teams combined` },
-  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 9, at100: 21, say: (v) => `${f1(v)} forecheck plays per hour, arena-adjusted` },
-  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 16, at100: 32, say: (v) => `${f1(v)} hits per hour, arena-adjusted` },
+  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per hour` },
+  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per hour` },
   depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `${f1(v)}% of 5-on-5 ice time goes to depth players` },
   pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per hour on the power play` },
   pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per hour shorthanded` },
@@ -337,7 +337,7 @@ const fpView = (key: string, pct: number, band: number) => {
   const meta = fpMeta[key];
   const value = meta.at0 + (pct / 100) * (meta.at100 - meta.at0);
   const rank = Math.max(1, Math.min(32, Math.round(32 - (pct / 100) * 31)));
-  return { pct, band, text: meta.say(value), rank: ordinal(rank) };
+  return { pct, band, text: meta.say(value), raw: meta.raw ? meta.raw(pct) : null, rank: ordinal(rank) };
 };
 export const fpCards = fingerprint.map((d) => {
   const meta = fpMeta[d.key];

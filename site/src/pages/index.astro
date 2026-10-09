@@ -1,28 +1,157 @@
 ---
+// Home: built in the browser from the real schedule, around whichever team the visitor has chosen.
 import Base from '../layouts/Base.astro';
-import * as m from '../data/mock';
 const base = import.meta.env.BASE_URL;
-const when = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(m.game.startTimeUTC));
 ---
-<Base title="Last Change">
-  <section class="home">
-    <h1>How two teams play, before they play.</h1>
-    <p>Matchup previews for the Carolina Hurricanes and the rest of the league. Only one mock-up preview exists so far.</p>
-    <a class="game card" href={`${base}preview/${m.game.id}/`}>
-      <span class="g-teams">{m.away} at {m.home}</span>
-      <span class="g-meta">{when} · {m.game.venue}</span>
-      <span class="g-go">Open the mock-up preview</span>
-    </a>
-  </section>
+<Base title="Last Change" mock={false}>
+  <div id="home" data-base={base}>
+    <section id="pick" hidden>
+      <h1>Pick your team</h1>
+      <p class="lede">Choose a team and this page becomes theirs. Your choice is remembered on this device, and you can change it at the top of any page.</p>
+      <ul class="teamgrid" id="teamgrid"></ul>
+    </section>
+
+    <section id="mine" hidden>
+      <p class="eyebrow" id="mine-eyebrow"></p>
+      <div id="next"></div>
+      <div class="cols">
+        <div>
+          <h2>Coming up</h2>
+          <ul class="games" id="upcoming"></ul>
+        </div>
+        <div>
+          <h2>Recent results</h2>
+          <ul class="games" id="recent"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="league">
+      <h2 id="slate-h">Around the league</h2>
+      <ul class="games slate" id="slate"></ul>
+    </section>
+  </div>
 </Base>
 
-<style>
-  .home { margin-top: 28px; display: grid; gap: 14px; max-width: 640px; }
-  h1 { font: 700 clamp(38px, 8vw, 60px) / 1 var(--display); letter-spacing: -0.02em; }
-  .home > p { color: var(--ink-2); }
-  .game { display: grid; gap: 2px; text-decoration: none; margin-top: 8px; }
-  .game:hover { border-color: var(--ink); }
-  .g-teams { font: 700 32px/1 var(--display); }
-  .g-meta { color: var(--ink-2); font-size: 14px; }
-  .g-go { margin-top: 8px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+<script is:inline>
+  (async () => {
+    const root = document.getElementById('home');
+    const base = root.dataset.base;
+    const [teams, sched] = await Promise.all(['teams', 'schedule'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
+    const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
+    const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    const PREVIEWS = { 2026020163: 'Mock-up preview' };
+
+    const row = (g, me) => {
+      const li = el('li', 'card game');
+      const opp = me ? (g.home === me ? g.away : g.home) : null;
+      const title = me ? `${g.home === me ? 'vs' : 'at'} ${byAbbr[opp]?.name ?? opp}` : `${g.away} at ${g.home}`;
+      li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), el('span', 'g-title', title));
+      if (g.final) {
+        const mine = me ? (g.home === me ? [g.hs, g.as] : [g.as, g.hs]) : [g.as, g.hs];
+        const extra = g.end && g.end !== 'REG' ? ` (${g.end})` : '';
+        const res = me ? (mine[0] > mine[1] ? 'W ' : 'L ') : '';
+        li.append(el('span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`));
+      } else if (PREVIEWS[g.id]) {
+        const a = el('a', 'g-link', PREVIEWS[g.id]);
+        a.href = `${base}preview/${g.id}/`;
+        li.append(a);
+      } else {
+        li.append(el('span', 'g-soon', g.venue ?? ''));
+      }
+      return li;
+    };
+
+    const render = () => {
+      const me = window.lcPrefs.get('team');
+      const now = new Date();
+      document.getElementById('pick').hidden = !!me;
+      document.getElementById('mine').hidden = !me;
+      if (!me) {
+        const grid = document.getElementById('teamgrid');
+        grid.replaceChildren(...teams.map((t) => {
+          const b = el('button', 'card teambtn');
+          b.type = 'button';
+          b.append(el('span', 'tb-abbr', t.abbr), el('span', 'tb-name', t.name));
+          b.addEventListener('click', () => window.lcPrefs.set('team', t.abbr));
+          const li = el('li');
+          li.append(b);
+          return li;
+        }));
+      } else {
+        const t = byAbbr[me];
+        const mine = games.filter((g) => g.home === me || g.away === me);
+        const next = mine.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
+        document.getElementById('mine-eyebrow').textContent = `${t.name} · ${t.w}-${t.l}-${t.otl}`;
+        const box = document.getElementById('next');
+        box.replaceChildren();
+        if (next) {
+          const rink = el('div', 'nrink');
+          ['rl blue l', 'rl red', 'rl blue r'].forEach((c) => rink.append(el('span', c)));
+          rink.append(el('span', 'circle', 'at'));
+          [next.away, next.home].forEach((a, i) => {
+            const side = el('div', 'side' + (i ? ' home' : ''));
+            side.append(el('p', 'abbr' + (a === me ? ' me' : ''), a), el('p', 'full', byAbbr[a]?.name ?? a));
+            if (i) side.append(el('p', 'lc', 'Has last change'));
+            rink.append(side);
+          });
+          const meta = el('p', 'next-meta', `Next game: ${day.format(next.t)}, ${time.format(next.t)} · ${next.venue ?? ''}`);
+          box.append(rink, meta);
+          if (PREVIEWS[next.id]) { const a = el('a', 'g-link', PREVIEWS[next.id]); a.href = `${base}preview/${next.id}/`; meta.append(' · ', a); }
+          else meta.append(' · Preview coming once the real numbers are ready');
+        }
+        document.getElementById('upcoming').replaceChildren(...mine.filter((g) => !g.final && g !== next).slice(0, 5).map((g) => row(g, me)));
+        document.getElementById('recent').replaceChildren(...mine.filter((g) => g.final).slice(-5).reverse().map((g) => row(g, me)));
+      }
+      const key = (d) => d.toDateString();
+      let slate = games.filter((g) => key(g.t) === key(now));
+      let label = 'Today around the league';
+      if (!slate.length) {
+        const nxt = games.find((g) => g.t > now);
+        slate = nxt ? games.filter((g) => key(g.t) === key(nxt.t)) : [];
+        label = nxt ? `Around the league, ${day.format(nxt.t)}` : 'Around the league';
+      }
+      document.getElementById('slate-h').textContent = label;
+      document.getElementById('slate').replaceChildren(...slate.map((g) => row(g, null)));
+    };
+    render();
+    document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') render(); });
+  })();
+</script>
+
+<style is:global>
+  #home h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 26px; }
+  #home h2 { font: 700 26px/1.1 var(--display); border-bottom: 5px solid var(--line-blue); padding-bottom: 8px; margin: 44px 0 14px; }
+  #home .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
+  #home .eyebrow { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
+  .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }
+  .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); padding: 12px 16px; font: inherit; }
+  .teambtn:hover { border-color: var(--ink); }
+  .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
+  .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
+  .nrink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 2px solid var(--ink); border-radius: 56px; overflow: hidden; min-height: 200px; }
+  .nrink .rl { position: absolute; top: 0; bottom: 0; width: 5px; }
+  .nrink .rl.red { left: 50%; margin-left: -2.5px; background: var(--line-red); }
+  .nrink .rl.blue { background: var(--line-blue); } .nrink .rl.blue.l { left: 37.5%; } .nrink .rl.blue.r { right: 37.5%; }
+  .nrink .circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
+  .nrink .side { position: relative; padding: 26px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .nrink .side.home { align-items: flex-end; text-align: right; }
+  .nrink .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--ink-3); }
+  .nrink .abbr.me { color: var(--ink); }
+  .nrink .full { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
+  .nrink .lc { font: 600 13px var(--ui); margin-top: 4px; color: var(--ink-2); }
+  .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
+  .cols { display: grid; gap: 0 28px; }
+  @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
+  .games { display: grid; gap: 8px; }
+  .games.slate { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 12px 16px; border-radius: 14px; }
+  .g-when { grid-column: 1 / -1; font: 400 12px var(--ui); color: var(--ink-3); }
+  .g-title { font-weight: 600; }
+  .g-score { font: 700 16px var(--ui); white-space: nowrap; }
+  .g-soon { font: 400 12px var(--ui); color: var(--ink-3); text-align: right; }
+  .g-link { font: 600 13px var(--ui); }
 </style>

@@ -37,14 +37,6 @@ const nav = [
       <div><dt>Probable goalies</dt><dd>{m.goalies[away][0].name} · {m.goalies[home][0].name}</dd></div>
       <div><dt>Data as of</dt><dd>{asOf}</dd></div>
     </dl>
-    <div class="mode-row">
-      <span class="mode-label">Numbers based on</span>
-      <div class="mode" role="group" aria-label="Which seasons the numbers use">
-        <button type="button" data-mode-btn="blend" aria-pressed="true">This season and last</button>
-        <button type="button" data-mode-btn="season" aria-pressed="false">This season only</button>
-      </div>
-      <span class="mode-note">In this mock-up the switch changes the style fingerprints only.</span>
-    </div>
     <nav class="jump" aria-label="Sections">
       {nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}
     </nav>
@@ -92,8 +84,8 @@ const nav = [
                 {order.map((a) => (
                   <li class={`t-${a}`}>
                     <i></i>
-                    <span class="m-blend"><span><b>{teams[a].place}:</b> {c[a].blend.text}</span><em>{c[a].blend.rank} of 32</em></span>
-                    <span class="m-season"><span><b>{teams[a].place}:</b> {c[a].season.text}</span><em>{c[a].season.rank} of 32</em></span>
+                    <span class="m-blend"><span><b>{teams[a].place}:</b> {c[a].blend.raw ? (<><span class="a-adj">{c[a].blend.text}</span><span class="a-raw">{c[a].blend.raw}</span></>) : c[a].blend.text}</span><em>{c[a].blend.rank} of 32</em></span>
+                    <span class="m-season"><span><b>{teams[a].place}:</b> {c[a].season.raw ? (<><span class="a-adj">{c[a].season.text}</span><span class="a-raw">{c[a].season.raw}</span></>) : c[a].season.text}</span><em>{c[a].season.rank} of 32</em></span>
                   </li>
                 ))}
               </ul>
@@ -446,12 +438,6 @@ const nav = [
   .m-season { display: none; }
   html[data-mode='season'] .m-season { display: revert; }
   html[data-mode='season'] .m-blend { display: none; }
-  .mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 20px; font-family: var(--ui); font-size: 13px; color: var(--ink-2); }
-  .mode-label { font-weight: 600; }
-  .mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--sheet); }
-  .mode button { font: 600 13px var(--ui); color: var(--ink); background: none; border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
-  .mode button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
-
   /* Fingerprint cards */
   .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
   .fpc { display: grid; gap: 10px; align-content: start; }
@@ -473,16 +459,4 @@ const nav = [
   .fpc-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   .fpc-stats em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
 </style>
-<script is:inline>
-  (() => {
-    const set = (mode) => {
-      document.documentElement.dataset.mode = mode;
-      document.querySelectorAll('[data-mode-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modeBtn === mode)));
-      try { localStorage.setItem('mode', mode); } catch {}
-    };
-    let saved = 'blend';
-    try { saved = localStorage.getItem('mode') || 'blend'; } catch {}
-    set(saved);
-    document.querySelectorAll('[data-mode-btn]').forEach((b) => b.addEventListener('click', () => set(b.dataset.modeBtn)));
-  })();
-</script>
+
