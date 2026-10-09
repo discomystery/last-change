@@ -1,0 +1,172 @@
+"""Preview snapshots: the "What to watch" calls for every game in the next week.
+
+Each call is a structured, checkable claim (metric, team, baseline, direction, threshold) so the post-game page can
+grade it by rule. A game's file is rewritten on every run until puck drop, then frozen: once the game has started the
+file is never touched again, so the recap grades exactly what the preview said.
+
+Reads the site JSON the other exports have just written (fingerprints, lines), so it must run after them.
+"""
+import json
+from datetime import datetime, timedelta, timezone
+
+from pipeline.config import SITE_DATA
+
+DAYS_AHEAD = 7
+# (offense trait, defense trait it runs into, what the offense does, what the defense does)
+CLASHES = [
+    ("volume", "suppression", "shot volume", "shot suppression"),
+    ("quality", "qualityAllowed", "shot quality", "keeping shots to the outside"),
+    ("turnover", "breakdowns", "chances off turnovers", "avoiding breakdowns"),
+    ("pp", "pk", "power play", "penalty kill"),
+]
+STRONG, WEAK = 70, 35  # league percentiles (higher is better) for a "meets a soft spot" call
+# What the recap will measure for each trait, in the game itself.
+MEASURE = {
+    "volume": "5-on-5 shot attempts per 60, adjusted for score and venue",
+    "quality": "expected goals per unblocked shot",
+    "turnover": "share of 5-on-5 expected goals within 5 seconds of winning the puck",
+    "pp": "expected goals per 60 on the power play",
+}
+# How each trait's value reads in a sentence, and whether its name takes a plural verb.
+SAY = {
+    "volume": lambda v: f"{v:.1f} shot attempts per 60 at 5-on-5",
+    "quality": lambda v: f"one expected goal for every {1 / v:.1f} unblocked shots",
+    "turnover": lambda v: f"{v:.1f}% of its chances come right after winning the puck",
+    "pp": lambda v: f"{v:.1f} expected goals per 60 on the power play",
+}
+PLURAL = {"turnover"}
+MIN_HOME_GAMES, MIN_MINUTES = 3, 30  # before a home matching habit becomes a call
+ORD = ["first", "second", "third", "fourth"]
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def _last(name: str) -> str:
+    return name.split(" ", 1)[-1]
+
+
+def clash_claims(away: str, home: str, fp: dict, places: dict) -> list[dict]:
+    out = []
+    for off, dfn, off_words, def_words in CLASHES:
+        for x, y in ((away, home), (home, away)):
+            o, d = fp[x]["dims"][off]["blend"], fp[y]["dims"][dfn]["blend"]
+            if o["pct"] >= STRONG and d["pct"] <= WEAK:
+                league = o["v"] * 100 / o["index"] if o.get("index") else None
+                out.append({
+                    "kind": "clash", "gap": o["pct"] - d["pct"], "metric": off, "team": x, "opp": y,
+                    "head": f"{places[x]}’s {off_words} {'meet' if off in PLURAL else 'meets'} a soft spot",
+                    "body": f"{places[x]} ranks {_ordinal(o['rank'])} of 32 for {off_words} ({SAY[off](o['v'])}); "
+                            f"{places[y]} ranks {_ordinal(d['rank'])} of 32 for {def_words}.",
+                    "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                    "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(o["v"], 4),
+                              "league": round(league, 4) if league else None, "direction": "above",
+                              "rule": "held if tonight's figure is at or above the team's usual level; partly if between the league average and that level; otherwise didn't happen"},
+                })
+    out.sort(key=lambda c: -c["gap"])
+    seen, picked = set(), []
+    for c in out:  # one call per trait pairing
+        if c["metric"] not in seen:
+            seen.add(c["metric"])
+            picked.append(c)
+    return picked[:3]
+
+
+def matchup_claim(away: str, home: str, lines: dict, places: dict) -> dict | None:
+    h, a = lines.get(home), lines.get(away)
+    if not h or not a or not h.get("matchups"):
+        return None
+    mu = h["matchups"]["home"]
+    if mu["games"] < MIN_HOME_GAMES:
+        return None
+    rows = [(r, j, v, v - r["expected"][j]) for r in mu["rows"] if r["minutes"] >= MIN_MINUTES for j, v in enumerate(r["share"]) if v is not None]
+    rows = [x for x in rows if x[3] >= 10]
+    if not rows:
+        return None
+    r, j, v, _ = max(rows, key=lambda x: x[3])
+    unit = next(u for u in h["units"] if u["label"] == r["label"])
+    opp = next((u for u in a["units"] if u["label"] == f"L{j + 1}"), None)
+    if not opp:
+        return None
+    mine = ", ".join(_last(n) for n in unit["players"])
+    theirs = ", ".join(_last(n) for n in opp["players"])
+    return {
+        "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away,
+        "head": f"{places[home]} will try to get {mine} out against {theirs}",
+        "body": f"At home, {places[home]}’s {r['label']} ({mine}) has spent {v}% of its 5-on-5 time against opponents’ {ORD[j]} lines. "
+                f"With no line matching it would be about {r['expected'][j]}%. Tonight {places[away]}’s usual {ORD[j]} line is {theirs}.",
+        "cite": f"Who plays against whom · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
+        "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
+                  "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
+                  "baseline": v, "threshold": r["expected"][j], "direction": "above",
+                  "rule": "held if the share is at or above the home habit; partly if above the no-matching level; otherwise didn't happen"},
+    }
+
+
+CONTRAST = {  # trait: (name, low end, high end) for the ungraded "biggest contrast" note
+    "volume": ("shot volume", "selective", "relentless"), "quality": ("shot quality", "perimeter", "point-blank"),
+    "suppression": ("shot suppression", "porous", "stingy"), "qualityAllowed": ("quality allowed", "exposed", "sheltered"),
+    "pace": ("pace", "slow", "fast"), "point": ("point-shot reliance", "down low", "point-heavy"),
+    "forecheck": ("forecheck pressure", "passive", "hounding"), "physical": ("physicality", "finesse", "bruising"),
+    "depth": ("depth", "top-heavy", "deep"), "pp": ("power play", "harmless", "lethal"), "pk": ("penalty kill", "leaky", "airtight"),
+}
+
+
+def contrast_claim(away: str, home: str, fp: dict, places: dict, skip: set) -> dict:
+    """A trait where the two teams sit far apart. Informational: nothing to grade."""
+    k = max((k for k in CONTRAST if k not in skip), key=lambda k: abs(fp[away]["dims"][k]["blend"]["pct"] - fp[home]["dims"][k]["blend"]["pct"]))
+    name, lo, hi = CONTRAST[k]
+    a, h = fp[away]["dims"][k]["blend"], fp[home]["dims"][k]["blend"]
+    top, bot = (away, home) if a["pct"] >= h["pct"] else (home, away)
+    rt, rb = (a, h) if top == away else (h, a)
+    return {
+        "kind": "contrast", "metric": k, "team": top, "opp": bot,
+        "head": f"Opposite ends on {name}",
+        "body": f"{places[top]} ranks {_ordinal(rt['rank'])} of 32 for {name}, toward the {hi} end; "
+                f"{places[bot]} ranks {_ordinal(rb['rank'])}, toward the {lo} end.",
+        "cite": f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season",
+        "check": None,
+    }
+
+
+def run(now: datetime | None = None) -> dict:
+    now = now or datetime.now(timezone.utc)
+    sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
+    teams = {t["abbr"]: t for t in json.loads((SITE_DATA / "teams.json").read_text())}
+    places = {k: t["place"] for k, t in teams.items()}
+    fp = json.loads((SITE_DATA / "fingerprints.json").read_text())
+    lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
+    out_dir = SITE_DATA / "previews"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = frozen = 0
+    for g in sched:
+        start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
+        path = out_dir / f"{g['id']}.json"
+        if start <= now:
+            frozen += path.exists()
+            continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
+        if g["final"] or start > now + timedelta(days=DAYS_AHEAD):
+            continue
+        away, home = g["away"], g["home"]
+        if away not in fp["teams"] or home not in fp["teams"]:
+            continue
+        claims = clash_claims(away, home, fp["teams"], places)
+        mc = matchup_claim(away, home, lines, places)
+        if mc:
+            claims.append(mc)
+        while len(claims) < 2:
+            claims.append(contrast_claim(away, home, fp["teams"], places, {c["metric"] for c in claims}))
+        for i, c in enumerate(claims):
+            c.pop("gap", None)
+            c["id"] = f"{g['id']}-{i + 1}"
+        snap = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
+                "snapshot_at": now.isoformat(timespec="seconds"), "data_as_of": fp["generated_at"], "claims": claims}
+        path.write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
+        written += 1
+    index = []
+    for p in sorted(q for q in out_dir.glob("*.json") if q.name != "index.json"):
+        s = json.loads(p.read_text())
+        index.append({"id": s["game_id"], "start": s["start"], "away": s["away"], "home": s["home"], "claims": len(s["claims"])})
+    (out_dir / "index.json").write_text(json.dumps(index, separators=(",", ":")))
+    return {"written": written, "frozen": frozen, "indexed": len(index)}

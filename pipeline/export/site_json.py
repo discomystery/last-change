@@ -45,6 +45,8 @@ def run(season: int) -> dict:
     export_lines(season)
     export_goalies(season)
     export_goal_sources(season)
+    from pipeline.export import previews
+    previews.run()  # last: reads the JSON written above
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 

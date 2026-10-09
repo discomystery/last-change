@@ -1,19 +1,23 @@
 ---
 // The matchup drawn as a rink seen from above: visitors on the left, home team on the right.
+// Real pages pass `sides`; the mock recap still falls back to the mock teams.
 import { order, home, teams, type Abbr } from '../data/mock';
-interface Props { score?: Record<Abbr, number>; centre?: string }
-const { score, centre = 'at' } = Astro.props;
+type Side = { abbr: string; cls: string; full: string; rec?: string; score?: number; home: boolean };
+interface Props { score?: Record<Abbr, number>; centre?: string; sides?: Side[] }
+const { score, centre = 'at', sides } = Astro.props;
 const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].record.otl}`;
+const list: Side[] = sides ?? order.map((a) => ({ abbr: a, cls: `t-${a}`, full: `${teams[a].place} ${teams[a].name}`, rec: rec(a), score: score?.[a], home: a === home }));
+const scored = list.some((s) => s.score !== undefined);
 ---
 <div class="rink">
   <span class="rl goal l"></span><span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span><span class="rl goal r"></span>
   <span class="dot-circle"><span>{centre}</span></span>
-  {order.map((a) => (
-    <div class:list={['side', `t-${a}`, a === home ? 'is-home' : 'is-away']}>
-      <p class="abbr">{a}{score && <span class="score">{score[a]}</span>}</p>
-      <p class="fullname">{teams[a].place} {teams[a].name}</p>
-      {!score && <p class="rec">{rec(a)}</p>}
-      {a === home && !score && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
+  {list.map((s) => (
+    <div class:list={['side', s.cls, s.home ? 'is-home' : 'is-away']}>
+      <p class="abbr">{s.abbr}{s.score !== undefined && <span class="score">{s.score}</span>}</p>
+      <p class="fullname">{s.full}</p>
+      {!scored && s.rec && <p class="rec">{s.rec}</p>}
+      {s.home && !scored && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
     </div>
   ))}
 </div>

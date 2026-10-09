@@ -37,13 +37,14 @@ const base = import.meta.env.BASE_URL;
   (async () => {
     const root = document.getElementById('home');
     const base = root.dataset.base;
-    const [teams, sched] = await Promise.all(['teams', 'schedule'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
+    const [teams, sched, pv] = await Promise.all(['teams', 'schedule', 'previews/index'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const PREVIEWS = { 2026020163: 'Mock-up preview' };
+    const finals = new Set(sched.games.filter((g) => g.final).map((g) => g.id));
+    const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
 
     const row = (g, me) => {
       const li = el('li', 'card game');
@@ -104,7 +105,7 @@ const base = import.meta.env.BASE_URL;
           const meta = el('p', 'next-meta', `Next game: ${day.format(next.t)}, ${time.format(next.t)} · ${next.venue ?? ''}`);
           box.append(rink, meta);
           if (PREVIEWS[next.id]) { const a = el('a', 'g-link', PREVIEWS[next.id]); a.href = `${base}preview/${next.id}/`; meta.append(' · ', a); }
-          else meta.append(' · Preview coming once the real numbers are ready');
+          else meta.append(' · Preview opens a week before the game');
         }
         document.getElementById('upcoming').replaceChildren(...mine.filter((g) => !g.final && g !== next).slice(0, 5).map((g) => row(g, me)));
         document.getElementById('recent').replaceChildren(...mine.filter((g) => g.final).slice(-5).reverse().map((g) => row(g, me)));

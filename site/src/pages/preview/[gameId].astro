@@ -1,228 +1,288 @@
 ---
+// Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
+// the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
-import Bar from '../../components/Bar.astro';
-import ShotMap from '../../components/ShotMap.astro';
-import Histogram from '../../components/Histogram.astro';
-import Quadrant from '../../components/Quadrant.astro';
 import Rink from '../../components/Rink.astro';
-import { clock as mmss } from '../../lib/format';
-import FpCard from '../../components/FpCard.astro';
+import ShotMap from '../../components/ShotMap.astro';
+import Quadrant from '../../components/Quadrant.astro';
+import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
-import * as m from '../../data/mock';
+import FpPair from '../../components/FpPair.astro';
+import { clock as mmss } from '../../lib/format';
+import { matchupColours } from '../../lib/teams';
+import '../../styles/blocks.css';
+import teamsData from '../../../public/data/teams.json';
+import fpData from '../../../public/data/fingerprints.json';
+import linesData from '../../../public/data/lines.json';
+import goalieData from '../../../public/data/goalies.json';
+import srcData from '../../../public/data/goal_sources.json';
+import schedule from '../../../public/data/schedule.json';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
 
-export function getStaticPaths() {
-  return [{ params: { gameId: String(m.game.id) } }];
+type Claim = { id: string; kind: string; head: string; body: string; cite: string; check: object | null };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[] };
+
+export async function getStaticPaths() {
+  const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
+  const final = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
+  return Object.values(files).map((f) => f.default).filter((s) => !final.has(s.game_id)).map((s) => ({ params: { gameId: String(s.game_id) }, props: { snap: s } }));
 }
-
-const { away, home, teams, order } = m;
-const start = new Date(m.game.startTimeUTC);
+const { snap } = Astro.props as { snap: Snap };
+const base = import.meta.env.BASE_URL;
+const { away, home } = snap;
+const order = [away, home] as const;
+const side = (a: string) => (a === away ? 'away' : 'home');
+const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
+const place = (a: string) => T[a]?.place ?? a;
+const full = (a: string) => T[a]?.name ?? a;
+const rec = (a: string) => (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
+const colours = matchupColours(away, home);
+const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
-const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(m.fetchedAt)) + ' ET';
-const rec = (a: m.Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].record.otl}`;
-const full = (a: m.Abbr) => `${teams[a].place} ${teams[a].name}`;
-const heat = (v: number) => `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.7)}%, var(--sheet)); color: ${v >= 32 ? 'var(--sheet)' : 'var(--ink)'}`;
-const maxSource = Math.max(...m.goalSources.flatMap((s) => [s.CAR, s.EDM, s.lg]));
-const quadHighlights = order.flatMap((a) => m.goalies[a].map((g) => ({ team: a, name: g.name, probable: g.probable, x: g.xga60, y: g.gsax60 })));
-const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
-const biggest = [...m.fpCards].sort((x, y) => Math.abs(y.CAR.blend.pct - y.EDM.blend.pct) - Math.abs(x.CAR.blend.pct - x.EDM.blend.pct)).slice(0, 6);
-const other = (a: m.Abbr): m.Abbr => (a === 'CAR' ? 'EDM' : 'CAR');
-const stEnds: Record<string, [string, string]> = { 'Power play': ['Harmless', 'Lethal'], 'Penalty kill': ['Leaky', 'Airtight'], 'Power kill': ['Bunkered', 'Predatory'], Discipline: ['Reckless', 'Clean'] };
-const stName: Record<string, string> = { 'Power play': 'power play', 'Penalty kill': 'penalty kill', 'Power kill': 'shorthanded threat', Discipline: 'discipline' };
-const stViews = [
-  { id: 'away', label: teams[away].place, pp: away, pk: away },
-  { id: 'home', label: teams[home].place, pp: home, pk: home },
-  { id: 'away-pp', label: `${teams[away].place} power play vs ${teams[home].place} penalty kill`, pp: away, pk: home },
-  { id: 'home-pp', label: `${teams[home].place} power play vs ${teams[away].place} penalty kill`, pp: home, pk: away },
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
+
+// Style fingerprints
+type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
+const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
+const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
+const traits = fpData.ready.map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
+const gap = (c: any) => Math.abs(c[away].blend.pct - c[home].blend.pct);
+const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a) }));
+const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
+
+// Lines and matchups
+type Unit = { label: string; players: string[]; seconds: number; toi_sec: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null> };
+type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
+type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; seconds: number; share: number; rate: number; pct?: number };
+type LT = { games: number; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
+const LN = linesData.teams as unknown as Record<string, LT>;
+const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+const lastName = (n: string) => n.split(' ').slice(1).join(' ');
+const awayLine = (j: number) => LN[away]?.units.find((u) => u.label === `L${j + 1}`);
+const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === label);
+const heat = (v: number | null) => (v === null ? '' : `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.5)}%, var(--sheet)); color: ${v >= 36 ? 'var(--sheet)' : 'var(--ink)'}`);
+const homeMu = LN[home]?.matchups?.home;
+const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
+
+// Special teams
+const roleTip: Record<string, string> = {
+  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
+  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
+  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
+  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
+  Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
+};
+const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
+
+// Goalies
+type GMode = { starts: number; shots: number; gsax: number; gsax60: number | null; xga60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
+type Goalie = { id: number; name: string; blend: GMode; season: GMode };
+const G = goalieData.teams as unknown as Record<string, Goalie[]>;
+const lg = goalieData.league as { x: number; y: number }[];
+const gx = lg.map((p) => p.x), gy = lg.map((p) => Math.abs(p.y));
+const xDom: [number, number] = [Math.min(...gx) - 0.1, Math.max(...gx) + 0.1];
+const yMax = Math.max(...gy) + 0.1;
+const xMid = [...gx].sort((a, b) => a - b)[Math.floor(gx.length / 2)];
+const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
+const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
+const gModes = [['blend', 'this season and last'], ['season', 'this season']] as const;
+const gSay: Record<string, (g: GMode) => string> = {
+  gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
+  busy: (g) => `${g.sa60} shots faced per 60`,
+  danger: (g) => `the average shot against is worth ${(g.danger ?? 0).toFixed(3)} expected goals`,
+  breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
+  gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
+  steady: (g) => `a quality start ${g.qs}% of the time`,
+};
+// Most starts this season first, so each menu opens on the goalie who has played most lately.
+const goaliesOf = (a: string) => [...(G[a] ?? [])].sort((x, y) => y.season.starts - x.season.starts || y.blend.starts - x.blend.starts);
+
+// Goal sources
+type Src = { n: number; share: number | null };
+type SrcSide = { goals: number; sources: Record<string, Src> };
+const SR = srcData.teams as unknown as Record<string, { sources: Record<'blend' | 'season', Record<'for' | 'against', SrcSide>> | null }>;
+const lgSrc = srcData.league_sources as Record<string, number>;
+const srcInfo: [string, string, string][] = [
+  ['other', 'Everyday even-strength play', 'Even-strength goals that were not a rebound and did not come within five seconds of a turnover or an offensive-zone faceoff win.'],
+  ['pp', 'Power play', 'Goals scored with more skaters on the ice than the opponent.'],
+  ['rebound', 'Rebound', 'Goals scored within three seconds of a teammate’s shot on goal.'],
+  ['en', 'Empty net', 'Goals into a net with no goalie in it.'],
+  ['turnover', 'Off a turnover', 'Even-strength goals within five seconds of winning the puck, with no stoppage in between.'],
+  ['ea', 'Goalie pulled', 'Goals scored with their own goalie off for an extra skater.'],
+  ['sh', 'Shorthanded', 'Goals scored with fewer skaters on the ice than the opponent.'],
+  ['faceoff', 'Off a faceoff win', 'Even-strength goals within five seconds of winning a faceoff in the offensive zone.'],
 ];
-const stDefault = 2;
-const neutralSig = new Set(['Hits', 'Defensive-zone starts', 'Shorthanded ice time', 'Shots off turnovers', 'Competition faced']);
-const nav = [
-  ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
-  ['goalies', 'Goalies'], ['win', 'Goal sources'], ['players', 'Key players'], ['notes', 'Data notes'],
-];
+const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
+
+const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
+const _ = ordinal;
 ---
-<Base title={`${away} at ${home} preview`}>
+<Base title={`${away} at ${home} preview`} mock={false}>
+  <style is:inline set:html={colourCss}></style>
   <section class="hero" aria-label="Matchup">
-    <Rink />
+    <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home }))} />
     <dl class="meta">
       <div><dt>When</dt><dd>{dateStr}, {timeStr}</dd></div>
-      <div><dt>Where</dt><dd>{m.game.venue}</dd></div>
-      <div><dt>Probable goalies</dt><dd>{m.goalies[away][0].name} · {m.goalies[home][0].name}</dd></div>
-      <div><dt>Data as of</dt><dd>{asOf}</dd></div>
+      <div><dt>Where</dt><dd>{snap.venue}</dd></div>
+      <div><dt>Numbers through</dt><dd>{asOf}</dd></div>
     </dl>
   </section>
-  <nav class="jump sticky" id="jump" aria-label="Sections">
-    {nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}
-  </nav>
+  <nav class="jump sticky" id="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
 
-  <Section id="watch" title="The short version">
+  <Section id="watch" title="The short version" placeholder={false}>
     <ol class="watch">
-      {m.insights.map((i) => (
+      {snap.claims.map((c) => (
         <li class="card">
-          <h3>{i.head}</h3>
-          <p>{i.body}</p>
-          <p class="cite">{i.cite}</p>
+          <h3>{c.head}</h3>
+          <p>{c.body}</p>
+          <p class="cite">{c.cite}</p>
         </li>
       ))}
     </ol>
+    {notes.length > 0 && (
+      <div class="card worth">
+        <p class="mini-h">Worth knowing</p>
+        <ul>{notes.map((n) => <li><strong>{place(n.a)}:</strong> {n.text}</li>)}</ul>
+      </div>
+    )}
+    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
   </Section>
 
-  <Section id="style" title="Style fingerprints" takeaway="Carolina floods the net with shots from everywhere; Edmonton takes fewer and better ones.">
+  <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <div class="key">
-      {order.map((a) => <span class={`t-${a}`}><i></i>{full(a)}</span>)}
+      {order.map((a) => <span class={`t-${side(a)}`}><i></i>{full(a)}</span>)}
       <span class="avg">League average</span>
       <span class="rng">Likely range</span>
     </div>
-    <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {teams[away].record.gp} or {teams[home].record.gp} games played so far.</p>
-    <p class="note m-season">This season only: {teams[away].record.gp} games for {teams[away].place}, {teams[home].record.gp} for {teams[home].place}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
+    <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
+    <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
     <h3 class="sub">The biggest differences</h3>
-    <ul class="fpgrid">
-      {biggest.map((c) => <FpCard c={c} />)}
-    </ul>
+    <ul class="fpgrid">{biggest.map((c) => <FpPair c={c} sides={fpSides} />)}</ul>
     <details class="fold">
-      <summary><span class="closed">Show all {m.fpCards.length} traits</span><span class="opened">Hide the full set</span></summary>
-      {m.fpGroups.map((g) => (
+      <summary><span class="closed">Show all {traits.length} traits</span><span class="opened">Hide the full set</span></summary>
+      {fpGroups.map((g) => traits.some((c) => c.group === g) && (
         <>
           <h3 class="sub">{g}</h3>
-          <ul class="fpgrid">
-            {m.fpCards.filter((c) => c.group === g).map((c) => <FpCard c={c} />)}
-          </ul>
+          <ul class="fpgrid">{traits.filter((c) => c.group === g).map((c) => <FpPair c={c} sides={fpSides} />)}</ul>
         </>
       ))}
     </details>
-    <h3 class="sub">Where the styles collide</h3>
-    <ul class="clashes">
-      {m.clashes.map((c) => (
-        <li class="card">
-          <p><strong>{teams[c.attacker].place}</strong> {c.phrase.split(' against ')[0]} <span class="big">{c.o}</span></p>
-          <p class="vs">against</p>
-          <p><strong>{teams[c.defender].place}</strong> {c.phrase.split(' against ')[1]} <span class="big">{c.d}</span></p>
-        </li>
-      ))}
-    </ul>
-    <p class="note">The big numbers are league percentiles: 90 means better than 90% of the league at that thing.</p>
+    <p class="note">Forecheck pressure and physicality are arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
-  <Section id="lines" title="Lines and deployment" takeaway={`${teams[home].place} is at home, so ${teams[home].coach ?? 'its coach'} chooses who plays against whom.`}>
+  <Section id="lines" title="Lines and deployment" placeholder={false} takeaway={`${place(home)} is at home, so its coach changes last and chooses who plays against whom.`}>
     <div class="key">
       <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
       <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
     </div>
-    <p class="note">Players are those who dressed in each team’s most recent game. How they are grouped here is a placeholder.</p>
+    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far). With so few games, each group’s results are pulled toward the average for its line number.</p>
     <div class="two">
       {order.map((a) => (
-        <div class={`t-${a}`}>
+        <div class={`t-${side(a)}`}>
           <h3 class="team-h">{full(a)}</h3>
           <ul class="units">
-            {[...m.lines[a].fwd, ...m.lines[a].def].map((u) => {
-              const pr = m.peers[a][u.label];
-              const grp = m.peerName[u.label];
-              return (
-                <li class="card unit">
-                  <div class="unit-top">
-                    <span class="unit-label">{u.label}</span>
-                    <span class="chip">{u.role}</span>
-                    <span class="unit-toi"><strong>{mmss(u.toi * 60)}</strong> a game <Marker pct={pr.toi} tip={`More 5-on-5 ice time than ${pr.toi}% of ${grp} around the league.`} /></span>
-                  </div>
-                  <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
-                  <dl class="stats">
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf.toFixed(2)}</dd><Pips pct={pr.xgf} tip={`Creates more than ${pr.xgf}% of ${grp}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga.toFixed(2)}</dd><Pips pct={pr.xga} tip={`Stingier than ${pr.xga}% of ${grp}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.xgfPct.toFixed(1)}%</dd><Pips pct={pr.share} tip={`A better share than ${pr.share}% of ${grp}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Of the shifts the coach starts with a faceoff at either end, the share that start in the offensive zone.">Off. starts</span></dt><dd>{u.ozs}%</dd><Marker pct={pr.ozs} tip={`More offensive-zone starts than ${pr.ozs}% of ${grp}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="How tough the opponents they face are.">Competition</span></dt><dd>{u.qoc}</dd><Marker pct={pr.qoc} tip={`Tougher opponents than ${pr.qoc}% of ${grp}.`} /></div>
-                  </dl>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
-
-    <h3 class="sub">Who {teams[home].place} is likely to send against whom</h3>
-    <p class="takeaway">Each row shows how one {teams[home].place} group’s 5-on-5 time is split across {teams[away].place}’s four forward lines, based on {teams[home].coach ?? 'the coach'}’s habits at home.</p>
-    <div class="two">
-      {[{ title: 'forward lines', rows: m.lines[home].fwd, data: m.matchupMatrix }, { title: 'defense pairs', rows: m.lines[home].def, data: m.pairMatrix }].map((h) => (
-        <div class="card">
-          <h4 class="mini-h">{teams[home].place} {h.title} against {teams[away].place} forward lines</h4>
-          <table class="heat">
-            <thead><tr><td></td>{m.lines[away].fwd.map((l) => <th scope="col">{away} {l.label}</th>)}</tr></thead>
-            <tbody>
-              {h.rows.map((r, i) => (
-                <tr>
-                  <th scope="row">{home} {r.label}</th>
-                  {h.data[i].map((v, j) => <td style={heat(v)} data-tip={`${home} ${r.label} (${r.players.join(', ')}) spends ${v}% of its 5-on-5 time against ${away} ${m.lines[away].fwd[j].label} (${m.lines[away].fwd[j].players.join(', ')})`}>{v}%</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
-    <details class="fold">
-      <summary><span class="closed">Show previous meetings</span><span class="opened">Hide previous meetings</span></summary>
-      <ul class="two meet">
-        {m.meetings.map((g) => <li class="card"><p><strong>{g.score}</strong> <span class="n">{g.date}, {g.site}</span></p><p class="note">{g.note}</p></li>)}
-      </ul>
-    </details>
-  </Section>
-
-  <Section id="special" title="Special teams" takeaway="Edmonton’s power play is the most dangerous unit in the game, but Carolina’s penalty killers attack rather than sit back.">
-    <div class="stpick">
-      <span>Show</span>
-      <select id="st-team" aria-label="Team">
-        {order.map((a) => <option value={a === away ? 'away' : 'home'} data-abbr={a}>{teams[a].place}</option>)}
-      </select>
-      <select id="st-sit" aria-label="Situation">
-        <option value="all">across all special teams</option>
-        <option value="pp" selected>on the power play</option>
-        <option value="pk">on the penalty kill</option>
-      </select>
-    </div>
-    {stViews.map((v, i) => {
-      const pp = m.specialTeams[v.pp];
-      const pk = m.specialTeams[v.pk];
-      const solo = v.pp === v.pk;
-      const tiles = solo
-        ? pp.rates.map((r) => ({ team: v.pp, r }))
-        : [{ team: v.pp, r: pp.rates[0] }, { team: v.pk, r: pk.rates[1] }, { team: v.pk, r: pk.rates[2] }, { team: v.pk, r: pk.rates[3] }];
-      return (
-        <div class="stblock" id={`stpanel-${v.id}`} hidden={i !== stDefault}>
-          <h3 class="sub">{solo ? `${teams[v.pp].place}’s special teams` : `${teams[v.pp].place} power play against ${teams[v.pk].place} penalty kill`}</h3>
-          <p class="note">Projected {teams[v.pp].place} power plays in this game: <strong>{pp.projectedOpps.toFixed(1)}</strong></p>
-          <ul class="tiles">
-            {tiles.map(({ team, r }) => (
-              <li class:list={['card', 'tile', `t-${team}`]}>
-                <p class="tile-h"><i></i><span class="term" tabindex="0" data-tip={r.tip}>{teams[team].place} {stName[r.label]}</span></p>
-                <p class="tile-v"><strong>{r.value}</strong> <span class="n">{r.unit}</span></p>
-                <div class="ends"><span>{stEnds[r.label][0]}</span><span>{stEnds[r.label][1]}</span></div>
-                <div class="lanes"><div class="lane" style={`--b:${r.pct};--bb:10;--c:${r.pct};--cb:10`} data-tip={`${teams[team].place}: ${r.pct}th percentile`}><span class="whisk"></span><span class="dot"></span></div></div>
+            {(LN[a]?.units ?? []).map((u) => (
+              <li class="card unit">
+                <div class="unit-top">
+                  <span class="unit-label">{u.label}</span>
+                  <span class="unit-toi"><strong>{mmss(u.toi_sec)}</strong> a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${mmss(u.seconds)} together in all.`} /></span>
+                </div>
+                <p class="unit-names">{u.players.map((n) => <span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span>)}</p>
+                <dl class="stats">
+                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`A better share than ${u.pct.share}% of ${peer[u.label]}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`More offensive-zone faceoffs than ${u.pct.oz}% of ${peer[u.label]}.`} />}</div>
+                </dl>
               </li>
             ))}
           </ul>
+        </div>
+      ))}
+    </div>
+
+    <h3 class="sub">Who {place(home)} is likely to send against whom</h3>
+    {homeMu && homeMu.games > 0 ? (
+      <>
+        <p class="takeaway">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
+        <div class="card stripcard">
+          <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
+          {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
+            <>
+              <h4 class="mini-h">{place(home)} {title.toLowerCase()} against {place(away)} forward lines</h4>
+              <ul class="strips">
+                {homeMu.rows.filter((r) => r.label[0] === kind).map((r) => {
+                  const mine = (homeUnit(r.label)?.players ?? []).map(lastName);
+                  return (
+                    <li class:list={{ thin: r.minutes < 10 }}>
+                      <span class="lab t-home" data-tip={`${(homeUnit(r.label)?.players ?? []).join(', ')}. ${mmss(r.seconds)} of 5-on-5 at home.`}><b>{r.label}</b>{mine.join(' · ')}</span>
+                      <span class="strip">
+                        {r.share.map((v, j) => {
+                          const opp = (awayLine(j)?.players ?? []).map(lastName);
+                          return <span style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `At home, ${mine.join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time against opponents’ ${['first', 'second', 'third', 'fourth'][j]} lines. With no line matching it would be about ${r.expected[j]}%. Tonight that line is ${opp.join(', ') || `${place(away)}’s L${j + 1}`}.`}><i>{away} L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>;
+                        })}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ))}
+        </div>
+        <p class="note">Based on {homeMu.games} {place(home)} home {homeMu.games === 1 ? 'game' : 'games'} this season, so treat it as a habit forming, not a certainty. Faded rows have under ten minutes. <strong>With no line matching</strong>, each group would face an opposing line about as often as that line is on the ice; a number well above that means the coach is sending that group out against it on purpose.</p>
+      </>
+    ) : <p class="note">{place(home)} has not played at home yet this season, so there is no matching habit to show.</p>}
+  </Section>
+
+  <Section id="special" title="Special teams" placeholder={false} takeaway="Each power play set against the penalty killers it will face.">
+    <div class="stpick">
+      <span>Show</span>
+      <select id="st-team" aria-label="Team">{order.map((a) => <option value={a} data-abbr={a}>{place(a)}</option>)}</select>
+      <select id="st-sit" aria-label="Situation"><option value="pp" selected>on the power play</option><option value="pk">on the penalty kill</option></select>
+    </div>
+    {stPanels.map(({ pp, pk }, i) => {
+      const P = LN[pp]?.special, K = LN[pk]?.special;
+      const ppE = fpT[pp].dims.pp.blend, pkE = fpT[pk].dims.pk.blend;
+      return (
+        <div class="stblock" data-pp={pp} hidden={i !== 0}>
+          <h3 class="sub">{place(pp)} power play against {place(pk)} penalty kill</h3>
+          <ul class="tiles">
+            <li class:list={['card', 'tile', `t-${side(pp)}`]}>
+              <p class="tile-h"><i></i><span class="term" tabindex="0" data-tip="Expected goals per 60 minutes of 5-on-4 play, this season blended with last.">{place(pp)} power play</span></p>
+              <p class="tile-v"><strong>{ppE.v.toFixed(1)}</strong> <span class="n">expected goals per 60 · {ordinal(ppE.rank)} of 32</span></p>
+            </li>
+            <li class:list={['card', 'tile', `t-${side(pk)}`]}>
+              <p class="tile-h"><i></i><span class="term" tabindex="0" data-tip="Expected goals allowed per 60 minutes of 4-on-5 play, this season blended with last. Lower is better.">{place(pk)} penalty kill</span></p>
+              <p class="tile-v"><strong>{pkE.v.toFixed(1)}</strong> <span class="n">expected goals allowed per 60 · {ordinal(pkE.rank)} of 32</span></p>
+            </li>
+          </ul>
+          {P?.faceoff && <div class="card worth"><p class="mini-h">Worth knowing</p><ul><li>{P.faceoff.text}</li></ul></div>}
           <div class="st3">
-            <div class:list={['card', `t-${v.pp}`]}>
-              <h4 class="st-h"><i></i>{teams[v.pp].place} power play</h4>
-              {pp.pp.map((u, k) => (
+            <div class:list={['card', `t-${side(pp)}`]}>
+              <h4 class="st-h"><i></i>{place(pp)} power play</h4>
+              {(P?.pp ?? []).map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{m.ppUnitStats[v.pp][k].xgf.toFixed(1)}</strong> expected goals per 60</span><Pips pct={m.ppUnitStats[v.pp][k].pct} tip={`Creates ${m.ppUnitStats[v.pp][k].xgf.toFixed(1)} expected goals per 60, more than ${m.ppUnitStats[v.pp][k].pct}% of ${k ? 'second' : 'top'} power-play units.`} /></p>
-                  <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span><span class="chip">{pl.role}</span></li>)}</ul>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice.">{u.share}% of the time</span></p>
+                  <p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`More than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
+                  <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name}. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
                 </div>
               ))}
             </div>
-            <div class="card mapcard">
-              <ShotMap long team={v.pp} shots={pp.shots} title={`Where ${teams[v.pp].place}’s power play shoots from. Bigger dots are more dangerous shots.`} />
+            <div class="card mapcard ppmap">
+              <p class="map-who" aria-live="polite">&nbsp;</p>
+              {P && P.shots.length > 0 && <ShotMap long team={side(pp)} shots={P.shots} title={`Where ${place(pp)}’s last ${P.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />}
             </div>
-            <div class:list={['card', `t-${v.pk}`]}>
-              <h4 class="st-h"><i></i>{teams[v.pk].place} penalty kill</h4>
-              {pk.pk.map((u, k) => (
+            <div class:list={['card', `t-${side(pk)}`]}>
+              <h4 class="st-h"><i></i>{place(pk)} penalty kill</h4>
+              {(K?.pk ?? []).map((u, k) => (
                 <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{m.pkUnitStats[v.pk][k].xga.toFixed(1)}</strong> expected goals per 60</span><Pips pct={m.pkUnitStats[v.pk][k].pct} tip={`Allows ${m.pkUnitStats[v.pk][k].xga.toFixed(1)} expected goals per 60, stingier than ${m.pkUnitStats[v.pk][k].pct}% of ${k ? 'second' : 'top'} penalty-kill units.`} /></p>
-                  <ul class="roles-list">{u.players.map((n, q) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{n}</span><span class="chip">{q < 2 ? 'Forward' : 'Defense'}</span></li>)}</ul>
+                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice.">{u.share}% of the time</span></p>
+                  <p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
+                  <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{pl.name}</span></li>)}</ul>
                 </div>
               ))}
             </div>
@@ -230,362 +290,244 @@ const nav = [
         </div>
       );
     })}
-    <p class="note">Role tags are rules of thumb based on where each player shoots and passes from. </p>
+    <p class="note">Units use each team’s last {linesData.window} games; role tags use two seasons; the map shows the last 140 power-play shots. Point at a power-play name to see his shots on the map.</p>
   </Section>
 
-  <Section id="goalies" title="Goaltending" takeaway="Carolina’s goalies see fewer shots, but the ones that get through are more dangerous and arrive after long quiet stretches.">
+  <Section id="goalies" title="Goaltending" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
     <div class="stpick">
       <span>Show</span>
-      <select id="g-away" aria-label={`${teams[away].place} goalie`}>{m.goalies[away].map((g, i) => <option value={`${away}-${i}`}>{g.name}{g.probable ? '' : ' (backup)'}</option>)}</select>
+      <select id="g-away" aria-label={`${place(away)} goalie`}>{goaliesOf(away).map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
       <span>against</span>
-      <select id="g-home" aria-label={`${teams[home].place} goalie`}>{m.goalies[home].map((g, i) => <option value={`${home}-${i}`}>{g.name}{g.probable ? '' : ' (backup)'}</option>)}</select>
+      <select id="g-home" aria-label={`${place(home)} goalie`}>{goaliesOf(home).map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
     </div>
-    <div class="g3">
-      {[away, null, home].map((a) => a === null ? (
-        <div class="card gmid">
-          <p class="mini-h"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are the rest of the league; filled dots are probable starters, outlined dots are backups.">Helping, or hung out to dry?</span></p>
-          <Quadrant tall league={m.leagueGoalies} highlights={quadHighlights} />
-        </div>
-      ) : m.goalies[a].map((g, i) => (
-        <div class:list={['card', 'gcard', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0}>
-          <p class="gname"><i></i><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span><span class="chip">{g.probable ? 'Probable starter' : 'Backup'}</span></p>
-          <p class="gbig"><strong>{signed(g.gsax)}</strong> <span class="term" tabindex="0" data-tip={m.goalieTraits[0].tip}>goals saved above expected</span> <Pips pct={m.goalieTraits[0].pct(g)} tip={`Better than ${m.goalieTraits[0].pct(g)}% of goalies at stopping more than expected.`} /></p>
-          <dl class="gkv">
-            {g.tiers.map((t) => <div><dt>{t.tier} save %</dt><dd>{t.sv.toFixed(3).slice(1)}</dd></div>)}
-            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[1].tip}>Shots faced per 60</span></dt><dd>{g.workload[0].value} <Marker pct={m.goalieTraits[1].pct(g)} tip={`Busier than ${m.goalieTraits[1].pct(g)}% of goalies.`} /></dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[3].tip}>Defensive breakdowns per 60</span></dt><dd>{g.workload[2].value} <Marker pct={m.goalieTraits[3].pct(g)} tip={`Faces more breakdowns than ${m.goalieTraits[3].pct(g)}% of goalies.`} /></dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[5].tip}>Quality starts</span></dt><dd>{g.consistency.qs}% <Pips pct={m.goalieTraits[5].pct(g)} tip={`Steadier than ${m.goalieTraits[5].pct(g)}% of goalies.`} /></dd></div>
-          </dl>
-        </div>
-      )))}
-    </div>
-    <details class="fold">
-      <summary><span class="closed">Show the full goalie comparison</span><span class="opened">Hide the full goalie comparison</span></summary>
-      <ul class="fpgrid">
-        {m.goalieTraits.map((t) => (
-          <li class="card fpc">
-            <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
-            <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
-            <div class="lanes">
-              {order.flatMap((a) => m.goalies[a].map((g, i) => <div class:list={['lane', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0} style={`--b:${t.pct(g)};--bb:11;--c:${t.pct(g)};--cb:11`}><span class="whisk"></span><span class="dot"></span></div>))}
+    {gModes.map(([mode, words]) => (
+      <div class={`gmode m-${mode}`}>
+        <div class="g3">
+          {[away, null, home].map((a) => a === null ? (
+            <div class="card gmid">
+              <p class="chart-title"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are every goalie with at least ten starts over this season and last; point at one to see who it is.">Helping, or hung out to dry?</span></p>
+              <Quadrant tall league={lg} xDomain={xDom} yDomain={[-yMax, yMax]} xMid={xMid} highlights={order.flatMap((t) => goaliesOf(t).filter((o) => o.blend.xga60 !== null && o.blend.gsax60 !== null).map((o) => ({ team: side(t), name: o.name, probable: o.blend.starts >= goalieData.min_starts.blend, x: o.blend.xga60!, y: o.blend.gsax60! })))} />
             </div>
-            <ul class="fpc-stats">
-              {order.flatMap((a) => m.goalies[a].map((g, i) => <li class={`t-${a}`} data-goalie={`${a}-${i}`} hidden={i !== 0}><i></i><span class="gsay"><b>{g.name}:</b> {t.say(g)}</span></li>))}
-            </ul>
-          </li>
-        ))}
-      </ul>
-      <div class="two gmore">
-        {order.flatMap((a) => m.goalies[a].map((g, i) => (
-          <div class:list={['card', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0}>
-            <p class="gname"><i></i>{g.name}</p>
-            <div class="cons">
-              <div><p class="mini-h">Night-to-night consistency</p><Histogram team={a} bins={g.bins} name={g.name} /></div>
-              <dl class="work tight">
-                <div><dt><span class="term" tabindex="0" data-tip="Share of starts with a save percentage under .850.">Really bad starts</span></dt><dd>{g.consistency.rbs}%</dd></div>
-                <div><dt>Disasters / steals</dt><dd>{g.consistency.disasters} / {g.consistency.steals}</dd></div>
-                <div><dt><span class="term" tabindex="0" data-tip={g.workload[5].tip}>Rebounds above expected</span></dt><dd>{g.workload[5].value}</dd></div>
-              </dl>
-            </div>
-          </div>
-        )))}
-      </div>
-    </details>
-    <p class="note">Expected-goal models can’t see passes before a shot. A goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
-  </Section>
-
-  <Section id="win" title="Where the goals come from" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton leans on the power play.">
-    <div class="key">
-      {order.map((a) => <span class={`t-${a}`}><i></i>{teams[a].place}</span>)}
-      <span class="avg">League average</span>
-    </div>
-    <div class="card">
-      <ul class="srows">
-        {m.goalSources.map((s) => (
-          <li>
-            <span class="term srow-name" tabindex="0" data-tip={s.tip}>{s.label}</span>
-            <span class="sline" data-tip={`${teams[away].place} ${s[away]}%, ${teams[home].place} ${s[home]}%. League average ${s.lg}%.`}>
-              <span class="slg" style={`left:${(s.lg / maxSource) * 100}%`}></span>
-              <span class="sspan" style={`left:${(Math.min(s.CAR, s.EDM) / maxSource) * 100}%;width:${(Math.abs(s.CAR - s.EDM) / maxSource) * 100}%`}></span>
-              {order.map((a) => <span class={`sdot t-${a}`} style={`left:${(s[a] / maxSource) * 100}%`}></span>)}
-            </span>
-            <span class="snums">{order.map((a) => <span class={`t-${a}`}><i></i>{s[a]}%</span>)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-    <p class="note">Share of each team’s goals that come from each source. The further apart the dots, the more the two teams differ.</p>
-  </Section>
-
-  <Section id="players" title="Key players" takeaway="What each team’s most-used players do, shown by the things they do more than almost anyone at their position.">
-    <div class="key">
-      <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against others at his position</span>
-      <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
-    </div>
-    {order.map((a) => (
-      <div class:list={['kp', `t-${a}`]}>
-        <h3 class="team-h">{full(a)}</h3>
-        <ul class="kpgrid">
-          {m.keyPlayers_[a].map((p) => {
-            const peers = p.pos === 'Defense' ? 'defensemen' : p.pos === 'Center' ? 'centers' : 'wingers';
+          ) : goaliesOf(a).map((g, gi) => {
+            const x = g[mode];
+            const few = x.pct.gsax === null;
             return (
-              <li class="card kpcard">
-                <p class="kp-name"><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{p.name}</span></p>
-                <p class="kp-role"><span class="chip">{p.pos}</span><span class="term" tabindex="0" data-tip={`His numbers look ${p.roles[0].pct}% like a typical ${p.roles[0].name.toLowerCase()} and ${p.roles[1].pct}% like a ${p.roles[1].name.toLowerCase()}. Role names are rules of thumb.`}>Mostly a {p.roles[0].name.toLowerCase()}, part {p.roles[1].name.toLowerCase()}</span></p>
-                <dl class="kp-sig">
-                  {p.signature.map((sg) => (
-                    <div>
-                      <dt><span class="term" tabindex="0" data-tip={sg.tip}>{sg.label}</span></dt>
-                      <dd>{neutralSig.has(sg.label)
-                        ? <Marker pct={sg.pct} tip={`More than ${sg.pct}% of ${peers}.`} />
-                        : <Pips pct={sg.pct} tip={`Better than ${sg.pct}% of ${peers}.`} />}</dd>
-                    </div>
-                  ))}
+              <div class:list={['card', 'gcard', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}>
+                <p class="gname"><i></i><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots, {words}</span></p>
+                <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Better than ${x.pct.gsax}% of goalies at stopping more than expected, per 60.`} />}</p>
+                <dl class="gkv">
+                  {(['low', 'medium', 'high'] as const).map((t) => <div><dt>{t[0].toUpperCase() + t.slice(1)}-danger save %</dt><dd>{svp(x.tiers[t].sv)} <span class="n">{x.tiers[t].shots} shots</span></dd></div>)}
+                  <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60 ?? '–'} {!few && <Marker pct={x.pct.busy!} tip={`Busier than ${x.pct.busy}% of goalies.`} />}</dd></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Dangerous chances his team gives up in front of him within seconds of losing the puck, per 60. Public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60 ?? '–'} {!few && <Marker pct={x.pct.breakdowns!} tip={`His team breaks down in front of him more than ${x.pct.breakdowns}% of goalies’ teams do.`} />}</dd></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`Steadier than ${x.pct.steady}% of goalies.`} />}</dd></div>
                 </dl>
-              </li>
+              </div>
             );
-          })}
-        </ul>
+          }))}
+        </div>
+        <details class="fold">
+          <summary><span class="closed">Show the full goalie comparison</span><span class="opened">Hide the full goalie comparison</span></summary>
+          <ul class="fpgrid">
+            {goalieTraitInfo.map((t) => (
+              <li class="card fpc">
+                <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
+                <div class="lanes">
+                  {order.flatMap((a) => goaliesOf(a).map((g, gi) => {
+                    const p = g[mode].pct[t.key];
+                    return p === null ? <div class:list={['lane', 'empty', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}></div> : <div class:list={['lane', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0} style={`--b:${p};--blo:${p};--bhi:${p};--c:${p};--clo:${p};--chi:${p}`}><span class="whisk"></span><span class="dot"></span></div>;
+                  }))}
+                </div>
+                <ul class="gsays">
+                  {order.flatMap((a) => goaliesOf(a).map((g, gi) => <li class={`t-${side(a)}`} data-goalie={g.id} hidden={gi !== 0}><i></i><span><b>{g.name}:</b> {gSay[t.key](g[mode])}{g[mode].pct[t.key] === null && <em> (too few starts to place)</em>}</span></li>))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+          <div class="two gnights">
+            {order.flatMap((a) => goaliesOf(a).map((g, gi) => (
+              <div class:list={['card', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}>
+                <p class="mini-h">{g.name}, night to night: goals saved above expected in each start</p>
+                <Histogram wide team={side(a)} bins={g[mode].bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} />
+              </div>
+            )))}
+          </div>
+        </details>
       </div>
     ))}
-    <p class="note">Each player shows the three things that most set him apart from others at his position.</p>
+    <p class="note">The menus list every goalie on each team, busiest this season first; the site does not yet know who will start. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
+  </Section>
+
+  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
+    <div class="stpick">
+      <span>Show goals</span>
+      <select id="src-side" aria-label="Scored or allowed"><option value="for">scored</option><option value="against">allowed</option></select>
+    </div>
+    <div class="key">
+      {order.map((a) => <span class={`t-${side(a)}`}><i></i>{place(a)}</span>)}
+      <span class="avg">League average</span>
+    </div>
+    {(['for', 'against'] as const).map((sd, si) => (
+      <div data-src={sd} hidden={si !== 0}>
+        {gModes.map(([mode, words]) => {
+          const got = order.map((a) => SR[a]?.sources?.[mode]?.[sd]);
+          return (
+            <div class={`gmode m-${mode}`}>
+              <div class="card">
+                <ul class="srows">
+                  {srcInfo.map(([k, label, tip]) => {
+                    const max = srcMax(k, mode, sd), at = (v: number) => (v / max) * 100;
+                    const vals = got.map((x) => x?.sources[k]?.share ?? null);
+                    const [va, vh] = vals;
+                    return (
+                      <li>
+                        <span class="term srow-name" tabindex="0" data-tip={tip}>{label}</span>
+                        <span class="sline" tabindex="0" data-tip={`${order.map((a, i) => `${place(a)} ${vals[i] ?? '–'}% (${got[i]?.sources[k]?.n ?? 0} of ${got[i]?.goals ?? 0})`).join(', ')} of goals ${sd === 'for' ? 'scored' : 'allowed'} ${words}. League average ${lgSrc[k]}%.`}>
+                          <span class="slg" style={`left:${at(lgSrc[k])}%`}></span>
+                          {va !== null && vh !== null && <span class="sspan" style={`left:${at(Math.min(va, vh))}%;width:${at(Math.abs(va - vh))}%`}></span>}
+                          {order.map((a, i) => vals[i] !== null && <span class={`sdot t-${side(a)}`} style={`left:${at(vals[i]!)}%`}></span>)}
+                        </span>
+                        <span class="snums two-n">{order.map((a, i) => <span class={`t-${side(a)}`}><i></i>{vals[i] ?? '–'}%</span>)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <p class="note">{order.map((a, i) => `${got[i]?.goals ?? 0} ${place(a)} goals`).join(' and ')} {sd === 'for' ? 'scored' : 'allowed'} {words}. Each row has its own scale.</p>
+            </div>
+          );
+        })}
+      </div>
+    ))}
+    <p class="note">Teams’ goal mixes differ far less than a season suggests: over three seasons, most of the gap between one team and another in these rows was luck. Each team page shows how far luck alone could move each row.</p>
   </Section>
 
   <Section id="notes" title="Data notes" placeholder={false}>
     <ul class="notes">
-      <li><strong>This page is a mock-up.</strong> Team names, records, the date, venue, coaches and the players listed are real. Every statistic, percentile, line grouping, role tag and written insight is invented to test the layout.</li>
-      <li><strong>Early season.</strong> Each team has played only {teams[away].record.gp} or {teams[home].record.gp} games, so the real page will blend this season with last season and show wide ranges until samples grow.</li>
-      <li><strong>Percentiles</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
-      <li><strong>Blind spot.</strong> Public shot data doesn’t record passes before a shot or where defenders are standing.</li>
-      <li><strong>Hits, giveaways, takeaways and blocks</strong> are counted by each arena’s scorer, and some arenas count more generously than others. Anything marked “arena-adjusted” corrects for that.</li>
+      <li><strong>Sources.</strong> Game data from the NHL; expected goals from this site’s own model, cross-checked against MoneyPuck.com.</li>
+      <li><strong>Early season.</strong> {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}, so most numbers blend this season with last. The season switch at the top shows this season alone.</li>
+      <li><strong>Percentiles and ranks</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
+      <li><strong>Blind spots.</strong> Public game data doesn’t record passes before a shot, where defenders are standing, or rushes up the ice, so the site shows none of those.</li>
+      <li><strong>Hits, giveaways and takeaways</strong> depend on each arena’s scorer; anything built on them is arena-adjusted. <a href={`${base}methods/`}>How it works</a>.</li>
+      <li><strong>Key players</strong> will be added once player-level numbers are ready.</li>
     </ul>
-    <details class="card explain">
-      <summary>How the arena adjustment works, with an example</summary>
-      <p>Take {m.arenaExample.event} at {m.arenaExample.arena}. Over three seasons, games played there averaged <strong>{m.arenaExample.here}</strong> {m.arenaExample.event} per 60 for both teams combined. The same teams, in every other building, averaged <strong>{m.arenaExample.elsewhere}</strong>.</p>
-      <p>{m.arenaExample.here} ÷ {m.arenaExample.elsewhere} = <strong>{m.arenaExample.raw.toFixed(2)}</strong>, so this scorer counts about 20% more {m.arenaExample.event} than those teams get elsewhere. Because a few seasons is still a limited sample, that figure is pulled part of the way back toward 1.00, landing at <strong>{m.arenaExample.shrunk.toFixed(2)}</strong>.</p>
-      <p>Every {m.arenaExample.event.slice(0, -1)} recorded in that building is then divided by {m.arenaExample.shrunk.toFixed(2)}. A night with {m.arenaExample.rawCount} recorded {m.arenaExample.event} counts as <strong>{(m.arenaExample.rawCount / m.arenaExample.shrunk).toFixed(1)}</strong>.</p>
-      <p class="note">These numbers are invented. The real site will have a page listing all 32 arenas with their actual figures for hits, giveaways, takeaways and blocks.</p>
-    </details>
-    <p class="after"><a href={`${import.meta.env.BASE_URL}recap/${m.game.id}/`}>After the game: see how this preview held up (mock-up)</a></p>
+    <p class="note">Team pages: <a href={`${base}team/${away}/`}>{full(away)}</a> · <a href={`${base}team/${home}/`}>{full(home)}</a></p>
   </Section>
 </Base>
 
 <style>
   .hero { margin-top: 10px; }
   .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
-  .meta dt { font-family: var(--ui); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
+  .meta dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .meta dd { font-weight: 500; }
   @media (min-width: 820px) { .meta { display: flex; flex-wrap: wrap; gap: 10px 48px; } .meta dd { white-space: nowrap; } }
-  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 18px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
-  .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
-  .jump a:hover { border-color: var(--ink); }
   .jump.sticky { position: sticky; top: var(--bar-h, 34px); z-index: 15; background: var(--ice); margin-top: 14px; padding-block: 8px; }
-  .jump a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
-
-
-  .n, .cite { font-size: 12px; color: var(--ink-3); font-weight: 400; }
+  .jump :global(a.here) { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .watch h3 { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
   .watch .cite { margin-top: 8px; }
-
-  .clashes { display: grid; gap: 12px; }
-  @media (min-width: 720px) { .clashes { grid-template-columns: repeat(3, 1fr); } }
-  .clashes p { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
-  .clashes p strong { margin-right: 4px; }
-  .clashes .vs { font-family: var(--ui); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 2px 0; }
-  .big { font: 700 30px/1 var(--display); margin-left: auto; }
-
-  .units, .players, .recipe, .meet { display: grid; gap: 14px; }
-  .unit-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-  .unit-toi { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
-  .unit-toi strong { font-size: 15px; color: var(--ink); }
-  .unit-label { font: 700 19px/1 var(--display); color: var(--team, var(--ink)); }
-  .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
-  @media (min-width: 480px) { .stats { grid-template-columns: repeat(5, 1fr); } }
-  .stats > div { display: grid; gap: 3px; justify-items: start; }
-  .stats dt, .work dt { font-size: 12px; color: var(--ink-2); }
-  .stats dd { font-weight: 600; font-size: 15px; }
-  .unit .n { margin-top: 8px; }
-
-  .heat { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 13px; table-layout: fixed; }
-  .heat caption { text-align: left; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
-  .heat th { font-weight: 600; font-size: 11px; color: var(--ink-2); padding: 4px 2px; white-space: nowrap; }
-  .heat tbody th { text-align: left; width: 58px; }
-  .heat tbody td { text-align: center; padding: 11px 0; border-radius: 4px; font-weight: 600; }
-
-  .rate { margin-bottom: 12px; }
-  .rate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; margin-bottom: 4px; }
+  .cite { font: 400 12px var(--ui); color: var(--ink-3); }
+  .watch + .worth { margin-top: 16px; }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin: 14px 0 12px; }
+  .tile { display: grid; gap: 6px; }
+  .tile-h { display: flex; align-items: center; gap: 8px; font: 600 14px var(--ui); }
+  .tile-h i, .st-h i, .gname i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
+  .tile-v strong { font: 700 28px/1 var(--display); }
+  .st-h { display: flex; align-items: center; gap: 8px; }
   .g3 { display: grid; gap: 12px; margin-top: 18px; }
   @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
-  .g3 > [hidden], .gmore > [hidden], .fpc [hidden] { display: none; }
+  .g3 > [hidden], .gnights > [hidden], .fpc [hidden] { display: none; }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
-  .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font: 700 22px/1 var(--display); margin-bottom: 14px; }
-  .gname i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
-  .gname .chip { margin-left: auto; }
-  .gbig { font: 400 14px var(--ui); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
-  .gbig strong { font: 700 38px/1 var(--display); }
-  .gkv div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
-  .gkv dt { color: var(--ink-2); }
-  .gkv dd { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }
-  .gmore { margin-top: 14px; align-items: stretch; }
-  .srows li { display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto; align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid var(--rule); }
-  .srows li:first-child { border-top: 0; }
-  .srow-name { font: 600 14px var(--ui); justify-self: start; }
-  .sline { position: relative; height: 14px; margin-inline: 7px; }
-  .sline::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
-  .slg { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; }
-  .sspan { position: absolute; top: 5px; height: 4px; background: var(--ink-3); }
-  .sdot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
-  .snums { display: inline-flex; gap: 14px; font: 600 13px var(--ui); }
-  .snums span { display: inline-flex; align-items: center; gap: 5px; min-width: 48px; }
-  .snums i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }
-  .rec { display: grid; gap: 14px; }
-  .rec li + li { border-top: 1px solid var(--rule); padding-top: 14px; }
-  .rec .cite { margin-top: 4px; }
-  .gsay { display: inline !important; }
-  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
-  .tile { display: grid; gap: 6px; grid-template-rows: 1fr auto auto auto; }
-  .tile-h { align-self: start; }
-  .tile-h, .st-h { display: flex; align-items: center; gap: 8px; font: 600 14px var(--ui); margin: 0; }
-  .tile-h i, .st-h i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
-  .tile-v strong { font: 700 28px/1 var(--display); }
-  .st3 { display: grid; gap: 12px; margin-top: 12px; }
-  @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
-  .st3 > .card { display: flex; flex-direction: column; }
-  .st3 .stunit { flex: 1; }
-  .mapcard { justify-content: center; }
-  .st-h { font-size: 16px; margin-bottom: 4px; }
-  .stunit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
-  .stunit-h { display: flex; align-items: center; gap: 10px; }
-  .stunit-rate { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; font: 400 13px var(--ui); color: var(--ink-2); }
-  .stunit-rate strong { font-size: 15px; color: var(--ink); }
-  .roles-list { margin-top: 8px; display: grid; gap: 6px; }
-  .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
-
-  .quad-wrap { display: grid; gap: 12px; margin-top: 16px; }
-  @media (min-width: 820px) { .quad-wrap { grid-template-columns: 1fr 1.25fr; align-items: center; } }
-  .sub.first { margin-top: 0; }
-  .goalie { margin-bottom: 14px; }
-  .explain { margin-top: 18px; }
-  .explain p { margin-top: 10px; font: 400 15px/1.5 var(--ui); }
-  .after { margin-top: 28px; font-weight: 600; }
-  .goalie header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .goalie h4 { font: 700 24px/1 var(--display); margin: 0; }
-  .gsax { margin-top: 8px; font-size: 14px; }
-  .gsax strong { font: 700 38px/1 var(--display); margin-right: 4px; }
-  .tiers { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-  .tiers th, .tiers td { padding: 5px 0; border-bottom: 1px solid var(--rule); text-align: right; font-weight: 500; }
-  .tiers thead th { font-size: 11px; color: var(--ink-3); font-weight: 600; }
-  .tiers tbody th { text-align: left; }
-  .work { margin-top: 10px; }
-  .work div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
-  .work dd { font-weight: 600; white-space: nowrap; }
-  .work.tight { margin-top: 0; }
-  .cons { display: grid; gap: 12px; margin-top: 14px; }
-  @media (min-width: 480px) { .cons { grid-template-columns: 1fr 1fr; align-items: end; } }
-  .mini-h { font-family: var(--ui); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 6px; }
-
-  .src { margin-top: 12px; padding: 6px 18px; max-width: 720px; }
-  .src li { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-  .src li:last-child { border-bottom: 0; }
-  .src-label { font-weight: 600; font-size: 14px; justify-self: start; }
-  @media (min-width: 720px) { .src li { grid-template-columns: 200px 1fr; align-items: center; gap: 16px; } }
-  .src-bars { display: grid; gap: 5px; }
-  .srcbar { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 8px; font-size: 12px; }
-  .src-track { position: relative; height: 8px; }
-  .src-fill { position: absolute; inset: 0 auto 0 0; background: var(--team); border-radius: 0 4px 4px 0; min-width: 2px; }
-  .src-lg { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
-  .recipe .cite { margin-top: 6px; }
-  .kp + .kp { margin-top: 28px; }
-  .kp .team-h { margin-top: 20px; }
-  .kpgrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
-  .kpcard { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; }
-  .kp-name { font: 700 22px/1.1 var(--display); }
-  .kp-role { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font: 400 14px/1.35 var(--ui); color: var(--ink-2); min-height: 44px; align-content: start; }
-  .kp-sig { align-self: end; }
-  .kp-sig div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
-  .kp-sig dd { display: inline-flex; }
-  .players .rate:last-child { margin-bottom: 0; }
+  .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .gsays { display: grid; gap: 6px; font: 400 14px/1.4 var(--ui); }
+  .gsays li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
+  .gsays i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .gsays em { color: var(--ink-3); font-style: normal; }
+  .gnights { margin-top: 14px; }
+  .two-n { gap: 14px; }
+  .two-n > span { display: inline-flex; align-items: center; gap: 5px; min-width: 52px; font-weight: 600; }
+  .two-n i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
-</style>
-
-<style is:global>
-  /* Season switch: the page carries both sets of numbers and shows one. */
-  .m-season { display: none; }
-  html[data-mode='season'] .m-season { display: revert; }
-  html[data-mode='season'] .m-blend { display: none; }
-  /* Fingerprint cards */
-  .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
-  .fpc { display: grid; gap: 10px; align-content: start; }
-  .fpc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .fpc-name { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
-  .ends { display: flex; justify-content: space-between; gap: 8px; font: italic 400 14px var(--body); color: var(--ink-2); margin-bottom: -4px; }
-  .lanes { position: relative; display: grid; gap: 4px; padding: 4px 7px; }
-  .lanes::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; border-radius: 1px; }
-  .lane { position: relative; height: 14px; --v: var(--b); --w: var(--bb); }
-  html[data-mode='season'] .lane { --v: var(--c); --w: var(--cb); }
-  .lane::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
-  .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(max(0, var(--v) - var(--w)) * 1%); width: calc((min(100, var(--v) + var(--w)) - max(0, var(--v) - var(--w))) * 1%); transition: left 0.35s, width 0.35s; }
-  .dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; transition: left 0.35s; }
-  @media (prefers-reduced-motion: reduce) { .dot, .whisk { transition: none; } }
-  .fpc-stats { display: grid; gap: 6px; font: 400 14px/1.4 var(--ui); }
-  .fpc-stats li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
-  .fpc-stats li > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
-  html[data-mode='season'] .fpc-stats li > .m-blend, html:not([data-mode='season']) .fpc-stats li > .m-season { display: none; }
-  .fpc-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  .fpc-stats em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .team-h { margin-top: 8px; }
+  .units { display: grid; gap: 14px; }
+  .opp-key { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; font: 400 14px var(--ui); margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+  .opp-key .mini-h { margin: 0; flex-basis: 100%; }
+  .opp-key b { color: var(--team); margin-right: 4px; }
 </style>
 
 <script is:inline>
   // Keep the section links in view and show which section is being read.
   (() => {
     const bar = document.querySelector('.mockbar');
-    const setBar = () => document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px');
+    const setBar = () => bar && document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px');
     setBar();
     addEventListener('resize', setBar);
     const links = [...document.querySelectorAll('#jump a')];
     const byId = Object.fromEntries(links.map((a) => [a.getAttribute('href').slice(1), a]));
-    const seen = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting) return;
-        links.forEach((a) => a.classList.remove('here'));
-        const a = byId[e.target.id];
-        if (a) { a.classList.add('here'); a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
-      });
-    }, { rootMargin: '-25% 0px -70% 0px' });
+    const seen = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      links.forEach((a) => a.classList.remove('here'));
+      const a = byId[e.target.id];
+      if (a) { a.classList.add('here'); a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    }), { rootMargin: '-25% 0px -70% 0px' });
     document.querySelectorAll('main section.sec').forEach((s) => seen.observe(s));
   })();
 
-  // Special-teams picker: "Show [team] [situation]". "On the penalty kill" shows the other team's power play against them.
+  // Special teams: "Show [team] [on the power play / on the penalty kill]". The penalty kill shows the other team's power play.
   (() => {
-    const team = document.getElementById('st-team');
-    const sit = document.getElementById('st-sit');
-    const mine = [...team.options].find((o) => o.dataset.abbr === window.lcPrefs?.get('team'));
+    const team = document.getElementById('st-team'), sit = document.getElementById('st-sit');
+    if (!team) return;
+    const mine = [...team.options].find((o) => o.value === window.lcPrefs?.get('team'));
     if (mine) team.value = mine.value;
-    const show = () => {
-      const otherTeam = team.value === 'away' ? 'home' : 'away';
-      const id = sit.value === 'all' ? team.value : sit.value === 'pp' ? `${team.value}-pp` : `${otherTeam}-pp`;
-      document.querySelectorAll('.stblock').forEach((p) => { p.hidden = p.id !== `stpanel-${id}`; });
-    };
+    const other = () => [...team.options].find((o) => o.value !== team.value).value;
+    const show = () => { const pp = sit.value === 'pp' ? team.value : other(); document.querySelectorAll('.stblock').forEach((p) => { p.hidden = p.dataset.pp !== pp; }); };
     team.addEventListener('change', show);
     sit.addEventListener('change', show);
     show();
   })();
 
-  // Goalie picker: one goalie from each team; everything tagged with a goalie follows the two menus.
+  // Pointing at a power-play name lights up his shots on that panel's map.
+  document.querySelectorAll('.stblock').forEach((panel) => {
+    const map = panel.querySelector('.ppmap');
+    if (!map) return;
+    const who = map.querySelector('.map-who');
+    let pinned = null;
+    const show = (el) => {
+      const id = el?.dataset.shooter;
+      map.classList.toggle('focus', !!id);
+      map.querySelectorAll('[data-p]').forEach((d) => d.classList.toggle('on', d.dataset.p === id));
+      const n = id ? map.querySelectorAll(`[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
+      who.textContent = id ? `${el.textContent}: ${n} of these shots` : ' ';
+    };
+    panel.querySelectorAll('[data-shooter]').forEach((el) => {
+      el.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') show(el); });
+      el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') show(pinned); });
+      el.addEventListener('focus', () => show(el));
+      el.addEventListener('blur', () => show(pinned));
+      el.addEventListener('click', () => { pinned = pinned === el ? null : el; show(pinned); });
+    });
+  });
+
+  // Goalies: one from each team; everything tagged with a goalie follows the two menus.
   (() => {
     const menus = [document.getElementById('g-away'), document.getElementById('g-home')];
+    if (!menus[0]) return;
     const show = () => {
       const on = new Set(menus.map((x) => x.value));
       document.querySelectorAll('#goalies [data-goalie]').forEach((el) => { el.hidden = !on.has(el.dataset.goalie); });
     };
     menus.forEach((x) => x.addEventListener('change', show));
     show();
+  })();
+
+  // Goal sources: scored or allowed.
+  (() => {
+    const sel = document.getElementById('src-side');
+    if (!sel) return;
+    sel.addEventListener('change', () => document.querySelectorAll('[data-src]').forEach((b) => { b.hidden = b.dataset.src !== sel.value; }));
   })();
 </script>

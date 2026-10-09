@@ -1,0 +1,45 @@
+---
+// One fingerprint trait for a real two-team matchup: a dot per team on one scale, then each team's stat in words.
+// `c` carries the trait's label, tip, scale ends and `say`, plus each team's blended and season-only estimates keyed by abbreviation.
+import { ordinal } from '../data/mock';
+interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
+const { c, sides } = Astro.props;
+const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
+---
+<li class="card fpc fpp">
+  <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
+  <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
+  <div class="lanes">
+    {sides.map((s) => {
+      const b = c[s.abbr].blend, n = c[s.abbr].season;
+      return <div class:list={['lane', s.cls]} style={`--b:${b.pct};--blo:${b.lo};--bhi:${b.hi};--c:${n.pct};--clo:${n.lo};--chi:${n.hi}`}><span class="whisk"></span><span class="dot"></span></div>;
+    })}
+  </div>
+  <ul class="fpp-stats">
+    {sides.map((s) => (
+      <li class={s.cls}>
+        <i></i>
+        {(['blend', 'season'] as const).map((mode) => {
+          const e = c[s.abbr][mode];
+          return (
+            <p class={`fpc-line m-${mode}`}>
+              {e.raw === undefined
+                ? <><span><b>{s.place}:</b> {c.say(e.v)}</span><em>{ordinal(e.rank)} of 32</em></>
+                : <>
+                    <span class="a-adj"><b>{s.place}:</b> {c.say(e.index)}</span><em class="a-adj">{ordinal(e.rank)} of 32</em>
+                    <span class="a-raw"><b>{s.place}:</b> {e.raw.toFixed(1)} {rawWords[c.key]}</span><em class="a-raw">{ordinal(e.raw_rank)} of 32</em>
+                  </>}
+            </p>
+          );
+        })}
+      </li>
+    ))}
+  </ul>
+</li>
+
+<style>
+  .fpp-stats { display: grid; gap: 6px; }
+  .fpp-stats li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
+  .fpp-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .fpp .lanes { gap: 6px; }
+</style>

@@ -307,7 +307,7 @@ const fpMeta: Record<string, FpMeta> = {
   point: { group: 'Offense', lo: 'Down low', hi: 'Point-heavy', at0: 26, at100: 44, say: (v) => `${f1(v)}% of shot attempts come from the point` },
   suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per 60` },
   qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `opponents need ${f1(1 / v)} shots per expected goal` },
-  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${f1(v)} breakdown chances allowed per 60` },
+  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${v.toFixed(2)} breakdown chances allowed per 60` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per 60, both teams combined` },
   forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },

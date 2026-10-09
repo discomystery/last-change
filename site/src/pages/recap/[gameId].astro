@@ -16,7 +16,7 @@ const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long
 <Base title={`${m.away} at ${m.home} recap`}>
   <section class="hero" aria-label="Final score">
     <Rink score={recap.score} centre="final" />
-    <p class="when">{dateStr} · {m.game.venue} · <a href={`${import.meta.env.BASE_URL}preview/${m.game.id}/`}>Read the preview as it stood at puck drop</a></p>
+    <p class="when">{dateStr} · {m.game.venue}</p>
   </section>
 
   <Section id="scorecard" title="What we said, and what happened" takeaway={`Of the ${recap.claims.length} things the preview told you to watch, ${tally('held')} held up, ${tally('partly')} partly did, and ${tally('missed')} didn’t happen.`}>
