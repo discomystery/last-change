@@ -92,8 +92,8 @@ const nav = [
                 {order.map((a) => (
                   <li class={`t-${a}`}>
                     <i></i>
-                    <span class="m-blend"><b>{teams[a].place}:</b> {c[a].blend.text}. <em>{c[a].blend.rank} of 32</em></span>
-                    <span class="m-season"><b>{teams[a].place}:</b> {c[a].season.text}. <em>{c[a].season.rank} of 32</em></span>
+                    <span class="m-blend"><span><b>{teams[a].place}:</b> {c[a].blend.text}</span><em>{c[a].blend.rank} of 32</em></span>
+                    <span class="m-season"><span><b>{teams[a].place}:</b> {c[a].season.text}</span><em>{c[a].season.rank} of 32</em></span>
                   </li>
                 ))}
               </ul>
@@ -204,13 +204,13 @@ const nav = [
                   {s.pk.map((u) => (
                     <div class="ppunit">
                       <p class="unit-label">{u.label} <span class="n">{u.share}% of penalty-kill time</span></p>
-                      <p class="pk-names">{u.players.join(' · ')}</p>
+                      <ul class="pk-names">{u.players.map((n) => <li>{n}</li>)}</ul>
                     </div>
                   ))}
                 </details>
-                <p class="note">Role tags are rules of thumb based on where each player shoots and passes from.</p>
               </div>
             </div>
+            <p class="note">Role tags are rules of thumb based on where each player shoots and passes from.</p>
           </div>
         );
       })}
@@ -357,6 +357,7 @@ const nav = [
   .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
   .meta dt { font-family: var(--ui); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); font-weight: 600; }
   .meta dd { font-weight: 500; }
+  @media (min-width: 820px) { .meta { display: flex; flex-wrap: wrap; gap: 10px 48px; } .meta dd { white-space: nowrap; } }
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 18px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
   .jump a:hover { border-color: var(--ink); }
@@ -397,14 +398,14 @@ const nav = [
   .ppunit { margin-bottom: 14px; }
   .ppunit ul { margin-top: 6px; display: grid; gap: 5px; }
   .ppunit li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
-  .pk-names { font-size: 14px; margin-top: 4px; }
+  .ppunit ul.pk-names { font-size: 14px; margin-top: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
 
   .quad-wrap { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 820px) { .quad-wrap { grid-template-columns: 1fr 1.25fr; align-items: center; } }
   .sub.first { margin-top: 0; }
   .goalie { margin-bottom: 14px; }
-  .explain { margin-top: 18px; max-width: 70ch; }
-  .explain p { margin-top: 10px; font-size: 16px; }
+  .explain { margin-top: 18px; }
+  .explain p { margin-top: 10px; font: 400 15px/1.5 var(--ui); }
   .after { margin-top: 28px; font-weight: 600; }
   .goalie header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .goalie h4 { font: 700 24px/1 var(--display); margin: 0; }
@@ -437,7 +438,7 @@ const nav = [
   .recipe .cite { margin-top: 6px; }
   .roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
   .players .rate:last-child { margin-bottom: 0; }
-  .notes { margin-top: 14px; display: grid; gap: 10px; max-width: 70ch; font-size: 15px; }
+  .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 </style>
 
 <style is:global>
@@ -452,7 +453,7 @@ const nav = [
   .mode button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
 
   /* Fingerprint cards */
-  .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
   .fpc { display: grid; gap: 10px; align-content: start; }
   .fpc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .fpc-name { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
@@ -467,6 +468,8 @@ const nav = [
   @media (prefers-reduced-motion: reduce) { .dot, .whisk { transition: none; } }
   .fpc-stats { display: grid; gap: 6px; font: 400 14px/1.4 var(--ui); }
   .fpc-stats li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
+  .fpc-stats li > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+  html[data-mode='season'] .fpc-stats li > .m-blend, html:not([data-mode='season']) .fpc-stats li > .m-season { display: none; }
   .fpc-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   .fpc-stats em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
 </style>
