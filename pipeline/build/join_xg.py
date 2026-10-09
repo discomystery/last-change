@@ -5,7 +5,7 @@ from pipeline.config import TABLES
 from pipeline.ingest import moneypuck
 
 EVENT_MAP = {"SHOT": "shot-on-goal", "MISS": "missed-shot", "GOAL": "goal"}
-KEEP = ["xGoal", "xRebound", "xFroze", "xPlayContinuedInZone", "shotRush", "shotRebound", "shotGeneratedRebound", "shotGoalieFroze",
+KEEP = ["xGoal", "xRebound", "xFroze", "xPlayContinuedInZone", "shotRebound", "shotGeneratedRebound", "shotGoalieFroze",
         "shotOnEmptyNet", "shotWasOnGoal", "timeSinceLastEvent", "lastEventCategory", "speedFromLastEvent",
         "arenaAdjustedShotDistance", "shotAngleAdjusted", "xCordAdjusted", "yCordAdjusted", "shooterLeftRight"]
 TOLERANCE_SECONDS = 2

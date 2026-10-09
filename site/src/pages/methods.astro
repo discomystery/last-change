@@ -12,7 +12,7 @@ const ex = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number))[0
 const sample = 30;
 const hr = (data as any).home_road as Record<string, { home_rate: number; away_rate: number }>;
 const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
-const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', rush: 'Rush offense', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
+const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
 ---
 <Base title="Methods" mock={false}>
   <h1 class="page-h">How the numbers are made</h1>
@@ -83,8 +83,8 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
   <Section id="limits" title="Blind spots" placeholder={false}>
     <ul class="limits">
       <li><strong>Passes before a shot</strong> aren’t in public data, so expected-goal numbers can’t see a cross-ice feed. Goalies behind teams that allow those look worse than they are.</li>
-      <li><strong>Rush chances</strong> are identified from the timing of recorded events, which catches only some of them. Treat rush numbers as a way to compare teams, not a full count.</li>
-      <li><strong>Defender positions</strong> aren’t tracked publicly, so “breakdowns” are inferred from dangerous rush and turnover chances.</li>
+      <li><strong>Rush chances</strong> can’t be picked out from the league’s public game data, which records too little between the blue lines. Shots flagged by the usual timing rule (within four seconds of an event outside the attacking zone) actually score less often than ordinary shots, so the site shows no rush numbers. Real rush counts come from people or cameras tracking zone entries.</li>
+      <li><strong>Defender positions</strong> aren’t tracked publicly, so “breakdowns” are inferred from dangerous chances within five seconds of a team losing the puck.</li>
     </ul>
   </Section>
 </Base>

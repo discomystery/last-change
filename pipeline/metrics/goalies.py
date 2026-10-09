@@ -23,9 +23,8 @@ def shots(season: int) -> pl.DataFrame:
     f = pl.read_parquet(d / "shot_features.parquet").select("game_id", "event_id", "empty_net", "prev_type", "prev_gap", "prev_x", "prev_same_team")
     xg = pl.read_parquet(d / "shots_xg_own.parquet")
     s = ev.join(f, on=["game_id", "event_id"]).join(xg, on=["game_id", "event_id"]).join(games, on="game_id").filter(~pl.col("empty_net"))
-    rush = (pl.col("prev_type") != "none") & (pl.col("prev_gap") <= 4) & (pl.col("prev_x") <= 25)
     turnover = (pl.col("prev_gap") <= 5) & (((pl.col("prev_type") == "giveaway") & ~pl.col("prev_same_team")) | ((pl.col("prev_type") == "takeaway") & pl.col("prev_same_team")))
-    return s.with_columns(goal=pl.col("type") == "goal", on_goal=pl.col("type") != "missed-shot", breakdown=(rush | turnover) & (pl.col("xg") >= 0.15), season=pl.lit(season))
+    return s.with_columns(goal=pl.col("type") == "goal", on_goal=pl.col("type") != "missed-shot", breakdown=turnover & (pl.col("xg") >= 0.15), season=pl.lit(season))
 
 
 def per_game(season: int) -> pl.DataFrame:

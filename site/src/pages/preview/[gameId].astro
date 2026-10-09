@@ -38,7 +38,7 @@ const stViews = [
   { id: 'home-pp', label: `${teams[home].place} power play vs ${teams[away].place} penalty kill`, pp: home, pk: away },
 ];
 const stDefault = 2;
-const neutralSig = new Set(['Hits', 'Defensive-zone starts', 'Shorthanded ice time', 'Rush shots', 'Competition faced']);
+const neutralSig = new Set(['Hits', 'Defensive-zone starts', 'Shorthanded ice time', 'Shots off turnovers', 'Competition faced']);
 const nav = [
   ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
   ['goalies', 'Goalies'], ['win', 'How they win'], ['players', 'Key players'], ['notes', 'Data notes'],
@@ -70,7 +70,7 @@ const nav = [
     </ol>
   </Section>
 
-  <Section id="style" title="Style fingerprints" takeaway="Carolina floods the net with shots from everywhere; Edmonton takes fewer and better ones, especially off the rush.">
+  <Section id="style" title="Style fingerprints" takeaway="Carolina floods the net with shots from everywhere; Edmonton takes fewer and better ones.">
     <div class="key">
       {order.map((a) => <span class={`t-${a}`}><i></i>{full(a)}</span>)}
       <span class="avg">League average</span>
@@ -294,7 +294,7 @@ const nav = [
     <p class="note">Expected-goal models can’t see passes before a shot. A goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
   </Section>
 
-  <Section id="win" title="How they win" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton scores on the power play and off the rush.">
+  <Section id="win" title="How they win" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton leans on the power play.">
     <h3 class="sub">Where the goals come from</h3>
     <div class="key">
       {order.map((a) => <span class={`t-${a}`}><i></i>{teams[a].place}</span>)}

@@ -16,7 +16,6 @@ DIMS = {
     "suppression": (["ca_adj"], ["sec5"], 3600, False),
     "qualityAllowed": (["xga_adj"], ["fa_adj"], 1, False),
     "pace": (["ff_adj", "fa_adj"], ["sec5"], 3600, True),
-    "rush": (["rush_xgf"], ["xgf5"], 100, True),
     "rebounds": (["reb_xgf"], ["xgf5"], 100, True),
     "turnover": (["to_xgf"], ["xgf5"], 100, True),
     "point": (["point_cf"], ["cf5"], 100, True),
@@ -69,7 +68,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     return t.group_by("game_id", "team_id", "date").agg(
         tot("sec", s5).alias("sec5"), tot("cf_adj", s5).alias("cf_adj"), tot("ca_adj", s5).alias("ca_adj"),
         tot("ff_adj", s5).alias("ff_adj"), tot("fa_adj", s5).alias("fa_adj"), tot("xgf_adj", s5).alias("xgf_adj"), tot("xga_adj", s5).alias("xga_adj"),
-        tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("rush_xgf", s5).alias("rush_xgf"), tot("reb_xgf", s5).alias("reb_xgf"),
+        tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
