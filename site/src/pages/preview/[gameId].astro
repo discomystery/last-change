@@ -41,7 +41,7 @@ const stDefault = 2;
 const neutralSig = new Set(['Hits', 'Defensive-zone starts', 'Shorthanded ice time', 'Shots off turnovers', 'Competition faced']);
 const nav = [
   ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
-  ['goalies', 'Goalies'], ['win', 'How they win'], ['players', 'Key players'], ['notes', 'Data notes'],
+  ['goalies', 'Goalies'], ['win', 'Goal sources'], ['players', 'Key players'], ['notes', 'Data notes'],
 ];
 ---
 <Base title={`${away} at ${home} preview`}>
@@ -294,8 +294,7 @@ const nav = [
     <p class="note">Expected-goal models can’t see passes before a shot. A goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
   </Section>
 
-  <Section id="win" title="How they win" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton leans on the power play.">
-    <h3 class="sub">Where the goals come from</h3>
+  <Section id="win" title="Where the goals come from" takeaway="Carolina grinds goals out of zone time and second chances; Edmonton leans on the power play.">
     <div class="key">
       {order.map((a) => <span class={`t-${a}`}><i></i>{teams[a].place}</span>)}
       <span class="avg">League average</span>
@@ -316,16 +315,6 @@ const nav = [
       </ul>
     </div>
     <p class="note">Share of each team’s goals that come from each source. The further apart the dots, the more the two teams differ.</p>
-    <h3 class="sub">What tends to be true when they win</h3>
-    <div class="two wins">
-      {order.map((a) => (
-        <div class:list={['card', `t-${a}`]}>
-          <p class="gname"><i></i>When {teams[a].place} wins</p>
-          <ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul>
-        </div>
-      ))}
-    </div>
-    <p class="note">These are patterns, not causes. They describe what has gone along with winning, not what makes it happen.</p>
   </Section>
 
   <Section id="players" title="Key players" takeaway="What each team’s most-used players do, shown by the things they do more than almost anyone at their position.">
@@ -456,7 +445,6 @@ const nav = [
   .snums span { display: inline-flex; align-items: center; gap: 5px; min-width: 48px; }
   .snums i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }
-  .wins { align-items: stretch; }
   .rec { display: grid; gap: 14px; }
   .rec li + li { border-top: 1px solid var(--rule); padding-top: 14px; }
   .rec .cite { margin-top: 4px; }

@@ -230,18 +230,6 @@ export const goalSources = [
   { label: 'Empty net', tip: 'Goals into an empty net.', CAR: 5, EDM: 6, lg: 7 },
   { label: 'Shorthanded', tip: 'Goals scored while killing a penalty.', CAR: 4, EDM: 2, lg: 3 },
 ];
-export const recipes: Record<Abbr, { text: string; sample: string }[]> = {
-  CAR: [
-    { text: 'When Carolina’s forecheck pressure is above its own median, they win 66% of the time, compared with 45% otherwise.', sample: '58 and 61 games · 80% range 57–74%' },
-    { text: 'When Carolina allows two or fewer breakdown chances while the game is tied, they win 63%.', sample: '71 games · 80% range 55–70%' },
-    { text: 'Against top-ten opponents, scoring first matters more than usual: 70% when they do, 31% when they don’t.', sample: '27 and 22 games · wide range, treat with care' },
-  ],
-  EDM: [
-    { text: 'When Edmonton has the better 5-on-5 chances, they win 64% of the time, compared with 47% otherwise.', sample: '60 and 59 games · 80% range 56–72%' },
-    { text: 'When Edmonton gets four or more power plays, they win 68%.', sample: '44 games · 80% range 58–77%' },
-    { text: 'When the starter saves at least one goal above expected, they win 79%.', sample: '39 games · 80% range 69–87%' },
-  ],
-};
 
 // ---------- Key players ----------
 const sigPool = [

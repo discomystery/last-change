@@ -44,7 +44,7 @@ def run(season: int) -> dict:
     export_fingerprints(season)
     export_lines(season)
     export_goalies(season)
-    export_how_they_win(season)
+    export_goal_sources(season)
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games}
 
 
@@ -272,15 +272,15 @@ def export_goalies(season: int) -> int:
     return len(payload["teams"])
 
 
-def export_how_they_win(season: int) -> int:
-    """Goal sources (for and against) and each team's record under the conditions that go with winning."""
-    from pipeline.metrics import goal_sources, win_splits
+def export_goal_sources(season: int) -> int:
+    """Where each team's goals come from, scored and allowed, with luck bands."""
+    from pipeline.metrics import goal_sources
 
     g = pl.read_parquet(TABLES / str(season) / "games.parquet")
     abbr = {**dict(zip(g["home_id"], g["home"])), **dict(zip(g["away_id"], g["away"]))}
-    src, wins = goal_sources.run(season), win_splits.run(season)
-    teams = {abbr[tid]: {"sources": src["teams"].get(tid), "wins": wins["teams"].get(tid)} for tid in sorted(abbr)}
+    src = goal_sources.run(season)
+    teams = {abbr[tid]: {"sources": src["teams"].get(tid)} for tid in sorted(abbr)}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
-               "league_sources": src["league"], "league_wins": wins["league"], "league_games": wins["league_games"], "teams": teams}
-    (SITE_DATA / "how_they_win.json").write_text(json.dumps(payload, separators=(",", ":")))
+               "league_sources": src["league"], "teams": teams}
+    (SITE_DATA / "goal_sources.json").write_text(json.dumps(payload, separators=(",", ":")))
     return len(teams)
