@@ -50,7 +50,9 @@ type MRow = { label: string; minutes: number; seconds: number; share: (number | 
 const mu = (ln as any)?.matchups as Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }> | undefined;
 const venues = [['all', 'in all games'], ['home', 'at home'], ['road', 'on the road']] as const;
 const oppName = ['first', 'second', 'third', 'fourth'];
-const heat = (v: number | null) => (v === null ? '' : `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.5)}%, var(--sheet)); color: ${v >= 36 ? 'var(--sheet)' : 'var(--ink)'}`);
+// Box shading lives in blocks.css (it differs between light and dark mode); the page only passes the share.
+const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
+const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const unitNames = (label: string) => ln.units.find((u) => u.label === label)?.players.join(', ') ?? '';
 const lastNames = (label: string) => (ln.units.find((u) => u.label === label)?.players ?? []).map((n) => n.split(' ').slice(1).join(' '));
 const standouts = (rows: MRow[]) => rows.filter((r) => r.minutes >= 15).flatMap((r) => r.share.map((v, j) => ({ r, j, v: v ?? 0, gap: (v ?? 0) - r.expected[j] }))).filter((x) => x.gap >= 10).sort((a, b) => b.gap - a.gap).slice(0, 3);
@@ -235,7 +237,7 @@ const _ = ordinal;
                         <li class:list={{ thin: r.minutes < 10 }}>
                           <span class="lab" data-tip={`${unitNames(r.label)}. ${mmss(r.seconds)} of 5-on-5 ${label}.`}><b>{r.label}</b>{lastNames(r.label).join(' · ')}</span>
                           <span class="strip">
-                            {r.share.map((v, j) => <span style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
+                            {r.share.map((v, j) => <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
                           </span>
                         </li>
                       ))}

@@ -136,6 +136,9 @@ const teamList = teams as { abbr: string; name: string }[];
     --ink-3: #6f7e8e;
     --rule: #d2dce5;
     --track: #e4ebf1;
+    --heat: var(--ink);            /* matchup boxes: share of ice time, sheet → heat */
+    --heat-on-hot: var(--sheet);
+    --heat-on-hotter: var(--sheet);
     --CAR: #c8102e;
     --EDM: #1f4e9e;
     --line-red: rgba(200, 16, 46, 0.32);
@@ -153,7 +156,10 @@ const teamList = teams as { abbr: string; name: string }[];
       --ink-2: #a9b6c3;
       --ink-3: #7c8a98;
       --rule: #25333f;
-      --track: #1b2835;
+      --track: #26384a;
+      --heat: #8fb3e8;
+      --heat-on-hot: var(--ink);
+      --heat-on-hotter: #0a121a;
       --CAR: #ee5a70;
       --EDM: #5a90ea;
       --line-red: rgba(238, 90, 112, 0.38);
@@ -292,6 +298,7 @@ const teamList = teams as { abbr: string; name: string }[];
   .quad { width: 100%; height: auto; display: block; }
   .q-axis { stroke: var(--rule); stroke-width: 1; }
   .q-lg { fill: var(--ink-3); opacity: 0.3; }
+  @media (prefers-color-scheme: dark) { .q-lg { opacity: 0.6; } }
   .q-hi { fill: var(--team); stroke: var(--sheet); stroke-width: 2; }
   .q-hi.backup { fill: var(--sheet); stroke: var(--team); stroke-width: 2.5; }
   .quad .q-name { font: 600 11px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 3px; }

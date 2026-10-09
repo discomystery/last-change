@@ -73,6 +73,9 @@
   @property --even { syntax: '<number>'; inherits: true; initial-value: 0; }
   #matchups { --even: 0; transition: --even 0.5s cubic-bezier(0.3, 0.7, 0.2, 1); }
   #matchups.even { --even: 1; }
+  .strip > span { background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); color: var(--ink); }
+  .strip > span.hot { color: var(--heat-on-hot); }
+  .strip > span.hotter { color: var(--heat-on-hotter); }
   .strip i { font: 500 10px var(--ui); font-style: normal; opacity: 0.75; white-space: nowrap; }
   @media (max-width: 640px) { .strips li { grid-template-columns: 1fr; gap: 4px; } }
   @media (prefers-reduced-motion: reduce) { #matchups { transition: none; } }
