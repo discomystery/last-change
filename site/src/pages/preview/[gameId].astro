@@ -37,6 +37,7 @@ const stViews = [
   { id: 'home-pp', label: `${teams[home].place} power play vs ${teams[away].place} penalty kill`, pp: home, pk: away },
 ];
 const stDefault = 2;
+const neutralSig = new Set(['Hits', 'Defensive-zone starts', 'Shorthanded ice time', 'Rush shots', 'Competition faced']);
 const nav = [
   ['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'],
   ['goalies', 'Goalies'], ['win', 'How they win'], ['players', 'Key players'], ['notes', 'Data notes'],
@@ -328,27 +329,37 @@ const nav = [
   </Section>
 
   <Section id="players" title="Key players" takeaway="What each team’s most-used players do, shown by the things they do more than almost anyone at their position.">
-    <div class="two">
-      {order.map((a) => (
-        <div class={`t-${a}`}>
-          <h3 class="team-h">{full(a)}</h3>
-          <ul class="players">
-            {m.keyPlayers_[a].map((p) => (
-              <li class="card">
-                <div class="unit-top"><span class="unit-names">{p.name}</span><span class="n">{p.pos}</span></div>
-                <p class="roles">{p.roles.map((r) => <span class="chip">{r.pct}% {r.name}</span>)}</p>
-                {p.signature.map((s) => (
-                  <div class="rate">
-                    <div class="rate-top"><span class="term" tabindex="0" data-tip={s.tip}>{s.label}</span></div>
-                    <Bar team={a} pct={s.pct} label={`${p.name}, ${s.label.toLowerCase()}`} />
-                  </div>
-                ))}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+    <div class="key">
+      <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against others at his position</span>
+      <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
     </div>
+    {order.map((a) => (
+      <div class:list={['kp', `t-${a}`]}>
+        <h3 class="team-h">{full(a)}</h3>
+        <ul class="kpgrid">
+          {m.keyPlayers_[a].map((p) => {
+            const peers = p.pos === 'Defense' ? 'defensemen' : p.pos === 'Center' ? 'centers' : 'wingers';
+            return (
+              <li class="card kpcard">
+                <p class="kp-name"><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{p.name}</span></p>
+                <p class="kp-role"><span class="chip">{p.pos}</span><span class="term" tabindex="0" data-tip={`His numbers look ${p.roles[0].pct}% like a typical ${p.roles[0].name.toLowerCase()} and ${p.roles[1].pct}% like a ${p.roles[1].name.toLowerCase()}. Role names are rules of thumb.`}>Mostly a {p.roles[0].name.toLowerCase()}, part {p.roles[1].name.toLowerCase()}</span></p>
+                <dl class="kp-sig">
+                  {p.signature.map((sg) => (
+                    <div>
+                      <dt><span class="term" tabindex="0" data-tip={sg.tip}>{sg.label}</span></dt>
+                      <dd>{neutralSig.has(sg.label)
+                        ? <Marker pct={sg.pct} tip={`More than ${sg.pct}% of ${peers}.`} />
+                        : <Pips pct={sg.pct} tip={`Better than ${sg.pct}% of ${peers}.`} />}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    ))}
+    <p class="note">Each player shows the three things that most set him apart from others at his position.</p>
   </Section>
 
   <Section id="notes" title="Data notes" placeholder={false}>
@@ -504,7 +515,15 @@ const nav = [
   .src-fill { position: absolute; inset: 0 auto 0 0; background: var(--team); border-radius: 0 4px 4px 0; min-width: 2px; }
   .src-lg { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
   .recipe .cite { margin-top: 6px; }
-  .roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+  .kp + .kp { margin-top: 28px; }
+  .kp .team-h { margin-top: 20px; }
+  .kpgrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+  .kpcard { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; }
+  .kp-name { font: 700 22px/1.1 var(--display); }
+  .kp-role { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font: 400 14px/1.35 var(--ui); color: var(--ink-2); min-height: 44px; align-content: start; }
+  .kp-sig { align-self: end; }
+  .kp-sig div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .kp-sig dd { display: inline-flex; }
   .players .rate:last-child { margin-bottom: 0; }
   .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 </style>
