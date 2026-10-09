@@ -1,128 +1,147 @@
 ---
-// Temporary comparison page: alternate layouts for the goalie and "how they win" sections. Not linked.
+// Temporary comparison page, round two: more layouts for the goalie and "how they win" sections. Not linked.
 import Base from '../layouts/Base.astro';
 import Quadrant from '../components/Quadrant.astro';
 import Histogram from '../components/Histogram.astro';
 import Pips from '../components/Pips.astro';
+import Marker from '../components/Marker.astro';
 import * as m from '../data/mock';
 const { order, teams } = m;
 const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
+const cl = (v: number) => Math.max(4, Math.min(97, Math.round(v)));
 const starters = order.map((a) => ({ a, g: m.goalies[a][0] }));
-const all = order.flatMap((a) => m.goalies[a].map((g) => ({ a, g })));
-const quad = all.map(({ a, g }) => ({ team: a, name: g.name, probable: g.probable, x: g.xga60, y: g.gsax60 }));
-const pct = (g: (typeof starters)[0]['g']) => Math.max(5, Math.min(98, Math.round(50 + g.gsax60 * 110)));
-const groups = (g: (typeof starters)[0]['g']) => [
-  { h: 'Results', rows: [['Goals saved above expected', signed(g.gsax)], ['Starts', String(g.starts)]] },
-  { h: 'Save percentage by shot danger', rows: g.tiers.map((t) => [t.tier, t.sv.toFixed(3).slice(1)]) },
-  { h: 'Workload', rows: g.workload.map((w) => [w.label, String(w.value)]) },
-  { h: 'Consistency', rows: [['Quality starts', `${g.consistency.qs}%`], ['Really bad starts', `${g.consistency.rbs}%`], ['Disasters / steals', `${g.consistency.disasters} / ${g.consistency.steals}`]] },
+const quad = order.flatMap((a) => m.goalies[a].map((g) => ({ team: a, name: g.name, probable: g.probable, x: g.xga60, y: g.gsax60 })));
+const num = (v: string | number) => parseFloat(String(v).replace('−', '-'));
+type G = (typeof starters)[0]['g'];
+const traits = [
+  { label: 'Stopping more than expected', lo: 'Sieve', hi: 'Wall', pct: (g: G) => cl(50 + g.gsax60 * 110), say: (g: G) => `${signed(g.gsax)} goals saved above expected in ${g.starts} starts` },
+  { label: 'How busy he is', lo: 'Quiet', hi: 'Under siege', pct: (g: G) => cl((num(g.workload[0].value) - 23) * 11), say: (g: G) => `${g.workload[0].value} shots faced per hour` },
+  { label: 'How dangerous the shots are', lo: 'Sheltered', hi: 'Exposed', pct: (g: G) => cl((num(g.workload[1].value) - 0.062) * 3600), say: (g: G) => `the average shot against is worth ${g.workload[1].value} expected goals` },
+  { label: 'Breakdowns in front of him', lo: 'Rare', hi: 'Constant', pct: (g: G) => cl((num(g.workload[2].value) - 1.8) * 45), say: (g: G) => `${g.workload[2].value} dangerous rush or turnover chances per hour` },
+  { label: 'Waiting between shots', lo: 'Steady work', hi: 'Long waits', pct: (g: G) => cl((num(g.workload[3].value) - 40) * 2.4), say: (g: G) => `a typical wait of ${g.workload[3].value} between shots` },
+  { label: 'Night-to-night steadiness', lo: 'Streaky', hi: 'Steady', pct: (g: G) => cl((g.consistency.qs - 40) * 3.6), say: (g: G) => `a quality start ${g.consistency.qs}% of the time` },
 ];
-const G = starters.map((s) => groups(s.g));
-const maxSrc = Math.max(...m.goalSources.flatMap((s) => [s.CAR, s.EDM, s.lg]));
+const verdict = (g: G) => (g.gsax60 >= 0 ? (g.xga60 > 2.55 ? 'bailing his team out' : 'good behind a good system') : g.xga60 > 2.55 ? 'struggling behind a leaky team' : 'giving back what his team’s system earns');
+const srcPct = (v: number, lg: number) => cl(50 + (v - lg) * 5);
 ---
 <Base title="Section formats">
-  <h1 class="page-h">Alternate formats: goalies and how they win</h1>
-  <p class="lede">Two options for each section, built with the same placeholder numbers. Everything runs the full width of the page.</p>
+  <h1 class="page-h">More formats: goalies and how they win</h1>
+  <p class="lede">Three new directions for each section. These lean on things already on the page that you’ve liked: the fingerprint scale cards, the three-column special-teams layout, the pucks and the sentence picker.</p>
 
   <section class="opt">
-    <p class="tag">Goaltending · Option 1</p>
-    <h2>Head to head</h2>
-    <p class="why">The two probable starters face each other across one table, stat by stat, so the page compares them for you. The chart and the night-to-night shapes sit side by side underneath; backups are behind a fold.</p>
-    <div class="card h2h">
-      <div class="h2h-row head">
-        {starters.map(({ a, g }, i) => <div class:list={['who', `t-${a}`, { right: i === 1 }]}><span class="nm"><i></i>{g.name}</span><Pips pct={pct(g)} tip={`Better than ${pct(g)}% of starting goalies at stopping more than expected.`} /></div>)}
-        <div class="mid">Probable starters</div>
-      </div>
-      {G[0].map((grp, gi) => (
-        <>
-          <div class="h2h-row grp"><div></div><div></div><div class="mid">{grp.h}</div></div>
-          {grp.rows.map((r, ri) => (
-            <div class="h2h-row">
-              <div class="val">{r[1]}</div>
-              <div class="val right">{G[1][gi].rows[ri][1]}</div>
-              <div class="mid">{r[0]}</div>
-            </div>
-          ))}
-        </>
+    <p class="tag">Goaltending · A</p>
+    <h2>Scale cards, like the fingerprints</h2>
+    <p class="why">Each goalie trait is one card with a named scale and a dot for each starter, plus a plain sentence apiece. Same look and reading habit as the style fingerprints, two cards per row.</p>
+    <div class="key">{starters.map(({ a, g }) => <span class={`t-${a}`}><i></i>{g.name}</span>)}<span class="avg">League average</span></div>
+    <ul class="fgrid">
+      {traits.map((t) => (
+        <li class="card sc">
+          <p class="sc-name">{t.label}</p>
+          <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
+          <div class="lanes">{starters.map(({ a, g }) => <div class:list={['lane', `t-${a}`]} style={`--v:${t.pct(g)};--w:11`}><span class="whisk"></span><span class="dot"></span></div>)}</div>
+          <ul class="sc-stats">{starters.map(({ a, g }) => <li class={`t-${a}`}><i></i><span><b>{g.name}:</b> {t.say(g)}</span></li>)}</ul>
+        </li>
       ))}
-    </div>
-    <div class="two even">
-      <div class="card"><p class="mini">Helping, or hung out to dry?</p><Quadrant league={m.leagueGoalies} highlights={quad} /></div>
-      <div class="card">
-        <p class="mini">Night to night</p>
-        {starters.map(({ a, g }) => <div class={`hrow t-${a}`}><span class="nm"><i></i>{g.name}</span><Histogram team={a} bins={g.bins} name={g.name} /></div>)}
-      </div>
-    </div>
-    <details class="fold"><summary><span class="closed">Show the backups</span><span class="opened">Hide the backups</span></summary><p class="why">The same table for {m.goalies[order[0]][1].name} and {m.goalies[order[1]][1].name} would appear here.</p></details>
+    </ul>
+    <details class="fold"><summary><span class="closed">Show the league chart and the backups</span><span class="opened">Hide the league chart and the backups</span></summary><div class="card narrow"><Quadrant league={m.leagueGoalies} highlights={quad} /></div></details>
   </section>
 
   <section class="opt">
-    <p class="tag">Goaltending · Option 2</p>
-    <h2>One goalie at a time</h2>
-    <p class="why">The chart leads, full width. Below it, a sentence picker chooses a goalie, and his numbers spread across three equal columns that always end level.</p>
-    <div class="card chartlead">
-      <div><p class="mini">Helping, or hung out to dry?</p><p class="why">Higher means he is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are the rest of the league.</p></div>
-      <Quadrant league={m.leagueGoalies} highlights={quad} />
+    <p class="tag">Goaltending · B</p>
+    <h2>Chart in the middle</h2>
+    <p class="why">The same three-column shape as special teams: one goalie on each side and the league chart between them, all ending level. A sentence picker switches between the starters and the backups.</p>
+    <div class="pick"><span>Show</span><select aria-label="Which goalies"><option>the probable starters</option><option>the backups</option></select></div>
+    <div class="g3">
+      {[starters[0], null, starters[1]].map((s) => s === null ? (
+        <div class="card mid"><p class="mini">Helping, or hung out to dry?</p><Quadrant league={m.leagueGoalies} highlights={quad} /></div>
+      ) : (
+        <div class:list={['card', `t-${s.a}`]}>
+          <p class="nm"><i></i>{s.g.name}</p>
+          <p class="bigline"><strong>{signed(s.g.gsax)}</strong> goals saved above expected <Pips pct={traits[0].pct(s.g)} tip={`Better than ${traits[0].pct(s.g)}% of starting goalies.`} /></p>
+          <dl class="kv">
+            {s.g.tiers.map((t) => <div><dt>{t.tier} save %</dt><dd>{t.sv.toFixed(3).slice(1)}</dd></div>)}
+            <div><dt>Shots faced per hour</dt><dd>{s.g.workload[0].value} <Marker pct={traits[1].pct(s.g)} tip="How busy he is, low to high, among starting goalies." /></dd></div>
+            <div><dt>Breakdown chances per hour</dt><dd>{s.g.workload[2].value} <Marker pct={traits[3].pct(s.g)} tip="How often his team breaks down in front of him, low to high." /></dd></div>
+            <div><dt>Quality starts</dt><dd>{s.g.consistency.qs}% <Pips pct={traits[5].pct(s.g)} tip={`Steadier than ${traits[5].pct(s.g)}% of starting goalies.`} /></dd></div>
+          </dl>
+        </div>
+      ))}
     </div>
-    <div class="pick"><span>Show</span>
-      <select id="g-pick" aria-label="Goalie">{all.map(({ a, g }, i) => <option value={String(i)}>{g.name}, {teams[a].place}’s {g.probable ? 'probable starter' : 'backup'}</option>)}</select>
+  </section>
+
+  <section class="opt">
+    <p class="tag">Goaltending · C</p>
+    <h2>Verdict first</h2>
+    <p class="why">Two level cards that each open with a one-line verdict in words, then four headline numbers in a tidy two-by-two grid. Everything else is behind a fold. The shortest and airiest of the three.</p>
+    <div class="two even">
+      {starters.map(({ a, g }) => (
+        <div class:list={['card', `t-${a}`]}>
+          <p class="nm"><i></i>{g.name}</p>
+          <p class="verdict">{g.name.split(' ').pop()} is {verdict(g)}.</p>
+          <ul class="quad4">
+            <li><span class="q-l">Saved above expected</span><strong>{signed(g.gsax)}</strong><Pips pct={traits[0].pct(g)} tip={`Better than ${traits[0].pct(g)}% of starting goalies.`} /></li>
+            <li><span class="q-l">Shots faced per hour</span><strong>{g.workload[0].value}</strong><Marker pct={traits[1].pct(g)} tip="Low to high among starting goalies." /></li>
+            <li><span class="q-l">Breakdowns per hour</span><strong>{g.workload[2].value}</strong><Marker pct={traits[3].pct(g)} tip="Low to high among starting goalies." /></li>
+            <li><span class="q-l">Quality starts</span><strong>{g.consistency.qs}%</strong><Pips pct={traits[5].pct(g)} tip={`Steadier than ${traits[5].pct(g)}% of starting goalies.`} /></li>
+          </ul>
+        </div>
+      ))}
     </div>
-    {all.map(({ a, g }, i) => (
-      <div class:list={['g3', `t-${a}`]} data-g={i} hidden={i !== 0}>
-        <div class="card"><p class="mini">Results</p><p class="bigline"><strong>{signed(g.gsax)}</strong> goals saved above expected in {g.starts} starts</p>
-          <dl class="kv">{g.tiers.map((t) => <div><dt>{t.tier} save %</dt><dd>{t.sv.toFixed(3).slice(1)}</dd></div>)}</dl></div>
-        <div class="card"><p class="mini">Workload</p><dl class="kv">{g.workload.map((w) => <div><dt>{w.label}</dt><dd>{w.value}</dd></div>)}</dl></div>
-        <div class="card"><p class="mini">Night to night</p><Histogram team={a} bins={g.bins} name={g.name} />
-          <dl class="kv"><div><dt>Quality starts</dt><dd>{g.consistency.qs}%</dd></div><div><dt>Really bad starts</dt><dd>{g.consistency.rbs}%</dd></div></dl>
-          <p class="scout">Scout’s note: none yet.</p></div>
+    <details class="fold"><summary><span class="closed">Show the full goalie numbers</span><span class="opened">Hide the full goalie numbers</span></summary><p class="why">Danger tiers, the league chart, night-to-night shapes, scout’s notes and the backups would open here.</p></details>
+  </section>
+
+  <section class="opt">
+    <p class="tag">How they win · A</p>
+    <h2>Scale cards, like the fingerprints</h2>
+    <p class="why">Each goal source is a card with a dot per team on a Rarely-to-Often scale and a sentence each. The four biggest differences show first; the rest fold away. Win conditions sit in two level columns below.</p>
+    <div class="key">{order.map((a) => <span class={`t-${a}`}><i></i>{teams[a].place}</span>)}<span class="avg">League average</span></div>
+    <ul class="fgrid">
+      {[...m.goalSources].sort((x, y) => Math.abs(y.CAR - y.EDM) - Math.abs(x.CAR - x.EDM)).slice(0, 4).map((s) => (
+        <li class="card sc">
+          <p class="sc-name">{s.label}</p>
+          <div class="ends"><span>Rarely</span><span>Often</span></div>
+          <div class="lanes">{order.map((a) => <div class:list={['lane', `t-${a}`]} style={`--v:${srcPct(s[a], s.lg)};--w:10`}><span class="whisk"></span><span class="dot"></span></div>)}</div>
+          <ul class="sc-stats">{order.map((a) => <li class={`t-${a}`}><i></i><span><b>{teams[a].place}:</b> {s[a]}% of goals (league average {s.lg}%)</span></li>)}</ul>
+        </li>
+      ))}
+    </ul>
+    <details class="fold"><summary><span class="closed">Show all 8 goal sources</span><span class="opened">Hide the full set</span></summary><p class="why">The other four cards would open here.</p></details>
+    <div class="two even">{order.map((a) => <div class={`card t-${a}`}><p class="nm"><i></i>When {teams[a].place} wins</p><ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul></div>)}</div>
+  </section>
+
+  <section class="opt">
+    <p class="tag">How they win · B</p>
+    <h2>Even tiles</h2>
+    <p class="why">Everything is a same-sized tile on a strict grid, so nothing can look lopsided. Per team: eight goal-source tiles in two rows of four, largest first, then three win-condition tiles.</p>
+    {order.map((a) => (
+      <div class={`t-${a} tblock`}>
+        <p class="nm"><i></i>{teams[a].place}</p>
+        <ul class="tiles8">
+          {[...m.goalSources].sort((x, y) => y[a] - x[a]).map((s) => <li class="card"><strong>{s[a]}%</strong><span class="q-l">{s.label}</span><Marker pct={srcPct(s[a], s.lg)} tip={`League average is ${s.lg}%. The slider shows low to high against other teams.`} /></li>)}
+        </ul>
+        <ul class="tiles3">{m.recipes[a].map((r) => <li class="card"><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul>
       </div>
     ))}
   </section>
 
   <section class="opt">
-    <p class="tag">How they win · Option 1</p>
-    <h2>Back to back</h2>
-    <p class="why">Goal sources as one mirrored chart: Carolina’s share grows to the left, Edmonton’s to the right, with a tick for league average. Then what’s true when each team wins, in two level columns.</p>
-    <div class="card bfly">
-      <div class="bf-row head"><div class="t-CAR"><i></i>{teams.CAR.place}</div><div></div><div class="t-EDM right"><i></i>{teams.EDM.place}</div></div>
-      {m.goalSources.map((s) => (
-        <div class="bf-row">
-          <div class="bar left t-CAR"><b>{s.CAR}%</b><span class="trk"><span class="fill" style={`width:${(s.CAR / maxSrc) * 100}%`}></span><span class="lg" style={`right:${(s.lg / maxSrc) * 100}%`}></span></span></div>
-          <div class="mid">{s.label}</div>
-          <div class="bar t-EDM"><span class="trk"><span class="fill" style={`width:${(s.EDM / maxSrc) * 100}%`}></span><span class="lg" style={`left:${(s.lg / maxSrc) * 100}%`}></span></span><b>{s.EDM}%</b></div>
-        </div>
-      ))}
-    </div>
-    <div class="two even">
-      {order.map((a) => <div class={`card t-${a}`}><p class="nm big"><i></i>When {teams[a].place} wins</p><ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul></div>)}
-    </div>
-  </section>
-
-  <section class="opt">
-    <p class="tag">How they win · Option 2</p>
-    <h2>Team by team</h2>
-    <p class="why">Each team gets one tall card: its three biggest goal sources as plain sentences, then what tends to be true when it wins. No chart at all; the full list of sources is behind a fold.</p>
-    <div class="two even">
-      {order.map((a) => {
-        const top = [...m.goalSources].sort((x, y) => y[a] - x[a]).slice(0, 3);
-        return (
-          <div class={`card t-${a}`}>
-            <p class="nm big"><i></i>{teams[a].place}</p>
-            <p class="mini">Where the goals come from</p>
-            <ul class="srcs">{top.map((s) => <li><strong>{s[a]}%</strong><span>{s.label.toLowerCase()}<em>league average {s.lg}%</em></span><Pips pct={Math.max(5, Math.min(98, 50 + (s[a] - s.lg) * 5))} tip={`More reliant on this than about ${Math.max(5, Math.min(98, 50 + (s[a] - s.lg) * 5))}% of teams.`} /></li>)}</ul>
-            <p class="mini">What tends to be true when they win</p>
-            <ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul>
-          </div>
-        );
-      })}
-    </div>
-    <details class="fold"><summary><span class="closed">Show all eight goal sources</span><span class="opened">Hide the full list</span></summary><p class="why">The full list for both teams would appear here.</p></details>
+    <p class="tag">How they win · C</p>
+    <h2>One team at a time</h2>
+    <p class="why">A sentence picker chooses the team. Its goal sources run down the left as a ranked list; what’s true when it wins runs down the right. Two level columns, nothing else on screen.</p>
+    <div class="pick"><span>Show how</span><select id="w-pick" aria-label="Team">{order.map((a) => <option value={a}>{teams[a].place}</option>)}</select><span>wins</span></div>
+    {order.map((a, i) => (
+      <div class:list={['two', 'even', `t-${a}`]} data-w={a} hidden={i !== 0}>
+        <div class="card"><p class="mini">Where the goals come from</p>
+          <ol class="rank">{[...m.goalSources].sort((x, y) => y[a] - x[a]).map((s) => <li><strong>{s[a]}%</strong><span>{s.label}</span><Marker pct={srcPct(s[a], s.lg)} tip={`League average is ${s.lg}%.`} /></li>)}</ol></div>
+        <div class="card"><p class="mini">What tends to be true when they win</p><ul class="rec">{m.recipes[a].map((r) => <li><p>{r.text}</p><p class="cite">{r.sample}</p></li>)}</ul></div>
+      </div>
+    ))}
   </section>
 </Base>
 
 <script is:inline>
-  document.getElementById('g-pick').addEventListener('change', (e) => {
-    document.querySelectorAll('[data-g]').forEach((p) => { p.hidden = p.dataset.g !== e.target.value; });
+  document.getElementById('w-pick').addEventListener('change', (e) => {
+    document.querySelectorAll('[data-w]').forEach((p) => { p.hidden = p.dataset.w !== e.target.value; });
   });
 </script>
 
@@ -133,62 +152,56 @@ const maxSrc = Math.max(...m.goalSources.flatMap((s) => [s.CAR, s.EDM, s.lg]));
   .tag { font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .opt h2 { font: 700 30px/1.1 var(--display); margin-top: 4px; }
   .why { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 6px 0 16px; }
-  .mini { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 8px; }
-  .nm { display: inline-flex; align-items: center; gap: 8px; font: 700 20px/1 var(--display); }
-  .nm.big { font-size: 22px; margin-bottom: 14px; }
-  .nm i, .bf-row.head i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); display: inline-block; }
+  .mini, .q-l { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .mini { margin-bottom: 10px; }
+  .nm { display: flex; align-items: center; gap: 8px; font: 700 22px/1 var(--display); margin-bottom: 12px; }
+  .nm i, .sc-stats i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); display: inline-block; flex: none; }
   .two.even { align-items: stretch; margin-top: 14px; }
+  .two[hidden] { display: none; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); margin-top: 4px; }
+  .key { margin: 0 0 14px; }
+  .narrow { max-width: 620px; margin-inline: auto; }
 
-  .h2h { padding-block: 8px; }
-  .h2h-row { display: grid; grid-template-columns: 1fr minmax(120px, 280px) 1fr; grid-template-areas: 'l m r'; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--rule); }
-  .h2h-row > :nth-child(1) { grid-area: l; text-align: right; }
-  .h2h-row > :nth-child(2) { grid-area: r; }
-  .h2h-row .mid { grid-area: m; text-align: center; font: 400 13px var(--ui); color: var(--ink-2); }
-  .h2h-row.head { border-bottom: 2px solid var(--ink); }
-  .h2h-row.head .who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: flex-end; }
-  .h2h-row.head .who.right { justify-content: flex-start; flex-direction: row; }
-  .h2h-row.grp { border-bottom: 0; padding: 16px 0 2px; }
-  .h2h-row.grp .mid { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-  .val { font: 600 17px var(--ui); }
-  .h2h > .h2h-row:last-child { border-bottom: 0; }
-  .hrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 10px 0; }
-  .hrow + .hrow { border-top: 1px solid var(--rule); }
+  .fgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
+  .sc { display: grid; gap: 10px; align-content: start; }
+  .sc-name { font: 600 20px/1.15 var(--display); }
+  .ends { display: flex; justify-content: space-between; font: italic 400 14px var(--body); color: var(--ink-2); margin-bottom: -4px; }
+  .lanes { position: relative; display: grid; gap: 4px; padding: 4px 7px; }
+  .lanes::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; }
+  .lane { position: relative; height: 14px; }
+  .lane::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(max(0, var(--v) - var(--w)) * 1%); width: calc((min(100, var(--v) + var(--w)) - max(0, var(--v) - var(--w))) * 1%); }
+  .dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; }
+  .sc-stats { display: grid; gap: 6px; font: 400 14px/1.4 var(--ui); }
+  .sc-stats li { display: grid; grid-template-columns: 11px 1fr; gap: 8px; align-items: baseline; }
 
-  .chartlead { display: grid; gap: 12px; }
-  @media (min-width: 820px) { .chartlead { grid-template-columns: 1fr 1.3fr; align-items: center; } }
-  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 14px; font: 600 20px var(--display); }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 14px; font: 600 20px var(--display); }
   .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; }
   .g3 { display: grid; gap: 14px; }
-  @media (min-width: 900px) { .g3 { grid-template-columns: repeat(3, 1fr); } }
-  .g3[hidden] { display: none; }
-  .bigline { font: 400 14px var(--ui); margin-bottom: 8px; }
-  .bigline strong { font: 700 38px/1 var(--display); margin-right: 4px; color: var(--ink); }
-  .kv div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
-  .kv div:last-child { border-bottom: 0; }
-  .kv dd { font-weight: 600; white-space: nowrap; }
-  .scout { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--ink); background: var(--ice); border-radius: 0 6px 6px 0; font: italic 400 14px var(--body); }
+  @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
+  .g3 .mid { display: flex; flex-direction: column; justify-content: center; }
+  .bigline { font: 400 14px var(--ui); margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .bigline strong { font: 700 38px/1 var(--display); color: var(--ink); }
+  .kv div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .kv dd { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }
 
-  .bfly { padding-block: 10px; }
-  .bf-row { display: grid; grid-template-columns: 1fr minmax(110px, 190px) 1fr; align-items: center; gap: 12px; padding: 8px 0; }
-  .bf-row.head { font: 700 16px var(--ui); border-bottom: 2px solid var(--ink); margin-bottom: 4px; }
-  .bf-row.head > div { display: flex; align-items: center; gap: 8px; }
-  .bf-row.head .right { justify-content: flex-end; }
-  .bf-row .mid { text-align: center; font: 600 14px var(--ui); }
-  .bar { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 8px; font: 600 13px var(--ui); }
-  .bar.left { grid-template-columns: 40px 1fr; }
-  .bar.left b { text-align: left; }
-  .bar b { text-align: right; }
-  .trk { position: relative; height: 10px; display: block; }
-  .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--team); border-radius: 0 5px 5px 0; }
-  .bar.left .fill { left: auto; right: 0; border-radius: 5px 0 0 5px; }
-  .lg { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+  .verdict { font: 400 20px/1.35 var(--body); margin-bottom: 16px; }
+  .quad4 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .quad4 li, .tiles8 li { display: grid; gap: 6px; justify-items: start; align-content: start; }
+  .quad4 strong, .tiles8 strong { font: 700 28px/1 var(--display); }
+
   .rec { display: grid; gap: 14px; }
   .rec li + li { border-top: 1px solid var(--rule); padding-top: 14px; }
-
-  .srcs { display: grid; gap: 10px; margin-bottom: 22px; }
-  .srcs li { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; }
-  .srcs strong { font: 700 26px/1 var(--display); }
-  .srcs span { font: 600 15px var(--ui); display: grid; }
-  .srcs em { font: 400 12px var(--ui); color: var(--ink-3); }
+  .tblock + .tblock { margin-top: 28px; }
+  .tiles8 { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 760px) { .tiles8 { grid-template-columns: repeat(4, 1fr); } }
+  .tiles8 li { padding: 14px 16px; border-radius: 14px; }
+  .tiles3 { display: grid; gap: 10px; margin-top: 10px; }
+  @media (min-width: 760px) { .tiles3 { grid-template-columns: repeat(3, 1fr); } }
+  .tiles3 li { border-radius: 14px; font-size: 15px; }
+  .rank { display: grid; }
+  .rank li { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--rule); }
+  .rank li:first-child { border-top: 0; }
+  .rank strong { font: 700 20px/1 var(--display); }
+  .rank span { font: 600 15px var(--ui); }
 </style>
