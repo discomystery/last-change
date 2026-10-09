@@ -1,0 +1,73 @@
+---
+// Offensive zone from above, net at the top, drawn from the shooter's point of view (his left on the left).
+// Two layers: areas of the zone shaded by how much of his shooting comes from each, and every unblocked shot.
+// Area rectangles match pipeline/export/players.py `area()`; keep the two in step.
+interface AreaStat { shots: number; goals: number; share: number; avg: number }
+interface Props {
+  id: string;
+  areas: Record<string, AreaStat>;
+  shots?: [number, number, number, number, number][];
+  tip: (key: string, a: AreaStat) => string;
+  label: (a: AreaStat) => string;
+  shade: (a: AreaStat) => number; // 0..1
+}
+const { id, areas, shots = [], tip, label, shade } = Astro.props;
+const sx = (y: number) => 42.5 - y;
+const sy = (x: number) => 100 - x;
+// [x from, x to, y from, y to] in feet; y > 0 is the shooter's left.
+const R: Record<string, [number, number, number, number][]> = {
+  behind: [[89, 100, -22, 22]],
+  cornerL: [[69, 89, 37, 42.5], [89, 100, 22, 42.5]], cornerR: [[69, 89, -42.5, -37], [89, 100, -42.5, -22]],
+  lowSlot: [[69, 89, -9, 9]], crease: [[83, 89, -4, 4]],
+  netSideL: [[69, 89, 9, 22]], netSideR: [[69, 89, -22, -9]],
+  circleL: [[54, 69, 9, 37], [69, 89, 22, 37]], circleR: [[54, 69, -37, -9], [69, 89, -37, -22]],
+  highSlot: [[45, 69, -9, 9]],
+  outerL: [[45, 54, 9, 42.5], [54, 69, 37, 42.5]], outerR: [[45, 54, -42.5, -9], [54, 69, -42.5, -37]],
+  point: [[25, 45, -14, 14]], pointL: [[25, 45, 14, 42.5]], pointR: [[25, 45, -42.5, -14]],
+};
+// Where each area's number sits: the middle of its first rectangle, nudged for the L-shaped ones.
+const at: Record<string, [number, number]> = { cornerL: [95, 33], cornerR: [95, -33], circleL: [63, 24], circleR: [63, -24], outerL: [49, 27], outerR: [49, -27] };
+const centre = (k: string): [number, number] => at[k] ?? [(R[k][0][0] + R[k][0][1]) / 2, (R[k][0][2] + R[k][0][3]) / 2];
+const board = 'M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76';
+---
+<figure class="areamap" id={id}>
+  <svg viewBox="-1 -1 87 78" role="img" aria-label="Where his shots come from">
+    <defs><clipPath id={`${id}-clip`}><path d={`${board} Z`} /></clipPath></defs>
+    <path class="rk-board" d={board} />
+    <g clip-path={`url(#${id}-clip)`} class="am-areas">
+      {Object.entries(R).map(([k, rects]) => (
+        <g class="am-area" data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? { shots: 0, goals: 0, share: 0, avg: 0 })}`}>
+          {rects.map(([x0, x1, y0, y1]) => <rect x={sx(y1)} y={sy(x1)} width={y1 - y0} height={x1 - x0} />)}
+        </g>
+      ))}
+    </g>
+    <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
+    <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
+    <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
+    <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
+    <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
+    <g class="am-labels">
+      {Object.keys(R).map((k) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text x={sx(y)} y={sy(x) + 1.3} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
+    </g>
+    <g class="am-shots">
+      {shots.filter((s) => s[0] >= 25).map(([x, y, xg, goal, cur]) => <circle class:list={['ps', { goal: goal === 1, old: cur === 0 }]} cx={sx(y)} cy={sy(x)} r={0.7 + Math.sqrt(xg / 1000) * 3.6} />)}
+    </g>
+  </svg>
+</figure>
+
+<style is:global>
+  .areamap svg { width: 100%; height: auto; display: block; }
+  .am-area rect { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.5; }
+  .am-area { cursor: help; outline: none; }
+  .am-area:hover rect, .am-area:focus rect { stroke: var(--ink); stroke-width: 0.6; }
+  .am-labels text { font: 600 3.4px var(--ui); fill: var(--ink); text-anchor: middle; pointer-events: none; }
+  .am-labels text.dark { fill: var(--sheet); }
+  .am-shots { display: none; }
+  .areamap.dots .am-shots { display: inline; }
+  .areamap.dots .am-area rect { fill: var(--sheet); stroke: none; }
+  .areamap.dots .am-labels { display: none; }
+  .areamap.dots .am-area { pointer-events: none; }
+  .ps { fill: var(--team, var(--ink)); fill-opacity: 0.32; stroke: none; }
+  .ps.goal { fill: var(--ink); fill-opacity: 0.95; stroke: var(--sheet); stroke-width: 0.3; }
+  html[data-mode='season'] .ps.old { display: none; }
+</style>

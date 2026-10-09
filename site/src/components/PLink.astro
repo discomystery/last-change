@@ -1,0 +1,8 @@
+---
+// A player's name, linked to his page when he has one.
+import { playerHref } from '../lib/playerLinks';
+interface Props { id?: number | null; name: string }
+const { id, name } = Astro.props;
+const href = playerHref(id);
+---
+{href ? <a class="plink" href={href}>{name}</a> : <span>{name}</span>}

@@ -1,0 +1,104 @@
+// Player pages: labels, tooltips, scale ends and plain-language wording for every rating.
+import { clock } from './format';
+
+export type Est = { v: number; pct: number; lo: number; hi: number; ok: boolean; of: number; rank: number; index?: number | null; raw?: number; raw_pct?: number };
+export type EdgeEst = { v: number; pct: number; ok: boolean; of: number; avg: number };
+export type Mode = 'blend' | 'season';
+export type Area = { shots: number; goals: number; share: number; avg: number };
+export type Misses = { n: number; wide: number; high: number; post: number; short: number; other: number; left: number; right: number; crossbar: number } | null;
+export type Unit = { label: string; role?: string | null; both?: boolean; share?: number; mates: { id: number; name: string }[] };
+export type Role = {
+  team_games: number; gp?: number; toi_rank?: number; toi_of?: number; toi?: { toi: number; toi5: number; toi_pp: number; toi_pk: number };
+  line?: { label: string; mates: { id: number; name: string }[]; toi_sec: number; share: number; pct: number | null };
+  pp?: Unit; pk?: Unit; faceoff?: string; notes: string[];
+};
+export type Stats = { gp: number; g: number; a: number; p: number; sog: number; toi: number };
+export type Skater = {
+  id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
+  group: 'F' | 'D'; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
+  traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
+  shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
+};
+
+export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
+export const groupWord = { F: 'forwards', D: 'defensemen' } as const;
+const sign = (v: number, d = 2) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
+
+export type TraitInfo = { label: string; tip: string; lo: string; hi: string; say: (v: number) => string; group: string; raw?: (v: number) => string };
+export const TRAITS: Record<string, TraitInfo> = {
+  shooting: { group: 'Scoring', label: 'Shooting volume', lo: 'Rarely shoots', hi: 'Fires away', say: (v) => `${v.toFixed(1)} shot attempts per 60 at 5-on-5`,
+    tip: 'Shot attempts he takes himself per 60 minutes at 5-on-5, counting shots that are blocked or miss the net.' },
+  chances: { group: 'Scoring', label: 'Creating his own chances', lo: 'Few chances', hi: 'Dangerous', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 at 5-on-5`,
+    tip: 'How dangerous his own shots are, added up: expected goals from shots he takes, per 60 minutes at 5-on-5. Shot volume and shot location both count.' },
+  finishing: { group: 'Scoring', label: 'Finishing', lo: 'Below expected', hi: 'Sniper', say: (v) => `${sign(v, 1)} goals above expected per 100 shots`,
+    tip: 'Goals he scores compared with what an average shooter would score from the same shots, per 100 unblocked shots (empty nets left out). Finishing takes a long time to tell apart from luck, so small samples are pulled hard toward average.' },
+  playmaking: { group: 'Scoring', label: 'Setting up goals', lo: 'Rarely sets up', hi: 'Playmaker', say: (v) => `${v.toFixed(2)} first assists per 60 at 5-on-5`,
+    tip: 'First assists (the last pass before a goal) per 60 minutes at 5-on-5.' },
+  powerPlay: { group: 'Scoring', label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,
+    tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play will rate lower here than their value.' },
+  onOffense: { group: 'With him on the ice', label: 'Team offense with him', lo: 'Quieter with him', hi: 'Livelier with him', say: (v) => `the team creates ${sign(v)} expected goals per 60 with him on the ice, compared with the rest of the time`,
+    tip: 'Expected goals the team creates per 60 at 5-on-5 with him on the ice, minus the same figure with him on the bench. Adjusted for score and home ice. Linemates and coaching affect this too.' },
+  onDefense: { group: 'With him on the ice', label: 'Team defense with him', lo: 'Leakier with him', hi: 'Tighter with him', say: (v) => `the team allows ${sign(v)} expected goals per 60 with him on the ice, compared with the rest of the time`,
+    tip: 'Expected goals the team allows per 60 at 5-on-5 with him on the ice, minus the same figure with him on the bench. Lower is better. Adjusted for score and home ice. Linemates and the opponents he faces affect this too.' },
+  hits: { group: 'Physical and puck', label: 'Hitting', lo: 'Avoids contact', hi: 'Physical', say: (v) => `a hitting score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} hits recorded per 60`,
+    tip: 'Hits per 60 minutes, as an arena-adjusted score (100 is average for his position) because some arenas’ scorers count hits far more generously than others.' },
+  blocks: { group: 'Physical and puck', label: 'Shot blocking', lo: 'Rarely blocks', hi: 'Shot blocker', say: (v) => `a shot-blocking score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} blocked shots recorded per 60`,
+    tip: 'Opponents’ shots he blocks per 60 minutes, as an arena-adjusted score (100 is average for his position).' },
+  takeaways: { group: 'Physical and puck', label: 'Takeaways', lo: 'Rare', hi: 'Puck thief', say: (v) => `a takeaway score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} takeaways recorded per 60`,
+    tip: 'Times he takes the puck off an opponent per 60 minutes, as an arena-adjusted score (100 is average for his position). Scorers vary a lot on this one.' },
+  drawsPenalties: { group: 'Penalties and faceoffs', label: 'Drawing penalties', lo: 'Rarely', hi: 'Draws calls', say: (v) => `${v.toFixed(2)} penalties drawn per 60`,
+    tip: 'Minor and major penalties called on opponents against him, per 60 minutes in all situations.' },
+  discipline: { group: 'Penalties and faceoffs', label: 'Staying out of the box', lo: 'Often penalized', hi: 'Clean', say: (v) => `${v.toFixed(2)} penalties taken per 60`,
+    tip: 'Minor and major penalties he takes per 60 minutes in all situations. Fewer is better. Misconducts and bench minors are left out.' },
+  faceoffs: { group: 'Penalties and faceoffs', label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
+    tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
+};
+export const GROUPS = ['Scoring', 'With him on the ice', 'Physical and puck', 'Penalties and faceoffs'];
+
+export const EDGE: Record<string, TraitInfo> = {
+  topSpeed: { group: 'EDGE', label: 'Top speed', lo: 'Slower', hi: 'Burner', say: (v) => `${v.toFixed(1)} mph at his fastest`, tip: 'His fastest skating speed, measured by the NHL’s puck and player tracking (NHL EDGE).' },
+  bursts: { group: 'EDGE', label: 'Fast bursts', lo: 'Rare', hi: 'Frequent', say: (v) => `${v.toFixed(1)} bursts over 20 mph per 60`, tip: 'How often he gets above 20 mph, per 60 minutes on the ice. Measured by NHL EDGE.' },
+  shotSpeed: { group: 'EDGE', label: 'Hardest shot', lo: 'Softer', hi: 'Cannon', say: (v) => `${v.toFixed(1)} mph on his hardest shot`, tip: 'The speed of his hardest shot, measured by NHL EDGE.' },
+  distance: { group: 'EDGE', label: 'Distance skated', lo: 'Shorter', hi: 'Covers ground', say: (v) => `${v.toFixed(2)} miles skated per 60`, tip: 'How far he skates per 60 minutes on the ice. Measured by NHL EDGE.' },
+  oz: { group: 'EDGE', label: 'Time in the offensive zone', lo: 'Defending', hi: 'Attacking', say: (v) => `${v.toFixed(1)}% of his even-strength time in the offensive zone`,
+    tip: 'Share of his even-strength ice time the puck spends in the offensive zone. Measured by NHL EDGE. His linemates and his usage (who he plays against, where his shifts start) shape this a lot.' },
+};
+
+export const ordinal = (n: number) => {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+export const most = (n: number) => (n === 1 ? 'most' : `${ordinal(n)}-most`);
+
+/** Strengths and weak spots: confident departures from the position average, biggest first. */
+export function standouts(p: Skater, mode: Mode) {
+  const out: { key: string; info: TraitInfo; pct: number; v: number; est?: Est; edge?: boolean }[] = [];
+  for (const [key, info] of Object.entries(TRAITS)) {
+    const e = p.traits[key]?.[mode];
+    if (!e || !e.ok) continue;
+    if ((e.pct >= 75 && e.lo >= 55) || (e.pct <= 25 && e.hi <= 45)) out.push({ key, info, pct: e.pct, v: e.index ?? e.v, est: e });
+  }
+  for (const [key, info] of Object.entries(EDGE)) {
+    const e = p.edge?.[mode]?.[key];
+    if (!e || !e.ok) continue;
+    if (e.pct >= 85 || e.pct <= 15) out.push({ key, info, pct: e.pct, v: e.v, edge: true });
+  }
+  const best = out.filter((x) => x.pct >= 50).sort((a, b) => b.pct - a.pct).slice(0, 4);
+  const worst = out.filter((x) => x.pct < 50).sort((a, b) => a.pct - b.pct).slice(0, 4);
+  return { best, worst };
+}
+
+export const roleTip: Record<string, string> = {
+  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
+  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
+  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
+  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
+  Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
+};
+
+export const toiLine = (t: NonNullable<Role['toi']>) => {
+  const parts = [`${clock(t.toi5)} at 5-on-5`];
+  if (t.toi_pp >= 15) parts.push(`${clock(t.toi_pp)} on the power play`);
+  if (t.toi_pk >= 15) parts.push(`${clock(t.toi_pk)} shorthanded`);
+  return parts;
+};

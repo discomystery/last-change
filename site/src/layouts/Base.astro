@@ -34,6 +34,7 @@ const teamList = teams as { abbr: string; name: string }[];
         <nav class="site-nav" aria-label="Site">
           <a href={base}>Home</a>
           <a id="my-team-link" href={base} data-base={base} hidden>My team</a>
+          <a href={`${base}players/`}>Players</a>
           <a href={`${base}check/`}>Real lines</a>
           <a href={`${base}xg-check/`}>Chance check</a>
           <a href={`${base}methods/`}>Methods</a>
@@ -182,7 +183,8 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
   .site-head { padding-block: 18px 6px; display: grid; gap: 14px; }
   .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
-  .site-nav { margin-left: auto; display: flex; gap: 18px; font: 600 14px var(--ui); }
+  .site-nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 18px; font: 600 14px var(--ui); }
+  .site-nav a { white-space: nowrap; }
   .site-nav a { text-decoration: none; }
   .site-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
   .prefs { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; padding: 10px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; font: 400 13px var(--ui); color: var(--ink-2); }

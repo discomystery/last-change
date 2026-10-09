@@ -1,0 +1,42 @@
+---
+// Every player who has dressed this season, by team.
+import Base from '../layouts/Base.astro';
+import teams from '../../public/data/teams.json';
+import index from '../../public/data/players/index.json';
+import '../styles/blocks.css';
+
+type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
+const base = import.meta.env.BASE_URL;
+const groups: [string, string[]][] = [['Forwards', ['C', 'L', 'R']], ['Defensemen', ['D']], ['Goalies', ['G']]];
+const byTeam = teams.map((t) => ({ t, players: (index as P[]).filter((p) => p.team === t.abbr) })).filter((x) => x.players.length);
+---
+<Base title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
+  <header class="team-top"><h1>Players</h1></header>
+  <p class="takeaway">Everyone who has dressed this season, by team. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
+  <nav class="jump" aria-label="Teams">{byTeam.map(({ t }) => <a href={`#${t.abbr}`}>{t.abbr}</a>)}</nav>
+  <div class="roster-grid">
+    {byTeam.map(({ t, players }) => (
+      <section class="card roster" id={t.abbr}>
+        <h2><a href={`${base}team/${t.abbr}/`}>{t.name}</a></h2>
+        {groups.map(([label, pos]) => {
+          const list = players.filter((p) => pos.includes(p.pos)).sort((a, b) => a.last.localeCompare(b.last));
+          return list.length > 0 && (
+            <>
+              <p class="mini-h">{label}</p>
+              <ul>{list.map((p) => <li><a class="plink" href={`${base}player/${p.id}/`}>{p.name}</a>{p.number !== null && <span class="n"> #{p.number}</span>}</li>)}</ul>
+            </>
+          );
+        })}
+      </section>
+    ))}
+  </div>
+</Base>
+
+<style>
+  .roster-grid { display: grid; gap: 14px; margin-top: 24px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .roster { scroll-margin-top: 24px; }
+  .roster h2 { font: 700 22px/1.15 var(--display); margin-bottom: 12px; }
+  .roster h2 a { text-decoration: none; }
+  .roster .mini-h { margin-top: 12px; }
+  .roster ul { display: grid; gap: 6px; font: 400 15px var(--ui); }
+</style>

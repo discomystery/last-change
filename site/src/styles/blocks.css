@@ -2,6 +2,7 @@
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
   .team-top h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; }
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
+  .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
   .next { margin-top: 18px; }

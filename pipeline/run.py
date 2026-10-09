@@ -33,8 +33,8 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import moneypuck, nhl
-    from pipeline.metrics import team_game, units, xg_model
+    from pipeline.ingest import edge, moneypuck, nhl
+    from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
     moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
@@ -44,6 +44,8 @@ def update(season: int) -> dict:
     team_game.build(season)
     units.game_units(season)
     units.depth_table(season)
+    player_game.build(season)
+    out["edge"] = edge.update(season)  # tracking numbers for players who played since the last fetch
     out["export"] = site_json.run(season)
     return out
 

@@ -3,7 +3,8 @@
 // With `long`, wide screens get a taller drawing that carries on through the neutral zone to centre ice.
 interface Props { team: string; shots: { x: number; y: number; xg: number; p?: number; who?: string }[]; title: string; long?: boolean }
 const { team, shots, title, long = false } = Astro.props;
-const sx = (y: number) => y + 42.5;
+// The drawing is from the shooter's point of view: positive y (his left, per the NHL's coordinates) is drawn on the left.
+const sx = (y: number) => 42.5 - y;
 const sy = (x: number) => 100 - x;
 const versions = long ? [{ h: 76, cls: 'zone' }, { h: 119, cls: 'full' }] : [{ h: 76, cls: '' }];
 const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;

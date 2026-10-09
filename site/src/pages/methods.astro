@@ -74,6 +74,15 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
     </div>
   </Section>
 
+  <Section id="players" title="Player ratings" placeholder={false} takeaway="Each player is compared with others at his position: forwards with forwards, defensemen with defensemen.">
+    <div class="card explain">
+      <p>Every rating is a rate: shot attempts, expected goals, assists, hits and so on per 60 minutes, mostly at 5-on-5. A player who has played a few games is pulled toward the average for his position, and how hard depends on how quickly that rating settles. Shot volume and hitting settle within a few games; finishing and power-play scoring take seasons, so they barely move early on. We measured this by splitting three past seasons into odd and even games and checking how well one half predicts the other.</p>
+      <p>“This season and last” also leans on the player’s own previous season. The likely range is the middle 80% of results when his games are reshuffled at random. A player is only listed as better or worse than most when even the cautious end of that range is clearly away from average. Percentiles compare him with regulars at his position: at least 20 games over the two seasons, or 3 this season.</p>
+      <p>“Team offense with him” and “Team defense with him” compare the team’s expected goals per 60 at 5-on-5 with him on the ice against the rest of the game, adjusted for score and home ice. They say how the team does with him out there, which his linemates, his coach and his opponents also shape.</p>
+      <p>Skating speed, bursts, shot speed, distance and offensive-zone time come from NHL EDGE, the league’s own puck and player tracking. They are measurements rather than estimates, so they carry no likely range, and we rank them against the same position groups ourselves.</p>
+    </div>
+  </Section>
+
   <Section id="per60" title="What “per 60” means" placeholder={false} takeaway="Most rates on the site are per 60 minutes of ice time.">
     <div class="card explain">
       <p>A top line plays far more than a fourth line, and a team with a lot of power plays gets far more power-play shots than one with few. To compare them fairly, almost every rate on the site is scaled to 60 minutes of ice time in that situation: “2.9 expected goals per 60” means what the group would produce in a full hour at its current pace. Ice time itself is written as minutes and seconds, like 9:15.</p>
@@ -84,6 +93,7 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
     <ul class="limits">
       <li><strong>Passes before a shot</strong> aren’t in public data, so expected-goal numbers can’t see a cross-ice feed. Goalies behind teams that allow those look worse than they are.</li>
       <li><strong>Rush chances</strong> can’t be picked out from the league’s public game data, which records too little between the blue lines. Shots flagged by the usual timing rule (within four seconds of an event outside the attacking zone) actually score less often than ordinary shots, so the site shows no rush numbers. Real rush counts come from people or cameras tracking zone entries.</li>
+      <li><strong>Where in the net</strong> a goal or save went (glove side, blocker, five-hole) isn’t recorded in any public NHL data. Missed shots do say how they missed (wide left, wide right, over the net, off the post), and player pages show that.</li>
       <li><strong>Defender positions</strong> aren’t tracked publicly, so “breakdowns” are inferred from dangerous chances within five seconds of a team losing the puck.</li>
     </ul>
   </Section>
