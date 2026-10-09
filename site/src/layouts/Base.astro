@@ -239,11 +239,11 @@ const teamList = teams as { abbr: string; name: string }[];
 
   /* The obvious fold: a full-width bar that opens and closes a longer set. */
   .fold { margin-top: 18px; }
-  .fold > summary { list-style: none; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 14px 18px; border: 2px solid var(--ink); border-radius: 999px; background: var(--sheet); font: 700 15px var(--ui); color: var(--ink); }
+  .fold > summary { list-style: none; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; background: var(--track); font: 500 15px var(--ui); color: var(--ink); }
   .fold > summary::-webkit-details-marker { display: none; }
-  .fold > summary::after { content: '+'; font: 700 22px/0.8 var(--ui); }
+  .fold > summary::after { content: '+'; }
   .fold[open] > summary::after { content: '–'; }
-  .fold > summary:hover { background: var(--ink); color: var(--sheet); }
+  .fold > summary:hover { background: var(--rule); }
   .fold .opened, .fold[open] .closed { display: none; }
   .fold[open] .opened { display: inline; }
   .fold[open] > summary { margin-bottom: 18px; }
