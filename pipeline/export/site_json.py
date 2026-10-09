@@ -88,3 +88,46 @@ def export_fingerprints(season: int) -> int:
                "stabilization": {d: out["stabilization"][d] for d in READY}, "teams": teams}
     (SITE_DATA / "fingerprints.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(teams)
+
+
+def export_xg_check(season: int) -> int:
+    """For each team's most recent game: every goal and the best chances, with our rating beside MoneyPuck's."""
+    import pickle
+
+    from pipeline.metrics import xg_model
+
+    bundle = pickle.loads(xg_model.MODEL_PATH.read_bytes())
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").sort("game_id")
+    feats = pl.read_parquet(d / "shot_features.parquet").filter(pl.col("type") != "blocked-shot")
+    feats = feats.with_columns(ours=pl.Series(xg_model.predict(bundle, feats)))
+    events = pl.read_parquet(d / "events.parquet").select("game_id", "event_id", "p1", "period")
+    mp = pl.read_parquet(d / "shots_xg.parquet").select("game_id", "event_id", pl.col("xGoal").alias("mp"))
+    players = pl.read_parquet(d / "players.parquet")
+    shots = feats.join(events, on=["game_id", "event_id"]).join(mp, on=["game_id", "event_id"], how="left")
+    built = set(shots["game_id"].unique().to_list())
+    latest = {}
+    for g in games.filter(pl.col("game_id").is_in(list(built))).iter_rows(named=True):
+        latest[g["home"]] = latest[g["away"]] = g
+    before = {"none": "after a whistle", "shot-on-goal": "after a save", "missed-shot": "after a missed shot", "blocked-shot": "after a blocked shot",
+              "goal": "after a goal", "hit": "after a hit", "giveaway": "after a giveaway", "takeaway": "after a takeaway", "faceoff": "off a faceoff",
+              "penalty": "after a penalty", "delayed-penalty": "on a delayed penalty"}
+    out = []
+    for gid in sorted({g["game_id"] for g in latest.values()}):
+        g = games.filter(pl.col("game_id") == gid).to_dicts()[0]
+        name = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in players.filter(pl.col("game_id") == gid).iter_rows(named=True)}
+        s = shots.filter(pl.col("game_id") == gid)
+        chances = s.filter(~pl.col("goal")).sort("ours", descending=True).head(8)
+        rows = []
+        for r in pl.concat([s.filter(pl.col("goal")), chances]).sort("sec").iter_rows(named=True):
+            clock = r["sec"] - (r["period"] - 1) * 1200
+            strength = "empty net" if r["empty_net"] else f'{r["own_skaters"]}-on-{r["opp_skaters"]}'
+            rows.append({"goal": r["goal"], "team": g["home"] if r["is_home"] else g["away"], "who": name.get(r["p1"], "Unknown"),
+                         "when": f'P{r["period"]} {clock // 60}:{clock % 60:02d}', "shot": (r["shot_type"] or "shot").replace("-", " "), "feet": round(r["dist"]),
+                         "strength": strength, "before": f'{round(r["prev_gap"])}s {before.get(r["prev_type"], "after play")}' if r["prev_type"] != "none" else "after a whistle",
+                         "ours": round(r["ours"], 3), "mp": None if r["mp"] is None else round(r["mp"], 3)})
+        tot = {side: {"ours": round(s.filter(pl.col("is_home") == (side == "home"))["ours"].sum(), 2),
+                      "mp": round(s.filter(pl.col("is_home") == (side == "home"))["mp"].sum() or 0.0, 2)} for side in ("home", "away")}
+        out.append({"id": gid, "date": g["date"], "home": g["home"], "away": g["away"], "hs": g["home_score"], "as": g["away_score"], "totals": tot, "shots": rows})
+    (SITE_DATA / "xg_check.json").write_text(json.dumps({"games": out}, separators=(",", ":")))
+    return len(out)
