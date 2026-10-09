@@ -31,7 +31,7 @@ const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].r
   .side.is-home { text-align: right; align-items: flex-end; }
   .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
   .is-home .abbr { flex-direction: row-reverse; }
-  .score { color: var(--ink); font-weight: 600; }
+  .score { color: var(--ink); font: 600 1em/0.9 var(--display); font-variation-settings: 'SOFT' 100; letter-spacing: -0.02em; }
   @media (max-width: 620px) {
     .abbr:has(.score) { flex-direction: column; align-items: inherit; gap: 6px; }
     .is-home .abbr:has(.score) { flex-direction: column; align-items: flex-end; }
