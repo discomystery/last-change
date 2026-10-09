@@ -151,6 +151,34 @@ def export_lines(season: int) -> int:
     before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum())
     usage = now.join(before, on="player_id", how="left", suffix="_last")
     words = {"pk": ("killing penalties", "shorthanded"), "pp": ("playing on the power play", "power-play")}
+    from pipeline.metrics import patterns
+
+    missing = patterns.absences(season, datetime.now(timezone.utc).date().isoformat())
+    f_rank = lambda r: None if r is None else ("first-line", "second-line", "third-line", "fourth-line")[min(3, (r - 1) // 3)]
+    d_rank = lambda r: None if r is None else ("top-pair", "second-pair", "third-pair")[min(2, (r - 1) // 2)]
+
+    def absence_text(n: dict, team_rank: dict) -> str | None:
+        """One short paragraph: who is out, who is in his spot, what it did to the line, and who covers the cover."""
+        who, kind = names.get(n["player"], "?"), n["kind"]
+        if "fill_in" not in n or n["fill_games"] < 2 or n["now_min"] < 4:
+            return None  # need a real, repeated replacement to say anything
+        sub = names.get(n["fill_in"], "?")
+        mates = " and ".join(names.get(x, "?") for x in n["partners"])
+        gone = "has not played this season" if n["missed"] == n["of"] else f'has missed {n["missed"]} of {n["of"]} games'
+        tier = (f_rank if kind == "F" else d_rank)(n.get("fill_rank"))
+        own = (f_rank if kind == "F" else d_rank)(team_rank.get(n["player"]))
+        text = f"{who} {gone}. {sub} is in his usual spot beside {mates}"
+        if tier and own and tier != own and (n.get("fill_rank") or 0) > (team_rank.get(n["player"]) or 0):
+            text += f", up from {tier} minutes last season"
+        text += "."
+        diff = n["now_min"] - n["old_min"]
+        if abs(diff) >= 1.0:
+            group = "line" if kind == "F" else "pair"
+            text += f' That {group} is getting {n["now_min"]} minutes a game at 5-on-5, {"down" if diff < 0 else "up"} from {n["old_min"]} with {who.split(" ", 1)[-1]}.'
+        if "chain" in n:
+            old = " and ".join(names.get(x, "?") for x in n["fill_old_partners"])
+            text += f' {names.get(n["chain"], "?")} has moved into {sub.split(" ", 1)[-1]}\u2019s old spot beside {old}.'
+        return text
     out = {}
     for tid, e in usual.items():
         place = abbr[tid]
@@ -165,6 +193,13 @@ def export_lines(season: int) -> int:
                 elif old >= stopped and cur < 0.05:
                     notes.append({"player": names[r["player_id"]], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
                                   "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% last season.'})
+        for n in missing.get(tid, []):
+            rk = n.get("rank")
+            if rk is None or rk > (9 if n["kind"] == "F" else 4):
+                continue  # only regulars who mattered: top nine forwards, top four defensemen
+            text = absence_text(n, {n["player"]: rk})
+            if text:
+                notes.insert(0, {"player": names.get(n["player"], "?"), "kind": "absence", "change": "out", "now": 100, "before": 0, "games": n["of"], "text": text, "order": rk})
         g = info[e["last_game"]]
         usual_sets = {u["label"]: u["unit"] for u in e["units"]}
         last_sets = {u["unit"] for u in e["last"]}
@@ -176,7 +211,7 @@ def export_lines(season: int) -> int:
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
-            "notes": sorted(notes, key=lambda n: -abs(n["now"] - n["before"])),
+            "notes": sorted(notes, key=lambda n: (n["kind"] != "absence", n.get("order", 0), -abs(n["now"] - n["before"]))),
         }
     for tid, m in units.matchups(season, usual).items():
         if abbr[tid] in out:
