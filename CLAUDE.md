@@ -1,6 +1,6 @@
 # Hockey Matchup Analysis Site
 
-Fan-facing site that explains how NHL teams differ in style and strategy and previews upcoming matchups. Default home team is the Carolina Hurricanes (CAR); every metric must work for all 32 teams.
+Fan-facing site that explains how NHL teams differ in style and strategy and previews upcoming matchups. The site is for fans of any team: every metric and page must work for all 32 teams, and nothing in the product is Hurricanes-specific.
 
 **Full spec: [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).** Read the relevant section before building any metric, page, or pipeline step. This file holds only the durable rules.
 
@@ -8,7 +8,7 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 
 - The user does not code and will not. Do all engineering. Never ask them to write, read, or run code or terminal commands.
 - The user is the product owner and hockey expert (Hurricanes fan). Ask them hockey and product questions. Make technical decisions yourself and explain each in one plain-English sentence.
-- Their eye test is part of validation. When a number contradicts what they see, check the data for a bug first, then report honestly. Their beliefs (H1-H6, brief Section 1) are hypotheses. Never tune a model to agree with them.
+- Their eye test is part of validation. When a number contradicts what they see, check the data for a bug first, then report honestly. Their beliefs (H1-H6, brief Section 1) are hypotheses. Never tune a model to agree with them. Those beliefs are private: use them only as checks in conversation and never publish them, or anything framed as testing them, on the site.
 - Show, don't describe: deliver a deployed page (a URL), not code or diffs. Keep updates short and non-technical.
 - Things only they can do (account settings, approvals) need click-by-click instructions, one step at a time.
 - End of each phase: deploy, send the URL with a 3-5 line plain-English summary, ask at most one or two hockey or product questions.
@@ -70,6 +70,19 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 - Arena-scorer adjustment needs a real explainer: what it is, the exact calculation, and a table of all 32 arenas with their factors per event type.
 - Season switch: every metric is exported twice (blended with prior seasons, and current season only) and the site toggles between them client-side. Blended is the default.
 - Post-game page compares the preview with what happened. Each "What to watch" insight must be stored as a structured, checkable claim (metric, team, baseline, direction, threshold) in a preview snapshot frozen at puck drop; the recap grades each claim by rule (held up / partly / didn't happen) and never rewrites the preview. Keep a season-long tally of how often claims hold. This moves the recap's preview-vs-result part into Phase 3; player report cards stay in Phase 4.
+
+## Agreed scope and site map (2026-10-09)
+
+- Home: the visitor's team's next game, upcoming previews, latest post-game pages, the league slate.
+- Preview (one per game, every matchup): the FULL preview with all sections (short version, complete fingerprints, lines and matchups, special teams, goalies, how they win, key players, data notes). Do not slim it; solve density with layout.
+- Post-game (one per game): graded preview calls, surprises, "did he do his job", goalies.
+- Team (all 32): fingerprint, usual lines and deployment home/road, special teams, goalies, goal sources, what's true when they win, schedule.
+- Player and goalie pages; League page (all 32 on every scale, league goalie chart); Track record (how often calls hold); Methods (glossary, arena-scorer table, sources and blind spots).
+- Every page: season switch, home-team picker, arena-adjusted/raw switch, credits footer.
+- Home-team picker: any visitor chooses their team; the choice is remembered in the browser (localStorage) and drives the home page and defaults. No team is assumed for a new visitor.
+- Arena-adjusted stats (hits, giveaways, takeaways, blocks and anything built on them) are shown as a SCORE (an index against league average), never as an adjusted count, so the site never appears to report events that were not recorded. A site-wide switch shows raw recorded numbers instead; arena-adjusted is the default.
+- Build order: launch with home, preview, post-game (calls and goalies), team, methods and the switches, verified on Hurricanes games first, then all teams. Second wave: player/goalie pages, league, track record, report cards, win conditions. Optional later: EDGE, AllThreeZones, in-house xG.
+- Out of scope: live in-game updates, win predictions or odds, accounts, comments, logos, anything commercial.
 
 ## Phases
 
