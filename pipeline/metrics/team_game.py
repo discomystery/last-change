@@ -17,6 +17,7 @@ TURNOVER_WINDOW = 5  # seconds from a turnover to a shot for it to count as off-
 RUSH_WINDOW = 4  # seconds from an event outside the offensive zone to a shot for it to count as a rush shot
 POINT_DISTANCE = 50  # feet
 BREAKDOWN_XG = 0.15  # a rush or off-turnover shot at least this dangerous counts as a breakdown chance
+FACEOFF_WINDOW = 5  # seconds from an offensive-zone faceoff win to a goal for it to count as off the draw
 COUNTS = ["cf", "ff", "sf", "gf", "xgf", "rush_xgf", "reb_xgf", "to_xgf", "point_cf", "hits", "gives", "takes", "blocks"]
 
 
@@ -54,16 +55,20 @@ def build(season: int) -> dict:
             key = (gid, ids[gid][0 if home else 1], home, strength(own, opp, hg if home else ag, ag if home else hg), _state(diff if home else -diff))
             rows[key]["sec"] += s["duration"]
 
+    goal_rows = []  # one row per goal, tagged with how it came about (goal sources)
     last_turnover: dict[bool, int] = {}
+    last_faceoff = None  # (second, won by home team) of the last offensive-zone faceoff win since play stopped
     prev = None  # (second, was a home-team event, x toward that team's attacking end) of the last live-play event
     current = None
     for e in events.iter_rows(named=True):
         gid = e["game_id"]
         if gid != current:
-            current, last_turnover, prev = gid, {}, None
+            current, last_turnover, prev, last_faceoff = gid, {}, None, None
         typ, home = e["type"], e["is_home"]
         if typ in ("stoppage", "faceoff", "period-start", "period-end"):
-            last_turnover, prev = {}, None
+            last_turnover, prev, last_faceoff = {}, None, None
+            if typ == "faceoff" and home is not None and (e["x_norm"] or 0) > 25:
+                last_faceoff = (e["sec"], home)
             continue
         if home is None or gid not in ids:
             continue
@@ -110,6 +115,14 @@ def build(season: int) -> dict:
                     bump(side, "s" + sfx)
                 if typ == "goal":
                     bump(side, "g" + sfx)
+            if typ == "goal":
+                goal_rows.append({
+                    "game_id": gid, "event_id": e["event_id"], "team_id": ids[gid][0 if home else 1], "is_home": home,
+                    "strength": strength(nh if home else na, na if home else nh, hg if home else ag, ag if home else hg),
+                    "rebound": bool(e["shotRebound"]), "rush": rush, "off_turnover": off_turnover,
+                    "off_faceoff": last_faceoff is not None and last_faceoff[1] == home and e["sec"] - last_faceoff[0] <= FACEOFF_WINDOW,
+                    "xg": xg,
+                })
             if typ == "blocked-shot":
                 bump(not home, "blocks")
         if e["x_norm"] is not None:
@@ -135,6 +148,7 @@ def build(season: int) -> dict:
         [{"game_id": k[0], "team_id": k[1], "is_home": k[2], "strength": k[3], "score_state": k[4], **{c: float(v.get(c, 0.0)) for c in cols}} for k, v in rows.items()]
     )
     table.write_parquet(d / "team_game.parquet")
+    pl.DataFrame(goal_rows).write_parquet(d / "goals.parquet")
 
     # Discipline: count each stretch a team spends shorthanded (from who is actually on the ice), not penalty calls,
     # so offsetting minors and misconducts that change nothing are ignored.

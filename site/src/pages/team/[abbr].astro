@@ -7,6 +7,7 @@ import schedule from '../../../public/data/schedule.json';
 import lines from '../../../public/data/last_game_lines.json';
 import fpData from '../../../public/data/fingerprints.json';
 import goalieData from '../../../public/data/goalies.json';
+import howData from '../../../public/data/how_they_win.json';
 import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import linesData from '../../../public/data/lines.json';
@@ -71,7 +72,49 @@ const gModes = [['blend', 'this season and last'], ['season', 'this season']] as
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['more', 'Still to come']];
+// Where the goals come from, and the team's record when the things that go with winning happen.
+type Src = { n: number; share: number | null; est: number; lo: number; hi: number; band: (number | null)[] };
+type SrcSide = { goals: number; sources: Record<string, Src> };
+type Split = { yes: [number, number]; no: [number, number] };
+type HowTeam = { sources: Record<'blend' | 'season', Record<'for' | 'against', SrcSide>> | null; wins: Record<'blend' | 'season', { games: number; wins: number; splits: Record<string, Split> }> | null };
+const how = (howData.teams as unknown as Record<string, HowTeam>)[abbr!];
+const lgSrc = howData.league_sources as Record<string, number>;
+const lgWin = howData.league_wins as unknown as Record<string, Split>;
+const srcPhrase: Record<string, string> = { other: 'everyday even-strength play', pp: 'the power play', rebound: 'rebounds', en: 'empty nets', turnover: 'turnovers', ea: 'play with the goalie pulled', sh: 'shorthanded play', faceoff: 'faceoff wins' };
+const srcInfo: [string, string, string][] = [
+  ['other', 'Everyday even-strength play', 'Even-strength goals that were not a rebound and did not come within five seconds of a turnover or an offensive-zone faceoff win. Rush goals land here too: the league’s game data records too little between the blue lines to pick them out.'],
+  ['pp', 'Power play', 'Goals scored with more skaters on the ice than the opponent.'],
+  ['rebound', 'Rebound', 'Goals scored within three seconds of a teammate’s shot on goal.'],
+  ['en', 'Empty net', 'Goals into a net with no goalie in it.'],
+  ['turnover', 'Off a turnover', 'Even-strength goals within five seconds of winning the puck (a takeaway, or the opponent’s giveaway) with no stoppage in between.'],
+  ['ea', 'Goalie pulled', 'Goals scored with their own goalie off for an extra skater.'],
+  ['sh', 'Shorthanded', 'Goals scored with fewer skaters on the ice than the opponent.'],
+  ['faceoff', 'Off a faceoff win', 'Even-strength goals within five seconds of winning a faceoff in the offensive zone.'],
+];
+const srcSides = [['for', `${team.place}’s goals`], ['against', `goals against ${team.place}`]] as const;
+const srcMax = (key: string, mode: 'blend' | 'season') => {
+  const vals = (['for', 'against'] as const).flatMap((side) => { const x = how.sources?.[mode]?.[side]?.sources[key]; return x ? [x.share ?? 0, x.band[1] ?? 0] : []; });
+  return Math.max(lgSrc[key] * 2, ...vals) * 1.08;
+};
+const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
+  if (!side) return '';
+  const out = srcInfo.filter(([k]) => { const x = side.sources[k]; return x.share !== null && x.band[0] !== null && (x.share < x.band[0]! || x.share > x.band[1]!); });
+  const whose = which === 'for' ? `${team.place}’s goals` : `the goals ${team.place} allows`;
+  if (!out.length) return `Every row of ${whose} is within luck’s reach of the league average.`;
+  const more = out.filter(([k]) => side.sources[k].share! > side.sources[k].band[1]!).map(([k]) => srcPhrase[k]);
+  const fewer = out.filter(([k]) => side.sources[k].share! < side.sources[k].band[0]!).map(([k]) => srcPhrase[k]);
+  const list = (a: string[]) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0]);
+  return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
+};
+const winInfo: [string, string, string][] = [
+  ['goalie', 'Goaltending at or above expected', 'Their goalies allowed no more goals than expected from the shots they faced (empty-net time left out).'],
+  ['first', 'Scored first', 'They scored the game’s first goal.'],
+  ['chances', 'Had the better 5-on-5 chances', 'They created at least as many expected goals as they allowed at 5-on-5, adjusted for score and venue.'],
+  ['attempts', 'Out-attempted them at 5-on-5', 'They took at least as many shot attempts as they allowed at 5-on-5, adjusted for score and venue.'],
+  ['pp', 'Drew three or more power plays', 'The opponent was shorthanded at least three separate times.'],
+];
+const pctOf = (x: [number, number]) => (x[0] ? Math.round((100 * x[1]) / x[0]) : null);
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['wins', 'When they win']];
 const _ = ordinal;
 ---
 <Base title={team.name} mock={false}>
@@ -316,11 +359,98 @@ const _ = ordinal;
     )}
   </Section>
 
-  <Section id="more" title="Still to come on this page" placeholder={false}>
-    <ul class="todo">
-      <li><strong>Where the goals come from:</strong> rush, rebounds, power play, turnovers and zone time, for and against.</li>
-      <li><strong>What tends to be true when they win.</strong></li>
-    </ul>
+  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway={`How ${team.place}’s goals are scored and allowed, against the league average, and how much of any difference luck alone could explain.`}>
+    {how?.sources && (
+      <>
+        <div class="pick"><span>Show</span>
+          <select id="src-side" aria-label="Whose goals">{srcSides.map(([k, label]) => <option value={k}>{label}</option>)}</select>
+        </div>
+        <div class="key t-one">
+          <span><i></i>{team.place}</span>
+          <span class="avg">League average</span>
+          <span class="luck">Where luck alone could put an average team</span>
+        </div>
+        {srcSides.map(([side], si) => (
+          <div data-src={side} hidden={si !== 0}>
+            {gModes.map(([mode, words]) => {
+              const x = how.sources![mode]?.[side];
+              if (!x) return <div class={`gmode m-${mode}`}><p class="note">No goals yet {words}.</p></div>;
+              const thin = x.goals < 40;
+              return (
+                <div class={`gmode m-${mode}`}>
+                  <p class="src-say">{srcSay(x, side)}</p>
+                  <div class:list={['card', { thin }]}>
+                    <ul class="srows t-one">
+                      {srcInfo.map(([k, label, tip]) => {
+                        const r = x.sources[k], max = srcMax(k, mode), at = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
+                        const band = r.band[0] !== null ? `left:${at(r.band[0]!)};width:calc(${at(r.band[1]!)} - ${at(r.band[0]!)})` : '';
+                        return (
+                          <li>
+                            <span class="term srow-name" tabindex="0" data-tip={tip}>{label}</span>
+                            <span class="sline" tabindex="0" data-tip={`${r.share}% of ${side === 'for' ? `${team.place}’s goals` : `goals against ${team.place}`} (${r.n} of ${x.goals}) ${words}. League average: ${lgSrc[k]}%. With ${x.goals} goals, luck alone would put a league-average team between ${r.band[0]}% and ${r.band[1]}%. Our best estimate of their true rate: ${r.est}%.`}>
+                              {band && <span class="sband" style={band}></span>}
+                              <span class="slg" style={`left:${at(lgSrc[k])}`}></span>
+                              <span class="sdot" style={`left:${at(r.share ?? 0)}`}></span>
+                            </span>
+                            <span class="snums"><strong>{r.share}%</strong><span class="n">{r.n} of {x.goals}</span></span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  <p class="note">{x.goals} goals {words}{thin ? ', too few to say much: most of any gap from the league is luck' : ''}. Each row has its own scale, so a small source is not squeezed against the left edge.</p>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        <p class="note">Every goal counts once, in the first of these that applies: empty net, power play, shorthanded, goalie pulled, then rebound, turnover, faceoff win, and everyday play. Teams’ goal mixes differ far less than a single season suggests: over three seasons, most of the gap between one team and another in these rows was luck.</p>
+      </>
+    )}
+  </Section>
+
+  <Section id="wins" title="What tends to be true when they win" placeholder={false} takeaway={`How often ${team.place} wins when each of these happens, and when it doesn’t, beside the league’s record.`}>
+    {how?.wins && (
+      <>
+        <div class="key">
+          <span><span class="wdot yes"></span>Win rate when it happened</span>
+          <span><span class="wdot no"></span>When it didn’t</span>
+          <span><span class="ldot yes"></span><span class="ldot no"></span>The league’s rates, for comparison</span>
+        </div>
+        {gModes.map(([mode, words]) => {
+          const w = how.wins![mode];
+          if (!w) return <div class={`gmode m-${mode}`}><p class="note">No games yet {words}.</p></div>;
+          return (
+            <div class={`gmode m-${mode}`}>
+              <div class:list={['card', { thin: w.games < 20 }]}>
+                <ul class="srows wrows t-one">
+                  {winInfo.map(([k, label, tip]) => {
+                    const sp = w.splits[k], lg = lgWin[k];
+                    const yes = pctOf(sp.yes), no = pctOf(sp.no), lyes = pctOf(lg.yes)!, lno = pctOf(lg.no)!;
+                    const lo = Math.min(yes ?? no ?? 0, no ?? yes ?? 0), hi = Math.max(yes ?? 0, no ?? 0);
+                    return (
+                      <li>
+                        <span class="srow-name"><span class="term" tabindex="0" data-tip={tip}>{label}</span><span class="n">In {sp.yes[0]} of {w.games} games {words}</span></span>
+                        <span class="sline" tabindex="0" data-tip={`${team.place} ${words}: won ${yes ?? '–'}% when it happened (${sp.yes[1]} of ${sp.yes[0]}), ${no ?? '–'}% when it didn’t (${sp.no[1]} of ${sp.no[0]}). League over three seasons: ${lyes}% and ${lno}%.`}>
+                          {yes !== null && no !== null && <span class="sspan" style={`left:${lo}%;width:${hi - lo}%`}></span>}
+                          <span class="ldot yes" style={`left:${lyes}%`}></span>
+                          <span class="ldot no" style={`left:${lno}%`}></span>
+                          {no !== null && <span class="wdot no" style={`left:${no}%`}></span>}
+                          {yes !== null && <span class="wdot yes" style={`left:${yes}%`}></span>}
+                        </span>
+                        <span class="snums wnums"><span><span class="wdot yes"></span><strong>{yes ?? '–'}%</strong></span><span><span class="wdot no"></span>{no ?? '–'}%</span></span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <p class="note">{w.wins} wins in {w.games} regular-season games {words}; overtime and shootout wins count as wins. The line runs from 0% to 100% of games won.{w.games < 20 ? ' Too few games yet to read much into these.' : ''}</p>
+            </div>
+          );
+        })}
+        <p class="note">These five go with winning across the whole league (over 7,870 team-games, teams win {pctOf(lgWin.first.yes)}% when they score first and {pctOf(lgWin.first.no)}% when they don’t), except power plays: drawing three or more goes with winning no more often than drawing fewer. Teams’ own splits differ from the league’s about as much as luck alone would produce over a season or two, so read these as {team.place}’s record, not as their formula. They describe what has gone along with winning, not what causes it.</p>
+      </>
+    )}
   </Section>
 
   <script type="application/json" id="team-games" set:html={JSON.stringify(games)}></script>
@@ -465,6 +595,34 @@ const _ = ordinal;
   .roles-list { margin-top: 8px; display: grid; gap: 6px; }
   .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
   .t-one { --team: var(--ink); }
+  .srows li { display: grid; grid-template-columns: minmax(150px, 230px) 1fr minmax(96px, auto); align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid var(--rule); }
+  .srows li:first-child { border-top: 0; }
+  .srow-name { font: 600 14px var(--ui); justify-self: start; display: grid; gap: 2px; }
+  .srow-name .n { font-weight: 400; }
+  .sline { position: relative; height: 14px; margin-inline: 7px; outline-offset: 4px; }
+  .sline::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .sband { position: absolute; top: 2px; height: 10px; border-radius: 5px; background: color-mix(in oklab, var(--ink) 13%, var(--sheet)); }
+  .slg { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; }
+  .sspan { position: absolute; top: 5px; height: 4px; background: var(--ink-3); }
+  .sdot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
+  .snums { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 8px; font: 400 13px var(--ui); white-space: nowrap; }
+  .snums strong { font-weight: 600; font-size: 15px; }
+  .wnums { gap: 14px; align-items: center; }
+  .wnums > span { display: inline-flex; align-items: center; gap: 5px; min-width: 52px; }
+  .wdot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; }
+  .wdot.yes { background: var(--ink); }
+  .wdot.no { background: var(--sheet); border: 2px solid var(--ink); }
+  .sline .wdot { position: absolute; top: 1px; margin-left: -6px; box-shadow: 0 0 0 2px var(--sheet); }
+  .sline .wdot.yes { z-index: 1; }
+  .key .luck::before { content: ''; width: 26px; height: 10px; border-radius: 5px; background: color-mix(in oklab, var(--ink) 13%, var(--sheet)); display: inline-block; }
+  .key .wdot { margin: 0; }
+  .ldot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; background: var(--ink-3); }
+  .ldot.no { background: var(--sheet); border: 1.5px solid var(--ink-3); }
+  .key .ldot + .ldot { margin-left: -2px; }
+  .sline .ldot { position: absolute; top: 3px; margin-left: -4px; }
+  .src-say { font: 400 18px/1.45 var(--body); margin: 14px 0 12px; }
+  .card.thin .srows { opacity: 0.55; }
+  @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }
   .chip.tag { cursor: help; }
   .both { margin-left: 8px; }
   .roles-list .plink[data-shooter]:hover, .roles-list .plink.on { text-decoration-color: var(--ink); }
@@ -539,6 +697,13 @@ const _ = ordinal;
     const apply = (v) => { section.classList.toggle('even', v === 'even'); size.value = v; };
     apply(saved);
     size.addEventListener('change', () => { apply(size.value); try { localStorage.setItem('lc-mu-size', size.value); } catch {} });
+  })();
+
+  // Goal sources: scored or allowed.
+  (() => {
+    const sel = document.getElementById('src-side');
+    if (!sel) return;
+    sel.addEventListener('change', () => document.querySelectorAll('[data-src]').forEach((b) => { b.hidden = b.dataset.src !== sel.value; }));
   })();
 
   // Goalie picker.
