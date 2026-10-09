@@ -27,9 +27,12 @@ def read_raw(season: int, kind: str, game_id: int) -> dict:
 
 
 def _write(path: Path, payload: dict) -> None:
+    # Write to a temporary file and rename, so an interrupted run never leaves a half-written file.
     path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, "wt") as f:
+    tmp = path.with_suffix(path.suffix + ".part")
+    with gzip.open(tmp, "wt") as f:
         json.dump(payload, f, separators=(",", ":"))
+    tmp.replace(path)
 
 
 def team_abbrevs(season: int) -> list[str]:
