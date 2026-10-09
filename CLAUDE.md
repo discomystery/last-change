@@ -31,6 +31,9 @@ Fan-facing site that explains how NHL teams differ in style and strategy and pre
 
 - Checked 2026-10-09 from this machine: `api-web.nhle.com`, `api.nhle.com`, and the MoneyPuck download host are all reachable, so fixtures-via-Actions is not required for local development.
 - GitHub CLI is signed in as `discomystery`.
+- Repo: `discomystery/last-change` (public). Live site: https://discomystery.github.io/last-change/ ("Last Change" is a working title the user has not confirmed).
+- Deploy today: `npm --prefix site run build`, then force-push `site/dist` (plus `.nojekyll`) to the `gh-pages` branch. The GitHub token lacks the `workflow` scope, so Actions workflow files cannot be pushed yet; the user must approve that scope before the nightly pipeline (Phase 2).
+- Phase 1 mock: real names, records, date and venue come from `site/scripts/fetch-mock-context.mjs`; every statistic in `site/src/data/mock.ts` is invented.
 - `uv` is not installed yet; system Python is 3.9. Install `uv` before pipeline work (Phase 2).
 
 ## Data rules
