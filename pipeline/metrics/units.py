@@ -176,12 +176,53 @@ def depth_table(season: int) -> pl.DataFrame:
     return out
 
 
+def _quarterback_units(spans: list, toi: dict, is_d: dict, *, total_sec: float) -> tuple[list[frozenset], list[int]]:
+    """Two power-play units, each anchored on its quarterback. Returns (member sets, anchors)."""
+    if not toi:
+        return [], []
+
+    def pick_anchor(times: dict, pool_sec: float, exclude: set) -> int | None:
+        cands = {p: t for p, t in times.items() if p not in exclude}
+        if not cands:
+            return None
+        dmen = {p: t for p, t in cands.items() if is_d.get(p)}
+        # Use a defenseman when one clearly runs things; a five-forward unit is anchored on its busiest player.
+        if dmen and max(dmen.values()) >= 0.25 * pool_sec:
+            return max(dmen, key=dmen.get)
+        return max(cands, key=cands.get)
+
+    a1 = pick_anchor(toi, total_sec, set())
+    off = defaultdict(float)
+    off_sec = 0.0
+    for sec, on in spans:
+        if a1 not in on:
+            off_sec += sec
+            for p in on:
+                off[p] += sec
+    a2 = pick_anchor(off, off_sec, {a1}) if off_sec else None
+    anchors = [a for a in (a1, a2) if a is not None]
+    members = []
+    for k, a in enumerate(anchors):
+        other = anchors[1 - k] if len(anchors) == 2 else None
+        shared = defaultdict(float)
+        for sec, on in spans:
+            if a in on and other not in on:
+                for p in on:
+                    if p != a:
+                        shared[p] += sec
+        mates = sorted((p for p in shared if p not in anchors), key=lambda p: -shared[p])[:4]
+        members.append(frozenset([a, *mates]))
+    return members, anchors
+
+
 def special_units(season: int) -> dict[int, dict]:
     """Power-play and penalty-kill units over the recent window, with player roles and a shot map.
 
-    Coaches swap a player or two constantly, so the exact same five are rarely out together for long. A unit is
-    therefore the players with the most ice time in that situation (top five and next five on the power play, top four
-    and next four on the kill), and each moment is credited to whichever unit has more of its members on the ice.
+    Power play: a unit is built around its quarterback, the defenseman running it from the blue line (the way a fan
+    tells the units apart). PP1's quarterback is the defenseman with the most power-play time; PP2's is the one with
+    the most time while the first is off. Each unit is its quarterback plus the four skaters most often out with him.
+    A forward who stays out for both units is listed on both. Each moment is credited to the unit whose quarterback
+    is on the ice. Penalty kill: the two forwards and two defensemen who kill most, then the next two of each.
     """
     seasons = [season - 1, season]
     d = TABLES / str(season)
@@ -255,28 +296,39 @@ def special_units(season: int) -> dict[int, dict]:
                 for pid in on:
                     toi[pid] += sec
             ranked = sorted(toi, key=lambda p: -toi[p])
+            anchors = []
             if kind == "pk":
                 # A kill is two forwards and two defensemen, so rank each position separately.
                 fwd = [p for p in ranked if not is_d.get(p, False)]
                 dmen = [p for p in ranked if is_d.get(p, False)]
                 members = [frozenset(fwd[i * 2:(i + 1) * 2] + dmen[i * 2:(i + 1) * 2]) for i in range(2) if len(fwd) >= (i + 1) * 2 and len(dmen) >= (i + 1) * 2]
             else:
-                members = [frozenset(ranked[i * size:(i + 1) * size]) for i in range(2) if len(ranked) >= (i + 1) * size]
+                members, anchors = _quarterback_units(spans[(tid, kind)], toi, is_d, total_sec=sum(sec for sec, _ in spans[(tid, kind)]))
             total = sum(sec for sec, _ in spans[(tid, kind)])
             secs, xgs = [0.0] * len(members), [0.0] * len(members)
+
+            def credit(on):
+                if kind == "pp":
+                    there = [a in on for a in anchors]
+                    if sum(there) == 1:
+                        return there.index(True)
+                return owner(members, on)
+
             for sec, on in spans[(tid, kind)]:
-                if (k := owner(members, on)) is not None:
+                if (k := credit(on)) is not None:
                     secs[k] += sec
             for xg, on in chances[(tid, kind)]:
-                if (k := owner(members, on)) is not None:
+                if (k := credit(on)) is not None:
                     xgs[k] += xg
             pool[kind][0] += sum(xgs)
             pool[kind][1] += sum(secs)
             for k, m in enumerate(members):
-                players = sorted(m, key=lambda p: (is_d.get(p, False) if kind == "pk" else False, -toi[p]))
+                players = sorted(m, key=lambda p: (is_d.get(p, False) if kind == "pk" else p != anchors[k], -toi[p]))
                 roles = {}
                 if kind == "pp":
-                    shooters = sorted(players, key=lambda p: -(ind.get(p, {}).get("ixg", 0.0)))
+                    if is_d.get(anchors[k]):
+                        roles[anchors[k]] = "Quarterback"
+                    shooters = sorted((p for p in players if p not in roles), key=lambda p: -(ind.get(p, {}).get("ixg", 0.0)))
                     if ind.get(shooters[0], {}).get("att", 0) >= 8:
                         roles[shooters[0]] = "Trigger"
                     passers = sorted((p for p in players if p not in roles), key=lambda p: -(ind.get(p, {}).get("a1", 0.0)))
@@ -286,11 +338,12 @@ def special_units(season: int) -> dict[int, dict]:
                         q = ind.get(pid)
                         if pid in roles or not q or q["att"] < 8:
                             continue
-                        if q.get("is_d"):
+                        if q.get("is_d") and pid != anchors[k]:
                             roles[pid] = "Point"
                         elif q["located"] and q["close"] / q["located"] >= 0.4:
                             roles[pid] = "Net-front"
-                entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "minutes": round(secs[k] / 60, 1),
+                both = [p for p in players if kind == "pp" and sum(p in mm for mm in members) > 1]
+                entry[kind].append({"label": f"{kind.upper()}{k + 1}", "players": players, "roles": {str(p): roles.get(p) for p in players}, "both": both, "minutes": round(secs[k] / 60, 1),
                                     "share": round(100 * secs[k] / total) if total else 0, "_xg": xgs[k], "_sec": secs[k]})
         out[tid] = entry
     for kind, higher in (("pp", True), ("pk", False)):

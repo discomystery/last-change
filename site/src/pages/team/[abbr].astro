@@ -29,12 +29,13 @@ type Unit = { label: string; players: string[]; minutes: number; toi: number; xg
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
 const roleTip: Record<string, string> = {
+  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
   Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
   Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
   'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
-  Point: 'Point: a defenseman working from the blue line.',
+  Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
 };
-type SUnit = { label: string; players: { id: number; name: string; role: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
+type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean }[]; minutes: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; shots: { x: number; y: number; xg: number }[] } | undefined;
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
@@ -142,14 +143,14 @@ const _ = ordinal;
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
-        <p class="note">Units are the players used most in each situation over the last {linesData.window} games ({ln.games} so far). The number beside each unit is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
+        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. The number beside each unit is expected goals per hour, created for a power play and allowed for a penalty kill, pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
         <div class="st3">
           <div class="card">
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time when most of this group was on the ice. Coaches swap a player or two constantly, so a unit is the five who play the power play most (PP1) and the next five (PP2).">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
-                <ul class="roles-list">{u.players.map((pl) => <li><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span><span class="stunit-v">{u.rate.toFixed(1)} <Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per hour, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${u.minutes} minutes together.`} /></span></p>
+                <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
           </div>
@@ -287,6 +288,7 @@ const _ = ordinal;
   .roles-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
   .t-one { --team: var(--ink); }
   .chip.tag { cursor: help; }
+  .both { margin-left: 8px; }
   .roles-list .plink[data-shooter]:hover, .roles-list .plink.on { text-decoration-color: var(--ink); }
   .map-who { font: 600 13px var(--ui); color: var(--ink-2); min-height: 20px; margin-bottom: 6px; }
   .tagkey { margin-top: 16px; display: grid; gap: 8px; font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
