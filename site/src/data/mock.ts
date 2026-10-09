@@ -452,3 +452,16 @@ export const pkUnitStats = Object.fromEntries(
 export const ppUnitStats = Object.fromEntries(
   (['CAR', 'EDM'] as Abbr[]).map((a) => [a, specialTeams[a].pp.map(() => ({ xgf: round(a === 'EDM' ? between(8.4, 10.4) : between(6.2, 7.9), 1), pct: clamp(a === 'EDM' ? between(75, 98) : between(40, 70)) }))]),
 ) as Record<Abbr, { xgf: number; pct: number }[]>;
+
+// ---------- Goalie trait scales (placeholder positions derived from the placeholder numbers) ----------
+const gnum = (v: string | number) => parseFloat(String(v).replace('−', '-'));
+const gsign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
+type Goalie = (typeof goalies)['CAR'][number];
+export const goalieTraits = [
+  { key: 'gsax', label: 'Stopping more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall', pct: (g: Goalie) => clamp(50 + g.gsax60 * 110), say: (g: Goalie) => `${gsign(g.gsax)} goals saved above expected in ${g.starts} starts` },
+  { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per hour.', lo: 'Quiet', hi: 'Under siege', pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per hour` },
+  { key: 'danger', label: 'How dangerous the shots are', tip: 'Average expected-goal value of an unblocked shot against him.', lo: 'Sheltered', hi: 'Exposed', pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
+  { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous rush or turnover chances he faces per hour. A stand-in for chances faced alone.', lo: 'Rare', hi: 'Constant', pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous rush or turnover chances per hour` },
+  { key: 'gaps', label: 'Waiting between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', lo: 'Steady work', hi: 'Long waits', pct: (g: Goalie) => clamp((gnum(g.workload[3].value) - 40) * 2.4), say: (g: Goalie) => `a typical wait of ${g.workload[3].value} between shots` },
+  { key: 'steady', label: 'Night-to-night steadiness', tip: 'How often he gives his team a fair chance to win.', lo: 'Streaky', hi: 'Steady', pct: (g: Goalie) => clamp((g.consistency.qs - 40) * 3.6), say: (g: Goalie) => `a quality start ${g.consistency.qs}% of the time` },
+];

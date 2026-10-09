@@ -232,58 +232,64 @@ const nav = [
   </Section>
 
   <Section id="goalies" title="Goaltending" takeaway="Carolina’s goalies see fewer shots, but the ones that get through are more dangerous and arrive after long quiet stretches.">
-    <div class="quad-wrap card">
-      <div>
-        <h3 class="sub first">Is he helping, or being hung out to dry?</h3>
-        <p class="note">Higher on the chart means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are the rest of the league.</p>
-        <div class="key">
-          {order.map((a) => <span class={`t-${a}`}><i></i>{a}</span>)}
-          <span>Filled: probable starter. Outlined: backup.</span>
-        </div>
-      </div>
-      <Quadrant league={m.leagueGoalies} highlights={quadHighlights} />
+    <div class="stpick">
+      <span>Show</span>
+      <select id="g-away" aria-label={`${teams[away].place} goalie`}>{m.goalies[away].map((g, i) => <option value={`${away}-${i}`}>{g.name}{g.probable ? '' : ' (backup)'}</option>)}</select>
+      <span>against</span>
+      <select id="g-home" aria-label={`${teams[home].place} goalie`}>{m.goalies[home].map((g, i) => <option value={`${home}-${i}`}>{g.name}{g.probable ? '' : ' (backup)'}</option>)}</select>
     </div>
-    <div class="two">
-      {order.map((a) => (
-        <div class={`t-${a}`}>
-          <h3 class="team-h">{full(a)}</h3>
-          {m.goalies[a].map((g) => (
-            <article class="card goalie">
-              <header>
-                <h4>{g.name}</h4>
-                <span class:list={['chip', { solid: g.probable }]}>{g.probable ? 'Probable starter' : 'Backup'}</span>
-              </header>
-              <p class="gsax"><strong>{signed(g.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> <span class="n">in {g.starts} starts</span></p>
-              <details open={g.probable}>
-              <summary>{g.probable ? 'His numbers' : 'Show his numbers'}</summary>
-              <table class="tiers">
-                <thead><tr><td></td><th scope="col">Save %</th><th scope="col">Saved above expected</th></tr></thead>
-                <tbody>{g.tiers.map((t) => <tr><th scope="row">{t.tier}</th><td>{t.sv.toFixed(3).slice(1)}</td><td>{signed(t.gsax)}</td></tr>)}</tbody>
-              </table>
-              <dl class="work">
-                {g.workload.map((w) => <div><dt><span class="term" tabindex="0" data-tip={w.tip}>{w.label}</span></dt><dd>{w.value}</dd></div>)}
+    <div class="g3">
+      {[away, null, home].map((a) => a === null ? (
+        <div class="card gmid">
+          <p class="mini-h"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are the rest of the league; filled dots are probable starters, outlined dots are backups.">Helping, or hung out to dry?</span></p>
+          <Quadrant league={m.leagueGoalies} highlights={quadHighlights} />
+        </div>
+      ) : m.goalies[a].map((g, i) => (
+        <div class:list={['card', 'gcard', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0}>
+          <p class="gname"><i></i><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span><span class="chip">{g.probable ? 'Probable starter' : 'Backup'}</span></p>
+          <p class="gbig"><strong>{signed(g.gsax)}</strong> <span class="term" tabindex="0" data-tip={m.goalieTraits[0].tip}>goals saved above expected</span> <Pips pct={m.goalieTraits[0].pct(g)} tip={`Better than ${m.goalieTraits[0].pct(g)}% of goalies at stopping more than expected.`} /></p>
+          <dl class="gkv">
+            {g.tiers.map((t) => <div><dt>{t.tier} save %</dt><dd>{t.sv.toFixed(3).slice(1)}</dd></div>)}
+            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[1].tip}>Shots faced per hour</span></dt><dd>{g.workload[0].value} <Marker pct={m.goalieTraits[1].pct(g)} tip={`Busier than ${m.goalieTraits[1].pct(g)}% of goalies.`} /></dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[3].tip}>Breakdown chances per hour</span></dt><dd>{g.workload[2].value} <Marker pct={m.goalieTraits[3].pct(g)} tip={`Faces more breakdowns than ${m.goalieTraits[3].pct(g)}% of goalies.`} /></dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip={m.goalieTraits[5].tip}>Quality starts</span></dt><dd>{g.consistency.qs}% <Pips pct={m.goalieTraits[5].pct(g)} tip={`Steadier than ${m.goalieTraits[5].pct(g)}% of goalies.`} /></dd></div>
+          </dl>
+        </div>
+      )))}
+    </div>
+    <details class="fold">
+      <summary><span class="closed">Show the full goalie comparison</span><span class="opened">Hide the full goalie comparison</span></summary>
+      <ul class="fpgrid">
+        {m.goalieTraits.map((t) => (
+          <li class="card fpc">
+            <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+            <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
+            <div class="lanes">
+              {order.flatMap((a) => m.goalies[a].map((g, i) => <div class:list={['lane', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0} style={`--b:${t.pct(g)};--bb:11;--c:${t.pct(g)};--cb:11`}><span class="whisk"></span><span class="dot"></span></div>))}
+            </div>
+            <ul class="fpc-stats">
+              {order.flatMap((a) => m.goalies[a].map((g, i) => <li class={`t-${a}`} data-goalie={`${a}-${i}`} hidden={i !== 0}><i></i><span class="gsay"><b>{g.name}:</b> {t.say(g)}</span></li>))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      <div class="two gmore">
+        {order.flatMap((a) => m.goalies[a].map((g, i) => (
+          <div class:list={['card', `t-${a}`]} data-goalie={`${a}-${i}`} hidden={i !== 0}>
+            <p class="gname"><i></i>{g.name}</p>
+            <div class="cons">
+              <div><p class="mini-h">Night-to-night consistency</p><Histogram team={a} bins={g.bins} name={g.name} /></div>
+              <dl class="work tight">
+                <div><dt><span class="term" tabindex="0" data-tip="Share of starts with a save percentage under .850.">Really bad starts</span></dt><dd>{g.consistency.rbs}%</dd></div>
+                <div><dt>Disasters / steals</dt><dd>{g.consistency.disasters} / {g.consistency.steals}</dd></div>
+                <div><dt><span class="term" tabindex="0" data-tip={g.workload[5].tip}>Rebounds above expected</span></dt><dd>{g.workload[5].value}</dd></div>
               </dl>
-              <div class="cons">
-                <div>
-                  <p class="mini-h">Night-to-night consistency</p>
-                  <Histogram team={a} bins={g.bins} name={g.name} />
-                </div>
-                <dl class="work tight">
-                  <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win.">Quality starts</span></dt><dd>{g.consistency.qs}%</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Share of starts with a save percentage under .850.">Really bad starts</span></dt><dd>{g.consistency.rbs}%</dd></div>
-                  <div><dt>Disasters / steals</dt><dd>{g.consistency.disasters} / {g.consistency.steals}</dd></div>
-                </dl>
-              </div>
-              <aside class="scout">
-                <p class="mini-h">Scout’s note</p>
-                <p>Puck handling: no note yet. This space is for what you see watching him, since public data doesn’t track it.</p>
-              </aside>
-              </details>
-            </article>
-          ))}
-        </div>
-      ))}
-    </div>
+            </div>
+            <aside class="scout"><p class="mini-h">Scout’s note</p><p>Puck handling: no note yet. This space is for what you see watching him, since public data doesn’t track it.</p></aside>
+          </div>
+        )))}
+      </div>
+    </details>
     <p class="note">Expected-goal models can’t see passes before a shot. A goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
   </Section>
 
@@ -416,6 +422,20 @@ const nav = [
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
+  .g3 { display: grid; gap: 12px; margin-top: 18px; }
+  @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
+  .g3 > [hidden], .gmore > [hidden], .fpc [hidden] { display: none; }
+  .gmid { display: flex; flex-direction: column; justify-content: center; }
+  .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font: 700 22px/1 var(--display); margin-bottom: 14px; }
+  .gname i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
+  .gname .chip { margin-left: auto; }
+  .gbig { font: 400 14px var(--ui); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
+  .gbig strong { font: 700 38px/1 var(--display); }
+  .gkv div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+  .gkv dt { color: var(--ink-2); }
+  .gkv dd { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }
+  .gmore { margin-top: 14px; align-items: stretch; }
+  .gsay { display: inline !important; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: 14px; }
   .tile { display: grid; gap: 6px; grid-template-rows: 1fr auto auto auto; }
   .tile-h { align-self: start; }
@@ -535,6 +555,17 @@ const nav = [
     };
     team.addEventListener('change', show);
     sit.addEventListener('change', show);
+    show();
+  })();
+
+  // Goalie picker: one goalie from each team; everything tagged with a goalie follows the two menus.
+  (() => {
+    const menus = [document.getElementById('g-away'), document.getElementById('g-home')];
+    const show = () => {
+      const on = new Set(menus.map((x) => x.value));
+      document.querySelectorAll('#goalies [data-goalie]').forEach((el) => { el.hidden = !on.has(el.dataset.goalie); });
+    };
+    menus.forEach((x) => x.addEventListener('change', show));
     show();
   })();
 </script>
