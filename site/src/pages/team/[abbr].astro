@@ -37,10 +37,17 @@ const roleTip: Record<string, string> = {
 };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string; player: string } | null; shots: { x: number; y: number; xg: number }[] } | undefined;
+type MRow = { label: string; minutes: number; share: (number | null)[]; expected: number[] };
+const mu = (ln as any)?.matchups as Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }> | undefined;
+const venues = [['all', 'in all games'], ['home', 'at home'], ['road', 'on the road']] as const;
+const oppName = ['first', 'second', 'third', 'fourth'];
+const heat = (v: number | null) => (v === null ? '' : `background: color-mix(in oklab, var(--ink) ${Math.round(v * 1.5)}%, var(--sheet)); color: ${v >= 36 ? 'var(--sheet)' : 'var(--ink)'}`);
+const unitNames = (label: string) => ln.units.find((u) => u.label === label)?.players.join(', ') ?? '';
+const standouts = (rows: MRow[]) => rows.filter((r) => r.minutes >= 15).flatMap((r) => r.share.map((v, j) => ({ r, j, v: v ?? 0, gap: (v ?? 0) - r.expected[j] }))).filter((x) => x.gap >= 10).sort((a, b) => b.gap - a.gap).slice(0, 3);
 const lastDiff = ln ? ln.last.units.filter((u) => !u.usual) : [];
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['more', 'Still to come']];
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['more', 'Still to come']];
 const _ = ordinal;
 ---
 <Base title={team.name} mock={false}>
@@ -140,6 +147,48 @@ const _ = ordinal;
     )}
   </Section>
 
+  <Section id="matchups" title="Who plays against whom" placeholder={false} takeaway={`Which opposing lines each ${team.place} group has actually been out against at 5-on-5.`}>
+    {mu && (
+      <>
+        <div class="pick"><span>Show {team.place}</span>
+          <select id="mu-venue" aria-label="Which games">{venues.map(([k, label]) => <option value={k}>{label} ({mu[k].games} {mu[k].games === 1 ? 'game' : 'games'})</option>)}</select>
+        </div>
+        {venues.map(([k, label], vi) => {
+          const top = standouts(mu[k].rows);
+          return (
+            <div data-venue={k} hidden={vi !== 0}>
+              {top.length > 0 && (
+                <div class="card worth">
+                  <p class="mini-h">Standing out {label}</p>
+                  <ul>{top.map((x) => <li><strong>{x.r.label}</strong> ({unitNames(x.r.label)}) has spent {x.v}% of its time against opponents’ {oppName[x.j]} lines. Ordinary line rotation would give about {x.r.expected[x.j]}%.</li>)}</ul>
+                </div>
+              )}
+              <div class="two grids">
+                {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
+                  <div class="card">
+                    <h4 class="mini-h">{title} against opposing forward lines</h4>
+                    <table class="heat">
+                      <thead><tr><td></td>{oppName.map((n, j) => <th scope="col">Opp. L{j + 1}</th>)}</tr></thead>
+                      <tbody>
+                        {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
+                          <tr class:list={{ thin: r.minutes < 10 }}>
+                            <th scope="row" data-tip={`${unitNames(r.label)}. ${r.minutes} minutes of 5-on-5 ${label}.`}>{r.label}</th>
+                            {r.share.map((v, j) => <td style={heat(v)} data-tip={v === null ? 'No ice time yet.' : `${r.label} (${unitNames(r.label)}) has spent ${v}% of its 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. Rotation alone would give about ${r.expected[j]}%.`}>{v === null ? '–' : `${v}%`}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <p class="note">Each row adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes. “Ordinary rotation” is how much each opposing line plays against {team.place} overall.</p>
+      </>
+    )}
+  </Section>
+
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
@@ -184,7 +233,6 @@ const _ = ordinal;
 
   <Section id="more" title="Still to come on this page" placeholder={false}>
     <ul class="todo">
-      <li><strong>Who plays against whom,</strong> home and road, and how tough each group’s opponents are.</li>
       <li><strong>Goalies:</strong> whether each one is helping or being hung out to dry, his workload, and how steady he is night to night.</li>
       <li><strong>Where the goals come from:</strong> rush, rebounds, power play, turnovers and zone time, for and against.</li>
       <li><strong>What tends to be true when they win.</strong></li>
@@ -281,6 +329,14 @@ const _ = ordinal;
   html[data-mode='season'] .fpc-line.m-blend { display: none; }
   .fpc-line em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
   .units2 { align-items: start; }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }
+  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .grids { align-items: stretch; margin-top: 16px; }
+  .heat { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 13px; table-layout: fixed; }
+  .heat th { font-weight: 600; font-size: 11px; color: var(--ink-2); padding: 4px 2px; white-space: nowrap; }
+  .heat tbody th { text-align: left; width: 44px; font-size: 14px; color: var(--ink); cursor: help; }
+  .heat tbody td { text-align: center; padding: 11px 0; border-radius: 4px; font-weight: 600; }
+  .heat tr.thin td { opacity: 0.45; }
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
   .st3 > .card { display: flex; flex-direction: column; }
@@ -354,5 +410,12 @@ const _ = ordinal;
       el.addEventListener('blur', () => show(pinned));
       el.addEventListener('click', () => { pinned = pinned === el ? null : el; show(pinned); });
     });
+  })();
+
+  // Matchup grid: all games, home or road.
+  (() => {
+    const sel = document.getElementById('mu-venue');
+    if (!sel) return;
+    sel.addEventListener('change', () => document.querySelectorAll('[data-venue]').forEach((b) => { b.hidden = b.dataset.venue !== sel.value; }));
   })();
 </script>

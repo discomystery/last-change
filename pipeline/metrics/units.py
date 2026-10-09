@@ -454,3 +454,68 @@ def special_units(season: int) -> dict[int, dict]:
                     below = sum(x < v for x in vals) if higher else sum(x > v for x in vals)
                     e[kind][i]["pct"] = round(100 * (below + 0.5) / len(vals))
     return out
+
+
+def matchups(season: int, usual_units: dict[int, dict]) -> dict[int, dict]:
+    """Who each line and pair plays against at 5v5: share of its ice time spent facing each opposing forward line.
+
+    Both teams' groups are their usual numbered lines; a group on the ice counts as a given line when at least two of
+    its three forwards (or both defensemen, else one) belong to it. Split by all games, home and road, because the
+    home coach changes last and so chooses the matchups.
+    """
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
+    pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
+    sets = {tid: {u["label"]: {int(x) for x in u["unit"].split("-")} for u in e["units"]} for tid, e in usual_units.items()}
+
+    def label(tid: int, players: set, kind: str) -> str | None:
+        best, score = None, 0
+        for lab, members in sets.get(tid, {}).items():
+            if lab[0] != kind:
+                continue
+            n = len(members & players)
+            if n > score:
+                best, score = lab, n
+        need = 2 if kind == "L" else 1
+        return best if score >= need else None
+
+    acc = defaultdict(lambda: defaultdict(float))  # (team, venue) -> (own label, opp label) -> seconds
+    played = defaultdict(set)
+    for s in pl.read_parquet(d / "stints.parquet").iter_rows(named=True):
+        gid = s["game_id"]
+        if gid not in ids or not (s["n_home"] == 5 and s["n_away"] == 5 and s["home_goalie"] and s["away_goalie"]):
+            continue
+        sides = {}
+        for home, skaters in ((True, s["home_skaters"]), (False, s["away_skaters"])):
+            tid = ids[gid][0 if home else 1]
+            fwd = {p for p in skaters if pos.get((gid, p)) in ("C", "L", "R")}
+            dmen = {p for p in skaters if pos.get((gid, p)) == "D"}
+            sides[home] = (tid, label(tid, fwd, "L") if len(fwd) == 3 else None, label(tid, dmen, "P") if len(dmen) == 2 else None)
+        for home in (True, False):
+            tid, own_f, own_d = sides[home]
+            _, opp_f, _ = sides[not home]
+            if opp_f is None:
+                continue
+            for venue in ("all", "home" if home else "road"):
+                played[(tid, venue)].add(gid)
+                for own in (own_f, own_d):
+                    if own:
+                        acc[(tid, venue)][(own, opp_f)] += s["duration"]
+    out = {}
+    cols = ["L1", "L2", "L3", "L4"]
+    for tid in usual_units:
+        entry = {}
+        for venue in ("all", "home", "road"):
+            cells = acc.get((tid, venue), {})
+            block = {"games": len(played.get((tid, venue), ())), "rows": []}
+            for kind, rows in (("L", cols), ("P", ["P1", "P2", "P3"])):
+                total = sum(v for (own, _), v in cells.items() if own[0] == kind)
+                expected = [sum(v for (own, opp), v in cells.items() if own[0] == kind and opp == c) / total * 100 if total else 0.0 for c in cols]
+                for r in rows:
+                    row_sec = sum(cells.get((r, c), 0.0) for c in cols)
+                    block["rows"].append({"label": r, "minutes": round(row_sec / 60, 1), "share": [round(100 * cells.get((r, c), 0.0) / row_sec) if row_sec else None for c in cols],
+                                          "expected": [round(x) for x in expected]})
+            entry[venue] = block
+        out[tid] = entry
+    return out

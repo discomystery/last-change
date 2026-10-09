@@ -178,6 +178,9 @@ def export_lines(season: int) -> int:
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
             "notes": sorted(notes, key=lambda n: -abs(n["now"] - n["before"])),
         }
+    for tid, m in units.matchups(season, usual).items():
+        if abbr[tid] in out:
+            out[abbr[tid]]["matchups"] = m
     special = units.special_units(season)
     for tid, sp in special.items():
         if abbr[tid] not in out:
