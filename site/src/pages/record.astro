@@ -105,7 +105,7 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
         <ol class="latest">{calls.latest.slice(0, SHOW).map((c) => <li>
               <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
               <div class="lc">
-                <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                <a class="lh hl" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
                 <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
               </div>
             </li>)}</ol>
@@ -115,7 +115,7 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
             <ol class="latest">{calls.latest.slice(SHOW).map((c) => <li>
               <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
               <div class="lc">
-                <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                <a class="lh hl" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
                 <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
               </div>
             </li>)}</ol>
@@ -232,8 +232,7 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   .vchip.held { background: var(--ink); color: var(--sheet); }
   .vchip.partly { background: transparent; color: var(--ink); }
   .vchip.missed { background: transparent; border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
-  .lh { font: 600 17px var(--body); color: var(--ink); text-decoration: none; }
-  .lh:hover { text-decoration: underline; }
+  .lh { font: 600 17px var(--body); color: var(--ink); }
   .lm { font: 500 13px var(--ui); color: var(--ink-2); margin-top: 3px; }
   .usual { color: var(--ink-3); }
   .fold { margin-top: 10px; }

@@ -38,18 +38,19 @@ const base = import.meta.env.BASE_URL;
     const dayLong = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
     const dayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
     const asDate = (d) => new Date(d + 'T12:00:00Z');
-    const teamLink = (a) => { const x = el('a', 'tlink', T[a]?.name ?? a); x.href = `${base}team/${a}/`; return x; };
 
     const card = (g, me) => {
       const li = el('li', 'card row gcard');
       const when = el('span', 'g-when', g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : time.format(g.t));
       if (me) when.textContent = dayShort.format(asDate(g.date)) + ' · ' + when.textContent;
-      const row = (a, score) => { const r = el('span', 'g-team'); r.append(teamLink(a)); if (g.final) r.append(el('strong', 'g-sc', String(score))); return r; };
+      const row = (a, score) => { const r = el('span', 'g-team'); r.append(el('span', null, T[a]?.name ?? a)); if (g.final) r.append(el('strong', 'g-sc', String(score))); return r; };
       const teamsBox = el('span', 'g-teams');
       teamsBox.append(row(g.away, g.as), row(g.home, g.hs));
       const acts = el('span', 'g-acts');
-      if (g.final && RECAPS.has(g.id)) { const a = el('a', 'g-btn', 'Post-game'); a.href = `${base}recap/${g.id}/`; acts.append(a); }
-      else if (!g.final && PREVIEWS.has(g.id)) { const a = el('a', 'g-btn', 'Preview'); a.href = `${base}preview/${g.id}/`; acts.append(a); }
+      // A game with a page is one card that opens it; the button is the cue, the whole card is the target.
+      const go = (label, href) => { const a = el('a', 'g-btn go-link', label); a.href = href; acts.append(a); li.classList.add('go'); };
+      if (g.final && RECAPS.has(g.id)) go('Post-game', `${base}recap/${g.id}/`);
+      else if (!g.final && PREVIEWS.has(g.id)) go('Preview', `${base}preview/${g.id}/`);
       else if (!g.final) acts.append(el('span', 'n', 'Preview opens a week before'));
       li.append(when, teamsBox, acts, el('span', 'g-venue n', g.venue ?? ''));
       if (me) li.classList.add(g.home === me ? 'home' : 'road');
@@ -160,8 +161,8 @@ const base = import.meta.env.BASE_URL;
   .gcard .g-team { display: flex; justify-content: space-between; gap: 12px; font: 600 16px var(--ui); }
   .gcard .g-sc { font: 700 17px var(--display); }
   .gcard .g-acts { justify-self: end; }
-  .gcard .g-btn { display: inline-block; font: 600 13px var(--ui); text-decoration: none; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--ink); white-space: nowrap; }
-  .gcard .g-btn:hover { background: var(--ink); color: var(--sheet); }
+  .gcard .g-btn { display: inline-block; font: 600 13px var(--ui); padding: 7px 13px; border-radius: 999px; border: 1px solid var(--ink); white-space: nowrap; transition: background-color 0.15s ease, color 0.15s ease; }
+  .gcard.go:hover .g-btn { background: var(--ink); color: var(--sheet); }
   .gcard .g-venue { grid-column: 1 / -1; font-size: 12px; }
   .gcard.next { outline: 2px solid var(--ink); }
 </style>

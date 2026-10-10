@@ -246,7 +246,23 @@ const teamList = teams as { abbr: string; name: string }[];
   body { margin: 0; background: var(--ice); color: var(--ink); font: 400 17px/1.6 var(--body); font-variant-numeric: lining-nums tabular-nums; }
   h1, h2, h3, h4, .wordmark { font-variation-settings: 'SOFT' 100; }
   .mockbar, .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
-  a { color: inherit; }
+  a { color: inherit; text-decoration: none; }
+  /* Links never look like underlined web links. A link inside text is set a little bolder; under the
+     pointer every text link (team names, crumbs) gets a soft rounded highlight instead of an underline. */
+  :is(main, .site-foot) a:not([class]) { font-weight: 600; }
+  .crumbs a { font-weight: inherit; }
+  :is(main, .site-foot) a:not([class]), .tlink, .crumbs a, .eyebrow a, .hl {
+    border-radius: 5px; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  :is(:is(main, .site-foot) a:not([class]), .tlink, .crumbs a, .eyebrow a, .hl):hover { background: var(--track); box-shadow: 0 0 0 3px var(--track); color: var(--ink); }
+  /* A card that is one link as a whole (a game, a team, a player): its main link stretches over the card,
+     and the card lifts under the pointer (motion.css). Any other link inside sits above the stretch. */
+  .card.go { position: relative; cursor: pointer; transition: border-color 0.15s ease; }
+  .card.go .go-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 0; }
+  .card.go :is(a:not(.go-link), button) { position: relative; z-index: 1; }
+  .card.go:hover { border-color: var(--ink-3); }
+  .card.go:has(:is(a:not(.go-link), button):hover) { border-color: var(--rule); }
   h1, h2, h3, h4, p, figure, ul, ol, dl, dd { margin: 0; padding: 0; }
   ul, ol { list-style: none; }
   :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 3px; }
@@ -361,8 +377,7 @@ const teamList = teams as { abbr: string; name: string }[];
   /* Small all-caps labels above a value or a card. */
   .eyebrow, .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   /* A team name that opens the team's page, in the surrounding text style. */
-  .tlink { color: inherit; text-decoration: none; }
-  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .tlink { color: inherit; }
 
   /* Sections */
   .sec { margin-top: 72px; scroll-margin-top: 96px; }
@@ -407,8 +422,9 @@ const teamList = teams as { abbr: string; name: string }[];
   /* Same height, colour and puck as the meter above, so the two sit level: a faint track with one puck inside. */
   .marker { position: relative; display: inline-block; width: 62px; height: 10px; border-radius: 999px; background: var(--rule); vertical-align: middle; cursor: help; }
   .marker i { position: absolute; top: 0; left: calc((100% - 10px) * var(--p, 50) / 100); width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
+  /* Player names keep a fine hairline underline (the one exception to the no-underline rule). */
   .plink { text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--ink-3); text-underline-offset: 5px; cursor: pointer; }
-  .plink:hover { text-decoration-color: var(--ink); }
+  .plink:hover, .plink.on { text-decoration-color: var(--ink); }
   details > summary { cursor: pointer; font: 600 14px var(--ui); color: var(--ink-2); padding: 6px 0; }
   details[open] > summary { margin-bottom: 8px; }
 
