@@ -224,7 +224,7 @@ const statRow = (x: any) => (isG ? null : x);
                   const e = s.traits[k];
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season.ok }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</span>; })}</span></span></span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e[m].vs)} data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${e.season.pct};--clo:${e.season.lo};--chi:${e.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
@@ -295,7 +295,7 @@ const statRow = (x: any) => (isG ? null : x);
                   const bp = b?.pct ?? 50, cp = c?.pct ?? 50;
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !(b?.ok || c?.ok) }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</span>; })}</span></span></span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e!.vs)} data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
@@ -424,6 +424,7 @@ const statRow = (x: any) => (isG ? null : x);
   .rk.rk-season { display: none; }
   html[data-mode='season'] .rk.rk-season { display: inline-block; }
   html[data-mode='season'] .rk.rk-blend { display: none; }
+  a.rk { cursor: pointer; text-decoration: none; }
   .fpgrid:has(> .mini) { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); }
   .sw-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
   .thin { opacity: 0.55; }
