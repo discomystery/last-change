@@ -11,8 +11,7 @@ import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
-import GameStory from '../../components/GameStory.astro';
-import { stories } from '../../data/storySamples';
+import GameStory, { type Story } from '../../components/GameStory.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -29,12 +28,12 @@ import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
 
-type Claim = { id: string; kind: string; head: string; body: string; call?: string; cite: string; check: object | null };
+type Claim = { id: string; kind: string; head: string; body: string; call?: string; nums?: string; cite: string; check: object | null };
 // `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
 // still be shown unchanged after the game. Previews for games played before snapshots began are made from the data before
 // each game and shown exactly like the rest.
 type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }> };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
@@ -85,6 +84,8 @@ const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === labe
 const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
 const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const homeMu = LN[home]?.matchups?.home;
+// With a story at the top, the lineup notes move down into Lines (the faceoff note already shows in Special teams).
+const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })));
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
 
 // Special teams
@@ -130,7 +131,8 @@ const srcInfo: [string, string, string][] = [
 ];
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
-const story = stories[snap.game_id];
+const story = snap.story;
+const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
 const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
@@ -153,7 +155,7 @@ const _ = ordinal;
   <SectionNav items={nav as [string, string][]} pinned />
 
   <Section id="watch" title="The short version" placeholder={false}>
-    {story && <GameStory story={story} />}
+    {story && <GameStory story={story} sides={sides} />}
     {!story && snap.outlook && (
       <div class="card outlook">
         {order.filter((a) => snap.outlook![a]).map((a) => (
@@ -170,9 +172,9 @@ const _ = ordinal;
       {snap.claims.map((c) => (
         <li class="card">
           <h3>{c.head}</h3>
-          <p>{story?.bodies?.[c.id]?.body ?? c.body}</p>
+          <p>{c.body}</p>
           {c.call && <p class="call"><span>The call</span> {c.call}</p>}
-          {story?.bodies?.[c.id] && <p class="cite nums">{story.bodies[c.id].nums}</p>}
+          {c.nums && <p class="cite nums">{c.nums}</p>}
           <p class="cite">{c.cite}</p>
         </li>
       ))}
@@ -238,6 +240,13 @@ const _ = ordinal;
         </div>
       ))}
     </div>
+
+    {story && lineNotes.length > 0 && (
+      <div class="card worth lines-worth">
+        <p class="mini-h">Worth knowing</p>
+        <ul>{lineNotes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
+      </div>
+    )}
 
     <h3 class="sub">Who {place(home)} is likely to send against whom</h3>
     {homeMu && homeMu.games > 0 ? (
@@ -457,6 +466,7 @@ const _ = ordinal;
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
   .watch + .worth { margin-top: 16px; }
+  .lines-worth { margin: 20px 0 8px; }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }

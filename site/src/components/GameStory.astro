@@ -1,74 +1,53 @@
 ---
-// WORKSHOP MOCK-UP: the plain-English blurb at the top of preview and post-game pages.
-// Layout options for the workshop are picked with ?story=a|b|c (a is the default).
-import type { Story } from '../data/storySamples';
-interface Props { story: Story }
-const { story } = Astro.props;
-const preview = story.kicker === 'Before the game';
-const labels = preview ? ['Coming in', 'What to look for'] : ['How it went', 'The bigger picture'];
+// The short version: the plain-English story at the top of preview and post-game pages (pipeline/export/stories.py).
+// The story reads at a comfortable width on the left; "Who to watch" (or "What it means") sits in a pale panel on the
+// right, and drops under the story on narrow screens. A preview's first paragraph ends with the matchup's lean, written
+// from one team's side: both versions are rendered and the page's pov CSS shows the visitor's team's, else the home team's.
+export type Story = { kicker: string; head: string; paras: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
+interface Props { story: Story; sides?: Record<string, 'away' | 'home'> }
+const { story, sides = {} } = Astro.props;
+const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
 ---
-<div class="card story lay-a">
+<div class="card story">
   <div class="s-head">
     <p class="mini-h">{story.kicker}</p>
     <h3>{story.head}</h3>
   </div>
   <div class="s-text">
-    {story.paras.map((p, i) => <div class="s-para"><p class="mini-h p-lab">{labels[i]}</p><p class="para">{p}</p></div>)}
+    {leanTeams.length > 0 ? (
+      <>
+        {leanTeams.map((t) => <p class={`para pov pov-${sides[t]}`}>{[story.paras[0], story.lean![t]].filter(Boolean).join(' ')}</p>)}
+        {story.paras.slice(1).map((p) => <p class="para">{p}</p>)}
+      </>
+    ) : story.paras.map((p) => <p class="para">{p}</p>)}
   </div>
-  <div class="s-list">
-    <h4 class="list-h">{story.listHead}</h4>
-    <ul>
-      {story.items.map((i) => <li><span class="tag">{i.tag}</span><span>{i.text}</span></li>)}
-    </ul>
-  </div>
+  {story.items.length > 0 && (
+    <div class="s-list">
+      <h4 class="list-h">{story.list_head}</h4>
+      <ul>
+        {story.items.map((i) => <li><span class="tag">{i.tag}</span><span>{i.text}</span></li>)}
+      </ul>
+    </div>
+  )}
 </div>
-<script is:inline>
-  (() => { if (/vol=light/.test(location.search)) document.querySelectorAll('.story').forEach((e) => { e.querySelectorAll('.s-para').forEach((x, i) => { if (i) x.remove(); }); e.querySelectorAll('.s-list li').forEach((x, i) => { if (i > 1) x.remove(); }); }); })();
-  (() => { const m = /story=([abc])/.exec(location.search); if (!m) return;
-    document.querySelectorAll('.story').forEach((e) => { e.classList.remove('lay-a'); e.classList.add('lay-' + m[1]); }); })();
-</script>
 <style>
-  .story { margin-bottom: 20px; padding: 24px 26px; display: grid; gap: 0 36px; }
+  .story { margin-bottom: 20px; padding: 24px 26px; display: grid; gap: 0 36px;
+    grid-template-columns: minmax(0, 64ch) minmax(270px, 1fr); grid-template-areas: 'head list' 'text list'; grid-template-rows: auto 1fr; }
+  .s-head { grid-area: head; }
+  .s-text { grid-area: text; align-self: start; }
+  .s-list { grid-area: list; background: var(--ice); border-radius: 12px; padding: 16px 18px; align-self: start; }
   .story h3 { font: 600 28px/1.15 var(--display); margin: 6px 0 12px; }
   .story .para { font: 400 18px/1.6 var(--body); margin: 0 0 12px; }
-  .story .p-lab { display: none; }
+  .list-h { font: 700 12.5px/1.2 var(--ui); margin: 0 0 4px; color: var(--ink); text-transform: uppercase; letter-spacing: 0.08em;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.12)); }
   .story ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 12px; }
   .story li { display: grid; gap: 2px; align-content: start; font: 400 16px/1.5 var(--ui); }
   .story .tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-
-  /* A: story on the left at reading width, the list in a pale panel on the right */
-  .lay-a { grid-template-columns: minmax(0, 64ch) minmax(270px, 1fr); grid-template-areas: 'head list' 'text list'; grid-template-rows: auto 1fr; }
-  .lay-a .s-text { align-self: start; }
-  .lay-a .s-head { grid-area: head; } .lay-a .s-text { grid-area: text; }
-  .lay-a .s-list { grid-area: list; background: var(--ice); border-radius: 12px; padding: 16px 18px; align-self: start; }
-  .story .list-h { font: 700 12.5px/1.2 var(--ui); margin: 0 0 4px; color: var(--ink); text-transform: uppercase; letter-spacing: 0.08em; }
-  .lay-a .s-list .list-h { padding-bottom: 8px; border-bottom: 1px solid var(--line, rgba(0,0,0,0.12)); margin-bottom: 4px; }
-
-  /* B: headline across, the two paragraphs side by side, the list as a row of tiles */
-  .lay-b .s-text { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
-  .lay-b .p-lab { display: block; margin-bottom: 4px; }
-  .lay-b .s-list { border-top: 1px solid var(--line, rgba(0,0,0,0.1)); margin-top: 8px; padding-top: 14px; }
-  .lay-b .list-h { margin: 0; }
-  .lay-b li { align-content: start; }
-  .lay-b ul { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-
-  /* C: magazine style, headline in a narrow left column, story and list on the right */
-  .lay-c { grid-template-columns: minmax(200px, 1fr) minmax(0, 64ch); grid-template-areas: 'head text' 'head list'; }
-  .lay-c .s-head { grid-area: head; border-right: 1px solid var(--line, rgba(0,0,0,0.1)); padding-right: 28px; }
-  .lay-c h3 { font-size: 34px; }
-  .lay-c .s-text { grid-area: text; } .lay-c .s-list { grid-area: list; margin-top: 6px; }
-  .lay-c .list-h { margin: 0; }
-  .lay-c li { grid-template-columns: 112px 1fr; gap: 12px; align-items: baseline; }
-
   @media (max-width: 900px) {
-    .story.lay-a, .story.lay-c { grid-template-columns: 1fr; grid-template-areas: 'head' 'text' 'list'; }
-    .lay-c .s-head { border-right: 0; padding-right: 0; }
-    .lay-c h3 { font-size: 28px; }
-    .lay-b .s-text { grid-template-columns: 1fr; gap: 0; }
+    .story { grid-template-columns: 1fr; grid-template-areas: 'head' 'text' 'list'; grid-template-rows: auto; }
   }
   @media (max-width: 560px) {
     .story { padding: 18px 16px; }
-    .story h3, .lay-c h3 { font-size: 24px; }
-    .lay-c li { grid-template-columns: 1fr; gap: 2px; }
+    .story h3 { font-size: 24px; }
   }
 </style>

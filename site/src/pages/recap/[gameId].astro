@@ -10,18 +10,17 @@ import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
 import GameSwing from '../../components/GameSwing.astro';
 import SectionNav from '../../components/SectionNav.astro';
-import GameStory from '../../components/GameStory.astro';
-import { stories } from '../../data/storySamples';
+import GameStory, { type Story } from '../../components/GameStory.astro';
 import '../../styles/blocks.css';
 import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
 
-type Call = { id: string; kind: string; head: string; body: string; call?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
+type Call = { id: string; kind: string; head: string; body: string; call?: string | null; nums?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null;
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }> } | null };
 
 export async function getStaticPaths() {
@@ -97,7 +96,7 @@ const hasJobs = !!jobs?.players.some((c) => c.pos !== 'G');
 const hasGoalieCards = !!jobs?.players.some((c) => c.pos === 'G');
 const scoreFiles = import.meta.glob<{ default: { game_id: number; players: unknown[] } }>('../../../public/data/scores/2*.json', { eager: true });
 const hasImpact = !!Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default.players.length;
-const story = stories[r.game_id];
+const story = r.story;
 const nav = [
   ...(story ? [['story', 'Short version']] : []),
   ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
@@ -154,6 +153,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
               <h3>{c.head}</h3>
               <p class="detail">{c.body}</p>
               {c.call && <p class="call"><span>The call</span> {c.call}</p>}
+              {c.nums && <p class="nums">{c.nums}</p>}
             </div>
             <div class="claim-did">
               {c.verdict === null ? (
@@ -251,6 +251,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 </Base>
 
 <style>
+  .nums { margin-top: 6px; font: 400 13px/1.45 var(--ui); color: var(--ink-3); }
   .reveal h3 { margin: 0 0 10px; }
   .ladder { width: 100%; border-collapse: collapse; font-family: var(--ui); }
   .ladder th { text-align: left; font-weight: 400; padding: 6px 0; }

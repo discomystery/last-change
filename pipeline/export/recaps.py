@@ -340,7 +340,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         for c in (snap or {}).get("claims", []):
             res = measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre)
             graded_claims.append({**c, "verdict": res.get("verdict")})
-            calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "cite": c["cite"], **res})
+            calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "nums": c.get("nums"), "cite": c["cite"], **res})
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
