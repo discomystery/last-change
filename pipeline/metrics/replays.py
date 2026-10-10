@@ -1,6 +1,6 @@
-"""Deserve to win: how often each team would have won a game, given the chances both teams actually got.
+"""Run it back: how often each team would have won a game, given the chances both teams actually got.
 
-Inspired by MoneyPuck's Deserve to Win O'Meter. Every unblocked shot is a coin flip that comes up "goal" with the
+Similar in spirit to MoneyPuck's game simulations, with our own xG and rules. Every unblocked shot is a coin flip that comes up "goal" with the
 probability our xG model gives it; replaying the game's shots many times gives a share of replays each team wins.
 Instead of simulating, the exact answer is computed: each team's goal total is a sum of independent coin flips
 (a Poisson-binomial distribution), and the two totals are compared directly. The result is the same every run.
@@ -13,7 +13,7 @@ Choices, each kept deliberately simple for the prototype:
 - Rebound flurries: a shot and the rebound off it cannot both go in (the first goal stops play). Each flurry
   (an unblocked shot within 3 seconds of a teammate's shot on goal, chained) becomes one coin flip with
   probability 1 - (chance every shot in it is stopped). Without this, teams that generate scrambles look like
-  they deserved more goals than were possible.
+  they earned more goals than were possible.
 - Shooter and goalie skill are not in it: an xG rating assumes a league-average shooter and goalie.
 - Optional score adjustment (`adjust_score=True`) weights each shot by the league's score-and-venue weight, so a
   trailing team's chase is discounted. It barely changes anything (see below), so it is off by default.
@@ -22,7 +22,7 @@ How to read it (2023-24 to 2025-26 regular seasons, 3,936 games): the share mean
 not "won this often in real life". Teams the meter gave 80%+ won 68% of the time. The code is right (replaying
 games with goals drawn from the same xG lands within a point or two of the meter in every band); the gap is
 hockey: a team that scores early on few chances tends to sit back while the other team piles up chances chasing.
-Its value is as a record of who carried play: a team's deserved wins over half a season predict its wins in the
+Its value is as a record of who carried play: a team's replay wins over half a season predict its wins in the
 other half far better than its real wins do (r 0.67 against 0.50), about as well as plain xG share.
 """
 import numpy as np
@@ -91,7 +91,7 @@ def chances(s: pl.DataFrame, collapse_flurries: bool = True) -> pl.DataFrame:
 
 
 def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool = True, adjust_score: bool = False) -> pl.DataFrame:
-    """One row per finished game: deserve-to-win shares, expected goals and the real result."""
+    """One row per finished game: replay shares, expected goals and the real result."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("state").is_in(["OFF", "FINAL"]))
     if game_type is not None:
@@ -115,7 +115,7 @@ def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool
             # Expected goals after flurries are collapsed (a flurry counts once, at its combined chance).
             "home_xg": float(hp.sum()), "away_xg": float(ap.sum()), "home_chances": int(hp.size), "away_chances": int(ap.size),
             "home_reg_win": win, "reg_tie": tie, "away_reg_win": loss,
-            "home_deserve": win + tie / 2, "away_deserve": loss + tie / 2,
+            "home_share": win + tie / 2, "away_share": loss + tie / 2,
             "home_won": g["home_score"] > g["away_score"],
             "real_home_goals": real.get((gid, True), 0), "real_away_goals": real.get((gid, False), 0),
         })
@@ -123,19 +123,19 @@ def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool
 
 
 def team_season(table: pl.DataFrame) -> pl.DataFrame:
-    """Per team: games, real wins and 'deserved' wins (the sum of its deserve-to-win shares)."""
+    """Per team: games, real wins and replay wins (the sum of its replay shares)."""
     side = lambda home: table.select(
         pl.col("home" if home else "away").alias("team"),
-        pl.col("home_deserve" if home else "away_deserve").alias("deserve"),
+        pl.col("home_share" if home else "away_share").alias("share"),
         (pl.col("home_won") == home).alias("won"))
     return (pl.concat([side(True), side(False)]).group_by("team")
-            .agg(pl.len().alias("gp"), pl.col("won").sum().alias("wins"), pl.col("deserve").sum().alias("deserved_wins"))
-            .with_columns((pl.col("wins") - pl.col("deserved_wins")).alias("luck")).sort("luck", descending=True))
+            .agg(pl.len().alias("gp"), pl.col("won").sum().alias("wins"), pl.col("share").sum().alias("replay_wins"))
+            .with_columns((pl.col("wins") - pl.col("replay_wins")).alias("luck")).sort("luck", descending=True))
 
 
 def build(season: int) -> dict:
-    """Write deserve.parquet for a season's finished regular-season games."""
+    """Write replays.parquet for a season's finished regular-season games."""
     t = season_table(season)
-    t.write_parquet(TABLES / str(season) / "deserve.parquet")
-    deserver_won = t.filter(pl.col("home_deserve") != 0.5).select(((pl.col("home_deserve") > 0.5) == pl.col("home_won")).mean()).item()
-    return {"season": season, "games": t.height, "deserving_team_won_pct": round(100 * deserver_won, 1) if t.height else None}
+    t.write_parquet(TABLES / str(season) / "replays.parquet")
+    favourite_won = t.filter(pl.col("home_share") != 0.5).select(((pl.col("home_share") > 0.5) == pl.col("home_won")).mean()).item()
+    return {"season": season, "games": t.height, "replay_favourite_won_pct": round(100 * favourite_won, 1) if t.height else None}

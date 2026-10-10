@@ -13,8 +13,8 @@ import recapIndex from '../../../public/data/recaps/index.json';
 type Call = { id: string; kind: string; head: string; body: string; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
-type Deserve = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[]; deserve?: Deserve | null };
+type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[]; replays?: Replays | null };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Recap }>('../../../public/data/recaps/2*.json', { eager: true });
@@ -47,8 +47,8 @@ const rows: [string, string, (n: Nums) => string][] = [
   ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked.', (n) => String(n.cf5)],
   ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
 ];
-// Deserve to win: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
-const dw = r.deserve ?? null;
+// Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
+const dw = r.replays ?? null;
 const replays = (() => {
   if (!dw) return null;
   const raw = [dw.regulation[away], dw.regulation.tie, dw.regulation[home]].map((p) => p * 100);
@@ -60,9 +60,9 @@ const replays = (() => {
 const winner = r.score[home] > r.score[away] ? home : away;
 const loser = winner === home ? away : home;
 const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
-const deserveHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} got the result its chances earned`
-  : pct(loser) >= 60 ? `${place(loser)} deserved better` : 'The chances couldn’t separate them';
-const deserveBody = !dw ? '' : pct(loser) >= 60
+const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
+  : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
+const replayBody = !dw ? '' : pct(loser) >= 60
   ? `Replaying this game’s chances, ${place(loser)} comes out ahead ${pct(loser)} times in 100. The goals went the other way.`
   : pct(winner) >= 60 ? `Replaying this game’s chances, ${place(winner)} comes out ahead ${pct(winner)} times in 100.`
   : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
@@ -117,14 +117,14 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   </Section>
 
   {dw && replays && (
-    <Section id="deserve" title="Who deserved to win" placeholder={false} takeaway="How often each team would come out ahead if both got exactly the same chances again.">
+    <Section id="replays" title="Run it back" placeholder={false} takeaway="We replayed this game’s chances 100 times. Here is how often each team came out ahead.">
       <div class="card meter">
         <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are level after regulation.`}>
           {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
         </div>
         <div class="meter-text">
-          <h3 class="h">{deserveHead}</h3>
-          <p>{deserveBody}</p>
+          <h3 class="h">{replayHead}</h3>
+          <p>{replayBody}</p>
           <dl class="compare">
             {order.map((a) => (
               <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: wins {replays[side(a)]} of 100, plus half of the {replays.tie} level ones</span></div>
