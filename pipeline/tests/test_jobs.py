@@ -58,7 +58,7 @@ def test_exported_cards_are_well_formed():
         d = json.loads(p.read_text())
         assert {c["team"] for c in d["players"]} <= {d["away"], d["home"]}
         for c in d["players"]:
-            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt", "rough")
+            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt")
             for j in c["jobs"]:
                 assert j["verdict"] in ("held", "partly", "missed", "na") and j["text"]
                 assert "deserve" not in j["text"].lower()
@@ -67,7 +67,7 @@ def test_exported_cards_are_well_formed():
 
 def test_scoresheet_levels():
     box = lambda g=0, a=0, pm=0, sh=0, pp=0: {"g": g, "a": a, "pm": pm, "sh": sh, "pp": pp, "ev": g - sh - pp}
-    assert scoresheet(box(a=2, pm=1), None) == ("big", "2 assists, +1")
+    assert scoresheet(box(a=2, pm=1), None) == ("big", "2 assists")
     assert scoresheet(box(g=3, pm=2, sh=1, pp=1), 1.0)[0] == "huge"
     assert "one shorthanded, one on the power play, one at even strength" in scoresheet(box(g=3, pm=2, sh=1, pp=1), 1.0)[1]
     assert scoresheet(box(a=4), None)[0] == "huge"
@@ -76,13 +76,14 @@ def test_scoresheet_levels():
     # a goal matters more from someone who rarely scores
     assert scoresheet(box(g=1), None, scoring_odds=0.09)[0] == "good"
     assert scoresheet(box(g=1), None, scoring_odds=0.35) == (None, None)
-    assert scoresheet(box(pm=-3), 0.4)[0] == "rough"
-    assert scoresheet(box(a=1), 0.5) == (None, None)
+    # plus-minus never sets the level
+    assert scoresheet(box(pm=4), 0.9) == (None, None) and scoresheet(box(pm=-4), 0.1) == (None, None)
+    assert scoresheet(box(a=1, pm=2), 0.9) == (None, None)
 
 
 def test_grid_never_fully_bails_out_missed_jobs():
     assert GRID["huge"]["didnt"] == "big" and GRID["big"]["didnt"] == "mixed" and GRID["good"]["didnt"] == "mixed"
-    assert GRID["huge"]["mixed"] == "huge" and GRID["rough"]["did"] == "mixed"
+    assert GRID["huge"]["mixed"] == "huge" and GRID["good"]["did"] == "big"
     assert all(GRID[None][s] == (s if s else None) for s in ("did", "mixed", "didnt", None))
 
 

@@ -143,10 +143,10 @@ RARE_GOAL = 0.2  # a goal counts as a good night only for a player who scores in
 
 
 def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> tuple[str | None, str | None]:
-    """The whole game, apart from his usual jobs, in one of five levels. A shorthanded goal counts as two points.
-    huge: a hat trick or 4+ points. big: 2+ points, +2 or better, or a point at +1 with his team owning the chances
-    with him on. good: a goal from a player who rarely scores. rough: -3 or worse with no points."""
-    goals, pm = box["g"], box["pm"]
+    """What he put on the scoresheet, apart from his usual jobs. A shorthanded goal counts as two points.
+    huge: a hat trick or 4+ points. big: 2+ points. good: a goal from a player who rarely scores. Plus-minus is
+    left out: it counts goals he was on the ice for, not what he did."""
+    goals = box["g"]
     pts = goals + box["a"] + box.get("sh", 0)
     bits = []
     if goals:
@@ -158,32 +158,29 @@ def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> 
             bits.append({3: "a hat trick"}.get(goals, f"{goals} goals") + (f" ({', '.join(split)})" if len(split) > 1 or box.get("sh") else ""))
     if box["a"]:
         bits.append(f"{box['a']} {'assist' if box['a'] == 1 else 'assists'}")
-    if pm:
-        bits.append(f"{'+' if pm > 0 else '−'}{abs(pm)}")
-    owned = xg_share is not None and xg_share >= 0.7
-    if owned and (pts or pm > 0):
+    if pts and xg_share is not None and xg_share >= 0.7:
         bits.append(f"{round(100 * xg_share)}% of the 5-on-5 chances with him on")
+    rare = goals and pts < 2 and scoring_odds < RARE_GOAL
+    if rare:
+        bits[0] += f" from a player who scores in about 1 game in {round(1 / scoring_odds)}"
     why = ", ".join(bits)
     if goals >= 3 or pts >= 4:
         return "huge", why
-    if pts >= 2 or pm >= 2 or (pts >= 1 and pm >= 1 and owned):
+    if pts >= 2:
         return "big", why
-    if goals and scoring_odds < RARE_GOAL:
-        return "good", f"{why}, from a player who scores in about 1 game in {round(1 / scoring_odds)}"
-    if pm <= -3 and pts == 0:
-        return "rough", why
+    if rare:
+        return "good", why
     return None, None
 
 
 # What the card says, from the scoresheet (rows) and his usual jobs (columns). A big scoresheet carries a card, but
 # never all the way when his jobs went badly: a hat trick with his jobs off is a big night, not a huge one, and two
-# points with his jobs off is mixed.
+# points with his jobs off is mixed. A rare scorer's goal on top of his jobs done is a big night.
 GRID = {
-    "huge":  {"did": "huge", "mixed": "huge", "didnt": "big", None: "huge"},
-    "big":   {"did": "big", "mixed": "big", "didnt": "mixed", None: "big"},
-    "good":  {"did": "did", "mixed": "did", "didnt": "mixed", None: None},
-    None:    {"did": "did", "mixed": "mixed", "didnt": "didnt", None: None},
-    "rough": {"did": "mixed", "mixed": "rough", "didnt": "rough", None: "rough"},
+    "huge": {"did": "huge", "mixed": "huge", "didnt": "big", None: "huge"},
+    "big":  {"did": "big", "mixed": "big", "didnt": "mixed", None: "big"},
+    "good": {"did": "big", "mixed": "did", "didnt": "mixed", None: None},
+    None:   {"did": "did", "mixed": "mixed", "didnt": "didnt", None: None},
 }
 
 UNIT_WEIGHT = 0.5  # power play and penalty kill results belong to five players, so they count half
