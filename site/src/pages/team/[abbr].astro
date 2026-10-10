@@ -15,6 +15,7 @@ import Histogram from '../../components/Histogram.astro';
 import linesData from '../../../public/data/lines.json';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
+import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -117,7 +118,7 @@ const _ = ordinal;
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
     <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
   </header>
-  <nav class="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+  <SectionNav items={nav as [string, string][]} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div id="next-card"></div>

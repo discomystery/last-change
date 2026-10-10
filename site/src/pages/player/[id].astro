@@ -4,6 +4,7 @@
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import AreaMap from '../../components/AreaMap.astro';
+import SectionNav from '../../components/SectionNav.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
@@ -91,7 +92,7 @@ const statRow = (x: any) => (isG ? null : x);
       <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
     </header>
     <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
-    <nav class="jump pjump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+    <SectionNav items={nav as [string, string][]} />
     {!isG && (
       <table class="pstats">
         <thead><tr><th></th>{cols.map(([full, short, tip]) => <th>{tip ? <span class="term" tabindex="0" data-tip={tip}><span class="full">{full}</span><span class="short">{short}</span></span> : <><span class="full">{full}</span><abbr class="short" title={full}>{short}</abbr></>}</th>)}</tr></thead>
@@ -375,7 +376,6 @@ const statRow = (x: any) => (isG ? null : x);
 <style>
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
   .rec a { color: inherit; }
-  .pjump { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
   .pstats { margin-top: 18px; border-collapse: collapse; font: 400 14px var(--ui); background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
   .pstats th, .pstats td { padding: 9px 14px; text-align: right; white-space: nowrap; }
   .pstats thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
