@@ -1,0 +1,15 @@
+---
+// A player's cut-out photo with no background, meant to stand on a line in the layout: its bottom edge is the bottom of
+// the shoulders, so the parent lines it up with a rule or a box edge. Renders nothing when there is no photo, and
+// removes itself if the photo fails to load (fresh call-ups often have none yet).
+import { photoOf } from '../lib/portraits';
+
+interface Props { id: number; size: number; class?: string }
+const { id, size, class: cls } = Astro.props;
+const src = photoOf(id);
+---
+{src && <img class:list={['portrait', cls]} src={src} alt="" width={size} height={size} loading="lazy" decoding="async" onerror="this.remove()" />}
+
+<style>
+  .portrait { display: block; flex: none; object-fit: contain; object-position: 50% 100%; user-select: none; pointer-events: none; }
+</style>

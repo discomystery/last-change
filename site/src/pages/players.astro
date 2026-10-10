@@ -3,6 +3,7 @@
 import Base from '../layouts/Base.astro';
 import teams from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
+import Portrait from '../components/Portrait.astro';
 
 type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
 const players = [...(index as P[])].sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
@@ -12,6 +13,7 @@ const base = import.meta.env.BASE_URL;
 <Base section="players" title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
   <header class="page-top"><h1>Players</h1></header>
   <p class="lede">Everyone who has dressed this season. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
+  <nav class="ptabs" aria-label="Players"><a href={`${base}players/`} aria-current="page">Find a player</a><a href={`${base}players/rankings/`}>Rankings</a></nav>
   <div class="find">
     <label class="search">
       <span class="sr">Find a player by name</span>
@@ -36,6 +38,7 @@ const base = import.meta.env.BASE_URL;
       <li class="card row prow go" data-name={`${p.name} ${p.number ?? ''}`.toLowerCase()} data-team={p.team} data-pos={p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F'}>
         <a class="pname go-link" href={`${base}player/${p.id}/`}>{p.name}</a>
         <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a></span>
+        <Portrait id={p.id} size={72} class="prow-photo" />
       </li>
     ))}
   </ul>
@@ -70,6 +73,9 @@ const base = import.meta.env.BASE_URL;
 </script>
 
 <style>
+  .ptabs { display: flex; gap: 6px; margin: 14px 0 0; }
+  .ptabs a { font: 600 14px var(--ui); color: var(--ink-2); padding: 7px 14px; border-radius: 999px; background: var(--track); text-decoration: none; }
+  .ptabs a[aria-current] { background: var(--ink); color: var(--sheet); }
   .find { display: grid; gap: 14px; margin-top: 18px; }
   .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 4px 14px; }
   .search:focus-within { border-color: var(--ink); }
@@ -79,7 +85,9 @@ const base = import.meta.env.BASE_URL;
   .find .pick { margin: 0; }
   .count { margin-top: 14px; }
   .plist { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
-  .prow { display: grid; gap: 2px; }
+  .prow { display: grid; gap: 2px; position: relative; overflow: hidden; padding-right: 92px; min-height: 76px; align-content: center; }
+  /* His photo sits in the right of the box, shoulders on the box's bottom edge. */
+  .prow :global(.prow-photo) { position: absolute; right: 12px; bottom: 0; width: 72px; height: 72px; }
   .prow[hidden] { display: none; }
   .pname { font: 600 17px var(--ui); }
   .pmeta { font-size: 13px; }
