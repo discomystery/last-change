@@ -31,3 +31,11 @@ def test_morning_rosters_use_the_game_record_when_played_and_the_latest_lineup_o
     done = pl.DataFrame({"game_id": [1, 1], "team_id": [10, 20], "r": [0.3, -0.1]})
     out = outlook._with_rosters(df, done, {10: 0.05, 20: 0.0, 30: 0.2})
     assert out["roster"].to_list() == [0.3 - -0.1, 0.05 - 0.2]
+
+
+def test_a_key_absence_and_return_are_named_in_the_note():
+    places = {"AAA": "Alpha", "BBB": "Beta"}
+    steps = [{"input": "home", "shift": 0.03}, {"input": "xgd", "shift": 0.0}, {"input": "b2b", "shift": 0.0}]
+    body = outlook._why(steps, "BBB", "AAA", "BBB", places, {"AAA": {"without": "Star", "maybe": True}, "BBB": {"back": "Ace"}})
+    assert "Alpha may be without Star" in body and "Beta should have Ace back" in body
+    assert "injur" not in body

@@ -12,7 +12,9 @@ Lineups shift each team's chance rating, in the same expected-goals-per-game uni
 skater is valued by his isolated 5v5 impact (rapm.py, fitted on earlier seasons only) times his usual 5v5 ice time,
 and a lineup is compared with the lineups behind the team's rating, so the model does not wait for results to show
 that a star is missing or back.
-  - roster (morning): the lineup the team used in its previous game. Catches players already out or back.
+  - roster (morning): the lineup the team used in its previous game, changed by NHL.com Status Report news since
+    then (a player reported out leaves it, one reported as playing comes back). Catches players already out or
+    back, and tonight's news where the league reported it.
   - lineup (puck drop): tonight's dressed skaters, which also catches tonight's changes.
 Backtest 2024-25 to 2026-27: in the 37% of games where a team's lineup was clearly weaker (0.15 expected goals a
 game) than the lineups behind its rating, the model without lineups gave it 46%, the morning figure 42%, the
@@ -116,8 +118,24 @@ def _rates(season: int, have: list[int]) -> dict[int, float]:
     return dict(zip(r["player_id"].to_list(), (r["off"] + r["def"]).to_list()))
 
 
+# Status Report news that takes a player out of the expected lineup (ingest/status_report.py); "day" (day to day,
+# game-time decision) is left as is, "playing" puts a player back in.
+NEWS_OUT = {"season", "long", "ir", "week", "personal", "suspended", "out"}
+
+
+def _news(seasons) -> dict[int, list[tuple[str, str]]]:
+    """Each player's Status Report mentions, [(date, status)] in date order, where the table has been built."""
+    out: dict[int, list[tuple[str, str]]] = defaultdict(list)
+    for s in seasons:
+        f = TABLES / str(s) / "status_reports.parquet"
+        if f.exists():
+            for d, pid, st in pl.read_parquet(f).sort("date").select("date", "player_id", "status").iter_rows():
+                out[pid].append((d, st))
+    return out
+
+
 @lru_cache(maxsize=4)
-def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.DataFrame, dict[int, float]]:
+def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.DataFrame, dict[int, dict]]:
     """Walks every game day in order and values lineups against what each team's rating has already seen.
 
     A lineup's value is the sum over its skaters of impact per 60 times his share of a game's 5v5 time, judged from
@@ -126,10 +144,18 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     with tonight's ratings. A star who has missed five games is therefore already partly out of the rating, and a
     returning one is added back in full on his first night.
 
-    Returns, per (game, team): `lineup` (who actually dressed, known at puck drop) and `roster` (who dressed in the
-    team's previous game, known the morning of the game), plus each team's `roster` term for its next game."""
+    The morning lineup is the team's previous one, changed by Status Report news published since that game: a
+    player reported out (injured reserve, week to week, suspended...) leaves it, and his share of the ice time goes
+    to an average replacement; a player reported as playing comes back in, in place of the least-used skater at his
+    position (or of a reported absence). News on or before the previous game is stale and ignored.
+
+    Returns, per (game, team): `lineup` (who actually dressed, known at puck drop), `roster` (the morning lineup)
+    and `roster_last` (the previous lineup without news), plus, per team, its next game's morning lineup: `roster`,
+    the players news took `out` and put `in`, the skaters its rating still counts on who are not in it (`missing`)
+    and those in it whom its rating has barely seen (`back`), each as (player, expected goals a game)."""
     have = [s for s in range(min(seasons) - 2, max(seasons) + 1) if (TABLES / str(s) / "player_game.parquet").exists()]
     rate = {s: _rates(s, have) for s in seasons}
+    news = _news(seasons)
     pg = pl.concat([
         pl.read_parquet(TABLES / str(s) / "player_game.parquet").filter(pl.col("pos") != "G").select("game_id", "player_id", "team_id", "pos", "sec5")
         .join(pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date"), on="game_id")
@@ -139,21 +165,46 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     tx: dict[int, float] = defaultdict(float)
     seen: dict[int, dict[int, float]] = defaultdict(lambda: defaultdict(float))  # per team: decayed 5v5 seconds per skater
     seen_w: dict[int, float] = defaultdict(float)  # per team: decayed game count, as in pregame
-    last: dict[int, tuple[list, list]] = {}  # per team: skaters and positions of its latest game
+    last: dict[int, tuple[list, list, str]] = {}  # per team: skaters, positions and date of its latest game
+    team_of: dict[int, tuple[int, str]] = {}  # per skater: his latest team and position
     season, r = None, {}
 
     def shares(ids, pos):
         usual = np.array([tx[q] / tw[q] if tw[q] else default[x == "D"] for q, x in zip(ids, pos)])
         return usual / usual.sum() * SEC5_PER_GAME
 
-    def value(ids, pos):
-        return float(sum(r.get(q, 0.0) * sec / 3600 for q, sec in zip(ids, shares(ids, pos))))
+    def value(ids, pos, zero=()):
+        return float(sum(r.get(q, 0.0) * sec / 3600 for q, sec in zip(ids, shares(ids, pos)) if q not in zero))
 
     def base(tid):  # the lineup the rating has seen; its phantom average games count as an average lineup (zero)
         return sum(r.get(q, 0.0) * sec / 3600 for q, sec in seen[tid].items()) / (seen_w[tid] + p.prior_games)
 
+    def latest(q, after, upto):
+        hits = [st for d, st in news.get(q, ()) if after < d <= upto]
+        return hits[-1] if hits else None
+
+    def morning(tid, day):
+        """The previous lineup with the news since then: (ids, positions, players to value at zero, out, in)."""
+        ids, pos, prev_day = last[tid]
+        ids, pos = list(ids), list(pos)
+        out = [q for q in ids if latest(q, prev_day, day) in NEWS_OUT]
+        back = sorted((q for q, (t, _) in team_of.items() if t == tid and q not in ids and latest(q, prev_day, day) == "playing"),
+                      key=lambda q: -(tx[q] / tw[q] if tw[q] else 0))
+        zero = set(out)
+        for q in back:
+            group = team_of[q][1] == "D"
+            slots = [i for i, x in enumerate(ids) if (pos[i] == "D") == group]
+            if not slots:
+                continue
+            gone = [i for i in slots if ids[i] in zero]
+            i = gone[0] if gone else min(slots, key=lambda i: tx[ids[i]] / tw[ids[i]] if tw[ids[i]] else 0)
+            zero.discard(ids[i])
+            ids[i], pos[i] = q, team_of[q][1]
+        return ids, pos, zero, out, back
+
     rows = []
     for day in pg.partition_by("date", maintain_order=True):
+        d0 = str(day["date"][0])
         if day["season"][0] != season:
             season = day["season"][0]
             r = rate.get(season, {})
@@ -164,10 +215,13 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
         today = []
         for (gid, tid), grp in day.group_by(["game_id", "team_id"], maintain_order=True):
             ids, pos = grp["player_id"].to_list(), grp["pos"].to_list()
-            b = base(tid)
-            prev = last.get(tid)
-            rows.append({"game_id": gid, "team_id": tid, "lineup": value(ids, pos) - b,
-                         "roster": (value(*prev) if prev else value(ids, pos)) - b})
+            b, now = base(tid), value(ids, pos)
+            if tid in last:
+                am_ids, am_pos, zero, _, _ = morning(tid, d0)
+                am, plain = value(am_ids, am_pos, zero), value(*last[tid][:2])
+            else:
+                am = plain = now
+            rows.append({"game_id": gid, "team_id": tid, "lineup": now - b, "roster": am - b, "roster_last": plain - b})
             today.append((tid, ids, pos, shares(ids, pos)))
         for tid, ids, pos, sh in today:
             seen_w[tid] = seen_w[tid] * p.decay + 1
@@ -175,7 +229,9 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
                 seen[tid][q] *= p.decay
             for q, sec in zip(ids, sh):
                 seen[tid][q] += sec
-            last[tid] = (ids, pos)
+            last[tid] = (ids, pos, d0)
+            for q, x in zip(ids, pos):
+                team_of[q] = (tid, x)
         for q, sec in zip(day["player_id"].to_list(), day["sec5"].to_list()):
             tw[q] = tw[q] * 0.9 + 1
             tx[q] = tx[q] * 0.9 + sec
@@ -185,19 +241,34 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
             seen_w[t] *= p.carry
             for q in seen[t]:
                 seen[t][q] *= p.carry
-    upcoming = {tid: value(*last[tid]) - base(tid) for tid in last}
-    df = pl.DataFrame(rows, schema={"game_id": pl.Int64, "team_id": pl.Int64, "lineup": pl.Float64, "roster": pl.Float64})
+    upcoming = {}
+    for tid in last:
+        ids, pos, zero, out, back = morning(tid, "9999")
+        b, w = base(tid), seen_w[tid] + p.prior_games
+        sh = dict(zip(ids, shares(ids, pos)))
+        playing = set(ids) - zero
+        # What each absent skater's games add to the rating, and what each skater in tonight's lineup adds beyond them.
+        missing = [(q, r[q] * sec / 3600 / w) for q, sec in seen[tid].items() if q not in playing and r.get(q, 0.0) * sec / 3600 / w > 0.01]
+        added = [(q, r[q] * (sh[q] - seen[tid].get(q, 0.0) / w) / 3600) for q in playing if r.get(q, 0.0) > 0]
+        upcoming[tid] = {"roster": value(ids, pos, zero) - b, "out": out, "in": back,
+                         "missing": sorted(missing, key=lambda x: -x[1]), "back": sorted((x for x in added if x[1] > 0.01), key=lambda x: -x[1])}
+    df = pl.DataFrame(rows, schema={"game_id": pl.Int64, "team_id": pl.Int64, "lineup": pl.Float64, "roster": pl.Float64, "roster_last": pl.Float64})
     return df.filter(pl.col("game_id") // 1_000_000 >= min(seasons)), upcoming
 
 
 def lineups(seasons: list[int], p: Params = Params()) -> pl.DataFrame:
-    """Per (game, team): `lineup` and `roster`, tonight's and last game's lineup against what the rating has seen,
-    in expected goals per game (see _lineup_pass)."""
+    """Per (game, team): `lineup`, `roster` and `roster_last` against what the rating has seen, in expected goals per
+    game (see _lineup_pass)."""
     return _lineup_pass(tuple(sorted(seasons)), p)[0]
 
 
 def next_rosters(seasons: list[int], p: Params = Params()) -> dict[int, float]:
-    """Each team's `roster` term for its next game: its latest lineup against what its rating has seen."""
+    """Each team's `roster` term for its next game: its latest lineup, with news since, against what its rating has seen."""
+    return {t: u["roster"] for t, u in _lineup_pass(tuple(sorted(seasons)), p)[1].items()}
+
+
+def next_lineups(seasons: list[int], p: Params = Params()) -> dict[int, dict]:
+    """Per team, its next game's morning lineup in detail (see _lineup_pass)."""
     return _lineup_pass(tuple(sorted(seasons)), p)[1]
 
 
