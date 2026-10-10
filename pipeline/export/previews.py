@@ -272,12 +272,18 @@ def site_files(folder) -> dict:
     return {k: json.loads((folder / f"{k}.json").read_text()) for k in ("fingerprints", "lines", "goalies", "goal_sources")}
 
 
-def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, **extra) -> dict:
+def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None, **extra) -> dict:
+    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number."""
     away, home = g["away"], g["home"]
-    claims = calls(g["id"], away, home, site["fingerprints"]["teams"], site["lines"]["teams"], places)
-    return {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
-            "snapshot_at": now.isoformat(timespec="seconds"), "data_as_of": site["fingerprints"]["generated_at"], **extra,
-            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}
+    fp = site["fingerprints"]["teams"]
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places)
+    out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
+           "snapshot_at": now.isoformat(timespec="seconds"), "data_as_of": site["fingerprints"]["generated_at"], **extra,
+           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}
+    if chance:
+        from pipeline.export import outlook
+        out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
+    return out
 
 
 def write_index(out_dir) -> int:
@@ -290,6 +296,19 @@ def write_index(out_dir) -> int:
     return len(index)
 
 
+def _chances(games: list[dict]) -> dict[int, dict]:
+    """Morning win chances for these games, used only to pick wording. Previews still work without them."""
+    if not games:
+        return {}
+    try:
+        from pipeline.config import CURRENT_SEASON
+        from pipeline.export import outlook
+        return outlook.morning(CURRENT_SEASON, games)
+    except Exception as e:  # e.g. tables missing in a test: no matchup note rather than no preview
+        print(f"win chances unavailable: {e!r}")
+        return {}
+
+
 def run(now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
@@ -298,16 +317,19 @@ def run(now: datetime | None = None) -> dict:
     out_dir = SITE_DATA / "previews"
     out_dir.mkdir(parents=True, exist_ok=True)
     written = frozen = 0
+    todo = []
     for g in sched:
         start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
-        path = out_dir / f"{g['id']}.json"
         if start <= now:
-            frozen += path.exists()
+            frozen += (out_dir / f"{g['id']}.json").exists()
             continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
         if g["final"] or start > now + timedelta(days=DAYS_AHEAD):
             continue
-        if g["away"] not in site["fingerprints"]["teams"] or g["home"] not in site["fingerprints"]["teams"]:
-            continue
-        path.write_text(json.dumps(snapshot(g, site, places, sched, now), separators=(",", ":"), ensure_ascii=False))
+        if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
+            todo.append(g)
+    chances = _chances(todo)
+    for g in todo:
+        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]))
+        (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
         written += 1
     return {"written": written, "frozen": frozen, "indexed": write_index(out_dir)}

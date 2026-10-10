@@ -232,6 +232,13 @@ def run(season: int = CURRENT_SEASON) -> dict:
             s = json.loads(p.read_text())
             snaps[s["game_id"]] = s
     index, tally, tally_rebuilt = [], defaultdict(int), defaultdict(int)
+    from pipeline.export import outlook
+    sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
+    try:
+        reveals = outlook.reveal(season, [g for g in sched if g["final"]], places)
+    except Exception as e:  # the post-game page still works without the reveal
+        print(f"win chance reveal unavailable: {e!r}")
+        reveals = {}
     by_kind = defaultdict(lambda: defaultdict(int))
     for gid, g in sorted(S.games.items()):
         if g["state"] not in ("OFF", "FINAL"):
@@ -253,7 +260,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
-               "numbers": nums, "goalies": glines, "surprises": surprises(S, gid, nums, places, fp, usual_lines, glines)}
+               "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surprises(S, gid, nums, places, fp, usual_lines, glines)}
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
         index.append({"id": gid, "date": g["date"], "away": g["away"], "home": g["home"], "score": rec["score"], "end": g["last_period"],

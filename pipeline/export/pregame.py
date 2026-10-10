@@ -92,13 +92,14 @@ def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
         if g["final"] and not (out_dir / f"{g['id']}.json").exists():
             todo[g["date"]].append(g)
     written = 0
+    chances = previews._chances([g for day in todo.values() for g in day])
     for day in sorted(todo):
         site, n = site_as_of(season, day)
         through = max((g["date"] for g in sched if g["final"] and g["date"] < day), default=None)
         for g in todo[day]:
             if g["away"] not in site["fingerprints"]["teams"] or g["home"] not in site["fingerprints"]["teams"]:
                 continue
-            snap = previews.snapshot(g, site, places, sched, now, rebuilt=True, games_before=n, data_through=through)
+            snap = previews.snapshot(g, site, places, sched, now, chances.get(g["id"]), rebuilt=True, games_before=n, data_through=through)
             (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
             written += 1
     previews.write_index(out_dir)
