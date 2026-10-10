@@ -101,9 +101,10 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 <Base section="games" title={`${away} at ${home}, final`} mock={false}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Final score">
+    <GameTrail id={r.game_id} part="crumbs" />
     <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <p class="when">{endWord} · {dateStr} · {r.venue}</p>
-      <GameTrail id={r.game_id} />
+    <p class="game-meta">{endWord} · {dateStr} · {r.venue}</p>
+    <GameTrail id={r.game_id} part="around" />
   </section>
 
   <SectionNav items={nav as [string, string][]} />
@@ -241,8 +242,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .ladder td { text-align: right; padding: 6px 0 6px 12px; white-space: nowrap; }
   .ladder tr + tr { border-top: 1px solid var(--rule); }
   .ladder .sum th, .ladder .sum td { font-weight: 700; }
-  .hero { margin-top: 10px; }
-  .when { margin-top: 14px; font: 400 14px var(--ui); color: var(--ink-2); }
+  .hero { margin-top: 0; }
   .claims { display: grid; gap: 16px; margin-top: 22px; }
   .claim { display: grid; gap: 16px; }
   @media (min-width: 760px) { .claim { grid-template-columns: 1fr 1fr; gap: 28px; } .claim-did { border-left: 1px solid var(--rule); padding-left: 24px; } }

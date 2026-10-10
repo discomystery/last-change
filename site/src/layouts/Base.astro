@@ -286,7 +286,9 @@ const teamList = teams as { abbr: string; name: string }[];
   .nrink .abbr.me { color: var(--ink); }
   .nrink .full { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
   .nrink .lc { font: 600 13px var(--ui); margin-top: 4px; color: var(--ink-2); }
-  .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
+  /* The one line of facts under a rink header (date, time, arena), the same on every page that has one. */
+  .next-meta, .game-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
+  .game-meta .asof { white-space: nowrap; }
   .a-raw { display: none; }
   html[data-arena='raw'] .a-raw { display: inline; }
   html[data-arena='raw'] .a-adj { display: none; }

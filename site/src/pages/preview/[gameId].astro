@@ -58,7 +58,7 @@ const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
 const asOf = snap.rebuilt
-  ? (snap.data_through ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${snap.data_through}T12:00:00Z`)) : 'Last season')
+  ? (snap.data_through ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${snap.data_through}T12:00:00Z`)) : 'last season')
   : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 
 // Style fingerprints
@@ -138,13 +138,10 @@ const _ = ordinal;
 <Base section="games" title={`${away} at ${home} preview`} mock={false}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
+    <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <dl class="meta">
-      <div><dt>When</dt><dd>{dateStr}, {timeStr}</dd></div>
-      <div><dt>Where</dt><dd>{snap.venue}</dd></div>
-      <div><dt>Numbers through</dt><dd>{asOf}</dd></div>
-    </dl>
-      <GameTrail id={snap.game_id} />
+    <p class="game-meta">{dateStr} · {timeStr} · {snap.venue} · <span class="asof">Numbers through {asOf}</span></p>
+    <GameTrail id={snap.game_id} part="around" />
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.
@@ -444,14 +441,10 @@ const _ = ordinal;
 </Base>
 
 <style>
-  .hero { margin-top: 10px; }
+  .hero { margin-top: 0; }
   .banner { margin-top: 16px; padding: 12px 16px; }
   .outlook { margin-bottom: 16px; }
   .outlook h3 { margin: 4px 0 6px; }
-  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
-  .meta dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-  .meta dd { font-weight: 500; }
-  @media (min-width: 820px) { .meta { display: flex; flex-wrap: wrap; gap: 10px 48px; } .meta dd { white-space: nowrap; } }
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .watch h3 { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }

@@ -6,8 +6,9 @@ import teams from '../../public/data/teams.json';
 import recapIndex from '../../public/data/recaps/index.json';
 import previewIndex from '../../public/data/previews/index.json';
 
-interface Props { id: number }
-const { id } = Astro.props;
+// `part` picks the trail back to the day's games (above the rink) or each team's previous and next game (below it).
+interface Props { id: number; part: 'crumbs' | 'around' }
+const { id, part } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const games = [...schedule.games].sort((a, b) => a.start.localeCompare(b.start));
 const g = games.find((x) => x.id === id)!;
@@ -31,15 +32,17 @@ const around = [g.away, g.home].map((me) => {
   return { me, prev: mine[i - 1], next: mine[i + 1] };
 });
 ---
-{g && (
-  <nav class="trail" aria-label="Where this game sits">
-    <p class="crumbs"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></p>
+{g && part === 'crumbs' && (
+  <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav>
+)}
+{g && part === 'around' && (
+  <nav aria-label="Each team's previous and next game">
     <ul class="around">
       {around.map(({ me, prev, next }) => (
         <li>
           <a class="who tlink" href={`${base}team/${me}/`}>{place[me] ?? me}</a>
-          {prev ? <a class="step" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="step n">First game</span>}
-          {next ? <a class="step" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="step n">Last game</span>}
+          {prev ? <a class="step" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="step none">First game</span>}
+          {next ? <a class="step nx" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="step nx none">Last game</span>}
         </li>
       ))}
     </ul>
@@ -47,15 +50,17 @@ const around = [g.away, g.home].map((me) => {
 )}
 
 <style>
-  .trail { margin-top: 14px; display: grid; gap: 10px; font: 400 13px var(--ui); }
-  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--ink-2); }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
   .crumbs a { color: inherit; }
   .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
-  .around { display: grid; gap: 6px; }
-  @media (min-width: 760px) { .around { grid-template-columns: 1fr 1fr; gap: 6px 24px; } }
-  .around li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
-  .who { font-weight: 700; color: var(--ink); min-width: 90px; }
-  .step { color: var(--ink-2); text-decoration: none; white-space: nowrap; }
-  a.step:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-  .tlink { text-decoration: none; }
+  /* One small panel per team, in rink order: name on top, previous game at the left, next at the right. */
+  .around { display: grid; gap: 8px; margin: 14px 0 8px; font: 400 14px var(--ui); }
+  @media (min-width: 640px) { .around { grid-template-columns: 1fr 1fr; } }
+  .around li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 16px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; }
+  .who { grid-column: 1 / -1; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .who:hover { color: var(--ink); }
+  .step { color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .step.nx { text-align: right; }
+  .step.none { color: var(--ink-3); }
+  a.step:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>
