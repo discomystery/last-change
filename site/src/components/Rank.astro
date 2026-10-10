@@ -1,0 +1,7 @@
+---
+// Percentile in grey at the right of a compact rating card; the plain-words comparison sits in its tooltip.
+import { topShare } from '../lib/players';
+interface Props { ok: boolean; pct: number; words: string; class?: string }
+const { ok, pct, words, class: cls } = Astro.props;
+---
+<em class={cls} tabindex="0" data-tip={ok ? `${words}.` : 'Too few games to rate him yet.'}>{ok ? topShare(pct) : 'too few games'}</em>

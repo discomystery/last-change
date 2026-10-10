@@ -9,11 +9,12 @@ import SectionNav from '../../components/SectionNav.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
+import Rank from '../../components/Rank.astro';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
 import { teamColour } from '../../lib/teams';
-import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, toiLine, type Skater, type Mode, type Area } from '../../lib/players';
+import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import '../../styles/blocks.css';
 
@@ -28,6 +29,10 @@ const known = new Set(index.map((x) => x.id));
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
+// A rank tag is glued to the label's last word so it never drops onto a line of its own.
+const headOf = (label: string) => label.slice(0, label.lastIndexOf(' ') + 1);
+const lastOf = (label: string) => label.slice(label.lastIndexOf(' ') + 1);
+const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 const tough = (p: number) => (p > 55 ? `tougher than ${p}%` : p < 45 ? `easier than ${100 - p}%` : 'about average');
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(p.generated_at));
 const isG = p.group === 'G';
@@ -40,22 +45,22 @@ const areaName: Record<string, string> = {
   behind: 'Behind the net', cornerL: 'Left corner', cornerR: 'Right corner', outerL: 'Left side, high', outerR: 'Right side, high', point: 'Middle of the blue line',
   pointL: 'Left point', pointR: 'Right point', outside: 'Outside the zone',
 };
-const lineWord: Record<string, string> = { L: 'trio', P: 'pair' };
 
 // ---- Skater role sentences ----
 const role = isG ? null : s.role;
 const nameLink = (m: { id: number; name: string }) => ({ ...m, href: href(m.id) });
 const unitWord = (label: string) => (label.endsWith('1') ? 'first' : 'second');
 const games = (n: number) => `${n} ${n === 1 ? 'game' : 'games'}`;
-const pkLine: string[] = (() => {
+// Penalty kill in one short line: how many of the team's recent kills he was in, then detail in grey.
+const pkSpan = `over the last ${games(Math.min(role?.team_games ?? 0, 10))}`;
+const pk = (() => {
   const k = role?.pk;
-  const span = `over the last ${games(Math.min(role?.team_games ?? 0, 10))}`;
-  if (!k || !k.kills) return ['The team has not killed a penalty in this stretch.'];
-  if (!k.role) return [`Rarely kills penalties: not a regular in ${team?.place ?? p.team}’s ${k.kills} kills ${span}.`];
-  const usage = `On the ice for ${k.kills_in} of ${team?.place ?? p.team}’s ${k.kills} kills ${span}, ${clock(k.per_kill!)} a kill`;
-  if (k.role === 'starter') return [`${usage}; out at the start of ${k.starts} of them${k.draw ? ', usually to take the defensive-zone faceoff' : ''}.`];
-  if (k.role === 'second') return [`${usage}, coming on after the first change${k.starts ? ` (out at the start of only ${k.starts})` : ' and never out at the start'}.`];
-  return [`${usage}.`];
+  if (!k || !k.kills) return { main: 'No kills in this stretch', more: [] as string[], tip: '' };
+  if (!k.role) return { main: 'Rarely kills penalties', more: [`not a regular in ${k.kills} kills`], tip: `Not a regular in ${team?.place ?? p.team}’s ${k.kills} kills ${pkSpan}.` };
+  const more = [`${clock(k.per_kill!)} a kill`];
+  if (k.role === 'starter') { more.push(`starts ${k.starts}`); if (k.draw) more.push('takes the draw'); }
+  if (k.role === 'second' && k.starts) more.push(`starts only ${k.starts}`);
+  return { main: `${k.kills_in} of ${k.kills} kills`, more, tip: `On the ice for ${k.kills_in} of ${team?.place ?? p.team}’s ${k.kills} kills ${pkSpan}.` };
 })();
 let strengths: ReturnType<typeof standouts> | null = null;
 const strengthsBy = isG ? null : Object.fromEntries(modes.map(([m]) => [m, standouts(s, m)])) as Record<Mode, ReturnType<typeof standouts>>;
@@ -115,8 +120,7 @@ const statRow = (x: any) => (isG ? null : x);
                 <dd>
                   {role.line ? (
                     <>
-                      <p>{posName} on the {lineWord[role.line.label[0]]} with {role.line.mates.map(nameLink).map((m, i) => <>{i > 0 && ' and '}{m.href ? <a class="plink" href={m.href}>{m.name}</a> : m.name}</>)}.</p>
-                      <p class="n">Listed as {role.line.label}: lines are numbered by recent 5-on-5 time together, with the latest games counting most{role.line.toi_sec != null && <> ({clock(role.line.toi_sec)} together a game when it is one of the team’s lines)</>}.</p>
+                      <p><span class="chip tag" tabindex="0" data-tip={`${role.line.label}: ${s.group === 'D' ? 'pairs' : 'lines'} are numbered by recent 5-on-5 time together, with the latest games counting most. Taken from who has actually played together lately, not the announced lineup.`}>{role.line.label}</span> with {role.line.mates.map(nameLink).map((m, i) => <>{i > 0 && ' and '}{m.href ? <a class="plink" href={m.href}>{m.name}</a> : m.name}</>)}{role.line.toi_sec != null && <span class="n"> · {clock(role.line.toi_sec)} a game together</span>}</p>
                     </>
                   ) : (
                     <p>Not part of one of the team’s usual {s.group === 'D' ? 'pairs' : 'lines'} over the last {Math.min(role.team_games, 10)} games{role.gp !== undefined ? `; has played ${role.gp} of the team’s ${role.team_games} games this season` : ''}.</p>
@@ -127,22 +131,21 @@ const statRow = (x: any) => (isG ? null : x);
                 <dt>Power play</dt>
                 <dd>
                   {role.pp ? (
-                    <p>{unitWord(role.pp.label)[0].toUpperCase() + unitWord(role.pp.label).slice(1)} unit ({role.pp.label}){role.pp.role && <>, as its <span class="chip tag" tabindex="0" data-tip={roleTip[role.pp.role]}>{role.pp.role}</span></>}{role.pp.both && ', and he often stays out when the second unit comes on'}.</p>
-                  ) : <p>Not on either of the team’s power-play units.</p>}
+                    <p><span class="chip tag" tabindex="0" data-tip={`The ${unitWord(role.pp.label)} power-play unit.`}>{role.pp.label}</span>{role.pp.role && <> <span class="chip tag" tabindex="0" data-tip={roleTip[role.pp.role]}>{role.pp.role}</span></>}{role.pp.both && <span class="n"> · often stays on for the second unit</span>}</p>
+                  ) : <p>Not on either unit</p>}
                   {role.faceoff && <p class="n">{role.faceoff}</p>}
                   {role.pp && s.moved_from && !role.pp.role && <p class="n">Power-play role tags count only games with his current team, and he has too few power-play shots with {team?.place ?? p.team} yet to earn one.</p>}
                 </dd>
               </div>
               <div>
                 <dt>Penalty kill</dt>
-                <dd>{pkLine.map((t, i) => <p class={i ? 'n' : undefined}>{i === 0 && role.pk?.role ? <><span class="chip tag" tabindex="0" data-tip={pkRoleTip[role.pk.role]}>{pkRoleWord[role.pk.role]}</span> </> : null}{t}</p>)}</dd>
+                <dd><p>{role.pk?.role && <><span class="chip tag" tabindex="0" data-tip={pkRoleTip[role.pk.role]}>{pkRoleWord[role.pk.role]}</span> </>}<span class:list={{ term: !!pk.tip }} tabindex={pk.tip ? 0 : undefined} data-tip={pk.tip || undefined}>{pk.main}</span>{pk.more.length > 0 && <span class="n"> · {pk.more.join(' · ')}</span>}</p></dd>
               </div>
               {role.toi && (
                 <div>
                   <dt>Ice time</dt>
                   <dd>
-                    <p><strong>{clock(role.toi.toi)}</strong> a game: {toiLine(role.toi).join(', ')}.</p>
-                    {role.toi_rank !== undefined && role.toi_of !== undefined && role.toi_of > 1 && <p class="n">The {most(role.toi_rank)} among {team?.place ?? p.team}’s {groupWord[s.group]} who have played at least half the games ({role.toi_of} of them).</p>}
+                    <p><strong>{clock(role.toi.toi)}</strong> a game{role.toi_rank !== undefined && role.toi_of !== undefined && role.toi_of > 1 && <>, <span class="term" tabindex="0" data-tip={`Among the ${role.toi_of} ${team?.place ?? p.team} ${groupWord[s.group]} who have played at least half the games.`}>{most(role.toi_rank)} among {team?.place ?? p.team} {groupWord[s.group]}</span></>}<span class="n"> · {[`${clock(role.toi.toi5)} 5-on-5`, role.toi.toi_pp >= 15 && `${clock(role.toi.toi_pp)} PP`, role.toi.toi_pk >= 15 && `${clock(role.toi.toi_pk)} PK`].filter(Boolean).join(' · ')}</span></p>
                   </dd>
                 </div>
               )}
@@ -154,10 +157,13 @@ const statRow = (x: any) => (isG ? null : x);
                       const c = s.competition![m];
                       if (!c?.all) return null;
                       const split = [c.home && `${tough(c.home.pct)} at home, where his coach has the last change`, c.road && `${tough(c.road.pct)} on the road`].filter(Boolean);
+                      // Home and road in grey: just the percentage when it reads from the same side as the main line.
+                      const side = (q: number) => (q > 55 ? 1 : q < 45 ? -1 : 0);
+                      const short = (q: number) => (side(q) !== 0 && side(q) === side(c.all!.pct) ? `${side(q) > 0 ? q : 100 - q}%` : tough(q));
+                      const hr = [c.home && `home ${short(c.home.pct)}`, c.road && `road ${short(c.road.pct)}`].filter(Boolean);
                       return (
                         <div class={`gmode m-${m}`}>
-                          <p>{compared(c.all.pct, 'faces tougher opponents than', 'faces easier opponents than', groupWord[s.group])} <Marker pct={c.all.pct} tip={`How dangerous the opponents he faces at 5-on-5 are, ${mw}. Not good or bad in itself; it is the job he is given.`} /></p>
-                          {split.length > 0 && <p class="n">{split.join('; ')}. The “Preventing chances” and “Creating chances” ratings already account for this.</p>}
+                          <p>{compared(c.all.pct, 'tougher opponents than', 'easier opponents than', groupWord[s.group])} <Marker pct={c.all.pct} tip={`How dangerous the opponents he faces at 5-on-5 are, ${mw}${split.length ? `: ${split.join('; ')}` : ''}. Not good or bad in itself; it is the job he is given, and his “Creating chances” and “Preventing chances” ratings already account for it.`} />{hr.length > 0 && <span class="n"> · {hr.join(', ')}</span>}</p>
                         </div>
                       );
                     })}
@@ -169,30 +175,30 @@ const statRow = (x: any) => (isG ? null : x);
           {role.notes.length > 0 && (
             <div class="card worth"><p class="mini-h">What’s changed</p><ul>{role.notes.map((n) => <li>{n}</li>)}</ul></div>
           )}
-          <p class="note">Lines and units come from who has actually played together lately, not from the team’s announced lineup.</p>
         </Section>
 
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
-              ? <><span class="a-adj">{it.info.say(it.est.index ?? 100)}</span><span class="a-raw">{it.info.raw!(it.est.raw!)}</span></>
-              : <>{it.info.say(it.v)}</>;
-            const cmpTip = (it: (typeof x.best)[number]) => it.edge ? compared(it.pct, it.info.up ?? 'more than', it.info.down ?? 'less than', it.vs) : compared(it.pct, 'better than', 'behind', it.vs);
+              ? <><span class="a-adj">{it.info.short(it.est.index ?? 100)}</span><span class="a-raw">{it.info.rawShort!(it.est.raw!)}</span></>
+              : <>{it.info.short(it.v)}</>;
+            const tagOf = (it: (typeof x.best)[number]) => rankTag(it.rank) && <span class="rk" tabindex="0" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span>;
+            const cmpTip = (it: (typeof x.best)[number], lower = false) => it.edge ? compared(it.pct, it.info.up ?? 'more than', it.info.down ?? 'less than', it.vs, lower) : compared(it.pct, 'better than', 'behind', it.vs, lower);
             const cmpOf = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
-              ? <><span class="a-adj">{cmpTip(it)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs)}</span></>
-              : <>{cmpTip(it)}</>;
+              ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
+              : <>{cmpTip(it, true)}</>;
             return (
               <div class={`gmode m-${m}`}>
                 <div class="two sw">
                   <div class="card">
                     <p class="mini-h">Better than most at his position</p>
-                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p>{cmpOf(it)}: {say(it)}.</p></li>)}</ul>
+                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{headOf(it.info.label)}<span class="nw">{lastOf(it.info.label)}{tagOf(it)}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is above most {groupWord[s.group]}.</p>}
                   </div>
                   <div class="card">
                     <p class="mini-h">Behind most at his position</p>
-                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p>{cmpOf(it)}: {say(it)}.</p></li>)}</ul>
+                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li><p class="sw-h"><span><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is below most {groupWord[s.group]}.</p>}
                   </div>
                 </div>
@@ -215,16 +221,16 @@ const statRow = (x: any) => (isG ? null : x);
                 {Object.entries(TRAITS).filter(([, t]) => t.group === grp).filter(([k]) => s.traits[k]).map(([k, t]) => {
                   const e = s.traits[k];
                   return (
-                    <li class:list={['card', 'fpc', { thin: !e.blend.ok && !e.season.ok }]}>
-                      <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                    <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season.ok }]}>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</span>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${e.season.pct};--clo:${e.season.lo};--chi:${e.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
                         <p class={`fpc-line m-${m}`}>
                           {e[m].raw === undefined
-                            ? <><span>{t.say(e[m].v)}</span><em>{e[m].ok ? compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group], true) : 'too small a sample to rate'}</em></>
-                            : <><span class="a-adj">{t.say(e[m].index ?? 100)}</span><em class="a-adj">{e[m].ok ? compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group], true) : 'too small a sample to rate'}</em>
-                                <span class="a-raw">{t.raw!(e[m].raw!)}</span><em class="a-raw">{e[m].ok ? compared(e[m].raw_pct!, 'more than', 'fewer than', peerWord[e[m].vs ?? s.group], true) : 'too small a sample to rate'}</em></>}
+                            ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} /></>
+                            : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} class='a-adj' />
+                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerWord[e[m].vs ?? s.group])} class='a-raw' /></>}
                         </p>
                       ))}
                     </li>
@@ -286,12 +292,12 @@ const statRow = (x: any) => (isG ? null : x);
                   if (!b && !c) return null;
                   const bp = b?.pct ?? 50, cp = c?.pct ?? 50;
                   return (
-                    <li class:list={['card', 'fpc', { thin: !(b?.ok || c?.ok) }]}>
-                      <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                    <li class:list={['card', 'fpc', 'mini', { thin: !(b?.ok || c?.ok) }]}>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</span>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
-                        <p class={`fpc-line m-${m}`}>{e ? <><span>{t.say(e.v)}</span><em>{e.ok ? compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', peerWord[e.vs ?? s.group], true) : 'too few games to rate'}</em></> : <span class="n">No tracking data yet.</span>}</p>
+                        <p class={`fpc-line m-${m}`}>{e ? <><span tabindex="0" data-tip={`${cap(t.say(e.v))}.`}>{t.short(e.v)}</span><Rank ok={e.ok} pct={e.pct} words={compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', peerWord[e.vs ?? s.group])} /></> : <span class="n">No tracking data yet.</span>}</p>
                       ); })}
                     </li>
                   );
@@ -408,6 +414,15 @@ const statRow = (x: any) => (isG ? null : x);
   .sw .card { align-content: start; }
   .swl { display: grid; gap: 14px; }
   .swl li { display: grid; gap: 2px; font: 400 15px/1.45 var(--ui); }
+  .sw-l { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+  .sw-l em { font-style: normal; color: var(--ink-3); }
+  .mini .fpc-name { font-size: 18px; }
+  .rk { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: var(--sheet); font: 700 11px/1.7 var(--ui); letter-spacing: 0.03em; vertical-align: 2px; white-space: nowrap; cursor: help; }
+  .nw { white-space: nowrap; }
+  .rk.rk-season { display: none; }
+  html[data-mode='season'] .rk.rk-season { display: inline-block; }
+  html[data-mode='season'] .rk.rk-blend { display: none; }
+  .fpgrid:has(> .mini) { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); }
   .sw-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
   .thin { opacity: 0.55; }
   .st2 { display: grid; gap: 14px; margin-top: 12px; align-items: start; }
