@@ -106,7 +106,7 @@ def run(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame
     """Relevancy for every skater who has played this season (before a date, if given), blending in last season."""
     sc = _scale(season - 1)
     now = season_lines(season, before)
-    last = season_lines(season - 1).rename({c: f"{c}_l" for c in ("gp", "g", "pts", "tgf", "sec5", "team_id", "pos")})
+    last = _last_full(season)
     # Players who have not dressed yet this season but are listed on a club's roster (hurt, scratched, held out)
     # still matter: they keep last season's standing on the club that lists them.
     listed = _listed(season, before).join(last.select("player_id", "pos_l"), on="player_id").join(now.select("player_id"), on="player_id", how="anti")
@@ -133,6 +133,18 @@ def run(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame
     d = d.with_columns(tier=pl.col("pct").map_elements(lambda p: next(t for cut, t in TIERS if p >= cut), return_dtype=pl.Utf8),
                        team_rank=pl.col("score").rank("ordinal", descending=True).over("team_id"))
     return d.select("player_id", "team_id", "pos", "gp", "gp_l", "moved", "share", "impact", "off", "def", "sec5_b", "score", "pct", "tier", "team_rank")
+
+
+def _last_full(season: int) -> pl.DataFrame:
+    """Last season's lines, reaching back one more season for a player who missed most of last season
+    (Barkov sat out all of 2025-26 and would otherwise start this season as an unknown)."""
+    cols = ("gp", "g", "pts", "tgf", "sec5", "team_id", "pos")
+    last = season_lines(season - 1)
+    if (TABLES / str(season - 2) / "player_game.parquet").exists():
+        older = season_lines(season - 2).filter(pl.col("gp") >= REGULAR_GP)
+        swap = older.join(last.filter(pl.col("gp") >= REGULAR_GP).select("player_id"), on="player_id", how="anti")
+        last = pl.concat([last.join(swap.select("player_id"), on="player_id", how="anti"), swap.select(last.columns)])
+    return last.rename({c: f"{c}_l" for c in cols})
 
 
 def _listed(season: int, before: str | None) -> pl.DataFrame:
