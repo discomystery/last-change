@@ -16,22 +16,32 @@ import { clock as mmss } from '../../lib/format';
 import { matchupColours } from '../../lib/teams';
 import '../../styles/blocks.css';
 import teamsData from '../../../public/data/teams.json';
-import fpData from '../../../public/data/fingerprints.json';
-import linesData from '../../../public/data/lines.json';
-import goalieData from '../../../public/data/goalies.json';
-import srcData from '../../../public/data/goal_sources.json';
+import fpAll from '../../../public/data/fingerprints.json';
+import linesAll from '../../../public/data/lines.json';
+import goalieAll from '../../../public/data/goalies.json';
+import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
 
 type Claim = { id: string; kind: string; head: string; body: string; cite: string; check: object | null };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[] };
+// `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
+// still be shown unchanged after the game. `rebuilt` previews were made after the game from the data before it.
+type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
   const final = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
-  return Object.values(files).map((f) => f.default).filter((s) => !final.has(s.game_id)).map((s) => ({ params: { gameId: String(s.game_id) }, props: { snap: s } }));
+  return Object.values(files).map((f) => f.default).filter((s) => !final.has(s.game_id) || s.pregame).map((s) => ({ params: { gameId: String(s.game_id) }, props: { snap: s } }));
 }
 const { snap } = Astro.props as { snap: Snap };
+const pre = snap.pregame;
+const fpData = pre?.fingerprints ?? fpAll;
+const linesData = pre?.lines ?? linesAll;
+const goalieData = pre?.goalies ?? goalieAll;
+const srcData = pre?.goal_sources ?? srcAll;
+const played = schedule.games.find((g) => g.id === snap.game_id && g.final);
+const fmtDay = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
 const base = import.meta.env.BASE_URL;
 const { away, home } = snap;
 const order = [away, home] as const;
@@ -39,12 +49,14 @@ const side = (a: string) => (a === away ? 'away' : 'home');
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
 const full = (a: string) => T[a]?.name ?? a;
-const rec = (a: string) => (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
+const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
 const colours = matchupColours(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
-const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
+const asOf = snap.rebuilt
+  ? (snap.data_through ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${snap.data_through}T12:00:00Z`)) : 'Last season')
+  : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
@@ -135,6 +147,14 @@ const _ = ordinal;
       <div><dt>Numbers through</dt><dd>{asOf}</dd></div>
     </dl>
       <GameTrail id={snap.game_id} />
+    {played && (
+      <p class="card banner">
+        {snap.rebuilt
+          ? <>This preview was rebuilt after the game, using only games played before {fmtDay(played.date)}{snap.data_through ? '' : ' (none yet this season, so it leans on last season)'}. Nobody could read it beforehand, so its calls are checked on the post-game page but left out of the season count. </>
+          : <>This is the preview as it stood at puck drop. </>}
+        Final: {played.away} {played.as}, {played.home} {played.hs}{played.end && played.end !== 'REG' ? ` (${played.end})` : ''}. <a href={`${base}recap/${snap.game_id}/`}>See how it held up</a>.
+      </p>
+    )}
   </section>
   <nav class="jump sticky" id="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
 
@@ -154,7 +174,9 @@ const _ = ordinal;
         <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
       </div>
     )}
-    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+    <p class="note">{snap.rebuilt
+      ? 'These calls are written by the same fixed rules as every preview, from the numbers below as they stood before the game.'
+      : 'These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.'}</p>
   </Section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
@@ -422,6 +444,7 @@ const _ = ordinal;
 
 <style>
   .hero { margin-top: 10px; }
+  .banner { margin-top: 16px; padding: 12px 16px; }
   .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
   .meta dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .meta dd { font-weight: 500; }
