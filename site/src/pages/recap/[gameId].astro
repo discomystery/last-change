@@ -1,21 +1,24 @@
 ---
-// Post-game page, one per finished game. The preview's calls are shown exactly as saved at puck drop, each graded by
-// the rule stored with it; then the game's numbers, what nobody saw coming, and the goalies.
+// Post-game page, one per finished game. What we expected (the win chance kept hidden before the game, then the
+// preview's calls exactly as saved at puck drop, each graded by the rule stored with it), what happened (run it back,
+// what nobody saw coming), then the detail (the game's numbers and the goalies).
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
 import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
+import SectionNav from '../../components/SectionNav.astro';
+import '../../styles/blocks.css';
 import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
 
-type Call = { id: string; kind: string; head: string; body: string; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
+type Call = { id: string; kind: string; head: string; body: string; call?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[]; replays?: Replays | null;
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string }[]; replays?: Replays | null;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }> } | null };
 
 export async function getStaticPaths() {
@@ -83,6 +86,13 @@ const replayBody = !dw ? '' : pct(loser) >= 60
   ? `Replaying this game’s chances, ${place(loser)} comes out ahead ${pct(loser)} times in 100. The goals went the other way.`
   : pct(winner) >= 60 ? `Replaying this game’s chances, ${place(winner)} comes out ahead ${pct(winner)} times in 100.`
   : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
+// Section order tells the story: what we expected, what happened, then the detail.
+// Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
+const hasJobs = Object.keys(import.meta.glob('../../../public/data/jobs/2*.json')).some((k) => k.endsWith(`/${r.game_id}.json`));
+const nav = [
+  ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
+  ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
+];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
 <Base section="games" title={`${away} at ${home}, final`} mock={false}>
@@ -93,6 +103,31 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
       <GameTrail id={r.game_id} />
   </section>
 
+  <SectionNav items={nav as [string, string][]} />
+
+  {rv && (
+    <Section id="chance" title="Our pre-game read" placeholder={false} takeaway="The win chance our model worked out before the game, kept off the site until now.">
+      {order.map((a) => (
+        <div class={`card pov pov-${side(a)} reveal`}>
+          <h3>{rv.sides[a].head}</h3>
+          <table class="ladder">
+            <tbody>
+              <tr><th scope="row">Two even teams on neutral ice</th><td></td><td>50%</td></tr>
+              {ladder(a).map((x) => (
+                <>
+                  <tr><th scope="row">{x.label}</th><td>{signed(x.pts)} points</td><td>{x.input === 'lineup' ? '' : `${x.after}%`}</td></tr>
+                  {x.input === 'b2b' && <tr class="sum"><th scope="row">Our chance for {place(a)} the morning of the game</th><td></td><td>{rv.sides[a].chance}%</td></tr>}
+                  {x.input === 'lineup' && <tr class="sum"><th scope="row">At puck drop, once the lineups were known</th><td></td><td>{x.after}%</td></tr>}
+                </>
+              ))}
+            </tbody>
+          </table>
+          <p class="note"><strong>Control of chances</strong> compares each team’s expected-goal difference over its recent games, with older games counting less. <strong>Back-to-back</strong> is a team playing for the second night in a row. <strong>Tonight’s lineup</strong> values the players who actually dressed against each team’s usual lineup. Only games played before this one went in, and the preview only hinted at the number in words.</p>
+        </div>
+      ))}
+    </Section>
+  )}
+
   <Section id="scorecard" title="What the preview said, and what happened" placeholder={false} takeaway={takeaway}>
     {r.calls.length > 0 ? (
       <ol class="claims">
@@ -102,12 +137,13 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
               <p class="eyebrow">Before the game</p>
               <h3>{c.head}</h3>
               <p class="detail">{c.body}</p>
+              {c.call && <p class="call"><span>The call</span> {c.call}</p>}
             </div>
             <div class="claim-did">
               {c.verdict === null ? (
                 <>
-                  <p class="verdict note-only">Background, not a call</p>
-                  <p class="detail">This was context about the two teams, not a prediction, so it isn’t graded.</p>
+                  <p class="verdict na">– Can’t judge</p>
+                  <p class="detail">This call has no rule to check it by.</p>
                 </>
               ) : (
                 <>
@@ -129,7 +165,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     ) : (
       <p class="note">Previews are saved at puck drop, starting with games on October 10, so there were no calls to check for this one.</p>
     )}
-    <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better; <strong>partly</strong> means it beat the league average (or, for a matchup, the share with no line matching) but fell short of its usual level. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
+    <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better (or, when the call is that one team comes out ahead, it won that comparison by at least half its usual margin); <strong>partly</strong> means it beat the league average (or the share with no line matching, or came out ahead by less) but fell short of that. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {r.rebuilt && <p class="note">No preview was saved before this game, so this one was <a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>rebuilt afterwards</a> from the games played before it, by the same rules. Because nobody could read it beforehand, its calls are left out of the season count below.</p>}
     {r.preview_page && !r.rebuilt && <p class="note"><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</p>}
     {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls.</p>}
@@ -157,6 +193,13 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     </Section>
   )}
 
+  {r.surprises.length > 0 && (
+    <Section id="surprises" title="What the preview didn’t see coming" placeholder={false} takeaway="The parts of this game furthest from how these teams usually play, biggest first.">
+      <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
+      <p class="note"><strong>Broke the pattern</strong>: the game went the other way from a team’s usual habit. <strong>Further than usual</strong>: the usual direction, much further. <strong>Closer than usual</strong>: the usual direction, much nearer even. <strong>Out of character</strong>: a team that is usually about average was far from it. Each one is measured against what the teams’ numbers said before the game, and shot counts have to stray further than anything else to make this list.</p>
+    </Section>
+  )}
+
   <Section id="numbers" title="The numbers" placeholder={false} takeaway="How the game went, beyond the score.">
     <div class="card">
       <table class="numbers">
@@ -169,35 +212,6 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     </div>
     {r.end === 'SO' && <p class="note">The shootout decides the result but is left out of every other number on this site.</p>}
   </Section>
-
-  {rv && (
-    <Section id="chance" title="Our pre-game read" placeholder={false} takeaway="The win chance our model worked out before the game, kept off the site until now.">
-      {order.map((a) => (
-        <div class={`card pov pov-${side(a)} reveal`}>
-          <h3>{rv.sides[a].head}</h3>
-          <table class="ladder">
-            <tbody>
-              <tr><th scope="row">Two even teams on neutral ice</th><td></td><td>50%</td></tr>
-              {ladder(a).map((x) => (
-                <>
-                  <tr><th scope="row">{x.label}</th><td>{signed(x.pts)} points</td><td>{x.input === 'lineup' ? '' : `${x.after}%`}</td></tr>
-                  {x.input === 'b2b' && <tr class="sum"><th scope="row">Our chance for {place(a)} the morning of the game</th><td></td><td>{rv.sides[a].chance}%</td></tr>}
-                  {x.input === 'lineup' && <tr class="sum"><th scope="row">At puck drop, once the lineups were known</th><td></td><td>{x.after}%</td></tr>}
-                </>
-              ))}
-            </tbody>
-          </table>
-          <p class="note"><strong>Control of chances</strong> compares each team’s expected-goal difference over its recent games, with older games counting less. <strong>Back-to-back</strong> is a team playing for the second night in a row. <strong>Tonight’s lineup</strong> values the players who actually dressed against each team’s usual lineup. Only games played before this one went in, and the preview only hinted at the number in words.</p>
-        </div>
-      ))}
-    </Section>
-  )}
-
-  {r.surprises.length > 0 && (
-    <Section id="surprises" title="What the preview didn’t see coming" placeholder={false} takeaway="The parts of this game furthest from how these teams usually play.">
-      <ul class="two surp">{r.surprises.map((s) => <li class="card"><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
-    </Section>
-  )}
 
   <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
@@ -246,6 +260,10 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .numbers td { font-weight: 600; font-variant-numeric: tabular-nums; width: 22%; }
   .numbers tr:first-child td { font: 700 22px/1 var(--display); }
   .surp, .gl { margin-top: 18px; }
+  .surp .eyebrow { margin-bottom: 6px; }
+  .surp .mild .h { font-size: 19px; }
+  .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
+  .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .meter { margin-top: 18px; display: grid; gap: 22px; align-items: center; }
   @media (min-width: 640px) { .meter { grid-template-columns: auto 1fr; gap: 32px; } }
   .replays { display: grid; grid-template-columns: repeat(10, 10px); gap: 5px; justify-content: start; }

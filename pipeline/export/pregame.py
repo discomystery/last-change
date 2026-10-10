@@ -80,8 +80,16 @@ def site_as_of(season: int, day: str) -> tuple[dict, int]:
     return site, n
 
 
+def _stale(path: Path) -> bool:
+    if not path.exists():
+        return True
+    snap = json.loads(path.read_text())
+    return bool(snap.get("rebuilt")) and snap.get("rules", 1) < previews.RULES_VERSION
+
+
 def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
-    """Rebuild a preview for every finished game that has none. Existing snapshots, live or rebuilt, are never touched."""
+    """Rebuild a preview for every finished game that has none, and redo rebuilt ones written under an older rulebook.
+    Live snapshots (saved before puck drop) are never touched."""
     now = now or datetime.now(timezone.utc)
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
     places = {t["abbr"]: t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())}
@@ -89,7 +97,7 @@ def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     todo = defaultdict(list)
     for g in sched:
-        if g["final"] and not (out_dir / f"{g['id']}.json").exists():
+        if g["final"] and _stale(out_dir / f"{g['id']}.json"):
             todo[g["date"]].append(g)
     written = 0
     chances = previews._chances([g for day in todo.values() for g in day])
