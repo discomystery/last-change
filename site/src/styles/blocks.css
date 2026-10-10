@@ -1,5 +1,6 @@
 /* Shared by team and preview pages: fingerprint cards, line cards, matchup strips, special teams, goalies, goal sources. */
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
+  .crumbs + .team-top { margin-top: 0; }
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
   .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }

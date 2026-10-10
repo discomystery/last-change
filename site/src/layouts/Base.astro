@@ -328,6 +328,17 @@ const teamList = teams as { abbr: string; name: string }[];
   .nrink .lc { font: 600 13px var(--ui); margin-top: 4px; color: var(--ink-2); }
   /* The one line of facts under a rink header (date, time, arena), the same on every page that has one. */
   .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
+  /* Breadcrumb trail above a page title (game, team pages). */
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
+  .crumbs a { color: inherit; }
+  .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
+  /* Round link buttons under a rink header (previous and next games, the preview). */
+  .pill { font: 500 13px var(--ui); text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
+  a.pill:hover { border-color: var(--ink); }
+  .pill.none { background: none; color: var(--ink-3); }
+  /* A next-game rink's date block, centred under the rink like a game page's. */
+  .next-when { display: grid; justify-items: center; gap: 2px; text-align: center; margin: 16px 0 12px; font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .next-when .pill { margin-top: 10px; }
   /* The game's day, set large under a rink header on preview and post-game pages. */
   .when-day { font: 600 20px/1.2 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-bottom: 2px; }
   .when-day + p strong { color: var(--ink); font-weight: 600; }
