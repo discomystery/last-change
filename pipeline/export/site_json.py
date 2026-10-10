@@ -88,7 +88,7 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
 
 
 # Traits whose numbers are checked and ready to show.
-READY = ["volume", "quality", "rebounds", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "depth", "pp", "pk", "powerKill", "discipline"]
+READY = ["volume", "quality", "rebounds", "turnover", "dShots", "inClose", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "depth", "pp", "pk", "powerKill", "discipline"]
 
 
 def export_fingerprints(season: int, idle: bool = False) -> int:

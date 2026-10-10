@@ -6,7 +6,7 @@ from pipeline.export import previews
 
 def _site(tmp_path, start):
     dims = {k: {"blend": {"v": 60.0, "pct": 50, "rank": 16, "index": 100}} for k in
-            ["volume", "suppression", "quality", "qualityAllowed", "turnover", "breakdowns", "pp", "pk", "pace", "point", "forecheck", "physical", "depth"]}
+            ["volume", "suppression", "quality", "qualityAllowed", "turnover", "breakdowns", "pp", "pk", "pace", "dShots", "inClose", "forecheck", "physical", "depth"]}
     strong = {**dims, "volume": {"blend": {"v": 66.0, "pct": 92, "rank": 3, "index": 116}}}
     weak = {**dims, "suppression": {"blend": {"v": 62.0, "pct": 10, "rank": 29, "index": 110}}}
     (tmp_path / "schedule.json").write_text(json.dumps({"games": [{"id": 1, "start": start, "home": "BBB", "away": "AAA", "venue": "Rink", "final": False, "hs": 0, "as": 0, "end": None}]}))
@@ -85,7 +85,7 @@ def test_edge_call_graded_on_the_usual_margin():
 
 def _dims(**over):
     d = {k: {"blend": {"v": 60.0, "pct": 50, "rank": 16, "index": 100}} for k in
-         ["volume", "suppression", "quality", "qualityAllowed", "turnover", "breakdowns", "pp", "pk", "pace", "point", "forecheck", "physical", "depth"]}
+         ["volume", "suppression", "quality", "qualityAllowed", "turnover", "breakdowns", "pp", "pk", "pace", "dShots", "inClose", "forecheck", "physical", "depth"]}
     for k, b in over.items():
         d[k] = {"blend": {"rank": 3, **b}}
     return d

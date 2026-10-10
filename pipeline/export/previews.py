@@ -24,8 +24,9 @@ from datetime import datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 3  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 4  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
+# 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -494,7 +495,9 @@ EDGE = {
     "quality": ("shot quality", "hopeful", "dangerous", "how dangerous the average shot was", lambda v: f"{100 * v:.1f}% a shot" if v else "–"),
     "suppression": ("shot suppression", "porous", "stingy", "5-on-5 shot attempts allowed per 60", lambda v: f"{v:.1f} per 60"),
     "qualityAllowed": ("preventing dangerous shots", "exposed", "sheltered", "how dangerous the average shot allowed was", lambda v: f"{100 * v:.1f}% a shot" if v else "–"),
-    "point": ("point-shot reliance", "down low", "point-heavy", "share of 5-on-5 shot attempts from the point", lambda v: f"{v:.0f}%"),
+    "point": ("point-shot reliance", "down low", "point-heavy", "share of 5-on-5 shot attempts from the point", lambda v: f"{v:.0f}%"),  # retired; grades old calls
+    "dShots": ("shots from defensemen", "forward-led", "active D", "share of 5-on-5 shot attempts taken by defensemen", lambda v: f"{v:.0f}%"),
+    "inClose": ("shots from in close", "long-range", "close-range", "share of 5-on-5 shots from within 20 feet", lambda v: f"{v:.0f}%"),
     "forecheck": ("forecheck pressure", "passive", "hounding", "forecheck score (arena-adjusted, 100 is league average)", lambda v: f"forecheck score {v:.0f}"),
     "physical": ("physicality", "finesse", "bruising", "hit score in close games (arena-adjusted, 100 is league average)", lambda v: f"hit score {v:.0f}"),
     "depth": ("depth", "top-heavy", "deep", "bottom-six share of forward ice time", lambda v: f"{v:.0f}%"),
@@ -506,7 +509,9 @@ INDEX_TRAITS = {"forecheck", "physical"}  # compared as a score against league a
 EDGE_CALL = {  # the prediction in plain words: {top} comes out ahead of {bot} on this tonight
     "volume": "{top} take more 5-on-5 shot attempts per 60 than {bot}.", "quality": "{topp} shots are more dangerous on average than {botp}.",
     "suppression": "{top} allow fewer 5-on-5 shot attempts per 60 than {bot}.", "qualityAllowed": "{top} prevent dangerous shots better than {bot} do.",
-    "point": "{top} take a bigger share of their shots from the point than {bot}.", "forecheck": "{top} put more forecheck pressure on than {bot}.",
+    "point": "{top} take a bigger share of their shots from the point than {bot}.",
+    "dShots": "{topp} defensemen take a bigger share of the team’s shot attempts than {botp}.",
+    "inClose": "{top} take a bigger share of their shots from within 20 feet than {bot}.", "forecheck": "{top} put more forecheck pressure on than {bot}.",
     "physical": "{top} hit more than {bot} in the close stretches of the game.", "depth": "{top} spread their forward ice time deeper down the lineup than {bot}.",
     "pp": "{topp} power play creates more per 60 than {botp}.", "pk": "{topp} penalty kill allows less per 60 than {botp}.",
 }
@@ -516,6 +521,8 @@ EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, 
     "suppression": ["{top} lock it down; {bot} don’t", "One stingy defense, one leaky one"],
     "qualityAllowed": ["{top} shut down the dangerous stuff; {bot} don’t", "Sheltered against exposed"],
     "point": ["{top} fire from the point; {bot} work down low", "Two different ideas of a good shot"],
+    "dShots": ["{topp} defense joins the attack; {botp} stays home", "Active D against forward-led"],
+    "inClose": ["{top} get in close; {bot} shoot from distance", "In close against from distance"],
     "forecheck": ["{top} hound the puck; {bot} sit back", "Forecheck against patience"],
     "physical": ["Bruisers against finesse", "{top} hit; {bot} mostly don’t"],
     "depth": ["{top} roll four lines; {bot} lean on their top six", "Depth against star power"],

@@ -12,7 +12,7 @@ const ex = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number))[0
 const sample = 30;
 const hr = (data as any).home_road as Record<string, { home_rate: number; away_rate: number }>;
 const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
-const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
+const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', turnover: 'Off-turnover offense', dShots: 'Shots from defensemen', inClose: 'Shots from in close', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
 ---
 <Base section="methods" title="Methods" mock={false}>
   <h1 class="page-top">How the numbers are made</h1>
