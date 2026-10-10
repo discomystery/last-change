@@ -1,30 +1,15 @@
 ---
-// MOCK: a player's portrait in three looks, chosen on the page with ?pv=a|b|c. a = photo cut out on a disc of the
-// team's colour; b = photo on a pale rounded tile, no colour; c = no photo, initials and number in the team's colour.
-// The photo is a grey stand-in here: NHL headshots cannot be fetched from the cloud session.
-interface Props { name: string; number?: number | null; size?: number; team?: string }
-const { name, number = null, size = 48 } = Astro.props;
-const parts = name.split(' ');
-const initials = (parts[0][0] + (parts.at(-1)?.[0] ?? '')).toUpperCase();
-const src = `${import.meta.env.BASE_URL}mock/headshot.svg`;
+// A player's cut-out photo with no background, meant to stand on a line in the layout: its bottom edge is the bottom of
+// the shoulders, so the parent lines it up with a rule or a box edge. Renders nothing when there is no photo, and
+// removes itself if the photo fails to load (fresh call-ups often have none yet).
+import { photoOf } from '../lib/portraits';
+
+interface Props { id: number; size: number; class?: string }
+const { id, size, class: cls } = Astro.props;
+const src = photoOf(id);
 ---
-<span class="pt" style={`--s:${size}px`} aria-hidden="true">
-  <img class="pt-photo" src={src} alt="" loading="lazy" width={size} height={size} />
-  <span class="pt-ini"><b>{initials}</b>{number !== null && size >= 40 && <small>#{number}</small>}</span>
-</span>
+{src && <img class:list={['portrait', cls]} src={src} alt="" width={size} height={size} loading="lazy" decoding="async" onerror="this.remove()" />}
 
 <style>
-  .pt { --s: 48px; position: relative; flex: none; width: var(--s); height: var(--s); display: inline-grid; place-items: center; overflow: hidden; vertical-align: middle; }
-  .pt-photo { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; display: block; }
-  .pt-ini { display: none; }
-  /* a: disc in the team's colour, a pale wash so the cut-out stands out. */
-  :global(html[data-pv='a']) .pt { border-radius: 50%; background: color-mix(in oklab, var(--team, var(--ink-3)) 38%, var(--sheet)); }
-  /* b: rounded tile on the page's own pale track colour, no team colour. */
-  :global(html[data-pv='b']) .pt { border-radius: 22%; background: var(--track); }
-  /* c: no photo. */
-  :global(html[data-pv='c']) .pt { border-radius: 50%; background: var(--team, var(--ink-3)); color: var(--sheet); }
-  :global(html[data-pv='c']) .pt-photo { display: none; }
-  :global(html[data-pv='c']) .pt-ini { display: grid; place-items: center; line-height: 1; }
-  .pt-ini b { font: 700 calc(var(--s) * 0.36) var(--ui); letter-spacing: 0.02em; }
-  .pt-ini small { font: 600 calc(var(--s) * 0.16) var(--ui); opacity: 0.8; margin-top: 2px; }
+  .portrait { display: block; flex: none; object-fit: contain; object-position: 50% 100%; user-select: none; pointer-events: none; }
 </style>

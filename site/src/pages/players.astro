@@ -3,6 +3,7 @@
 import Base from '../layouts/Base.astro';
 import teams from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
+import Portrait from '../components/Portrait.astro';
 
 type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
 const players = [...(index as P[])].sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
@@ -36,6 +37,7 @@ const base = import.meta.env.BASE_URL;
       <li class="card row prow go" data-name={`${p.name} ${p.number ?? ''}`.toLowerCase()} data-team={p.team} data-pos={p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F'}>
         <a class="pname go-link" href={`${base}player/${p.id}/`}>{p.name}</a>
         <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a></span>
+        <Portrait id={p.id} size={72} class="prow-photo" />
       </li>
     ))}
   </ul>
@@ -79,7 +81,9 @@ const base = import.meta.env.BASE_URL;
   .find .pick { margin: 0; }
   .count { margin-top: 14px; }
   .plist { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
-  .prow { display: grid; gap: 2px; }
+  .prow { display: grid; gap: 2px; position: relative; overflow: hidden; padding-right: 92px; min-height: 76px; align-content: center; }
+  /* His photo sits in the right of the box, shoulders on the box's bottom edge. */
+  .prow :global(.prow-photo) { position: absolute; right: 12px; bottom: 0; width: 72px; height: 72px; }
   .prow[hidden] { display: none; }
   .pname { font: 600 17px var(--ui); }
   .pmeta { font-size: 13px; }
