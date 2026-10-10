@@ -4,6 +4,7 @@
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import AreaMap from '../../components/AreaMap.astro';
+import AreaShapes from '../../components/AreaShapes.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
@@ -86,6 +87,7 @@ const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['As
 const statRow = (x: any) => (isG ? null : x);
 ---
 <Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
+  <AreaShapes />
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     <header class="team-top">
       <h1>{p.name}</h1>

@@ -1,0 +1,12 @@
+---
+// The shot-area outlines every AreaMap on the page points at (see lib/areaShapes.ts). Include once per page, outside
+// anything that can be hidden: some browsers stop drawing shapes whose definitions sit inside a hidden element.
+import { paths, shapeId } from '../lib/areaShapes';
+---
+<svg class="area-shapes" aria-hidden="true" focusable="false">
+  <defs>{Object.entries(paths).map(([k, d]) => <path id={shapeId(k)} d={d} />)}</defs>
+</svg>
+
+<style>
+  .area-shapes { position: absolute; width: 0; height: 0; overflow: hidden; }
+</style>
