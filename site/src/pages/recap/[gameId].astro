@@ -177,7 +177,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     <Section id="replays" title="Run it back" placeholder={false} takeaway="We replayed this game’s chances 100 times. Here is how often each team came out ahead.">
       <div class="card meter">
         <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
-          {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
+          {dots.map((d, i) => <i class={d === 'tie' ? 'tie' : `t-${d}`} style={`--i:${i}`}></i>)}
         </div>
         <div class="meter-text">
           <h3 class="h">{replayHead}</h3>
