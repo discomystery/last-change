@@ -188,6 +188,86 @@ GRID = {
     "rough": {"did": "mixed", "mixed": "rough", "didnt": "rough", None: "rough"},
 }
 
+# Goalies: every goalie has the same three jobs, judged against his own earlier games and an average goalie.
+G_MIN_SEC, G_MIN_SHOTS = 1200, 10  # a card for 20+ minutes or 10+ shots; less is too little to judge
+G_K = {"high": 150, "routine": 800}  # shots of league-average weight when shrinking his save rates
+G_LABEL = {"gsax": "Saving more than expected", "high": "Dangerous shots", "routine": "Routine shots"}
+G_UNIT = {"gsax": "goals saved above expected", "high": "saves on shots with a 15%+ chance", "routine": "saves on shots under a 15% chance"}
+
+
+def binom_median(n: int, p: float) -> int:
+    """The number of saves he reaches in at least half of games with n shots at save rate p."""
+    k = 0
+    while k < n and binom_tail(k + 1, n, p) >= 0.5:
+        k += 1
+    return k
+
+
+def goalie_scoresheet(sa: int, ga: int, gsax: float, sec: float, started: bool) -> tuple[str | None, str | None]:
+    """huge: a shutout on 25+ shots or 3+ goals saved above expected. big: any other shutout of 20+ minutes or 1.5+
+    saved above expected. rough: 2+ goals worse than expected, or pulled early after three or more."""
+    why = f"{sa - ga} saves on {sa} shots, {gsax:+.1f} goals saved above expected".replace("-", "−")
+    pulled = started and sec < 2400 and ga >= 3
+    if (ga == 0 and sa >= 25) or gsax >= 3:
+        return "huge", ("A shutout, " if ga == 0 else "") + why
+    if (ga == 0 and sec >= 1200 and sa >= 10) or gsax >= 1.5:
+        return "big", ("A shutout, " if ga == 0 else "") + why
+    if gsax <= -2 or pulled:
+        return "rough", (f"Pulled after {ga} goals, " if pulled else "") + why
+    return None, None
+
+
+def goalie_cards(season: int, game_ids: set[int]):
+    """A card per goalie per finished game, in the same shape as the skaters' cards."""
+    from pipeline.metrics import goalies as G
+    last = G.per_game(season - 1).with_columns(pl.lit("1900-01-01").alias("date_s"))
+    now = G.per_game(season).with_columns(pl.col("date").cast(pl.Utf8).alias("date_s"))
+    lg = last.select([pl.col(f"sa_{t}").sum() for t in ("low", "medium", "high")] + [pl.col(f"ga_{t}").sum() for t in ("low", "medium", "high")]).row(0, named=True)
+    league = {"high": 1 - lg["ga_high"] / lg["sa_high"],
+              "routine": 1 - (lg["ga_low"] + lg["ga_medium"]) / (lg["sa_low"] + lg["sa_medium"])}
+    cols = ["goalie_id", "date_s", "sec", "sa", "ga", "xga", "sa_high", "ga_high", "sa_low", "ga_low", "sa_medium", "ga_medium", "started"]
+    hist = pl.concat([last.select(cols), now.select(cols)])
+    by = {gid: g for (gid,), g in hist.group_by("goalie_id")}
+    for r in now.filter(pl.col("game_id").is_in(list(game_ids))).iter_rows(named=True):
+        if r["sec"] < G_MIN_SEC and r["sa"] < G_MIN_SHOTS:
+            continue
+        before = by[r["goalie_id"]].filter(pl.col("date_s") < r["date_s"])
+        starts = before.filter(pl.col("started") & (pl.col("sec") >= G_MIN_SEC))
+        gsax = r["xga"] - r["ga"]
+        jobs = []
+        # Saves above expected: a typical night for him is the middle of his earlier starts; an average goalie saves
+        # exactly what is expected (0).
+        usual = float((starts["xga"] - starts["ga"]).median()) if starts.height >= 5 else 0.0
+        job = {"key": "gsax", "label": G_LABEL["gsax"], "why": "core", "pct": None, "unit": G_UNIT["gsax"]}
+        if r["sa"] < G_MIN_SHOTS:
+            job |= {"verdict": "na", "text": f"Faced only {r['sa']} shots, too few to judge."}
+        else:
+            job |= {"verdict": grade(gsax, usual, 0.0), "tonight": f"{gsax:+.1f}", "usual": f"{usual:+.1f}", "bench": "+0.0", "bench_is": "Average",
+                    "text": f"Allowed {r['ga']} on shots worth {r['xga']:.1f} expected goals: {gsax:+.1f} saved above expected. "
+                            f"Typical start for him: {usual:+.1f}. An average goalie: 0."}
+        jobs.append(job)
+        for key, n, a, pn, pa in (("high", r["sa_high"], r["ga_high"], before["sa_high"].sum(), before["ga_high"].sum()),
+                                  ("routine", r["sa_low"] + r["sa_medium"], r["ga_low"] + r["ga_medium"],
+                                   before["sa_low"].sum() + before["sa_medium"].sum(), before["ga_low"].sum() + before["ga_medium"].sum())):
+            p_usual = shrink(pn, 1 - pa / pn if pn else league[key], G_K[key], league[key])
+            job = {"key": key, "label": G_LABEL[key], "why": "core", "pct": None, "unit": G_UNIT[key]}
+            if n < 3:
+                job |= {"verdict": "na", "text": f"Faced only {n} {'shot' if n == 1 else 'shots'} like this."}
+            else:
+                saves, typ_u, typ_a = n - a, binom_median(n, p_usual), binom_median(n, league[key])
+                job |= {"verdict": grade(saves, typ_u, typ_a), "tonight": f"{saves} of {n}", "usual": str(typ_u), "bench": str(typ_a), "bench_is": "Average",
+                        "text": f"Saved {saves} of {n} {'dangerous' if key == 'high' else 'routine'} shots. Typical for him: {typ_u}. "
+                                f"Average goalie: {typ_a}. He usually stops {100 * p_usual:.0f}% of these."}
+            jobs.append(job)
+        night, why = goalie_scoresheet(r["sa"], r["ga"], gsax, r["sec"], r["started"])
+        summ = summary([(j["key"], j["verdict"]) for j in jobs])
+        yield r["game_id"], {"id": r["goalie_id"], "team_id": r["team_id"], "pos": "G", "toi_sec": round(r["sec"]),
+                             "toi": clock(r["sec"]), "toi5": clock(r["sec"]), "toi_pp": "", "toi_pk": "",
+                             "box": {"sa": r["sa"], "ga": r["ga"], "sv": round((r["sa"] - r["ga"]) / r["sa"], 3) if r["sa"] else None,
+                                     "xga": round(r["xga"], 2), "gsax": round(gsax, 2), "high": f"{r['sa_high'] - r['ga_high']}/{r['sa_high']}"},
+                             "jobs": jobs, "summary": summ, "night": night, "night_why": why, "pill": GRID[night][summ], "standouts": []}
+
+
 UNIT_WEIGHT = 0.5  # power play and penalty kill results belong to five players, so they count half
 
 
@@ -337,6 +417,9 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)
 
+    for gid, card in goalie_cards(season, set(info)):
+        cards[gid].append(card)
+
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
         old.unlink()
@@ -347,7 +430,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
             c["team"] = abbr.get(c.pop("team_id"))
         out = {"game_id": gid, "away": g["away"], "home": g["home"], "players": [], "stood_out": []}
         for t in (g["away"], g["home"]):
-            mine = sorted((c for c in cs if c["team"] == t), key=lambda c: -c["toi_sec"])
+            mine = sorted((c for c in cs if c["team"] == t), key=lambda c: (c["pos"] != "G", -c["toi_sec"]))  # goalies first, then by ice time
             out["players"] += [c for c in mine if c["pill"]]
         # The most unlikely nights first, at most two of any one kind so hits can't crowd out everything else.
         notes, per_kind = [], defaultdict(int)

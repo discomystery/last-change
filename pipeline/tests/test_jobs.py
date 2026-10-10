@@ -6,7 +6,7 @@ import pytest
 
 from pipeline.config import SITE_DATA
 from pipeline.config import RAW, TABLES
-from pipeline.export.jobs import GRID, RARE_GOAL, binom_tail, box_extras, grade, poisson_median, poisson_tail, scoresheet, scoring_odds, summary
+from pipeline.export.jobs import GRID, binom_median, goalie_scoresheet, RARE_GOAL, binom_tail, box_extras, grade, poisson_median, poisson_tail, scoresheet, scoring_odds, summary
 
 
 def test_typical_night_is_the_median_count():
@@ -58,7 +58,7 @@ def test_exported_cards_are_well_formed():
         d = json.loads(p.read_text())
         assert {c["team"] for c in d["players"]} <= {d["away"], d["home"]}
         for c in d["players"]:
-            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt", "rough")
+            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt", "rough") and (c["pos"] != "G" or len(c["jobs"]) == 3)
             for j in c["jobs"]:
                 assert j["verdict"] in ("held", "partly", "missed", "na") and j["text"]
                 assert "deserve" not in j["text"].lower()
@@ -106,3 +106,20 @@ def test_plus_minus_comes_from_the_nhl_boxscore():
                     assert pm.get((d["id"], p["playerId"]), 0) == p["plusMinus"], (d["id"], p["playerId"])
                     checked += 1
     assert checked > 100
+
+
+def test_goalie_scoresheet():
+    assert goalie_scoresheet(30, 0, 2.4, 3600, True)[0] == "huge"  # a shutout on 25+ shots
+    assert goalie_scoresheet(18, 0, 1.0, 3600, True)[0] == "big"
+    assert goalie_scoresheet(35, 1, 3.2, 3600, True)[0] == "huge"
+    assert goalie_scoresheet(30, 2, 1.6, 3600, True)[0] == "big"
+    assert goalie_scoresheet(30, 5, -2.4, 3600, True)[0] == "rough"
+    assert goalie_scoresheet(15, 4, -1.0, 1500, True)[0] == "rough"  # pulled early
+    assert goalie_scoresheet(28, 3, -0.3, 3600, True) == (None, None)
+
+
+def test_binom_median_is_a_typical_night():
+    assert binom_median(10, 0.9) == 9 and binom_median(8, 0.7) == 6 and binom_median(0, 0.9) == 0
+    for n, p in ((5, 0.8), (12, 0.93), (3, 0.5)):
+        k = binom_median(n, p)
+        assert binom_tail(k, n, p) >= 0.5 and (k == n or binom_tail(k + 1, n, p) < 0.5)
