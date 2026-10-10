@@ -18,6 +18,7 @@ import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
+import Roster from '../../components/Roster.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -169,6 +170,7 @@ const _ = ordinal;
   <Section id="players" title="Key players" placeholder={false} takeaway={`Who ${team.place} leans on, and what they do best.`}>
     <KeyPlayers abbr={abbr!} place={team.place} />
     <p class="note">The {KEY_COUNT.F} forwards and {KEY_COUNT.D} defensemen with the most ice time a game (at least half the games played). Tags show how each is used; rows show his clearest strengths, and a weak spot in grey, as a percentile against his position. Point at anything for details. <a href={`${base}players/#${abbr}`}>All {team.nick} players</a>.</p>
+    <Roster abbr={abbr!} />
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'}>
