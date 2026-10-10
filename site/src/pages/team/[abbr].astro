@@ -17,6 +17,8 @@ import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
+import KeyPlayers from '../../components/KeyPlayers.astro';
+import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import ShotMap from '../../components/ShotMap.astro';
@@ -109,7 +111,7 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   const list = (a: string[]) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0]);
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 ---
 <Base section="teams" title={team.name} mock={false}>
@@ -160,6 +162,11 @@ const _ = ordinal;
       </>
     ))}
     <p class="note">Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+  </Section>
+
+  <Section id="players" title="Key players" placeholder={false} takeaway={`The players ${team.place} leans on most, what the coach uses them for, and what they do better than others at their position.`}>
+    <KeyPlayers abbr={abbr!} place={team.place} />
+    <p class="note">Key players are the {KEY_COUNT.F} forwards and {KEY_COUNT.D} defensemen with the most ice time a game this season, among those who have played at least half of {team.place}’s games. “Relied on for” comes from how they have actually been used over the last {linesData.window} games; “Better than most at” lists only ratings where even the cautious end of the likely range is clearly above average for the position. <a href={`${base}players/#${abbr}`}>All {team.nick} players</a>.</p>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'}>
