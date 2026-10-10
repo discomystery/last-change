@@ -20,7 +20,8 @@ def game_units(season: int, game_id: int) -> dict:
     pos = dict(zip(players["player_id"], players["pos"]))
     stints = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id") == game_id)
     events = pl.read_parquet(d / "events.parquet").filter((pl.col("game_id") == game_id) & pl.col("type").is_in(list(ATTEMPTS)))
-    xg = pl.read_parquet(d / "shots_xg.parquet").filter(pl.col("game_id") == game_id).select("event_id", "xGoal")
+    # Our own expected goals, like the rest of the site (MoneyPuck's per-shot file is only a cross-check and is not kept).
+    xg = pl.read_parquet(d / "shots_xg_own.parquet").filter(pl.col("game_id") == game_id).select("event_id", pl.col("xg").alias("xGoal"))
     events = events.join(xg, on="event_id", how="left")
 
     def split(ids):
