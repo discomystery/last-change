@@ -1,6 +1,6 @@
 // Key players: the forwards and defensemen a team leans on most, what it leans on them for, and what they do better
 // than others at their position. Shared by team pages (and ready for previews).
-import { standouts, type Skater, type Mode } from './players';
+import { standouts, roleTip, type Skater, type Mode } from './players';
 
 const files = import.meta.glob('../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
 const skaters = Object.entries(files)
@@ -11,29 +11,25 @@ const skaters = Object.entries(files)
 /** How many of each group make the list. */
 export const KEY_COUNT = { F: 4, D: 2 } as const;
 
-export type Job = { text: string; tip?: string; tag?: string; tagTip?: string };
+export type Job = { text: string; tip: string };
 export type KeyPlayer = { p: Skater; jobs: Job[]; strengths: Record<Mode, ReturnType<typeof standouts>> };
 
 const nth = ['first', 'second', 'third', 'fourth'];
 const lineName = (label: string) => `${nth[Number(label.slice(1)) - 1] ?? ''} ${label[0] === 'L' ? 'line' : 'pair'}`.trim();
 const lastName = (n: string) => n.split(' ').slice(1).join(' ') || n;
-const and = (a: string[]) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] ?? '');
 
-/** The jobs his coach gives him, from how he has actually been used lately. Not good or bad in itself. */
+/** The jobs his coach gives him, from how he has actually been used lately, as short tags. Not good or bad in itself. */
 function jobs(p: Skater, place: string): Job[] {
   const r = p.role;
   const out: Job[] = [];
   const grp = p.group === 'D' ? 'defensemen' : 'forwards';
   if (r.toi && r.toi_rank && r.toi_rank <= 2)
-    out.push({ text: `${r.toi_rank === 1 ? 'Most' : 'Second-most'} ice time of ${place}’s ${grp}` });
-  if (r.line) out.push({ text: `${lineName(r.line.label)[0].toUpperCase()}${lineName(r.line.label).slice(1)}, with ${and(r.line.mates.map((m) => lastName(m.name)))}` });
-  if (r.pp) {
-    const unit = r.pp.label === 'PP1' ? 'First power-play unit' : 'Second power-play unit';
-    out.push({ text: unit, tag: r.pp.role ?? undefined });
-  }
-  if (r.pk?.role === 'starter') out.push({ text: r.pk.draw ? 'Starts penalty kills and takes the draw' : 'Starts penalty kills', tip: `Out at the start of ${r.pk.starts} of ${place}’s ${r.pk.kills} kills lately.` });
-  else if (r.pk?.role === 'second') out.push({ text: 'Second wave on the penalty kill', tip: `On for ${r.pk.kills_in} of ${place}’s ${r.pk.kills} kills lately, usually after the first change.` });
-  if (r.faceoff) out.push({ text: 'Takes power-play faceoffs, then changes', tip: r.faceoff });
+    out.push({ text: r.toi_rank === 1 ? 'Most ice time' : '2nd in ice time', tip: `${r.toi_rank === 1 ? 'The most' : 'The second-most'} ice time a game of ${place}’s ${grp} who have played at least half the games.` });
+  if (r.line) out.push({ text: `${r.line.label} · ${r.line.mates.map((m) => lastName(m.name)).join(', ')}`, tip: `${lineName(r.line.label)[0].toUpperCase()}${lineName(r.line.label).slice(1)} at 5-on-5, numbered by ice time together over the last ten games.` });
+  if (r.pp) out.push({ text: r.pp.role ? `${r.pp.label} ${r.pp.role}` : r.pp.label, tip: `${r.pp.label === 'PP1' ? 'First' : 'Second'} power-play unit.${r.pp.role ? ' ' + roleTip[r.pp.role] : ''}` });
+  if (r.pk?.role === 'starter') out.push({ text: r.pk.draw ? 'Starts PK, takes draw' : 'Starts PK', tip: `Starts penalty kills: out at the start of ${r.pk.starts} of ${place}’s ${r.pk.kills} kills lately${r.pk.draw ? ', usually to take the faceoff' : ''}.` });
+  else if (r.pk?.role === 'second') out.push({ text: 'PK second wave', tip: `On for ${r.pk.kills_in} of ${place}’s ${r.pk.kills} kills lately, usually after the first change.` });
+  if (r.faceoff) out.push({ text: 'PP draw man', tip: r.faceoff });
   return out;
 }
 

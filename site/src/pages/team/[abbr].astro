@@ -164,9 +164,9 @@ const _ = ordinal;
     <p class="note">Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
-  <Section id="players" title="Key players" placeholder={false} takeaway={`The players ${team.place} leans on most, what the coach uses them for, and what they do better than others at their position.`}>
+  <Section id="players" title="Key players" placeholder={false} takeaway={`Who ${team.place} leans on, and what they do best.`}>
     <KeyPlayers abbr={abbr!} place={team.place} />
-    <p class="note">Key players are the {KEY_COUNT.F} forwards and {KEY_COUNT.D} defensemen with the most ice time a game this season, among those who have played at least half of {team.place}’s games. “Relied on for” comes from how they have actually been used over the last {linesData.window} games; “Better than most at” lists only ratings where even the cautious end of the likely range is clearly above average for the position. <a href={`${base}players/#${abbr}`}>All {team.nick} players</a>.</p>
+    <p class="note">The {KEY_COUNT.F} forwards and {KEY_COUNT.D} defensemen with the most ice time a game (at least half the games played). Tags show how each is used; rows show his clearest strengths, and a weak spot in grey, as a percentile against his position. Point at anything for details. <a href={`${base}players/#${abbr}`}>All {team.nick} players</a>.</p>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'}>
