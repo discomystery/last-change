@@ -36,7 +36,9 @@
   .fpc-line.m-season { display: none; }
   html[data-mode='season'] .fpc-line.m-season { display: flex; }
   html[data-mode='season'] .fpc-line.m-blend { display: none; }
-  .fpc-line em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .fpc-line em, .fpc-line .rank-link { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .fpc-line .rank-link { text-decoration: underline 1px var(--rule); text-underline-offset: 4px; }
+  .fpc-line .rank-link:hover { color: var(--ink); text-decoration-color: var(--ink); }
   .units2 { align-items: start; }
   .gmode.m-season { display: none; }
   html[data-mode='season'] .gmode.m-season { display: block; }
@@ -47,6 +49,10 @@
   .gname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font: 700 22px/1.1 var(--display); margin-bottom: 14px; }
   .gbig { font: 400 14px var(--ui); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
   .gbig strong { font: 700 38px/1 var(--display); }
+  /* Goalie card: name and headline number on the left, his photo standing on the first row's line at the right. */
+  .ghead { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .ghead-text { min-width: 0; }
+  .ghead .g-photo { width: 96px; height: 96px; margin: -8px -4px 0 0; }
   .gkv div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
   .gkv dt { color: var(--ink-2); }
   .gkv dd { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }

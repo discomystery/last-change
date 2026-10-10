@@ -55,6 +55,8 @@ def run(season: int) -> dict:
     export_goal_sources(season)
     if not OFFLINE:  # needs MoneyPuck's shot file, which offline runs don't have: keep the saved page
         export_xg_check(season)
+    from pipeline.export import roster
+    roster.run(season)  # every club's full roster and who is out, from availability.parquet
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import previews
@@ -174,6 +176,7 @@ def clock(seconds: float) -> str:
 SHUFFLED = 0.33  # listed forward lines covering less than this share of 5v5 trio time = a lineup in flux (league median ~0.5)
 
 
+NOTE_ORDER = {"absence": 0, "back": 1, "new": 2}  # lineup changes first, then power-play and penalty-kill changes
 ORDINAL_WORDS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
 
 
@@ -201,7 +204,12 @@ def export_lines(season: int) -> int:
     words = {"pk": ("killing penalties", "shorthanded"), "pp": ("playing on the power play", "power-play")}
     from pipeline.metrics import patterns
 
-    missing = patterns.absences(season, datetime.now(timezone.utc).date().isoformat())
+    from pipeline.export import changes
+
+    # Lineup changes from the league's rosters and injury news when that table has been built, else the older
+    # detector that can only see last season's regulars who have stopped dressing.
+    lineup_changes = changes.notes(season)
+    missing = patterns.absences(season, datetime.now(timezone.utc).date().isoformat()) if lineup_changes is None else {}
     f_rank = lambda r: None if r is None else ("first-line", "second-line", "third-line", "fourth-line")[min(3, (r - 1) // 3)]
     d_rank = lambda r: None if r is None else ("top-pair", "second-pair", "third-pair")[min(2, (r - 1) // 2)]
 
@@ -239,6 +247,12 @@ def export_lines(season: int) -> int:
                 "text": f'The forward lines keep changing. Even their four most-used trios over the last {e["games"]} games cover only {round(100 * share)}% of their forwards\u2019 '
                         f'5-on-5 time, {lowest} (a typical team: {round(100 * typical)}%). The lines listed lean on their latest games, but expect new combinations tonight.'}
 
+    every_name = sorted(set(names.values()), key=len, reverse=True)
+
+    def named(text: str) -> list[str]:
+        """Player names in a note, longest first, so the site can set them in bold."""
+        return [x for x in every_name if x in text]
+
     out = {}
     for tid, e in usual.items():
         place = abbr[tid]
@@ -264,6 +278,8 @@ def export_lines(season: int) -> int:
         usual_sets = {u["label"]: u["unit"] for u in e["units"]}
         last_sets = {u["unit"] for u in e["last"]}
         fmt = lambda unit: [names.get(int(i), "?") for i in unit.split("-")]
+        if lineup_changes:
+            notes = lineup_changes.get(place, []) + notes
         shuffle = shuffle_note(e)
         if shuffle:
             notes.insert(0, shuffle)
@@ -275,7 +291,7 @@ def export_lines(season: int) -> int:
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
-            "notes": sorted(notes, key=lambda n: (n["kind"] != "shuffle", n["kind"] != "absence", n.get("order", 0), -abs(n["now"] - n["before"]))),
+            "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] != "shuffle", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
     for tid, m in units.matchups(season, usual).items():
         if abbr[tid] in out:
@@ -291,7 +307,7 @@ def export_lines(season: int) -> int:
         if shown:
             who = names.get(fo["player"], "?")
             heir = names.get(fo["replaced_by"][0][0], "?")
-            faceoff = {"player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
+            faceoff = {"names": [who, heir], "player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
                        "text": f'{who} is sent out to take power-play faceoffs, then changes. He has taken {fo["draw_pct"]}% of the team\u2019s power-play draws but stays on for about {fo["avg_stay"]} seconds at a time, against {fo["usual_stay"]} for the regulars, and is most often replaced by {heir} ({fo["replaced_by"][0][1]} of {fo["exits"]} changes).'}
         for kind in ("pp", "pk"):
             for u in sp[kind]:

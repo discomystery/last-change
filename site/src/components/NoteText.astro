@@ -1,0 +1,12 @@
+---
+// A Worth knowing note with its player names in bold. `names` comes with the note from the pipeline; notes saved
+// before it did fall back to the site's "J. Staal" name pattern.
+interface Props { text: string; names?: string[] }
+const { text, names } = Astro.props;
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const pattern = names && names.length
+  ? new RegExp(`(${[...names].sort((a, b) => b.length - a.length).map(esc).join('|')})`, 'g')
+  : /(\b\p{Lu}\. (?:(?:van|de|der|von|da|di|le|la) )?\p{Lu}[\p{L}'’-]+)/gu;
+const parts = text.split(pattern);
+---
+{parts.map((p, i) => (i % 2 === 1 ? <strong class="pname">{p}</strong> : p))}

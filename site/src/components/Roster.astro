@@ -1,0 +1,58 @@
+---
+// The full roster: who is out first (with NHL.com's status where it gave one), then everyone by position.
+// Sits under Key players: a one-line "who's out", the roster behind a fold. Each reason opens its details on hover/tap.
+import PLink from './PLink.astro';
+import { roster, asOf, day } from '../lib/roster';
+import { clock } from '../lib/format';
+
+interface Props { abbr: string }
+const { abbr } = Astro.props;
+const { rows, gone } = roster(abbr);
+const out = rows.filter((r) => r.out);
+const groups = [['F', 'Forwards'], ['D', 'Defense'], ['G', 'Goalies']] as const;
+const posWord: Record<string, string> = { C: 'C', L: 'LW', R: 'RW', D: 'D', G: 'G' };
+// Players off the NHL roster are often just in the minors; list them only if they were key here last season.
+const outLine = out.filter((r) => r.status !== 'not_listed' || r.key);
+---
+<div class="ro-fold">
+    {outLine.length > 0
+      ? <p class="ro-out"><span class="ro-lab">Out</span>{outLine.map((r, i) => <><span class="ro-o">{r.page ? <PLink id={r.id} name={r.name} /> : r.name} <em tabindex="0" data-tip={r.tip}>{r.tag[0].toLowerCase() + r.tag.slice(1)}</em></span>{i < outLine.length - 1 && <span class="ro-sep">·</span>}</>)}</p>
+      : <p class="ro-out"><span class="ro-lab">Out</span><span class="n">Nobody reported out.</span></p>}
+    <details class="fold">
+      <summary><span class="closed">Show the full roster · {rows.length} players</span><span class="opened">Hide the full roster</span></summary>
+      <div class="ro-cols">
+        {groups.map(([g, label]) => (
+          <div>
+            <h3 class="sub">{label}</h3>
+            <ul class="ro-list">
+              {rows.filter((r) => r.group === g).map((r) => (
+                <li class={r.out ? 'is-out' : ''}>
+                  <span class="ro-num">{r.number ?? ''}</span>
+                  <span class="ro-name">{r.page ? <PLink id={r.id} name={r.name} /> : r.name}<span class="ro-pos">{posWord[r.pos ?? ''] ?? ''}</span></span>
+                  {r.tag ? <span class="ro-tag" tabindex="0" data-tip={r.tip}>{r.tag}</span> : <span class="ro-stat">{r.line}{r.toi !== null && <> · {clock(r.toi)}</>}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {gone.length > 0 && <p class="note">Regulars here last season whom no NHL club lists now: {gone.map((r) => r.name).join(', ')}.</p>}
+      <p class="note">As of {day(asOf)}. Injury details come from the NHL.com Status Report when it names a player; otherwise we only say what the rosters show.</p>
+    </details>
+</div>
+
+<style>
+  .ro-out { font: 400 15px/1.7 var(--ui); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 18px; }
+  .ro-lab { font: 700 11px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+  .ro-o { white-space: nowrap; }
+  .ro-o em { font-style: normal; color: var(--ink-3); font-size: 13px; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .ro-sep { color: var(--ink-3); }
+  .ro-cols { display: grid; gap: 8px 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; }
+  .ro-list { list-style: none; padding: 0; margin: 0; font: 400 14px var(--ui); }
+  .ro-list li { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+  .ro-num { color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
+  .ro-pos { margin-left: 6px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+  .ro-stat { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ro-tag { font: 600 11px var(--ui); padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--ink); white-space: nowrap; cursor: help; }
+  .is-out .ro-name { color: var(--ink-2); }
+</style>

@@ -65,8 +65,16 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
     rows (id, date, home, away); only games from earlier days feed the ratings, so the figure is the same whether it
     is worked out the morning of the game or after it."""
     ids = team_ids(season)
+    abbr = {v: k for k, v in ids.items()}
     played = win_model.team_games(FULL_SEASONS + [season])
     m, out = model(), {}
+    try:  # who each team has been dressing: a finished game's own previous lineup, otherwise the latest one
+        done = win_model.lineups([season]).select("game_id", "team_id", pl.col("roster").alias("r"))
+        upcoming = win_model.next_rosters([season])
+        who = _who(season)
+    except Exception as e:  # no player ratings yet: chances without lineups
+        print(f"lineups unavailable for the morning figure: {e!r}")
+        done, upcoming, who = None, None, {}
     for day in sorted({g["date"] for g in games}):
         today = [g for g in games if g["date"] == day and g["home"] in ids and g["away"] in ids]
         if not today:
@@ -75,9 +83,50 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
                               "home_score": 0, "away_score": 0, "h_xgd": 0.0, "a_xgd": 0.0} for g in today], schema=played.schema)
         df = win_model.pregame(pl.concat([played.filter(pl.col("date") < day), rows]))
         df = df.filter(pl.col("game_id").is_in([g["id"] for g in today]))
+        if upcoming is not None:
+            df = _with_rosters(df, done, upcoming)
         for r, p in zip(df.iter_rows(named=True), win_model.predict(m, df)):
             out[r["game_id"]] = {"p_home": float(p), "steps": win_model.explain(m, r)}
+            if upcoming is not None and done.filter(pl.col("game_id") == r["game_id"]).is_empty():
+                out[r["game_id"]]["lineups"] = {abbr[t]: who[t] for t in (r["home_id"], r["away_id"]) if t in who and t in abbr}
     return out
+
+
+KEY_PLAYER = 0.04  # expected goals a game a missing or returning skater adds to his team's rating to be named
+
+
+def _who(season: int) -> dict[int, dict]:
+    """Per team id, for its next game: the most valuable skater it will be without (still with the club, but out or
+    not dressing) and the one news says is coming back, as last names, if either is worth naming."""
+    path = TABLES / str(season) / "availability.parquet"
+    if not path.exists():
+        return {}
+    av = pl.read_parquet(path)
+    av = av.filter(pl.col("date") == av["date"].max())
+    out_now = {(r["team"], r["player_id"]): r["report_status"] for r in av.filter(pl.col("status").is_in(["injured", "suspended", "personal", "scratched", "off_roster"])).iter_rows(named=True)}
+    names = {}
+    for s in (season - 1, season):
+        f = TABLES / str(s) / "players.parquet"
+        if f.exists():
+            names |= dict(pl.read_parquet(f).select("player_id", "last").iter_rows())
+    abbr = {v: k for k, v in team_ids(season).items()}
+    out = {}
+    for tid, u in win_model.next_lineups([season]).items():
+        team = abbr.get(tid)
+        without = [p for p, v in u["missing"] if v >= KEY_PLAYER and (team, p) in out_now]
+        back = [p for p, v in u["back"] if v >= KEY_PLAYER and p in u["in"]]
+        out[tid] = {"without": names.get(without[0]) if without else None, "back": names.get(back[0]) if back else None,
+                    "maybe": bool(without) and out_now[(team, without[0])] == "day"}  # day to day: he may still play
+    return out
+
+
+def _with_rosters(df: pl.DataFrame, done: pl.DataFrame, upcoming: dict[int, float]) -> pl.DataFrame:
+    """Adds the `roster` term (home minus away): from the games table for games already played, so the figure is
+    the same as it was that morning, and from each team's latest lineup for games still to come."""
+    known = {(g, t): r for g, t, r in done.iter_rows()}
+    side = lambda g, t: known.get((g, t), upcoming.get(t, 0.0))
+    return df.with_columns(roster=pl.Series([side(g, h) - side(g, a) for g, h, a in df.select("game_id", "home_id", "away_id").iter_rows()],
+                                            dtype=pl.Float64))
 
 
 def _pick(pool: list[str], *key) -> str:
@@ -91,8 +140,9 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
     return ROUTE[k][1], ROUTE[k][2]
 
 
-def _why(steps: list[dict], team: str, opp: str, home: str, places: dict) -> str:
-    """Plain reasons, from the model's own breakdown, told from `team`'s side."""
+def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
+    """Plain reasons, from the model's own breakdown, told from `team`'s side. `lineups` (by team abbreviation) names
+    a key skater a side will be without or gets back."""
     s = {x["input"]: x["shift"] * (1 if team == home else -1) for x in steps}
     T, O = places[team], places[opp]
     out = []
@@ -103,6 +153,12 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict) -> str
         out.append(f"{T if chances > 0 else O} has had more of the chances over recent games")
     else:
         out.append("the two have been about even at controlling the play lately")
+    for side in (team, opp):
+        lu = (lineups or {}).get(side) or {}
+        if lu.get("without"):
+            out.append(f"{places[side]} {'may' if lu.get('maybe') else 'will'} be without {lu['without']}")
+        if lu.get("back"):
+            out.append(f"{places[side]} should have {lu['back']} back")
     if abs(s.get("b2b", 0.0)) >= 0.005:
         tired = opp if s["b2b"] > 0 else team
         out.append(f"{places[tired]} is playing for the second night in a row")
@@ -116,6 +172,7 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict) -> str
 def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) -> dict[str, dict]:
     """The pre-game note for each team. Holds words only, never the chance itself."""
     out = {}
+    lineups = chance.get("lineups") or {}
     for team, opp in ((home, away), (away, home)):
         p = chance["p_home"] if team == home else 1 - chance["p_home"]
         _, heads, caveats = next(b for b in BANDS if p < b[0])
@@ -123,7 +180,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {"T": places[team], "O": places[opp], "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _pick(heads, gid, team, "head").format(**w),
-                     "body": _why(chance["steps"], team, opp, home, places) + " " + _pick(caveats, gid, team, "caveat").format(**w)}
+                     "body": _why(chance["steps"], team, opp, home, places, lineups) + " " + _pick(caveats, gid, team, "caveat").format(**w)}
     return out
 
 

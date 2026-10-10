@@ -1,7 +1,10 @@
 ---
 // Percentile in grey at the right of a compact rating card; the plain-words comparison sits in its tooltip.
+// With `href` it opens the skater rankings for that rating, with this player picked out.
 import { topShare } from '../lib/players';
-interface Props { ok: boolean; pct: number; words: string; class?: string }
-const { ok, pct, words, class: cls } = Astro.props;
+interface Props { ok: boolean; pct: number; words: string; class?: string; href?: string }
+const { ok, pct, words, class: cls, href } = Astro.props;
 ---
-<em class={cls} tabindex="0" data-tip={ok ? `${words}.` : 'Too few games to rate him yet.'}>{ok ? topShare(pct) : 'too few games'}</em>
+{ok && href
+  ? <a class:list={[cls, 'rank-link']} href={href} data-tip={`${words}. Tap to see who ranks highest.`}>{topShare(pct)}</a>
+  : <em class={cls} tabindex="0" data-tip={ok ? `${words}.` : 'Too few games to rate him yet.'}>{ok ? topShare(pct) : 'too few games'}</em>}

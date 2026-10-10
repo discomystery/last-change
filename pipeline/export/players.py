@@ -10,8 +10,8 @@ from datetime import date, datetime, timezone
 import numpy as np
 import polars as pl
 
-from pipeline.config import REGULAR, SITE_DATA, TABLES
-from pipeline.ingest import edge
+from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
+from pipeline.ingest import edge, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
 
@@ -110,6 +110,10 @@ def _combine_edge(now: dict | None, last: dict | None, mode: str) -> dict | None
             "oz": 100 * sum(v * n for v, n in oz) / sum(n for _, n in oz) if oz else None}
 
 
+# The NHL's portrait photos. A player no club lists today (sent down) gets the address his photo would have for this
+# season's team; the site shows initials when no photo loads.
+MUGS = "https://assets.nhle.com/mugs/nhl"
+
 EDGE_HIGHER = {"topSpeed": True, "bursts": True, "shotSpeed": True, "distance": True, "oz": True}
 EDGE_SPLIT = {"shotSpeed", "distance"}  # centres and wingers differ here (standardized gap 0.3+), so each is compared with his own
 
@@ -198,6 +202,7 @@ def run(season: int) -> int:
         old.unlink()
     index = []
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    photos = rosters.headshots(season)
     goalie_rec = {g["id"]: (abbr_, g) for abbr_, gs in goalies["teams"].items() for g in gs}
     for row in latest.iter_rows(named=True):
         pid, tid = row["player_id"], row["team_id"]
@@ -205,7 +210,8 @@ def run(season: int) -> int:
         e_now = edge.read(season, pid) or edge.read(season - 1, pid) or {}
         bio = e_now.get("player") or {}
         base = {"id": pid, "first": row["first"], "last": row["last"], "name": f'{row["first"]} {row["last"]}', "number": row["number"], "pos": row["pos"],
-                "team": team, "shoots": bio.get("shootsCatches"), "age": _age(bio.get("birthDate")), "generated_at": now_iso, "season": season}
+                "team": team, "shoots": bio.get("shootsCatches"), "age": _age(bio.get("birthDate")), "generated_at": now_iso, "season": season,
+                "photo": photos.get(pid) or (f"{MUGS}/{season_id(season)}/{team}/{pid}.png" if team else None)}
         stats = {}
         for s, key in ((season, "season"), (season - 1, "last")):
             c = count_by.get((pid, s))
@@ -242,7 +248,7 @@ def run(season: int) -> int:
             mb = miss_by.get(pid, {})
             base["misses"] = {"season": mb.get(season), "blend": _add(mb.get(season), mb.get(season - 1))}
         (OUT / f"{pid}.json").write_text(json.dumps(base, separators=(",", ":"), default=_num))
-        index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"]})
+        index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"]})
     (OUT / "index.json").write_text(json.dumps(sorted(index, key=lambda x: (x["team"] or "", x["last"])), separators=(",", ":")))
     return len(index)
 
