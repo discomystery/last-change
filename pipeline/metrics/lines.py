@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import polars as pl
 
+from pipeline.build.stints import penalty_shot
 from pipeline.config import TABLES
 
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
@@ -40,7 +41,7 @@ def game_units(season: int, game_id: int) -> dict:
                 if key:
                     units[home][key]["sec"] += s["duration"]
     for e in events.iter_rows(named=True):
-        if not (len(e["home_on"]) == 5 and len(e["away_on"]) == 5 and e["home_goalie"] and e["away_goalie"]) or e["is_home"] is None:
+        if not (len(e["home_on"]) == 5 and len(e["away_on"]) == 5 and e["home_goalie"] and e["away_goalie"]) or e["is_home"] is None or penalty_shot(e["situation_code"]):
             continue
         for home, ids in ((True, e["home_on"]), (False, e["away_on"])):
             mine = e["is_home"] == home

@@ -48,3 +48,9 @@ def test_html_report_parsing():
            '<tr><td class="x">2</td><td class="x">OT</td><td class="x">2:47 / 2:13</td><td class="x">3:34 / 1:26</td>'
     rows = parse_report(html, 18, {15: 999})
     assert [(r["playerId"], r["period"], r["startTime"], r["endTime"]) for r in rows] == [(999, 1, "00:00", "00:35"), (999, 4, "02:47", "03:34")]
+
+
+def test_penalty_shot_codes():
+    from pipeline.build.stints import penalty_shot
+    assert penalty_shot("1010") and penalty_shot("0101")  # one shooter against one goalie, home or away shooting
+    assert not penalty_shot("1551") and not penalty_shot("0651") and not penalty_shot(None)

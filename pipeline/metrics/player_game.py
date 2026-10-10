@@ -7,6 +7,7 @@ weighted to put home and road games on the same footing (see rink_bias).
 """
 import polars as pl
 
+from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import REGULAR, TABLES
 from pipeline.metrics import adjust, rink_bias
 
@@ -48,13 +49,14 @@ def build(season: int) -> pl.DataFrame:
         n_own=pl.when(pl.col("is_home")).then(pl.col("home_on").list.len()).otherwise(pl.col("away_on").list.len()),
         n_opp=pl.when(pl.col("is_home")).then(pl.col("away_on").list.len()).otherwise(pl.col("home_on").list.len()),
         own_g=pl.when(pl.col("is_home")).then(pl.col("home_goalie")).otherwise(pl.col("away_goalie")).is_not_null(),
-        opp_g=pl.when(pl.col("is_home")).then(pl.col("away_goalie")).otherwise(pl.col("home_goalie")).is_not_null())
+        opp_g=pl.when(pl.col("is_home")).then(pl.col("away_goalie")).otherwise(pl.col("home_goalie")).is_not_null(),
+        ps=pl.col("situation_code").is_in(list(PENALTY_SHOT)))
     for m in ("cf", "xgf"):
         shots = shots.join(wt[m], on="home_state", how="left").with_columns(
             pl.when(pl.col("is_home")).then(pl.col(f"wh_{m}")).otherwise(pl.col(f"wa_{m}")).alias(f"w_{m}")).drop(f"wh_{m}", f"wa_{m}")
     shots = shots.with_columns(
-        s5=pl.col("own_g") & pl.col("opp_g") & (pl.col("n_own") == 5) & (pl.col("n_opp") == 5),
-        pp=pl.col("own_g") & pl.col("opp_g") & (pl.col("n_own") > pl.col("n_opp")),
+        s5=~pl.col("ps") & pl.col("own_g") & pl.col("opp_g") & (pl.col("n_own") == 5) & (pl.col("n_opp") == 5),
+        pp=~pl.col("ps") & pl.col("own_g") & pl.col("opp_g") & (pl.col("n_own") > pl.col("n_opp")),
         unb=pl.col("type").is_in(UNBLOCKED), goal=pl.col("type") == "goal")
 
     # On the ice at 5-on-5, for and against.
@@ -72,7 +74,7 @@ def build(season: int) -> pl.DataFrame:
     onice = on.explode("player_id").group_by("game_id", "player_id").agg(agg("on_"))
 
     # Shorthanded: chances his team creates while killing a penalty with him on (the "power kill"), and allows.
-    shorthanded = pl.col("own_g") & pl.col("opp_g") & pl.col("unb")
+    shorthanded = ~pl.col("ps") & pl.col("own_g") & pl.col("opp_g") & pl.col("unb")
     own_on = pl.when(pl.col("is_home")).then(pl.col("home_on")).otherwise(pl.col("away_on"))
     opp_on = pl.when(pl.col("is_home")).then(pl.col("away_on")).otherwise(pl.col("home_on"))
     sh_for = shots.filter(shorthanded & (pl.col("n_own") < pl.col("n_opp"))).select("game_id", own_on.alias("player_id"), "xg").explode("player_id")

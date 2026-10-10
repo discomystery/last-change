@@ -8,7 +8,7 @@ from collections import defaultdict
 
 import polars as pl
 
-from pipeline.build.stints import strength
+from pipeline.build.stints import penalty_shot, strength
 from pipeline.config import TABLES
 
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
@@ -78,10 +78,17 @@ def build(season: int) -> dict:
         hg, ag = e["home_goalie"] is not None, e["away_goalie"] is not None
         nh, na = len(e["home_on"]), len(e["away_on"])
         diff = e["home_score"] - e["away_score"]
+        ps = penalty_shot(e["situation_code"])
+
+        def side_strength(for_home: bool) -> str:
+            # A penalty shot is its own bucket ("PS"), never 5-on-5, whoever the shift charts list on the ice.
+            if ps:
+                return "PS"
+            own, opp = (nh, na) if for_home else (na, nh)
+            return strength(own, opp, hg if for_home else ag, ag if for_home else hg)
 
         def bump(for_home: bool, col: str, by: float = 1.0):
-            own, opp = (nh, na) if for_home else (na, nh)
-            key = (gid, ids[gid][0 if for_home else 1], for_home, strength(own, opp, hg if for_home else ag, ag if for_home else hg), _state(diff if for_home else -diff))
+            key = (gid, ids[gid][0 if for_home else 1], for_home, side_strength(for_home), _state(diff if for_home else -diff))
             rows[key][col] += by
 
         if typ in ATTEMPTS:
@@ -117,7 +124,7 @@ def build(season: int) -> dict:
             if typ == "goal":
                 goal_rows.append({
                     "game_id": gid, "event_id": e["event_id"], "team_id": ids[gid][0 if home else 1], "is_home": home,
-                    "strength": strength(nh if home else na, na if home else nh, hg if home else ag, ag if home else hg),
+                    "strength": side_strength(home),
                     "rebound": bool(e["shotRebound"]), "off_turnover": off_turnover,
                     "off_faceoff": last_faceoff is not None and last_faceoff[1] == home and e["sec"] - last_faceoff[0] <= FACEOFF_WINDOW,
                     "xg": xg,

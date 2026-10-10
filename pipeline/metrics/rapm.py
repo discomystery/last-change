@@ -17,6 +17,7 @@ import numpy as np
 import polars as pl
 from scipy import sparse
 
+from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import REGULAR, TABLES
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
@@ -35,7 +36,7 @@ def stretches(season: int) -> pl.DataFrame:
     xg = pl.read_parquet(d / "shots_xg_own.parquet")
 
     # Expected goals in each stint: an event belongs to the stint with start < t <= end.
-    shots = ev.filter(pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null()).join(xg, on=["game_id", "event_id"], how="left")
+    shots = ev.filter(pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & ~pl.col("situation_code").is_in(list(PENALTY_SHOT))).join(xg, on=["game_id", "event_id"], how="left")
     shots = shots.select("game_id", (pl.col("sec").cast(pl.Float64) - 1e-6).alias("t"), "sec", "is_home", pl.col("xg").fill_null(0.0)).sort("t")
     keyed = st.select("game_id", pl.col("start").cast(pl.Float64).alias("t"), "sid", "end").sort("t")
     hit = shots.join_asof(keyed, on="t", by="game_id", strategy="backward", check_sortedness=False).filter(pl.col("sec") <= pl.col("end"))

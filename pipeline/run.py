@@ -2,7 +2,7 @@
 import argparse
 import json
 
-from pipeline.config import CURRENT_SEASON
+from pipeline.config import CURRENT_SEASON, FULL_SEASONS, TABLES
 
 
 def main() -> None:
@@ -51,6 +51,7 @@ def update(season: int) -> dict:
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
+    refresh_saved(season)
     team_game.build(season)
     units.game_units(season)
     units.depth_table(season)
@@ -58,6 +59,30 @@ def update(season: int) -> dict:
     out["edge"] = edge.update(season)  # tracking numbers for players who played since the last fetch
     out["export"] = site_json.run(season)
     return out
+
+
+TABLE_RULES = 2  # bump when a change to how these tables are built must also reach seasons saved earlier
+# 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
+
+
+def refresh_saved(season: int) -> list[int]:
+    """Rebuild the team, unit and player tables of earlier seasons once after a rule change, so blends, priors and
+    league baselines follow the same rules as the current season. A small marker file records the rules each was built with."""
+    from pipeline.metrics import player_game, team_game, units
+
+    def stale(s: int) -> bool:
+        d = TABLES / str(s)
+        marker = d / "rules.json"
+        return (d / "events.parquet").exists() and not (marker.exists() and json.loads(marker.read_text()).get("rules", 0) >= TABLE_RULES)
+
+    done = [s for s in range(FULL_SEASONS[0], season) if stale(s)]
+    for s in done:  # every team table first: player tables read league baselines pooled over all of them
+        team_game.build(s)
+        units.game_units(s)
+    for s in done:
+        player_game.build(s)
+        (TABLES / str(s) / "rules.json").write_text(json.dumps({"rules": TABLE_RULES}))
+    return done
 
 
 def publish(season: int) -> dict:
@@ -72,6 +97,7 @@ def publish(season: int) -> dict:
     out = {"build": games.build_season(season)}
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
+    refresh_saved(season)
     team_game.build(season)
     units.game_units(season)
     units.depth_table(season)
