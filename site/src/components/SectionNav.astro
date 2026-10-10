@@ -59,7 +59,7 @@ const { items, pinned = false } = Astro.props;
   .secnav-pills a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
   .secnav-bar { display: none; }
   @media (max-width: 719px) {
-    .secnav-pills { display: none; }
+    .jump.secnav-pills { display: none; }  /* beats the shared .jump row style, whichever loads last */
     .secnav-bar {
       display: flex; align-items: center; gap: 10px; position: sticky; top: var(--bar-h, 34px); z-index: 15;
       margin: 14px -16px 0; padding: 9px 16px; background: var(--ice); border-bottom: 1px solid transparent; transition: border-color 0.2s;
