@@ -40,6 +40,9 @@ G_MIN_SHOTS = 5  # goalies facing fewer shots get no score
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 
 
+SPECIAL = ("pp_xgf", "sec_pp", "sh_xga", "sec_pk")  # newer player_game columns; older saved seasons get rebuilt
+
+
 def _ratings(seasons: list[int]) -> dict[int, tuple[float, float]]:
     seasons = [s for s in seasons if (TABLES / str(s) / "stints.parquet").exists()]
     if not seasons:
@@ -95,7 +98,7 @@ def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
 
 def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str, float]) -> pl.DataFrame:
     """Every skater's and goalie's night in a season, with its parts."""
-    pg = P.load(season)
+    pg = P.load(season, need=SPECIAL)
     credit, goalies = shot_credit(season)
     ctx = usage(season, ratings) if ratings else pl.DataFrame(schema={"game_id": pl.Int64, "player_id": pl.Int64, "ctx": pl.Float64})
     d = pg.join(credit, on=["game_id", "player_id"], how="left").join(ctx, on=["game_id", "player_id"], how="left").with_columns(
@@ -122,7 +125,7 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
 def league_rates(season: int) -> dict[str, float]:
     """League power-play chances per second and penalty-kill chances allowed per second (every skater on the ice
     shares the same chances and seconds, so the ratio of the sums is the team rate)."""
-    t = P.load(season).select("pp_xgf", "sec_pp", "sh_xga", "sec_pk").sum().row(0, named=True)
+    t = P.load(season, need=SPECIAL).select(SPECIAL).sum().row(0, named=True)
     return {"pp": t["pp_xgf"] / t["sec_pp"], "pk": t["sh_xga"] / t["sec_pk"]}
 
 
