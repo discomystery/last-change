@@ -8,6 +8,7 @@ again from the same pre-game inputs (win_model uses only earlier days) and revea
 Each note is written for both teams; the page shows the visitor's own team's version if it is playing, otherwise the
 home team's.
 """
+import re
 import zlib
 from functools import lru_cache
 
@@ -163,14 +164,25 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         tired = opp if s["b2b"] > 0 else team
         out.append(f"{places[tired]} is playing for the second night in a row")
     if len(out) == 1 and out[0].startswith(places[home] + " has"):
-        return out[0] + " and has home ice."  # one team has both: name it once
+        return out[0] + (" and have" if places[home].startswith("the ") else " and has") + " home ice."  # one team has both: name it once
     out.append(f"{places[home]} has home ice")
     text = ", ".join(out[:-1]) + (", and " if len(out) > 2 else " and ") + out[-1]
     return text[0].upper() + text[1:] + "."
 
 
+_PLURAL = {"has": "have", "is": "are", "faces": "face", "starts": "start"}
+
+
+def _agree(text: str) -> str:
+    """"NY Rangers" reads badly as a place, so the New York teams go by nickname, and nicknames are plural."""
+    text = re.sub(r"\b([Tt]he (?:Rangers|Islanders)) (has|is|faces|starts)\b", lambda m: f"{m[1]} {_PLURAL[m[2]]}", text)
+    text = re.sub(r"(Rangers|Islanders)’s\b", r"\1’", text)
+    return text[0].upper() + text[1:]
+
+
 def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) -> dict[str, dict]:
     """The pre-game note for each team. Holds words only, never the chance itself."""
+    places = {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
     out = {}
     lineups = chance.get("lineups") or {}
     for team, opp in ((home, away), (away, home)):
@@ -179,8 +191,8 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how, how_bare = _route(fp, team, opp)
         how_o, how_o_bare = _route(fp, opp, team)
         w = {"T": places[team], "O": places[opp], "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
-        out[team] = {"head": _pick(heads, gid, team, "head").format(**w),
-                     "body": _why(chance["steps"], team, opp, home, places, lineups) + " " + _pick(caveats, gid, team, "caveat").format(**w)}
+        out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
+                     "body": _agree(_why(chance["steps"], team, opp, home, places, lineups) + " " + _agree(_pick(caveats, gid, team, "caveat").format(**w)))}
     return out
 
 
