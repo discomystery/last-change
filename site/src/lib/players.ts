@@ -88,6 +88,11 @@ export const ordinal = (n: number) => {
 /** League-rank tag for the very best in a comparison group: 1st, 2nd, 3rd, Top 5, Top 10. Nothing below that. */
 export const rankTag = (rank?: number, ok = true) => (!ok || !rank || rank > 10 ? null : rank <= 3 ? ordinal(rank) : rank <= 5 ? 'Top 5' : 'Top 10');
 export const rankTip = (rank: number, of: number, label: string, vs: string) => `${rank === 1 ? 'The best' : `${ordinal(rank)}-best`} of ${of} ${vs} at ${label.toLowerCase()}.`;
+/** Where a percentile sits, said from its own end so it never reads like a rank: 98 → "top 2%", 17 → "bottom 17%". */
+export const topShare = (pct: number) => {
+  const p = Math.round(pct);
+  return p >= 45 && p <= 55 ? 'average' : p > 55 ? `top ${Math.max(1, 100 - p)}%` : `bottom ${Math.max(1, p)}%`;
+};
 export const most = (n: number) => (n === 1 ? 'most' : `${ordinal(n)}-most`);
 
 /** Strengths and weak spots: confident departures from the position average, biggest first. */
