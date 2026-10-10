@@ -8,8 +8,16 @@ Inputs, per team, as a decaying average over its recent games (older games count
 for less again; a few phantom league-average games pull small samples toward the middle):
   - xgd: expected-goal difference per game, all situations, empty nets excluded (how well a team controls chances)
   - rest: playing on the second night of a back-to-back
+That is the base figure, known the morning of the game. At puck drop the lineup is known too, and the puck-drop
+figure adds to each team's chance rating:
+  - lineup: tonight's dressed skaters against the team's last ten lineups, each skater valued by his isolated 5v5
+    impact (rapm.py, fitted on earlier seasons only) times his usual 5v5 ice time, in expected goals per game.
+    It is in the same units as xgd, so it shifts that rating and needs no weight of its own. Over 2024-25 and
+    2025-26 it improved log loss by 0.0012 (80% range 0.0001-0.0023): small, because most nights a team dresses
+    its usual players.
 Finishing and goaltending (goals minus expected goals, for the team or for the starting goalie) were tested and
-dropped: over 2023-25 their weight came out at zero. A logistic regression on the home-minus-away gaps (plus home ice) turns them into a home win probability.
+dropped: over 2023-25 their weight came out at zero. A logistic regression on the home-minus-away gaps (plus home
+ice) turns them into a home win probability.
 Shootout and overtime results count as wins and losses like any other.
 """
 import math
@@ -23,6 +31,8 @@ from sklearn.linear_model import LogisticRegression
 from pipeline.config import FINAL_STATES, REGULAR, TABLES
 
 FEATURES = ["xgd", "b2b"]
+LINEUP_WINDOW = 10  # a team's usual lineup is the average of its last this-many
+SEC5_PER_GAME = 5 * 2900  # skater-seconds of 5v5 play in a typical game, to share out by usual ice time
 
 
 @dataclass(frozen=True)
@@ -85,23 +95,80 @@ def pregame(games: pl.DataFrame, p: Params = Params()) -> pl.DataFrame:
     return df.with_columns(xgd=pl.col("h_xgd") - pl.col("a_xgd"), b2b=pl.col("h_b2b") - pl.col("a_b2b"))
 
 
+def lineups(seasons: list[int]) -> pl.DataFrame:
+    """Per (game, team): tonight's lineup value minus the team's usual, in expected goals per game.
+
+    A skater's value is his offense plus defense impact per 60 from the seasons before this one (none for rookies),
+    times his share of the night's 5v5 time judged from his earlier games. Only earlier games feed both."""
+    from pipeline.metrics import rapm
+    from pipeline.metrics.players import RAPM_LAMBDA
+
+    have = [s for s in range(min(seasons) - 2, max(seasons) + 1) if (TABLES / str(s) / "player_game.parquet").exists()]
+    rate = {}
+    for s in seasons:
+        prior = [x for x in (s - 2, s - 1) if x in have]
+        r = rapm.run(prior, RAPM_LAMBDA) if prior else pl.DataFrame({"player_id": [], "off": [], "def": []})
+        rate[s] = dict(zip(r["player_id"].to_list(), (r["off"] + r["def"]).to_list()))
+    pg = pl.concat([
+        pl.read_parquet(TABLES / str(s) / "player_game.parquet").filter(pl.col("pos") != "G").select("game_id", "player_id", "team_id", "pos", "sec5")
+        .join(pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date"), on="game_id")
+        .with_columns(season=pl.lit(s)) for s in have]).sort("date", "game_id")
+    default = {d: float(pg.filter((pl.col("pos") == "D") == d)["sec5"].mean()) for d in (True, False)}
+    tw: dict[int, float] = defaultdict(float)  # decaying ice-time history per skater
+    tx: dict[int, float] = defaultdict(float)
+    past: dict[int, list[float]] = defaultdict(list)
+    rows = []
+    for day in pg.partition_by("date", maintain_order=True):
+        r = rate.get(day["season"][0], {})
+        today = []
+        for (gid, tid), grp in day.group_by(["game_id", "team_id"], maintain_order=True):
+            ids = grp["player_id"].to_list()
+            usual = np.array([tx[p] / tw[p] if tw[p] else default[pos == "D"] for p, pos in zip(ids, grp["pos"].to_list())])
+            share = usual / usual.sum() * SEC5_PER_GAME
+            value = float(sum(r.get(p, 0.0) * sec / 3600 for p, sec in zip(ids, share)))
+            h = past[tid][-LINEUP_WINDOW:]
+            rows.append({"game_id": gid, "team_id": tid, "lineup": value - (float(np.mean(h)) if h else value)})
+            today.append((tid, value))
+        for tid, value in today:
+            past[tid].append(value)
+        for p, sec in zip(day["player_id"].to_list(), day["sec5"].to_list()):
+            tw[p] = tw[p] * 0.9 + 1
+            tx[p] = tx[p] * 0.9 + sec
+    return pl.DataFrame(rows).filter(pl.col("game_id") // 1_000_000 % 10_000 >= min(seasons))
+
+
+def with_lineups(df: pl.DataFrame, lineup: pl.DataFrame) -> pl.DataFrame:
+    h = lineup.rename({"team_id": "home_id", "lineup": "h_lineup"})
+    a = lineup.rename({"team_id": "away_id", "lineup": "a_lineup"})
+    return (df.join(h, on=["game_id", "home_id"], how="left").join(a, on=["game_id", "away_id"], how="left")
+            .with_columns(lineup=(pl.col("h_lineup") - pl.col("a_lineup")).fill_null(0.0)))
+
+
 def fit(train: pl.DataFrame) -> LogisticRegression:
     m = LogisticRegression(C=1.0)
     m.fit(train.select(FEATURES).to_numpy(), train["home_win"].to_numpy())
     return m
 
 
-def predict(m: LogisticRegression, df: pl.DataFrame) -> np.ndarray:
+def predict(m: LogisticRegression, df: pl.DataFrame, puck_drop: bool = False) -> np.ndarray:
+    """Home win chance: the morning figure, or at puck drop with tonight's lineup added to the chance ratings."""
+    if puck_drop:
+        df = df.with_columns(xgd=pl.col("xgd") + pl.col("lineup"))
     return m.predict_proba(df.select(FEATURES).to_numpy())[:, 1]
 
 
 def explain(m: LogisticRegression, row: dict) -> list[dict]:
     """How each input moved the home team's chance, starting from two evenly matched teams on neutral ice.
 
-    Steps are taken in a fixed order (home ice, chances, rest), so they add up to the final figure."""
-    names = {"home": "Home ice", "xgd": "Control of chances", "b2b": "Back-to-back"}
+    Steps are taken in a fixed order (home ice, chances, rest, then tonight's lineup if the row has one), so they
+    add up to the final figure: the morning figure is the sum before the lineup step."""
+    names = {"home": "Home ice", "xgd": "Control of chances", "b2b": "Back-to-back", "lineup": "Tonight's lineup"}
+    coef = dict(zip(FEATURES, m.coef_[0]))
+    parts = [("home", m.intercept_[0])] + [(f, coef[f] * row[f]) for f in FEATURES]
+    if row.get("lineup") is not None:
+        parts.append(("lineup", coef["xgd"] * row["lineup"]))
     z, steps, before = 0.0, [], 0.5
-    for k, v in [("home", m.intercept_[0])] + [(f, m.coef_[0][i] * row[f]) for i, f in enumerate(FEATURES)]:
+    for k, v in parts:
         z += v
         after = 1 / (1 + math.exp(-z))
         steps.append({"input": k, "label": names[k], "shift": after - before})

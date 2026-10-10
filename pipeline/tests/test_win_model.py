@@ -27,11 +27,14 @@ def test_explanation_adds_up_to_the_probability():
     df = pl.DataFrame({"xgd": rng.normal(0, 0.5, 2000), "b2b": rng.integers(-1, 2, 2000)})
     y = (rng.random(2000) < 1 / (1 + np.exp(-(0.15 + 0.8 * df["xgd"].to_numpy())))).astype(int)
     m = win_model.fit(df.with_columns(home_win=pl.Series(y)))
-    row = {"xgd": 0.4, "b2b": -1}
+    row = {"xgd": 0.4, "b2b": -1, "lineup": -0.3}
     steps = win_model.explain(m, row)
-    p = win_model.predict(m, pl.DataFrame([row]))[0]
-    assert abs(0.5 + sum(s["shift"] for s in steps) - p) < 1e-9
+    morning = win_model.predict(m, pl.DataFrame([row]))[0]
+    at_drop = win_model.predict(m, pl.DataFrame([row]), puck_drop=True)[0]
+    assert abs(0.5 + sum(s["shift"] for s in steps[:-1]) - morning) < 1e-9
+    assert abs(0.5 + sum(s["shift"] for s in steps) - at_drop) < 1e-9
     assert steps[0]["input"] == "home" and steps[0]["shift"] > 0
+    assert steps[-1]["input"] == "lineup" and at_drop < morning  # a weaker lineup than usual lowers the chance
 
 
 def test_score_on_a_coin_flip():
