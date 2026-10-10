@@ -101,7 +101,6 @@ const statRow = (x: any) => (isG ? null : x);
 ---
 <Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
-  <script is:inline>(function () { var v = new URLSearchParams(location.search).get('intro'); if (v) document.documentElement.dataset.iv = v; })();</script>
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
@@ -112,8 +111,6 @@ const statRow = (x: any) => (isG ? null : x);
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
       <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
-      <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} parts={['lead', 'rest']} class="pin iv-a" />
-      <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} parts={['lead']} class="pin pin-lead iv-c" />
       {!isG && (
         <div class="pstats-in">
           <table class="pstats">
@@ -126,10 +123,8 @@ const statRow = (x: any) => (isG ? null : x);
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory iv-b" />
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} />
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} parts={['next']} class="iv-a" />
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} parts={['rest', 'next']} class="ptwo iv-c" />
 
     {!isG && role && (
       <>
@@ -432,31 +427,13 @@ const statRow = (x: any) => (isG ? null : x);
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
-  /* MOCK-UP: three intro placements (?intro=a|b|c). */
-  :global(html:not([data-iv='b']):not([data-iv='c'])) :global(.iv-b), :global(html:not([data-iv='b']):not([data-iv='c'])) :global(.iv-c),
-  :global(html[data-iv='b']) :global(.iv-a), :global(html[data-iv='b']) :global(.iv-c),
-  :global(html[data-iv='c']) :global(.iv-a), :global(html[data-iv='c']) :global(.iv-b) { display: none !important; }
-  /* A and C: inside the name card, between the meta line and the stats; the photo still stands on the card's bottom edge. */
-  .phead :global(.pin) { grid-column: 1; grid-row: 3; margin: 16px 0 0; max-width: 760px; }
-  .phead :global(.pin .intro-text) { font-size: 17px; }
-  .phead :global(.pin-lead .intro-lead) { font-size: 22px; }
-  .phead:has(:global(.pin)) .pstats-in { grid-row: 4; }
-  .phead:has(:global(.pin)) :global(.phead-photo) { grid-row: 1 / 5; }
-  /* B: a story card joined to the bottom of the name card, the next game in a column at its right. */
+  /* The intro is the name card's second half: joined below the stats, the story on the left and the next game on the right. */
+  .phead:has(+ :global(.pstory)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
   :global(.pstory) { max-width: none !important; margin: -1px 0 0 !important; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; }
   :global(.pstory:not(.with-next)) { grid-template-columns: minmax(0, 1fr); }
   :global(.pstory .intro-next) { margin-top: 0 !important; background: var(--ice) !important; }
-  :global(html[data-iv='b']) .phead { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  /* C: the rest of the intro and the next game side by side under the section menu. */
-  :global(.ptwo) { max-width: none !important; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-  :global(.ptwo:not(.with-next)) { grid-template-columns: minmax(0, 820px); }
-  :global(.ptwo .intro-next) { margin-top: 0 !important; }
   @media (max-width: 719px) {
-    .phead :global(.pin) { grid-column: 1 / -1; grid-row: 4; margin: 0 0 14px; }
-    .phead:has(:global(.pin)) .pstats-in { grid-row: 5; }
-    .phead:has(:global(.pin)) :global(.phead-photo) { grid-row: 2 / 4; }
-    :global(.pstory), :global(.ptwo) { grid-template-columns: 1fr !important; gap: 14px; padding-left: 16px; padding-right: 16px; }
-    :global(.ptwo) { padding: 0; }
+    :global(.pstory) { grid-template-columns: 1fr !important; gap: 14px; padding: 16px; }
   }
   .rec a { color: inherit; }
   .pstats { border-collapse: collapse; font: 400 14px var(--ui); }
