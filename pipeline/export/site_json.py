@@ -52,6 +52,8 @@ def run(season: int) -> dict:
     export_lines(season)
     export_goalies(season)
     export_goal_sources(season)
+    if not OFFLINE:  # needs MoneyPuck's shot file, which offline runs don't have: keep the saved page
+        export_xg_check(season)
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import previews

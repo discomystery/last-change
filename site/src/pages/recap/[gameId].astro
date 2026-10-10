@@ -169,7 +169,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
         ))}
       </ol>
     ) : (
-      <p class="note">Previews are saved at puck drop, starting with games on October 10, so there were no calls to check for this one.</p>
+      <p class="note">No preview was saved for this game, so there were no calls to check.</p>
     )}
     <p class="note">Each call is checked by a rule set before the game. <strong>Held up</strong>: the team reached its usual level. <strong>Partly</strong>: it fell short of its usual level but still beat the league average. When a call says one team will come out ahead, held up means it won by at least half its usual gap, and partly means it won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {r.preview_page && <p class="note"><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</p>}

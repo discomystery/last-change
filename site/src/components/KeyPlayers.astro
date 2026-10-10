@@ -4,7 +4,7 @@
 import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
-import { posWord, groupWord, ordinal, type Mode } from '../lib/players';
+import { posWord, groupWord, ordinal, rankTag, rankTip, topShare, type Mode } from '../lib/players';
 import { clock, compared } from '../lib/format';
 
 interface Props { abbr: string; place: string }
@@ -42,12 +42,12 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
                   <ul class="kp-rows">
                     {best.map((it) => (
                       <li tabindex="0" data-tip={`${it.info.label}: better than ${it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
-                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} />{rankTag(it.rank) ? <span class="kp-pct"><span class="rk" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span></span> : <span class="kp-pct">{topShare(it.pct)}</span>}
                       </li>
                     ))}
                     {worst.map((it) => (
                       <li class="weak" tabindex="0" data-tip={`${it.info.label}: behind ${100 - it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
-                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{topShare(it.pct)}</span>
                       </li>
                     ))}
                   </ul>
@@ -72,9 +72,11 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
   .kp-jobs { list-style: none; padding: 0; margin: 2px 0 4px; display: flex; flex-wrap: wrap; gap: 5px; }
   .kp-jobs .chip { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; }
   :global(html[data-mode='season']) .kp-jobs li.m-season { display: inline-block; }
-  .kp-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font: 400 14px var(--ui); }
-  .kp-rows li { display: grid; grid-template-columns: 1fr auto 3.2em; align-items: center; gap: 10px; cursor: help; }
+  .kp-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px 10px; font: 400 14px var(--ui); }
+  .kp-rows { grid-template-columns: 1fr auto auto; }
+  .kp-rows li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; gap: 10px; cursor: help; }
   .kp-rows li.weak { color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 6px; }
   .kp-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 12px; }
   .kp-none { font-size: 13px; }
+  .rk { display: inline-block; margin-left: 0; padding: 0 6px; border-radius: 999px; background: var(--ink); color: var(--sheet); font: 700 10px/1.6 var(--ui); letter-spacing: 0.03em; vertical-align: 1px; white-space: nowrap; }
 </style>

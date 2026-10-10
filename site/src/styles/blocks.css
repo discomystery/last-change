@@ -108,7 +108,6 @@
   @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }
   .chip.tag { cursor: help; }
   .both { margin-left: 8px; }
-  .roles-list .plink[data-shooter]:hover, .roles-list .plink.on { text-decoration-color: var(--ink); }
   .map-who { font: 600 13px var(--ui); color: var(--ink-2); min-height: 20px; margin-bottom: 6px; }
   .tagkey { margin-top: 16px; display: grid; gap: 8px; font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .tagkey dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }

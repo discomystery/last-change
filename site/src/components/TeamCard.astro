@@ -6,16 +6,15 @@ interface Props { t: { abbr: string; name: string; w: number; l: number; otl: nu
 const { t } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
-<li class="card row tcard" data-team={t.abbr} style={`--c:${teamColour(t.abbr)}`}>
-  <a class="tname" href={`${base}team/${t.abbr}/`}><i></i>{t.name}</a>
+<li class="card row tcard go" data-team={t.abbr} style={`--c:${teamColour(t.abbr)}`}>
+  <a class="tname go-link" href={`${base}team/${t.abbr}/`}><i></i>{t.name}</a>
   <span class="trec">{t.w}-{t.l}-{t.otl} <span class="n">· {t.pts} pts</span></span>
   <span class="tnext n"></span>
 </li>
 
 <style>
   .tcard { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
-  .tname { font: 600 17px var(--ui); text-decoration: none; display: inline-flex; align-items: center; gap: 9px; }
-  .tname:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .tname { font: 600 17px var(--ui); display: inline-flex; align-items: center; gap: 9px; }
   .tname i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); flex: none; }
   @media (prefers-color-scheme: dark) { .tname i { background: color-mix(in oklab, var(--c) 55%, white); } }
   .trec { font: 700 15px var(--ui); white-space: nowrap; }
