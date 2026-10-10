@@ -7,7 +7,7 @@ from pipeline.config import CURRENT_SEASON
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update"])
+    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update", "deserve"])
     p.add_argument("--season", type=int, default=CURRENT_SEASON)
     p.add_argument("--limit", type=int)
     a = p.parse_args()
@@ -23,6 +23,9 @@ def main() -> None:
     elif a.step == "export":
         from pipeline.export import site_json
         print(json.dumps(site_json.run(a.season)))
+    elif a.step == "deserve":
+        from pipeline.metrics import deserve
+        print(json.dumps(deserve.build(a.season)))
     elif a.step == "update":
         print(json.dumps(update(a.season)))
 
