@@ -10,6 +10,8 @@ import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
+import Intro from '../../components/Intro.astro';
+import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
@@ -28,6 +30,8 @@ const index = Object.values(import.meta.glob('../../../public/data/players/index
 const known = new Set(index.map((x) => x.id));
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
+const intro = playerIntro(p.id);
+const introNext = nextGame(intro?.game, base);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
 // A rank tag is glued to the label's last word so it never drops onto a line of its own.
 const headOf = (label: string) => label.slice(0, label.lastIndexOf(' ') + 1);
@@ -101,6 +105,7 @@ const statRow = (x: any) => (isG ? null : x);
     </header>
     <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
     <SectionNav items={nav as [string, string][]} />
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} />
     {!isG && (
       <table class="pstats">
         <thead><tr><th></th>{cols.map(([full, short, tip]) => <th>{tip ? <span class="term" tabindex="0" data-tip={tip}><span class="full">{full}</span><span class="short">{short}</span></span> : <><span class="full">{full}</span><abbr class="short" title={full}>{short}</abbr></>}</th>)}</tr></thead>

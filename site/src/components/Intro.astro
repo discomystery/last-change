@@ -1,0 +1,26 @@
+---
+// Plain-English intro at the top of team and player pages (pipeline/export/intros.py): who this is, are they good,
+// have they been good; for players, storylines for the next game under a small heading.
+interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null }
+const { text, next = [], nextLabel, nextHref } = Astro.props;
+---
+{text.length > 0 && (
+  <div class="intro">
+    <p class="intro-text">{text.join(' ')}</p>
+    {next.length > 0 && (
+      <div class="intro-next">
+        <p class="intro-eyebrow">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
+        <p class="intro-story">{next.join(' ')}</p>
+      </div>
+    )}
+  </div>
+)}
+<style>
+  .intro { margin: 18px 0 8px; max-width: 760px; }
+  .intro-text { margin: 0; font: 400 19px/1.65 var(--body); color: var(--ink); }
+  .intro-next { margin-top: 16px; padding: 12px 16px; background: var(--sheet); border-radius: 14px; }
+  .intro-eyebrow { margin: 0 0 4px; font: 700 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .intro-eyebrow a { color: inherit; }
+  .intro-story { margin: 0; font: 400 17px/1.6 var(--body); }
+  @media (max-width: 719px) { .intro-text { font-size: 18px; } }
+</style>
