@@ -27,7 +27,7 @@ from collections import defaultdict
 import numpy as np
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.metrics import players as P
 from pipeline.metrics import rink_bias
 
@@ -109,6 +109,42 @@ def grade(v: float, usual: float, bench: float, higher: bool = True) -> str:
     if beyond(v, bench):
         return "partly"
     return "missed"
+
+
+def plus_minus(season: int) -> dict[tuple[int, int], int]:
+    """Plus-minus per player-game, straight from the NHL boxscore (rebuilding it from play-by-play disagrees with the
+    league in a few games where the recorded manpower at a goal is off)."""
+    import gzip
+    out = {}
+    for f in (RAW / str(season) / "box").glob("*.json.gz"):
+        d = json.loads(gzip.decompress(f.read_bytes()))
+        for side in ("awayTeam", "homeTeam"):
+            for grp in ("forwards", "defense"):
+                for p in (d.get("playerByGameStats") or {}).get(side, {}).get(grp, []):
+                    out[(d["id"], p["playerId"])] = p.get("plusMinus") or 0
+    return out
+
+
+def night(box: dict, xg_share: float | None) -> tuple[str | None, str | None]:
+    """The whole game, apart from his usual jobs: a big night (2+ points, +2 or better, or his team owning the chances
+    with him on) or a rough one (-3 or worse with no points). Shown first on the card, so a player who had a great
+    game in other ways never reads as "mixed" just because his usual jobs went quiet."""
+    pts, pm = box["g"] + box["a"], box["pm"]
+    bits = []
+    if box["g"]:
+        bits.append(f"{box['g']} {'goal' if box['g'] == 1 else 'goals'}")
+    if box["a"]:
+        bits.append(f"{box['a']} {'assist' if box['a'] == 1 else 'assists'}")
+    if pm:
+        bits.append(f"{'+' if pm > 0 else '−'}{abs(pm)}")
+    owned = xg_share is not None and xg_share >= 0.7
+    if pts >= 2 or pm >= 2 or (pts >= 1 and pm >= 1 and owned):
+        if owned:
+            bits.append(f"{round(100 * xg_share)}% of the 5-on-5 chances with him on")
+        return "big", ", ".join(bits)
+    if pm <= -3 and pts == 0:
+        return "rough", ", ".join(bits)
+    return None, None
 
 
 def summary(verdicts: list[str]) -> str | None:
@@ -219,6 +255,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     grp = {**ref.grp, **P._groups(now)}
     sub = {**ref.sub, **P._groups(now, P.SUB)}
 
+    pm = plus_minus(season)
     cards = defaultdict(list)
     for (pid,), rows in now.group_by("player_id", maintain_order=True):
         m = rows.select(P.COLS).to_numpy()
@@ -236,6 +273,10 @@ def run(season: int = CURRENT_SEASON) -> dict:
                                ref, impact.get(pid, {}), fac, hr, league, typical)
             if card:
                 card["id"] = pid
+                card["box"]["pm"] = pm.get((e["game_id"], pid), 0)
+                f, a = float(m[i][P.C["on_xgf_adj"]]), float(m[i][P.C["on_xga_adj"]])
+                share = f / (f + a) if m[i][P.C["sec5"]] >= 600 and f + a > 0 else None
+                card["night"], card["night_why"] = night(card["box"], share)
                 cards[e["game_id"]].append(card)
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -249,7 +290,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         out = {"game_id": gid, "away": g["away"], "home": g["home"], "players": [], "stood_out": []}
         for t in (g["away"], g["home"]):
             mine = sorted((c for c in cs if c["team"] == t), key=lambda c: -c["toi_sec"])
-            out["players"] += [c for c in mine if c["jobs"]]
+            out["players"] += [c for c in mine if c["jobs"] or c["night"]]
         # The most unlikely nights first, at most two of any one kind so hits can't crowd out everything else.
         notes, per_kind = [], defaultdict(int)
         for s in sorted(({**s, "id": c["id"], "name": c["name"], "team": c["team"]} for c in cs for s in c["standouts"]), key=lambda s: s["p"]):

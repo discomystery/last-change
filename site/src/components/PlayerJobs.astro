@@ -6,7 +6,7 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 
 type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
-type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null };
+type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'big' | 'rough' | null; night_why: string | null };
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
@@ -28,6 +28,12 @@ const whyTip = (j: Job) => {
   const base = j.key === 'offImpact' || j.key === 'defImpact' ? 'over the two seasons before this one, after allowing for linemates and opponents' : 'going into this game, this season blended with last';
   return `Better than ${j.pct}% of ${peer[j.vs ?? 'F']} ${base}.`;
 };
+// When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.
+const nightNote = (c: Card) => {
+  if (c.night === 'big' && (c.summary === 'mixed' || c.summary === 'didnt')) return '. A strong game, even though his usual jobs were quieter.';
+  if (c.night === 'rough' && c.summary === 'did') return '. A hard night on the scoresheet, though he still did his usual jobs.';
+  return '.';
+};
 const posWord: Record<string, string> = { C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defense' };
 const graded = d ? d.players.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];
 const share = (v: string) => graded.filter((j) => j.verdict === v).length;
@@ -45,12 +51,15 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
         <li class:list={['card', 'pc', `t-${side(t)}`]}>
           <div class="pc-top">
             <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
-            {c.summary && <span class:list={['pc-sum', c.summary]}>{summaryWord[c.summary]}</span>}
+            {c.night ? <span class:list={['pc-sum', c.night === 'big' ? 'did' : 'didnt']}>{c.night === 'big' ? 'Big night' : 'Rough night'}</span>
+              : c.summary && <span class:list={['pc-sum', c.summary]}>{summaryWord[c.summary]}</span>}
           </div>
+          {c.night && <p class="pc-night">{c.night_why}{nightNote(c)}</p>}
           <dl class="pc-box">
             <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={`All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
             <div><dt>G</dt><dd>{c.box.g}</dd></div>
             <div><dt>A</dt><dd>{c.box.a}</dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip="Plus-minus, as the NHL counts it: goals for minus goals against while he was on the ice, leaving out power-play goals.">+/−</span></dt><dd>{c.box.pm > 0 ? `+${c.box.pm}` : c.box.pm < 0 ? `−${-c.box.pm}` : '0'}</dd></div>
             <div><dt>Shots</dt><dd>{c.box.sog}</dd></div>
             <div><dt>Hits</dt><dd>{c.box.hits}</dd></div>
             <div><dt>Blocks</dt><dd>{c.box.blocks}</dd></div>
@@ -79,7 +88,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       );
     })}
     <p class="note">
-      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither.
+      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary.
       Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
     </p>
     <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>
@@ -127,6 +136,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-sum { margin-left: auto; font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
   .pc-sum.did { background: var(--ink); color: var(--sheet); }
   .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .pc-night { font: 500 14px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
   .pc-box { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
   .pc-box div { display: grid; gap: 0; }
   .pc-box dt { font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
