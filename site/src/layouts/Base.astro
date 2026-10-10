@@ -3,13 +3,13 @@ import teams from '../../public/data/teams.json';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
-// Main sections. Track record has its place in the menu before its page exists.
+// Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
   { id: 'teams', label: 'Teams', href: 'teams/' },
   { id: 'players', label: 'Players', href: 'players/' },
   { id: 'league', label: 'League', href: 'league/' },
-  { id: 'record', label: 'Track record', soon: 'Coming soon: how often the previews’ calls hold up, all season.' },
+  { id: 'record', label: 'Track record', href: 'record/' },
 ];
 const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
@@ -85,7 +85,7 @@ const teamList = teams as { abbr: string; name: string }[];
     <div class="more" id="more" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
       <a href={`${base}league/`} aria-current={cur('league')}>League</a>
-      <span class="soon">Track record <em>coming soon</em></span>
+      <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
       <a href={`${base}methods/`}>Methods</a>
       <a href={`${base}check/`}>Real lines check</a>
       <a href={`${base}xg-check/`}>Chance check</a>

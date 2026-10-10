@@ -1,0 +1,349 @@
+---
+// Track record: how the previews' calls have held up this season, kept apart from previews rebuilt after the fact,
+// and how the win chances (never shown before a game, revealed on post-game pages) compare with the results.
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import SectionNav from '../components/SectionNav.astro';
+import '../styles/blocks.css';
+import teamsData from '../../public/data/teams.json';
+import track from '../../public/data/track.json';
+
+type Count = { held: number; partly: number; missed: number };
+type Latest = { game_id: number; date: string; away: string; home: string; kind: string; head: string; call: string | null; verdict: keyof Count; usual: string | null; tonight: string | null };
+type CallSet = { tally: Count; kinds: Record<string, Count>; weeks: ({ week: string } & Count)[]; games: number; latest: Latest[] };
+type Band = { band: string; games: number; said: number; won: number; lo: number; hi: number };
+type Win = { games: number; picked: number; hit_rate: number; home_rate: number; bands: Band[]; puck?: { games: number; picked: number }; seasons?: number[] };
+
+const sets = track.sets as Record<'live' | 'rebuilt', CallSet>;
+const win = track.win as { season: Win | null; past: Win | null };
+const base = import.meta.env.BASE_URL;
+const place = Object.fromEntries(teamsData.map((t) => [t.abbr, t.place]));
+const total = (c: Count) => c.held + c.partly + c.missed;
+const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
+const day = (iso: string, opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }) =>
+  new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+const liveN = total(sets.live.tally);
+const rebuiltN = total(sets.rebuilt.tally);
+// Open on the real record once it has anything in it.
+const start: 'live' | 'rebuilt' = liveN > 0 || rebuiltN === 0 ? 'live' : 'rebuilt';
+
+const kindInfo: Record<string, { label: string; rule: string }> = {
+  clash: { label: 'Strength meets weakness', rule: 'Held up if the team reached its usual level' },
+  edge: { label: 'One team comes out ahead', rule: 'Held up if it won by half its usual margin' },
+  contrast: { label: 'One team comes out ahead', rule: 'Held up if it won by half its usual margin' },
+  pace: { label: 'Pace of the game', rule: 'Held up if the game ran at the teams’ usual pace' },
+  physical: { label: 'A physical game', rule: 'Held up if the hit score reached the teams’ usual' },
+  matchup: { label: 'Line matching', rule: 'Held up if the coach matched lines as usual at home' },
+};
+const kindRows = (s: CallSet) => {
+  const merged: Record<string, Count> = {};
+  for (const [k, c] of Object.entries(s.kinds)) {
+    const label = kindInfo[k]?.label ?? k;
+    const m = (merged[label] ??= { held: 0, partly: 0, missed: 0 });
+    m.held += c.held; m.partly += c.partly; m.missed += c.missed;
+  }
+  return Object.entries(merged)
+    .map(([label, c]) => ({ label, rule: Object.values(kindInfo).find((x) => x.label === label)?.rule ?? '', c }))
+    .sort((a, b) => total(b.c) - total(a.c));
+};
+const weekMax = Math.max(1, ...[...sets.live.weeks, ...sets.rebuilt.weeks].map(total));
+const mark = { held: '✓', partly: '≈', missed: '✕' } as const;
+const word = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
+const SHOW = 12;
+const seasonsLabel = (s: number[]) => `${s[0]}–${String(s[0] + 1).slice(2)} to ${s[s.length - 1]}–${String(s[s.length - 1] + 1).slice(2)}`;
+// Calibration scale: the favourite's chance runs from 50% up, results can fall below it.
+const LO = 30, HI = 100;
+const x = (p: number) => `${((100 * p - LO) / (HI - LO)) * 100}%`;
+const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
+---
+<Base section="record" title="Track record" mock={false} description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
+  <header class="team-top"><h1>Track record</h1></header>
+  <p class="takeaway lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
+  <SectionNav items={nav} />
+
+  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Only calls saved before the game count. Bolder is better.">
+    <div class="sets">
+      <div class="card set live">
+        <p class="eyebrow">Made before the game</p>
+        {liveN > 0 ? (
+          <>
+            <p class="big">{pct(sets.live.tally.held, liveN)}%<span> held up</span></p>
+            <div class="stack lg" role="img" aria-label={`${sets.live.tally.held} held up, ${sets.live.tally.partly} partly, ${sets.live.tally.missed} didn’t happen`}>
+              {(['held', 'partly', 'missed'] as const).map((v) => sets.live.tally[v] > 0 && <span class={v} style={`flex-grow:${sets.live.tally[v]}`}>{sets.live.tally[v]}</span>)}
+            </div>
+            <p class="sub">{liveN} calls in {sets.live.games} {sets.live.games === 1 ? 'game' : 'games'}</p>
+          </>
+        ) : (
+          <>
+            <p class="big empty">None graded yet</p>
+            <div class="stack lg"><span class="none"></span></div>
+            <p class="sub">{track.waiting > 0 ? `${track.waiting} previews are saved and waiting on their games.` : 'The first saved previews are waiting on their games.'}</p>
+          </>
+        )}
+      </div>
+      <div class="card set rebuilt">
+        <p class="eyebrow">Rebuilt after the fact · not counted</p>
+        {rebuiltN > 0 ? (
+          <>
+            <p class="big">{pct(sets.rebuilt.tally.held, rebuiltN)}%<span> held up</span></p>
+            <div class="stack lg" role="img" aria-label={`${sets.rebuilt.tally.held} held up, ${sets.rebuilt.tally.partly} partly, ${sets.rebuilt.tally.missed} didn’t happen`}>
+              {(['held', 'partly', 'missed'] as const).map((v) => sets.rebuilt.tally[v] > 0 && <span class={v} style={`flex-grow:${sets.rebuilt.tally[v]}`}>{sets.rebuilt.tally[v]}</span>)}
+            </div>
+            <p class="sub">{rebuiltN} calls in {sets.rebuilt.games} games played before previews were saved</p>
+          </>
+        ) : <p class="sub">None.</p>}
+      </div>
+    </div>
+    <p class="key" aria-hidden="true"><span class="held"></span>Held up <span class="partly"></span>Partly <span class="missed"></span>Didn’t happen</p>
+    <p class="note">Rebuilt previews were made afterwards, from only the games played before each one, by the same rules. Nobody could read them before the game, so they never count toward the record.</p>
+  </Section>
+
+  <div class="pick setpick"><span>Show calls</span>
+    <select id="set-pick" aria-label="Which calls">
+      <option value="live" selected={start === 'live'}>made before the game</option>
+      <option value="rebuilt" selected={start === 'rebuilt'}>rebuilt after the fact</option>
+    </select>
+  </div>
+
+  {(['live', 'rebuilt'] as const).map((k) => {
+    const s = sets[k];
+    const n = total(s.tally);
+    const empty = <p class="note">No graded calls made before a game yet. {track.waiting > 0 && `${track.waiting} saved previews are waiting on their games.`}</p>;
+    return (
+      <div class="setview" data-set={k} hidden={k !== start}>
+        <Section id={k === start ? 'kinds' : `kinds-${k}`} title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others.">
+          {n > 0 ? (
+            <ol class="rows">
+              {kindRows(s).map(({ label, rule, c }) => (
+                <li>
+                  <div class="rl"><strong>{label}</strong><span>{rule}</span></div>
+                  <div class="stack">{(['held', 'partly', 'missed'] as const).map((v) => c[v] > 0 && <span class={v} style={`flex-grow:${c[v]}`}>{c[v]}</span>)}</div>
+                  <p class="rn"><strong>{pct(c.held, total(c))}%</strong> of {total(c)}</p>
+                </li>
+              ))}
+            </ol>
+          ) : empty}
+        </Section>
+
+        <Section id={k === start ? 'weeks' : `weeks-${k}`} title="Week by week" placeholder={false} takeaway="Each column is one week of graded calls.">
+          {n > 0 ? (
+            <div class="weeks" style={`--n:${s.weeks.length}`}>
+              {s.weeks.map((w) => (
+                <div class="wk">
+                  <p class="wp">{pct(w.held, total(w))}%</p>
+                  <div class="col" style={`height:${(100 * total(w)) / weekMax}%`} title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+                    {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
+                  </div>
+                  <p class="wl">{day(w.week)}</p>
+                </div>
+              ))}
+            </div>
+          ) : empty}
+        </Section>
+
+        <Section id={k === start ? 'latest' : `latest-${k}`} title="Latest calls" placeholder={false} takeaway="The most recent calls and how each one went.">
+          {n > 0 ? (
+            <>
+              <ol class="latest">
+                {s.latest.slice(0, SHOW).map((c) => (
+                  <li>
+                    <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
+                    <div class="lc">
+                      <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                      <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              {s.latest.length > SHOW && (
+                <details class="fold">
+                  <summary><span class="more-word">Show {s.latest.length - SHOW} more</span><span class="less-word">Show fewer</span></summary>
+                  <ol class="latest">
+                    {s.latest.slice(SHOW).map((c) => (
+                      <li>
+                        <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
+                        <div class="lc">
+                          <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                          <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+            </>
+          ) : empty}
+        </Section>
+      </div>
+    );
+  })}
+
+  <Section id="chances" title="Win chances, after the fact" placeholder={false} takeaway="When we gave a team about 60%, did teams like that win about 60% of the time?">
+    {win.season || win.past ? (
+      <>
+        <div class="tiles">
+          {win.season && (
+            <div class="card tile">
+              <p class="eyebrow">This season</p>
+              <p class="big">{win.season.picked}<span> of {win.season.games}</span></p>
+              <p class="sub">games won by the team we favoured ({Math.round(100 * win.season.hit_rate)}%)</p>
+            </div>
+          )}
+          {win.season && (
+            <div class="card tile">
+              <p class="eyebrow">Home team every time</p>
+              <p class="big">{Math.round(100 * win.season.home_rate)}%</p>
+              <p class="sub">the score to beat this season</p>
+            </div>
+          )}
+          {win.past && win.past.seasons && (
+            <div class="card tile">
+              <p class="eyebrow">{seasonsLabel(win.past.seasons)}</p>
+              <p class="big">{Math.round(100 * win.past.hit_rate)}%<span> vs {Math.round(100 * win.past.home_rate)}%</span></p>
+              <p class="sub">favourite against home team, {win.past.games.toLocaleString('en-US')} games</p>
+            </div>
+          )}
+        </div>
+        <div class="pick"><span>Show</span>
+          <select id="win-pick" aria-label="Which games">
+            {win.season && <option value="season">this season</option>}
+            {win.past && win.past.seasons && <option value="past">{seasonsLabel(win.past.seasons)}</option>}
+          </select>
+        </div>
+        {(['season', 'past'] as const).map((k, i) => {
+          const w = win[k];
+          if (!w) return null;
+          return (
+            <div class="card calib" data-win={k} hidden={k !== (win.season ? 'season' : 'past')}>
+              <p class="key"><span class="said"></span>Chance we gave <span class="won"></span>How often they won <span class="rng"></span>Likely range</p>
+              <ol>
+                {w.bands.map((b) => (
+                  <li>
+                    <span class="bl">{b.band}</span>
+                    <div class="lane" title={`Given ${Math.round(100 * b.said)}% on average, won ${Math.round(100 * b.won)}% of ${b.games} games`}>
+                      <span class="even" style={`left:${x(0.5)}`}></span>
+                      <span class="whisk" style={`left:${x(b.lo)};width:calc(${x(b.hi)} - ${x(b.lo)})`}></span>
+                      <span class="said" style={`left:${x(b.said)}`}></span>
+                      <span class="won" style={`left:${x(b.won)}`}></span>
+                    </div>
+                    <span class="bn"><strong>{Math.round(100 * b.won)}%</strong> of {b.games}</span>
+                  </li>
+                ))}
+              </ol>
+              <div class="axis" aria-hidden="true"><span class="bl"></span><div class="ticks">{[30, 50, 70, 90].map((t) => <span style={`left:${x(t / 100)}`}>{t}%</span>)}</div><span class="bn"></span></div>
+              {k === 'season' && w.games < 300 && <p class="note">Small samples: each row is only a handful of games so far, so the ranges are wide.</p>}
+              {k === 'past' && <p class="note">Each of these seasons was predicted by the model fitted on the other two, so no game was scored by a model that had seen it.</p>}
+            </div>
+          );
+        })}
+        <p class="note">The win chance is never shown before a game. It is worked out afterwards from what was known that morning, and each post-game page reveals it with the reasons.</p>
+      </>
+    ) : <p class="note">No finished games to score yet.</p>}
+  </Section>
+</Base>
+
+<script>
+  const pick = document.getElementById('set-pick') as HTMLSelectElement | null;
+  pick?.addEventListener('change', () => {
+    document.querySelectorAll<HTMLElement>('.setview').forEach((v) => {
+      const on = v.dataset.set === pick.value;
+      v.hidden = !on;
+      // Section ids follow the visible set so the section menu keeps working.
+      v.querySelectorAll<HTMLElement>('section.sec').forEach((s) => {
+        const id = s.id.replace(/-(live|rebuilt)$/, '');
+        s.id = on ? id : `${id}-${v.dataset.set}`;
+      });
+    });
+  });
+  const wp = document.getElementById('win-pick') as HTMLSelectElement | null;
+  wp?.addEventListener('change', () => document.querySelectorAll<HTMLElement>('[data-win]').forEach((c) => (c.hidden = c.dataset.win !== wp.value)));
+</script>
+
+<style>
+  .lede { max-width: 46em; }
+  .eyebrow { font: 600 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .big { font: 700 40px / 1.1 var(--display); margin: 8px 0 12px; }
+  .big span { font: 500 17px var(--ui); color: var(--ink-2); }
+  .big.empty { font-size: 26px; color: var(--ink-2); }
+  .sub { font: 500 14px var(--ui); color: var(--ink-2); margin-top: 10px; }
+
+  .sets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+  .set.rebuilt { background: transparent; border-style: dashed; }
+  .set.rebuilt .big { color: var(--ink-2); }
+
+  /* Darker is better: held in ink, partly in a mid tone, missed as the pale track. */
+  .stack { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--sheet); }
+  .stack.lg { height: 30px; }
+  .stack span { display: flex; align-items: center; justify-content: center; min-width: 0; font: 700 12px var(--ui); overflow: hidden; }
+  .held { background: var(--ink); color: var(--sheet); }
+  .partly { background: color-mix(in oklab, var(--ink) 42%, var(--track)); color: var(--sheet); }
+  .missed { background: var(--track); color: var(--ink-2); }
+  .stack .none { flex-grow: 1; background: repeating-linear-gradient(-45deg, var(--track) 0 6px, transparent 6px 12px); }
+  .key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 14px; }
+  .key span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: -8px; vertical-align: -1px; }
+
+  .setpick { margin-top: 64px; }
+  .setview :global(.sec) { margin-top: 48px; }
+
+  .rows { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 14px; }
+  .rows li { display: grid; grid-template-columns: minmax(200px, 1.1fr) 2fr 92px; gap: 16px; align-items: center; }
+  .rl strong { display: block; font: 600 16px var(--ui); }
+  .rl span { font-size: 14px; color: var(--ink-2); }
+  .rn { font: 500 14px var(--ui); color: var(--ink-2); text-align: right; white-space: nowrap; }
+  .rn strong { font-size: 17px; color: var(--ink); }
+
+  .weeks { display: flex; gap: 10px; align-items: flex-end; height: 200px; margin-top: 20px; max-width: calc(var(--n) * 90px); }
+  .wk { flex: 1 1 0; max-width: 80px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
+  .col { display: flex; flex-direction: column; gap: 2px; border-radius: 6px 6px 2px 2px; overflow: hidden; min-height: 6px; }
+  .col span { flex-basis: 0; min-height: 2px; }
+  .wp { font: 700 14px var(--ui); text-align: center; margin-bottom: 6px; }
+  .wl { font: 500 12px var(--ui); color: var(--ink-3); text-align: center; margin-top: 6px; white-space: nowrap; }
+
+  .latest { list-style: none; padding: 0; margin-top: 16px; }
+  .latest li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--rule); }
+  .vchip { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 128px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+  .vchip.held { background: var(--ink); color: var(--sheet); }
+  .vchip.partly { background: transparent; color: var(--ink); }
+  .vchip.missed { background: transparent; border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .lh { font: 600 17px var(--body); color: var(--ink); text-decoration: none; }
+  .lh:hover { text-decoration: underline; }
+  .lm { font: 500 13px var(--ui); color: var(--ink-2); margin-top: 3px; }
+  .usual { color: var(--ink-3); }
+  .fold { margin-top: 10px; }
+  .fold .less-word, .fold[open] .more-word { display: none; }
+  .fold[open] .less-word { display: inline; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 22px; }
+  .tile .big { font-size: 34px; }
+
+  .calib { margin-top: 12px; }
+  .calib ol { list-style: none; padding: 0; margin-top: 16px; display: grid; gap: 12px; }
+  .calib li, .axis { display: grid; grid-template-columns: 70px 1fr 84px; gap: 14px; align-items: center; }
+  .bl { font: 600 14px var(--ui); }
+  .bn { font: 500 13px var(--ui); color: var(--ink-2); text-align: right; white-space: nowrap; }
+  .bn strong { font-size: 15px; color: var(--ink); }
+  .lane { position: relative; height: 22px; }
+  .lane::before { content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--track); border-radius: 1px; }
+  .lane span { position: absolute; top: 50%; transform: translate(-50%, -50%); }
+  .lane .even { width: 1px; height: 22px; background: var(--rule); }
+  .lane .whisk { transform: translateY(-50%); height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--ink) 18%, var(--track)); }
+  .lane .said, .key .said { width: 3px; height: 20px; border-radius: 2px; background: var(--ink-3); }
+  .lane .won, .key .won { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
+  .key .said { width: 3px; height: 14px; margin-right: -6px; }
+  .key .won { width: 12px; height: 12px; }
+  .key .rng { width: 18px; height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--ink) 18%, var(--track)); }
+  .axis { margin-top: 6px; }
+  .ticks { position: relative; height: 16px; }
+  .ticks span { position: absolute; transform: translateX(-50%); font: 500 12px var(--ui); color: var(--ink-3); }
+
+  @media (max-width: 719px) {
+    .sets, .tiles { grid-template-columns: 1fr; }
+    .rows li { grid-template-columns: 1fr auto; gap: 6px 12px; }
+    .rows .stack { grid-column: 1 / -1; grid-row: 2; }
+    .rows .rn { grid-row: 1; grid-column: 2; }
+    .vchip { min-width: 0; padding: 4px 8px; }
+    .vchip .vh { display: none; }
+    .vchip { width: 30px; height: 30px; padding: 0; }
+    .calib li, .axis { grid-template-columns: 58px 1fr 70px; gap: 10px; }
+  }
+</style>

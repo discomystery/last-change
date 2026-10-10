@@ -168,7 +168,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better (or, when the call is that one team comes out ahead, it won that comparison by at least half its usual margin); <strong>partly</strong> means it beat the league average (or the share with no line matching, or came out ahead by less) but fell short of that. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {r.rebuilt && <p class="note">No preview was saved before this game, so this one was <a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>rebuilt afterwards</a> from the games played before it, by the same rules. Because nobody could read it beforehand, its calls are left out of the season count below.</p>}
     {r.preview_page && !r.rebuilt && <p class="note"><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</p>}
-    {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls.</p>}
+    {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls. <a href={`${import.meta.env.BASE_URL}record/`}>See the track record</a>.</p>}
   </Section>
 
   {dw && replays && (
