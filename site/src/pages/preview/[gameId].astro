@@ -10,6 +10,7 @@ import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
+import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -153,7 +154,7 @@ const _ = ordinal;
       </p>
     )}
   </section>
-  <nav class="jump sticky" id="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+  <SectionNav items={nav as [string, string][]} pinned />
 
   <Section id="watch" title="The short version" placeholder={false}>
     {snap.outlook && (
@@ -454,8 +455,6 @@ const _ = ordinal;
   .meta dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .meta dd { font-weight: 500; }
   @media (min-width: 820px) { .meta { display: flex; flex-wrap: wrap; gap: 10px 48px; } .meta dd { white-space: nowrap; } }
-  .jump.sticky { position: sticky; top: var(--bar-h, 34px); z-index: 15; background: var(--ice); margin-top: 14px; padding-block: 8px; }
-  .jump :global(a.here) { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .watch h3 { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
@@ -495,23 +494,6 @@ const _ = ordinal;
 </style>
 
 <script is:inline>
-  // Keep the section links in view and show which section is being read.
-  (() => {
-    const bar = document.querySelector('.mockbar');
-    const setBar = () => bar && document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px');
-    setBar();
-    addEventListener('resize', setBar);
-    const links = [...document.querySelectorAll('#jump a')];
-    const byId = Object.fromEntries(links.map((a) => [a.getAttribute('href').slice(1), a]));
-    const seen = new IntersectionObserver((entries) => entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      links.forEach((a) => a.classList.remove('here'));
-      const a = byId[e.target.id];
-      if (a) { a.classList.add('here'); a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
-    }), { rootMargin: '-25% 0px -70% 0px' });
-    document.querySelectorAll('main section.sec').forEach((s) => seen.observe(s));
-  })();
-
   // Special teams: "Show [team] [on the power play / on the penalty kill]". The penalty kill shows the other team's power play.
   (() => {
     const team = document.getElementById('st-team'), sit = document.getElementById('st-sit');

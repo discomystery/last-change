@@ -1,0 +1,77 @@
+---
+// Section menu for long pages (team, preview, player). Wide screens: a row of section links (pinned while
+// scrolling when `pinned`). Phones: a thin bar pinned under the top strip, "Jump to [section]", using the phone's
+// own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
+// pinned elements stick for the whole page, not just inside a short wrapper.
+interface Props { items: [string, string][]; pinned?: boolean }
+const { items, pinned = false } = Astro.props;
+---
+<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+<div class="secnav-bar">
+  <label for="secnav-pick">Jump to</label>
+  <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
+</div>
+
+<script is:inline>
+  // Runs once the page has loaded: the sections it tracks come after this menu in the page.
+  const secnavStart = () => {
+    const strip = document.querySelector('.mockbar');
+    const root = document.documentElement;
+    const setBar = () => { if (strip) root.style.setProperty('--bar-h', strip.offsetHeight + 'px'); };
+    setBar();
+    addEventListener('resize', setBar);
+    const pills = [...document.querySelectorAll('.secnav-pills a')];
+    const bar = document.querySelector('.secnav-bar');
+    const pick = document.getElementById('secnav-pick');
+    if (!pick) return;
+    const ids = [...pick.options].map((o) => o.value);
+    const secs = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    pick.addEventListener('change', () => {
+      const el = document.getElementById(pick.value);
+      if (el) el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const top = (strip ? strip.offsetHeight : 0) + (bar.offsetHeight || 0) + 40;
+      let cur = ids[0];
+      for (const s of secs) if (s.getBoundingClientRect().top <= top) cur = s.id;
+      if (document.activeElement !== pick) pick.value = cur;
+      bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= (strip ? strip.offsetHeight : 0) + 1 && scrollY > 0);
+      pills.forEach((a) => a.classList.toggle('here', a.getAttribute('href') === '#' + cur));
+      const row = document.querySelector('.secnav-pills.pinned');
+      const here = row && row.querySelector('a.here');
+      if (here) {
+        const want = here.offsetLeft - row.clientWidth / 2 + here.offsetWidth / 2;
+        if (Math.abs(row.scrollLeft - want) > 4) row.scrollLeft = want;
+      }
+    };
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', secnavStart);
+  else secnavStart();
+</script>
+
+<style is:global>
+  .secnav-pills.pinned { position: sticky; top: var(--bar-h, 34px); z-index: 15; background: var(--ice); padding-block: 8px; }
+  .secnav-pills a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+  .secnav-bar { display: none; }
+  @media (max-width: 719px) {
+    .secnav-pills { display: none; }
+    .secnav-bar {
+      display: flex; align-items: center; gap: 10px; position: sticky; top: var(--bar-h, 34px); z-index: 15;
+      margin: 14px -16px 0; padding: 9px 16px; background: var(--ice); border-bottom: 1px solid transparent; transition: border-color 0.2s;
+      font: 600 17px var(--display); font-variation-settings: 'SOFT' 100;
+    }
+    .secnav-bar.stuck { border-bottom-color: var(--rule); }
+    .secnav-bar label { white-space: nowrap; }
+    .secnav-bar select {
+      flex: 1; min-width: 0; font: 600 16px var(--ui); color: var(--ink); background: var(--sheet);
+      border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer;
+    }
+    main [id] { scroll-margin-top: calc(var(--bar-h, 34px) + 72px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .secnav-bar { transition: none; } }
+</style>
