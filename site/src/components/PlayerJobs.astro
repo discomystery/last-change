@@ -89,7 +89,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
     })}
     <p class="note">
       <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary.
-      Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
+      Listed by ice time, down the left column first. Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
     </p>
     <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>
 
@@ -127,8 +127,9 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
 <style>
   .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
-  .pcs { display: grid; gap: 16px; margin-top: 18px; align-items: start; }
-  @media (min-width: 760px) { .pcs { grid-template-columns: 1fr 1fr; } }
+  .pcs { display: grid; gap: 16px; margin-top: 18px; }
+  /* Masonry on wide screens: two columns that pack cards of different heights, read down the left column first. */
+  @media (min-width: 760px) { .pcs { display: block; columns: 2; column-gap: 16px; } .pcs > li { break-inside: avoid; margin-bottom: 16px; } }
   .pc { display: grid; gap: 12px; align-content: start; }
   .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
