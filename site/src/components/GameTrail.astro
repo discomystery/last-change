@@ -55,7 +55,8 @@ const around = [g.away, g.home].map((me) => {
   .crumbs a { color: inherit; }
   .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
   /* Under the rink: when the game is in the middle, and each team's previous and next game under its own end of the rink. */
-  .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; }
+  .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; padding-inline: 5.5%; }
+  /* The side padding lines the buttons up with the rink's goal lines, not its rounded ends. */
   .when { grid-area: when; text-align: center; font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
   .around { display: grid; gap: 6px; justify-items: start; }
   .around.away { grid-area: away; }
