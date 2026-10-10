@@ -4,8 +4,9 @@ previews, post-game pages, team pages and Worth knowing notes talk about.
 Two parts, equal weight, each as a z-score against last full season's regulars (all skaters together):
   * Scoring reliance: his share of the team's goals (goals plus assists) in the games he plays, so a star on a
     low-scoring team counts as much as one on a high-scoring team.
-  * Impact: his isolated 5-on-5 effect on chances for and against (RAPM, two seasons) times his 5-on-5 ice time,
+  * Impact: his isolated 5-on-5 effect on chances for and against (RAPM, three seasons) times his 5-on-5 ice time,
     in expected goals per game.
+Percentiles and tiers are within his position group (forwards or defensemen); the score is on one scale for both.
 Ice time on its own is left out: once both parts are in, it does not help predict how a team does without him.
 Splitting scoring share by position was tried and dropped: it predicted no better and filled the top with defensemen.
 
@@ -28,10 +29,11 @@ from functools import lru_cache
 import numpy as np
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, REGULAR, TABLES
+from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics import rapm
 
 RAPM_LAMBDA = 40000.0  # same ridge penalty as player pages (metrics/players.py)
+RAPM_SEASONS = 3  # impact from three seasons: steadier than two, and closer to expert rankings (ESPN rho 0.54 -> 0.66)
 LAST_SEASON_GAMES = 30  # last season counts as at most this many games beside this season's
 LAST_SEASON_WEIGHT = 0.8
 MOVED_WEIGHT = 0.6  # a player on a new team: his old scoring share carries over less (year-to-year r 0.80 vs 0.88)
@@ -42,7 +44,7 @@ REGULAR_GP = 20  # games for a season to define the league's scale and percentil
 GAP_SLOPE = 0.10
 GAP_TRUE_SD = 0.12
 GAME_SD = 1.18  # within-team spread of one game's expected-goal difference (all situations, empty nets out)
-TIERS = [(98.5, "franchise"), (90, "star"), (70, "core"), (35, "regular"), (0, "depth")]
+TIERS = [(98.5, "franchise"), (88, "star"), (70, "core"), (35, "regular"), (0, "depth")]
 
 
 def _group(pos: str) -> str:
@@ -83,7 +85,7 @@ def _scale(season: int) -> dict:
     """League scale from the last full season's regulars: means and spreads by position group, and the score list
     every player is ranked against (so the scale does not wobble with five games of this season)."""
     lines = season_lines(season)
-    r = rapm.run([season - 1, season], RAPM_LAMBDA)
+    r = rapm.run(_rapm_seasons(season), RAPM_LAMBDA)
     d = lines.filter(pl.col("gp") >= REGULAR_GP).join(r.select("player_id", "off", "def"), on="player_id", how="left")
     d = d.with_columns(share=pl.col("pts") / pl.col("tgf"), impact=(pl.col("off").fill_null(0) + pl.col("def").fill_null(0)) * pl.col("sec5") / 3600,
                        grp=pl.col("pos").map_elements(_group, return_dtype=pl.Utf8))
@@ -92,7 +94,7 @@ def _scale(season: int) -> dict:
         out["means"][g] = float(d.filter(pl.col("grp") == g)["share"].mean())
     out["impact"] = (float(d["impact"].mean()), float(d["impact"].std()))
     z = _score(d, out)
-    out["pool"] = np.sort(z)
+    out["pool"] = {g: np.sort(z[(d["grp"] == g).to_numpy()]) for g in ("F", "D")}
     return out
 
 
@@ -124,11 +126,13 @@ def run(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame
     mean = sc["means"]
     d = d.with_columns(share=(pl.col("pts_b") + pl.col("grp").replace_strict(mean) * SHRINK_GAMES * gpg) / (pl.col("tgf_b") + SHRINK_GAMES * gpg))
     sec5 = (pl.col("sec5").fill_null(0) * pl.col("gp") + pl.col("sec5_l").fill_null(0) * pl.col("c") * pl.col("gp_l")) / pl.col("eff_gp")
-    r = rapm.run([season - 1, season], RAPM_LAMBDA) if before is None else _rapm_before(season, before)
+    r = rapm.run(_rapm_seasons(season), RAPM_LAMBDA) if before is None else _rapm_before(season, before)
     d = d.join(r.select("player_id", "off", "def"), on="player_id", how="left").with_columns(
         sec5_b=sec5, impact=(pl.col("off").fill_null(0) + pl.col("def").fill_null(0)) * sec5 / 3600)
     z = _score(d, sc)
-    pct = 100.0 * np.searchsorted(sc["pool"], z, side="right") / len(sc["pool"])
+    # Percentile and tier among his own position group (a star defenseman next to star defensemen); the score itself
+    # stays on one scale for both, so a team's ranking mixes forwards and defensemen fairly.
+    pct = np.array([100.0 * np.searchsorted(sc["pool"][g], v, side="right") / len(sc["pool"][g]) for v, g in zip(z, d["grp"].to_list())])
     d = d.with_columns(score=pl.Series(z), pct=pl.Series(np.round(pct, 1)))
     d = d.with_columns(tier=pl.col("pct").map_elements(lambda p: next(t for cut, t in TIERS if p >= cut), return_dtype=pl.Utf8),
                        team_rank=pl.col("score").rank("ordinal", descending=True).over("team_id"))
@@ -145,6 +149,11 @@ def _last_full(season: int) -> pl.DataFrame:
         swap = older.join(last.filter(pl.col("gp") >= REGULAR_GP).select("player_id"), on="player_id", how="anti")
         last = pl.concat([last.join(swap.select("player_id"), on="player_id", how="anti"), swap.select(last.columns)])
     return last.rename({c: f"{c}_l" for c in cols})
+
+
+def _rapm_seasons(season: int) -> list[int]:
+    # Never before 2023-24: event timing was recorded differently earlier, which our expected goals cannot bridge.
+    return [s for s in range(max(season - RAPM_SEASONS + 1, FULL_SEASONS[0]), season + 1) if (TABLES / str(s) / "stints.parquet").exists()]
 
 
 def _listed(season: int, before: str | None) -> pl.DataFrame:
@@ -166,8 +175,7 @@ def _rapm_before(season: int, before: str) -> pl.DataFrame:
     """Two-season ratings using only games before a date (for pages frozen before puck drop)."""
     keep = _games(season).filter(pl.col("date") < before)["game_id"]
     st = rapm.stretches(season)
-    prev = rapm.stretches(season - 1)
-    full = pl.concat([prev, st.filter(pl.col("game_id").is_in(keep))])
+    full = pl.concat([rapm.stretches(s) for s in _rapm_seasons(season) if s != season] + [st.filter(pl.col("game_id").is_in(keep))])
     X, y, w, players, _ = rapm.design(full)
     m = rapm.fit(X, y, w, RAPM_LAMBDA, len(players), intervals=False)
     n = len(players)
