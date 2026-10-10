@@ -1,38 +1,105 @@
 ---
-// Methods: how the numbers are made. First section: the arena-scorer adjustment, with every arena's real factors.
+// Methods: how the numbers are made, as one read from the raw data to the pages built on it. The arena and blending
+// sections are the deep ones; every figure in them is read from the exported data, so the page stays true each night.
 import Base from '../layouts/Base.astro';
 import Section from '../components/Section.astro';
+import SectionNav from '../components/SectionNav.astro';
 import data from '../../public/data/arena_factors.json';
 import fp from '../../public/data/fingerprints.json';
+import teamsData from '../../public/data/teams.json';
+import { fpInfo, ordinal } from '../data/mock';
+import '../styles/blocks.css';
+
+const base = import.meta.env.BASE_URL;
+const nav: [string, string][] = [['sources', 'Data'], ['xg', 'Chances'], ['score', 'Score'], ['arena', 'Arenas'], ['blend', 'Blending'], ['lines', 'Lines'], ['players', 'Players'], ['games', 'Previews'], ['limits', 'Blind spots']];
+
+// ---------- Arenas ----------
+const SHRINK_GAMES = 20; // pipeline/metrics/rink_bias.py
 const events = [['hits', 'Hits'], ['gives', 'Giveaways'], ['takes', 'Takeaways'], ['blocks', 'Blocked shots']] as const;
 type Row = (typeof data.arenas)[number] & Record<string, number | string>;
 const arenas = (data.arenas as Row[]).filter((a) => (a.home_games as number) >= 82);
 const pct = (f: number) => { const p = Math.round((f - 1) * 100); return p === 0 ? 'even' : `${p > 0 ? '+' : '−'}${Math.abs(p)}%`; };
-const ex = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number))[0];
+const byHits = [...arenas].sort((a, b) => (b.hits as number) - (a.hits as number));
+const ex = byHits[0], stingy = byHits[byHits.length - 1];
+const keep = Math.round((100 * (ex.home_games as number)) / ((ex.home_games as number) + SHRINK_GAMES));
 const sample = 30;
 const hr = (data as any).home_road as Record<string, { home_rate: number; away_rate: number }>;
-const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
-const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', turnover: 'Off-turnover offense', dShots: 'Shots from defensemen', inClose: 'Shots from in close', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
+const tilt = (e: string) => Math.round(100 * Math.abs(hr[e].home_rate / hr[e].away_rate - 1));
+type Team = { abbr: string; name: string; place: string; nick: string };
+const teamBy = Object.fromEntries((teamsData as Team[]).map((t) => [t.abbr, t]));
+const nick = (abbr: string) => teamBy[abbr]?.nick ?? abbr;
+const exPlace = teamBy[ex.team as string]?.place ?? ex.team;
+
+// ---------- Blending ----------
+const stab = fp.stabilization as Record<string, { r: number; k_games: number }>;
+const label = (k: string) => fpInfo[k]?.label ?? k;
+const settle = (fp.ready as string[]).filter((k) => stab[k]).map((k) => [k, stab[k].k_games] as const).sort((a, b) => a[1] - b[1]);
+const N = 10, LAST = 82;
+// Shares of a blended number N games in: this season, last season (itself pulled toward the league), league average.
+const shares = (k: number) => {
+  const now = N / (N + k), prior = 1 - now;
+  return { now: Math.round(100 * now), last: Math.round(100 * prior * (LAST / (LAST + k))), league: Math.round(100 * prior * (k / (LAST + k))) };
+};
+const kOf = (key: string) => stab[key]?.k_games ?? 0;
+const vol = shares(kOf('volume')), pk = shares(kOf('pk'));
+const gNow = Math.round((100 * N) / (N + kOf('goalie')));
+// Tonight's example: the team whose this-season and blended ranks are furthest apart on a trait that settles slowly.
+type Est = { rank: number | null };
+const fpTeams = fp.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
+const example = (() => {
+  let best: { abbr: string; key: string; s: number; b: number; games: number } | null = null;
+  for (const [abbr, t] of Object.entries(fpTeams)) {
+    for (const [key, k] of settle) {
+      if (k < 40 || !t.dims[key]) continue;
+      const s = t.dims[key].season.rank, b = t.dims[key].blend.rank;
+      if (s == null || b == null) continue;
+      if (!best || Math.abs(s - b) > Math.abs(best.s - best.b)) best = { abbr, key, s, b, games: t.games };
+    }
+  }
+  return best && Math.abs(best.s - best.b) >= 8 ? best : null;
+})();
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fp.generated_at));
 ---
 <Base section="methods" title="Methods" mock={false}>
   <h1 class="page-top">How the numbers are made</h1>
-  <p class="lede">Plain-language explanations of the adjustments behind the site, with the real figures.</p>
+  <p class="lede">This site is about how teams play, not who’s going to win. Everything here is built from the NHL’s own public data, and four things set it apart from most stats sites: we <a href="#arena">correct for each arena’s scorers</a>, we <a href="#blend">blend this season with last</a> by an amount that depends on the trait, we rate every chance with <a href="#xg">our own model</a>, and player ratings <a href="#players">account for linemates and opponents</a>. This page walks through all of it, in the order the numbers are built.</p>
 
-  <Section id="arena" title="The arena adjustment" placeholder={false} takeaway="Hits, giveaways, takeaways and blocked shots are counted by people, and some buildings count more generously than others.">
+  <SectionNav items={nav} />
+
+  <Section id="sources" title="Where the numbers come from" placeholder={false} takeaway="The NHL’s public game data, refreshed twice a day, with a few things left out on purpose.">
     <div class="card explain">
-      <p><strong>What it is.</strong> Every NHL arena has its own off-ice scorers. A bump along the boards might be a hit in one building and nothing in another. Left alone, that makes teams look more or less physical just because of where they play half their games.</p>
-      <p><strong>How it’s calculated.</strong> For each arena, we take every game played there over three seasons ({data.seasons}) and work out how often each event is recorded per 60 minutes of play, for both teams combined. Then we do the same for that home team’s road games. Dividing the first by the second gives the arena’s factor. Because even three seasons is a limited sample, each factor is pulled a little of the way back toward 1.00.</p>
-      <p><strong>A worked example.</strong> At {ex.venue}, scorers recorded <strong>{ex.hits_here}</strong> hits per 60. In {ex.team}’s road games, the same team and their opponents were credited with <strong>{ex.hits_elsewhere}</strong>. {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong>, which settles at <strong>{(ex.hits as number).toFixed(2)}</strong> after the pull toward 1.00. So a night with {sample} recorded hits there counts as <strong>{(sample / (ex.hits as number)).toFixed(1)}</strong>.</p>
-      <p><strong>How it’s shown.</strong> We never display an adjusted count, because that would look like a number of hits that nobody recorded. Instead, arena-adjusted stats appear as a <em>score</em>, where 100 is league average. The “Hits and takeaways” switch at the top of every page flips to the raw numbers exactly as recorded.</p>
+      <p><strong>Games.</strong> Play-by-play, shifts, boxscores, rosters, standings and the schedule come from the NHL’s public game data, pulled every morning and afternoon. When the shift feed is missing a game, the NHL’s official time-on-ice reports fill the gap, and every player’s ice time is checked against the boxscore.</p>
+      <p><strong>Skating and shot speed.</strong> Player pages use NHL EDGE, the league’s puck and player tracking.</p>
+      <p><strong>An outside check.</strong> We download <a href="https://moneypuck.com">MoneyPuck.com</a>’s shot data to compare with ours. It appears only on the <a href={`${base}xg-check/`}>Chance check</a> page, beside our own rating; every expected-goal number elsewhere is ours.</p>
+      <p><strong>Left out.</strong> Shootouts never count. Empty-net time is left out of 5-on-5 and goalie numbers, because a shot at an empty net says nothing about either. Penalty shots count for the shooter and the goalie, the way the NHL counts them, but not in 5-on-5 or on-ice numbers, since nobody else was really out there.</p>
     </div>
-    <h3 class="sub">Home and road</h3>
+  </Section>
+
+  <Section id="xg" title="Rating every chance" placeholder={false} takeaway="Every shot gets a rating: how often shots like it go in.">
     <div class="card explain">
-      <p>Separately from any one building, home teams are credited with more of these events everywhere in the league. Over three seasons, home teams were given <strong>{hr.hits.home_rate}</strong> hits per 60 to visitors’ <strong>{hr.hits.away_rate}</strong>, <strong>{hr.takes.home_rate}</strong> takeaways to <strong>{hr.takes.away_rate}</strong>, and also more giveaways: <strong>{hr.gives.home_rate}</strong> to <strong>{hr.gives.away_rate}</strong>.</p>
-      <p>That could be scorers watching the home side more closely, or teams genuinely having the puck more at home; public data can’t separate the two. Either way, it would flatter a team in the middle of a long homestand. So events are weighted to put home and road games on the same footing, the same way shots are.</p>
-      <p>We also tested whether particular buildings favour their home team more than others do. The differences were there in any single season but did not repeat from one season to the next, which means they are noise rather than a habit. Correcting for them would make the numbers worse, so we don’t.</p>
+      <p>Goals are rare and streaky, so most of this site works from expected goals: every shot that gets past the shot blockers gets a chance of going in, and adding those up says how many goals a team’s chances were worth. The model is our own, trained on about 360,000 shots from three seasons. For each shot it looks at where it came from, what kind of shot it was, what happened just before (a save, a turnover, a faceoff win) and how long before, the manpower, the score and the period. It deliberately doesn’t know who shot or who was in net, so a goalie or a sniper is judged against the shot, not against himself.</p>
+      <p>Tested on a full season it had never seen, it was about as sharp as the best public models, including MoneyPuck’s, on the same shots, and well calibrated: shots it rated around 10% went in about 10% of the time. Because one model rates every season, a team’s numbers from different years can be compared fairly. <a href={`${base}xg-check/`}>See how it rated the chances in recent games.</a></p>
+    </div>
+  </Section>
+
+  <Section id="score" title="Score and venue" placeholder={false} takeaway="Teams that are behind shoot more, and so do home teams. Shot numbers are corrected for both.">
+    <div class="card explain">
+      <p>A team protecting a lead sits back; a team chasing one throws everything at the net. Raw shot totals would reward teams for trailing. So each 5-on-5 shot is weighted by the score when it was taken and by whether the shooter was at home, with weights set so that across three seasons the home and away totals come out even in every score situation. Behaviour that depends on the score, like hitting, is measured only while the game is close.</p>
+    </div>
+  </Section>
+
+  <Section id="arena" title="The arena correction" placeholder={false} takeaway="Hits, giveaways, takeaways and blocked shots are counted by people, and some buildings count a lot more than others.">
+    <div class="card explain">
+      <p>Every arena has its own off-ice scorers, and they don’t agree on what a hit is. At {ex.venue} scorers log about <strong>{Math.round(ex.hits_here as number)}</strong> hits per 60; when the {nick(ex.team as string)} and their opponents play anywhere else, the same kind of games produce about <strong>{Math.round(ex.hits_elsewhere as number)}</strong>. Nobody thinks {exPlace} turns into a different team at home. Leave that alone and every team looks more physical for the nights they play in a generous building, and the home team looks like bruisers when they may be ordinary.</p>
+      <p><strong>How we measure it.</strong> For each arena we compare two sets of games from the last three seasons ({data.seasons}): the home team’s games in their own building, and the same team’s road games. Both sets have the same team in them, so that team’s own style cancels out, and what’s left is the building. The opponents differ, but over 120-odd road games the home team visits every other arena, so those quirks wash out. Dividing one rate by the other gives the arena’s factor: {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong> for hits at {ex.venue}.</p>
+      <p><strong>Not taking it at face value.</strong> Even three seasons is a limited sample, so each factor is pulled part of the way back toward “no difference”, as if we’d also watched {SHRINK_GAMES} perfectly ordinary games there. With {ex.home_games} home games that keeps about {keep}% of the gap, and {ex.venue} settles at <strong>{(ex.hits as number).toFixed(2)}</strong>. A building with only a season of games behind it is pulled harder toward neutral and earns its factor as games come in.</p>
+      <p><strong>Applying it.</strong> Each event is divided by the factor of the building it happened in, for both teams. Thirty hits at {ex.venue} count as about <strong>{(sample / (ex.hits as number)).toFixed(0)}</strong>; thirty at {stingy.venue}, where scorers are stingy, count as about <strong>{(sample / (stingy.hits as number)).toFixed(0)}</strong>. That feeds Physicality and Forecheck pressure on team pages, and hits, blocks, takeaways and giveaways on player pages and post-game report cards.</p>
+      <p><strong>Home teams get more everywhere.</strong> Separately from any one building, home teams across the league are credited with about {tilt('hits')}% more hits, {tilt('gives')}% more giveaways and {tilt('takes')}% more takeaways than visitors, and {tilt('blocks')}% fewer blocks. It might be scorers watching the home side more closely, or teams really having the puck more at home; public data can’t tell the two apart. Either way it would flatter a team in the middle of a long homestand, so events are reweighted to put home and road games on the same footing.</p>
+      <p><strong>What we tried and threw out.</strong> We tested whether some buildings tilt toward their own team more than others. In any one season it looks that way, but the arenas that tilted one year weren’t the ones that tilted the next, so it’s the bounces of a season rather than a habit of the scorers. Correcting for it would make the numbers worse, so we don’t.</p>
+      <p><strong>Why it’s a score, not a count.</strong> We never show an adjusted count, because “25 hits” would look like something somebody recorded. Corrected stats appear as a score where 100 is league average. The switch at the top of every page shows the raw numbers exactly as recorded.</p>
     </div>
     <h3 class="sub">Every arena’s factors</h3>
-    <p class="note">How much more or less each building records than its home team’s road games do. “+19%” means 19% more.</p>
+    <p class="note">How much more or less each building records than its home team’s road games do, after the pull toward neutral. “+19%” means 19% more.</p>
     <div class="card tablecard">
       <table class="at">
         <thead><tr><th scope="col">Arena</th><th scope="col">Home team</th>{events.map(([, l]) => <th scope="col">{l}</th>)}</tr></thead>
@@ -43,75 +110,67 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
         </tbody>
       </table>
     </div>
-    <p class="note">Arenas with fewer than two seasons of games in this window are left out of the table and treated as neutral until there is enough to judge.</p>
+    <p class="note">Arenas with fewer than two seasons of games in this window are left out of the table; their factors stay close to even until there is more to go on.</p>
   </Section>
 
-  <Section id="blend" title="Blending this season with last" placeholder={false} takeaway="Early in a season, a handful of games says little about some traits and a lot about others.">
+  <Section id="blend" title="Blending this season with last" placeholder={false} takeaway={`${N} games in, some things about a team are already clear and some are still mostly bounces. Each trait gets its own answer.`}>
     <div class="card explain">
-      <p>With “This season and last” selected, each number is a mix of this season’s games and the team’s previous season. How much it leans on last season depends on the trait. We measured, from three past seasons, how many games it takes before a trait is as much signal as noise:</p>
-      <ul class="settle">{settle.map(([k, v]) => <li><span>{names[k] ?? k}</span><strong>{v.k_games >= 300 ? 'over 300' : Math.round(v.k_games)} games</strong></li>)}</ul>
-      <p>So shot volume is trustworthy within a couple of weeks, while goaltending and penalty killing stay close to league average until much later. “This season only” turns the blending off and shows the raw swing.</p>
+      <p>Early in a season, a team’s shot volume already tells you a lot about them, while their goaltending numbers barely tell you anything yet. Most sites either show the raw season numbers, which swing wildly in October, or lean on last season, which misses real change. We do something in between, and how far each number leans depends on the trait.</p>
+      <p><strong>How long each trait takes to settle.</strong> We took three full seasons, split every team’s games into odd and even nights, and checked how well one half predicted the other. Shot volume barely changes from one half to the other, so it’s a habit. Second chances in one half say almost nothing about the other. From that comparison we get, for each trait, the number of games at which this season’s results and what we knew before count equally:</p>
+      <ul class="settle">{settle.map(([k, g]) => <li><span>{label(k)}</span><strong>{g >= 300 ? 'over 300' : Math.round(g)} games</strong></li>)}</ul>
+      <p><strong>What “what we knew before” means.</strong> It’s last season, but not last season raw: last season gets the same treatment, pulled toward league average by the same number of games. So for a trait that settles quickly, last season counts almost in full; for a slow one, even a whole season doesn’t move far from average.</p>
+      <p><strong>What that does {N} games in.</strong> A team’s shot volume is about {vol.now}% this season and {vol.last}% last season. Their penalty kill is {pk.now}% this season, {pk.last}% last season and {pk.league}% league average. Their goaltending is only {gNow}% this season, which is why a hot two weeks in net barely shows on the blended view.</p>
+      <p><strong>Goaltending follows the goalies.</strong> A team’s system carries over from one season to the next; their goaltending belongs to whoever is in net. So for goaltending, “what we knew before” is the goalies who have actually played for the team this season, each on his own last season wherever he played it (pulled toward league average the same way), weighted by his time in net. We tested it on the last two seasons: a team’s goaltending one season says almost nothing about the next, even when the starter stays, and starting from the goalies’ own records predicted the rest of the season better than starting from the team’s.</p>
+      {example && <p><strong>An example from today.</strong> As of {asOf}, the {nick(example.abbr)} rank {ordinal(example.s)} in {label(example.key).toLowerCase()} on this season alone but {ordinal(example.b)} blended. After only {example.games} games that’s still mostly bounces, so the blend leans on what we knew before.</p>}
+      <p><strong>The likely range.</strong> Every number carries a whisker: the middle 80% of results when a team’s games are reshuffled at random and the whole calculation is redone. Early in a season, or for a slow trait, it’s wide.</p>
+      <p><strong>This season only.</strong> The switch at the top of every page turns blending off and shows this season’s raw numbers, swings and all. Player ratings blend the same way, measured in ice time rather than games (see <a href="#players">Player ratings</a>).</p>
     </div>
   </Section>
 
-  <Section id="score" title="Score and venue adjustment" placeholder={false} takeaway="Teams that are behind shoot more, and so do home teams. Shot-based numbers are corrected for both.">
+  <Section id="lines" title="Lines, power plays and penalty kills" placeholder={false} takeaway="First line, second line and so on are decided by ice time together, not reputation.">
     <div class="card explain">
-      <p>A team protecting a lead sits back; a team chasing one throws everything at the net. Comparing raw shot totals would reward teams for trailing. Each 5-on-5 shot is therefore weighted by the score at the time and by whether the shooter is at home, so that across the league the home and away totals balance in every score situation.</p>
+      <p><strong>Lines and pairs</strong> are numbered by how much 5-on-5 time each group has played together over the team’s last ten games, with each older game counting half as much as the one after it. Coaches change lines, and the latest combinations are the best guess for the next game: tested on the last two seasons, lines picked this way covered about 45% of the next game’s forward ice time, against about 30% when all ten games counted equally. A group’s ice time is its average over the games it was one of that night’s lines, with “in 3 of 5” when it wasn’t a line every game. A group that was a line for the first time last game is marked New. When a team’s four most-used trios cover under a third of their forwards’ 5-on-5 time (a typical team’s cover about half), the page says the lines keep changing. Each line is rated against the same-numbered line on the other 31 teams: first lines with first lines, third pairs with third pairs.</p>
+      <p><strong>Power-play units</strong> are built around the defenseman running them, because that’s how fans tell units apart: the first unit is the quarterback with the most power-play time plus the four skaters most often out with him, the second is built the same way around the next one. Forwards who stay out for both are listed on both. When one player takes the draw and then changes for someone else, he’s shown as the faceoff specialist and his time goes to whoever replaces him. Units use this season only, and the Quarterback, Trigger, Distributor and Net-front tags count only a player’s games with his current team.</p>
+      <p><strong>Penalty kills</strong> are too loose for fixed units: the most common foursome covers only about a tenth of a typical team’s shorthanded time. So penalty killers are grouped by when they go on: the ones who start most kills (usually for the defensive-zone draw), the second wave who come on after the first change, and spot duty. Most teams work this way.</p>
+      <p><strong>Matchups</strong> are split by home and road, because the home coach has the last change. Each line’s share of time against each opposing line is shown beside the share it would get with no line matching, where each group faces an opposing line about as often as that line is on the ice.</p>
     </div>
   </Section>
 
-  <Section id="xg" title="How dangerous a chance is" placeholder={false} takeaway="Every shot gets a rating: how often shots like it go in.">
+  <Section id="players" title="Player ratings" placeholder={false} takeaway="Each player is compared with others who play his position, after accounting for who he plays with and against.">
     <div class="card explain">
-      <p>The site uses its own expected-goals model, trained on about 360,000 shots from three seasons. For each shot it looks at where it was taken from, what kind of shot it was, what happened just before (a save, a turnover, a faceoff) and how long ago, and the manpower on the ice. It deliberately doesn’t know who shot or who was in net.</p>
-      <p>Tested on a full season it had never seen, a rating of 10% meant the puck went in 10.0% of the time. Because one model rates every season, numbers from different years can be compared fairly. <a href={`${import.meta.env.BASE_URL}xg-check/`}>See how it rated the chances in recent games.</a></p>
+      <p><strong>Settling, for players.</strong> Ratings blend the same way team traits do, but the yardstick is ice time (or shots, or faceoffs) rather than games, and a short sample is pulled toward the average for his position. Shot volume and hitting settle within a few games; finishing and power-play scoring take seasons, so they barely move early on. “This season and last” also leans on his own previous season. Even “this season only” keeps the pull toward the position average, or five-game players would fill the top of every list.</p>
+      <p><strong>Who he’s compared with.</strong> Forwards are compared with forwards and defensemen with defensemen, among regulars (20+ games over two seasons, or 3 this season). Centres and wingers are split only where they really play different games: shooting volume, creating their own chances, shot blocking, hardest shot and distance skated. We checked every rating and split only where the gap was large; defense showed none. A player is listed as better or worse than most only when even the cautious end of his likely range is clearly away from the middle.</p>
+      <p><strong>Creating and preventing chances</strong> isolate what a player adds at 5-on-5. Every shift of this season and last goes into one model that rates all players at once, so each player gets credit or blame only for what’s left after his linemates, the opponents on the ice, where the shift started and the score are accounted for. A shutdown centre who faces top lines every night isn’t punished for their chances, and a winger riding with a star doesn’t take the star’s credit. This is regularized adjusted plus-minus (RAPM), the method public analysts such as Evolving-Hockey use; it pulls everyone toward average, harder the less he has played. It measures chances, so it can’t see good stick work that stops a pass before a shot.</p>
+      <p><strong>Competition</strong> on a player’s Role section is how dangerous his 5-on-5 opponents are, from those same ratings, split by home and road.</p>
+      <p><strong>Players who changed teams.</strong> Last season still counts, but not equally for everything. Over three seasons, personal habits (shooting volume, the danger of his shots, hitting, shot blocking, penalties) carried to a new team almost as well as for players who stayed put. Setting up goals, finishing, faceoffs and power-play chances carried far less, because they depend on linemates and role, so for a player on a new team those lean on last season only 35% to 60% as much.</p>
+      <p><strong>Shorthanded threat</strong> is the chances a team creates while killing penalties with him on the ice. It holds up from season to season, so it’s a real skill.</p>
+      <p><strong>Skating and shot speed</strong> come from NHL EDGE. They’re measurements rather than estimates, so they carry no likely range; we rank them against the same position groups ourselves.</p>
     </div>
   </Section>
 
-  <Section id="lines" title="Numbering the lines" placeholder={false} takeaway="First line, second line and so on are decided by ice time, not reputation.">
+  <Section id="games" title="Previews and post-game pages" placeholder={false} takeaway="Every preview call is written down before puck drop and graded afterwards, never rewritten.">
     <div class="card explain">
-      <p>A team’s lines and defense pairs are numbered by how much 5-on-5 ice time each group has played together over its last ten games, with each older game counting half as much as the one after it. The group with the most is the first line. Coaches change lines, and a team’s latest combinations are the best guess for their next game: tested on the last two seasons, lines chosen this way covered about 45% of the next game’s forward ice time, against about 30% when all ten games counted equally. The ice time shown for each group is its average over the games it was one of that night’s lines (picked the same way from that game alone), with “in 3 of 5” when it was not a line every game, so time spent briefly together in other games does not drag the average down. A group that was a line for the first time in the most recent game is marked New and shows that game’s time. When a team’s four most-used trios cover less than a third of their forwards’ 5-on-5 time (a typical team’s cover about half), the page says the lines keep changing.</p>
-      <p>Each line’s ratings compare it with the same-numbered line on the other 31 teams: first lines with first lines, third pairs with third pairs.</p>
+      <p><strong>Preview calls</strong> come from rules, not opinions: two of a team’s traits meeting head on, a coach’s matching habit at home, a team playing unlike their usual selves, and a few more. Each call is saved as a checkable claim (which number, which team, what we expect) and frozen at puck drop. After the game, the same rule grades it from that game’s data: held, partly, or didn’t happen. The <a href={`${base}record/`}>Track record</a> keeps the season’s tally.</p>
+      <p><strong>Report cards</strong> judge each player only against earlier games, so a card never changes. His jobs come from what he’s relied on for (power play, penalty kill, faceoffs) and what he’s better than most at. A job counts as done when he had a typical night for him, not an average one: single games are lopsided, so most players fall short of their own average more often than not.</p>
+      <p><strong>Swing</strong> puts each player’s night into one number: his scoresheet, his 5-on-5 play, his special teams, and the company he kept. It leans on 5-on-5 play over points, and leaves out hits and blocks, which mostly follow the score.</p>
+      <p><strong>Run it back</strong> replays every regulation shot from the game at its expected-goal rating, exactly rather than by random draws, so the answer never changes. A flurry of rebounds counts as one chance. Taken literally it’s overconfident, because a team that’s ahead sits back while the other chases: teams it gives 80% or more won about two games in three.</p>
+      <p><strong>No predictions.</strong> The site never shows a win chance or odds before a game.</p>
     </div>
   </Section>
 
-  <Section id="players" title="Player ratings" placeholder={false} takeaway="Each player is compared with others at his position: forwards with forwards, defensemen with defensemen.">
-    <div class="card explain">
-      <p>Every rating is a rate: shot attempts, expected goals, assists, hits and so on per 60 minutes, mostly at 5-on-5. A player who has played a few games is pulled toward the average for his position, and how hard depends on how quickly that rating settles. Shot volume and hitting settle within a few games; finishing and power-play scoring take seasons, so they barely move early on. We measured this by splitting three past seasons into odd and even games and checking how well one half predicts the other.</p>
-      <p>“This season and last” also leans on the player’s own previous season. The likely range is the middle 80% of results when his games are reshuffled at random. A player is only listed as better or worse than most when even the cautious end of that range is clearly away from average. Percentiles compare him with regulars at his position: at least 20 games over the two seasons, or 3 this season.</p>
-      <p>Forwards are compared with all forwards, except where centers and wingers really play different games: shooting volume, creating their own chances, shot blocking, hardest shot and distance skated. There, centers are compared with centers and wingers with wingers. We checked every rating over two seasons of regulars and split only where the gap between the two groups was large (wingers shoot more and harder; centers block more shots and skate farther). Defense showed no gap at all.</p>
-      <p>“Creating chances” and “Preventing chances” isolate what a player adds at 5-on-5. Every shift of this season and last goes into one regression that rates all players at once, so each player gets credit or blame only for what is left after his linemates, the opponents on the ice, where the shift started and the score are accounted for. A shutdown center who faces top lines every night is not punished for their chances, and a winger riding with a star does not take the star’s credit. This is regularized adjusted plus-minus (RAPM), the method public analysts such as Evolving-Hockey use; the “regularized” part pulls every player toward average, harder the less he has played, with the strength chosen by testing predictions on games the model had not seen. It measures expected goals, so it sees chances, not things public data does not record, such as good stick work that stops a pass.</p>
-      <p>Players who changed teams: last season still counts, but not equally for everything. Over the last three seasons, habits that travel with a player (shooting volume, the danger of his shots, hitting, shot blocking, drawing and taking penalties) carried over to a new team almost as well as for players who stayed put. Setting up goals, finishing, faceoffs and power-play chances carried over far less, because they depend on linemates and role, so for a player on a new team those four lean on last season only 35% to 60% as much as usual.</p>
-      <p>Special teams: power-play units are built from the current season only, and the Trigger, Distributor and Net-front tags count only a player’s games with his current team. Penalty kills are too loose for fixed units (the most common foursome covers only about a tenth of a typical team’s shorthanded time), so each team’s penalty killers are grouped by when they go on: the ones who start most kills (usually for the defensive-zone faceoff), the second wave who come on after the first change, and spot duty. Most teams work this way. “Shorthanded threat” is the chances a team creates while killing penalties with him on the ice; it holds up from season to season, so it is a real skill.</p>
-      <p>“Competition” on a player’s Role section is how dangerous his 5-on-5 opponents are, using those same ratings: the five opposing skaters’ offense added up, averaged over his ice time, split by home and road because the home coach has the last change.</p>
-      <p>Skating speed, bursts, shot speed, distance and offensive-zone time come from NHL EDGE, the league’s own puck and player tracking. They are measurements rather than estimates, so they carry no likely range, and we rank them against the same position groups ourselves.</p>
-    </div>
-  </Section>
-
-  <Section id="sources" title="Where the data comes from" placeholder={false} takeaway="Everything is built from the NHL’s own public data.">
-    <div class="card explain">
-      <p><strong>Games.</strong> Play-by-play, shifts, boxscores, rosters, standings and the schedule come from the NHL’s public game data, updated twice a day. When the shift feed is missing a game, the NHL’s official time-on-ice reports fill the gap.</p>
-      <p><strong>Skating and shot speed.</strong> Player pages use NHL EDGE, the league’s puck and player tracking.</p>
-      <p><strong>Expected goals.</strong> Every expected-goal number on the site comes from our own model (above). We also download <a href="https://moneypuck.com">MoneyPuck.com</a>’s shot data as an outside check on ours; it appears only on the <a href={`${import.meta.env.BASE_URL}xg-check/`}>Chance check</a> page, beside our rating.</p>
-    </div>
-  </Section>
-
-  <Section id="per60" title="What “per 60” means" placeholder={false} takeaway="Most rates on the site are per 60 minutes of ice time.">
-    <div class="card explain">
-      <p>A top line plays far more than a fourth line, and a team with a lot of power plays gets far more power-play shots than one with few. To compare them fairly, almost every rate on the site is scaled to 60 minutes of ice time in that situation: “2.9 expected goals per 60” means what the group would produce in a full hour at its current pace. Ice time itself is written as minutes and seconds, like 9:15.</p>
-    </div>
-  </Section>
-
-  <Section id="limits" title="Blind spots" placeholder={false}>
+  <Section id="limits" title="Blind spots" placeholder={false} takeaway="What public data can’t see, and what we don’t pretend to.">
     <ul class="limits">
-      <li><strong>Passes before a shot</strong> aren’t in public data, so expected-goal numbers can’t see a cross-ice feed. Goalies behind teams that allow those look worse than they are.</li>
-      <li><strong>Rush chances</strong> can’t be picked out from the league’s public game data, which records too little between the blue lines. Shots flagged by the usual timing rule (within four seconds of an event outside the attacking zone) actually score less often than ordinary shots, so the site shows no rush numbers. Real rush counts come from people or cameras tracking zone entries.</li>
-      <li><strong>Where in the net</strong> a goal or save went (glove side, blocker, five-hole) isn’t recorded in any public NHL data. Missed shots do say how they missed (wide left, wide right, over the net, off the post), and player pages show that.</li>
-      <li><strong>Defender positions</strong> aren’t tracked publicly, so “breakdowns” are inferred from dangerous chances within five seconds of a team losing the puck.</li>
+      <li><strong>Passes before a shot</strong> aren’t in public data, so expected goals can’t see a cross-ice feed. Goalies behind teams that allow those look worse than they are.</li>
+      <li><strong>Rush chances</strong> can’t be picked out from the league’s public data, which records too little between the blue lines. Shots flagged by the usual timing rule actually score less often than ordinary shots, so the site shows no rush numbers. Real rush counts come from people or cameras tracking zone entries.</li>
+      <li><strong>Where in the net</strong> a goal or save went (glove, blocker, five-hole) isn’t recorded in any public NHL data. Missed shots do say how they missed, and player pages show that.</li>
+      <li><strong>Defender positions</strong> aren’t tracked publicly, so breakdowns are inferred from dangerous chances within five seconds of a team losing the puck.</li>
+      <li><strong>Why a player is out</strong> isn’t in the data. When a regular stops dressing, the site says he hasn’t played, never why.</li>
     </ul>
   </Section>
 </Base>
 
 <style>
+  .lede a { color: inherit; }
   .explain { margin-top: 18px; display: grid; gap: 12px; }
   .explain p { font: 400 16px/1.6 var(--body); }
   .tablecard { overflow-x: auto; margin-top: 12px; }

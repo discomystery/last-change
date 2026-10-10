@@ -2,6 +2,8 @@
 
 "season" uses this season's games only. "blend" pulls each team toward its own previous season,
 by an amount that depends on how repeatable the trait is (measured from split halves of past seasons).
+Goaltending is the exception: it starts from the goalies who have actually played for the team this season,
+each judged on his own last season, because a team's goaltending follows its goalies, not the logo.
 """
 import numpy as np
 import polars as pl
@@ -126,6 +128,26 @@ def stabilization(w: pl.DataFrame) -> dict[str, dict]:
     return out
 
 
+def _goalie_priors(season: int, k: float, league: float) -> dict[int, float]:
+    """Each team's goaltending starting point: the goalies who have played for them this season, each on his own
+    last season (wherever he played it) pulled toward the league by k games, weighted by his time in net for them.
+
+    Tested 2024-25 and 2025-26 (predicting the rest of the season from the first 10 / 20 / 41 games): a team's
+    goaltending barely carries from one season to the next (r 0.07, about the same whether or not the starter
+    changed), and starting from the goalies' own history beat both the team's last season and league average alone.
+    """
+    from pipeline.metrics import goalies
+    try:
+        now, last = goalies.per_game(season), goalies.per_game(season - 1)
+    except FileNotFoundError:
+        return {}
+    own = last.group_by("goalie_id").agg((pl.col("sec").sum() / 3600).alias("hours"), (pl.col("xga") - pl.col("ga")).sum().alias("saved"))
+    use = now.group_by("team_id", "goalie_id").agg(pl.col("sec").sum()).join(own, on="goalie_id", how="left").with_columns(
+        prior=(pl.col("saved").fill_null(0.0) + k * league) / (pl.col("hours").fill_null(0.0) + k))
+    out = use.group_by("team_id").agg(((pl.col("prior") * pl.col("sec")).sum() / pl.col("sec").sum()).alias("p"))
+    return {r["team_id"]: float(r["p"]) for r in out.iter_rows(named=True) if r["p"] is not None}
+
+
 def _pct(value: float, league: np.ndarray, higher: bool) -> float:
     below = (league < value).mean() if higher else (league > value).mean()
     return float(np.clip(100 * below, 1, 99))
@@ -142,6 +164,7 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
         now |= {tid: np.empty((0, len(COLS))) for tid in last if tid not in now}
     league_last = {dim: float(np.nanmean([_values(m)[dim] for m in last.values()])) for dim in DIMS}
     rng = np.random.default_rng(season)
+    in_net = _goalie_priors(season, k["goalie"]["k_games"], league_last["goalie"])
 
     def estimates(mat: np.ndarray, tid: int) -> dict[str, dict[str, float]]:
         n = len(mat)
@@ -152,6 +175,8 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
             kk = k[dim]["k_games"]
             n_prev = len(last[tid]) if tid in last else 0
             prior = (n_prev * prev[dim] + kk * league_last[dim]) / (n_prev + kk)  # last season, itself pulled toward the league
+            if dim == "goalie" and tid in in_net:
+                prior = in_net[tid]  # this season's goalies on their own records (see _goalie_priors)
             out["blend"][dim] = (n * obs[dim] + kk * prior) / (n + kk) if n else prior
         return out
 
