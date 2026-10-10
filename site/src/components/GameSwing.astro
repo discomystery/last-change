@@ -129,6 +129,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
               <li class="sw-item" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}>
                 <div class="sw-row" role="button" tabindex="0" aria-expanded="false">
                   <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag">{of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}</span></span>
+                  <span class="sw-foot">Swing tonight</span>
                   <span class="sw-bar" aria-hidden="true">
                     <span class="sw-zero" style={`left:${zero.toFixed(1)}%`}></span>
                     {layout(r).map((p) => <span class:list={['sw-piece', { neg: p.v < 0 }]} data-part={p.key} style={`left:${p.l.toFixed(1)}%;width:${p.w.toFixed(1)}%;--mix:${p.mix}%`}></span>)}
@@ -249,8 +250,18 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .sw-row { display: grid; grid-template-columns: minmax(0, 13em) 1fr 3.2em 7em; align-items: center; gap: 16px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; cursor: pointer; }
   .sw-item { transition: opacity 0.2s; }
   /* An opened player is one even block: the row becomes its header and the cards line up with the name. */
-  .sw-item.open { background: var(--track); border-radius: 12px; margin: 6px -8px 10px; padding: 0 8px 14px; }
-  .sw-item.open .sw-row { margin: 0; padding: 12px 0 10px; background: none; }
+  /* Opened, the row splits: the name heads the block and his bar, number and night sit at the bottom on the list's own background. */
+  .sw-foot { display: none; }
+  .sw-item.open { display: grid; grid-template-columns: minmax(0, 13em) 1fr 3.2em 7em; column-gap: 16px; align-items: center; background: var(--track); border-radius: 12px; margin: 6px -8px 10px; padding: 0 8px; }
+  .sw-item.open .sw-row { display: contents; }
+  .sw-item.open .sw-name { grid-column: 1 / -1; grid-row: 1; padding: 12px 0 10px; }
+  .sw-item.open .sw-det { grid-column: 1 / -1; grid-row: 2; padding-bottom: 14px; }
+  .sw-item.open .sw-foot { display: block; grid-column: 1; grid-row: 3; padding: 14px 0; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .sw-item.open .sw-bar { grid-column: 2; grid-row: 3; }
+  .sw-item.open .sw-n { grid-column: 3; grid-row: 3; }
+  .sw-item.open .sw-row > :last-child { grid-column: 4; grid-row: 3; }
+  .sw-item.open .sw-foot, .sw-item.open .sw-bar, .sw-item.open .sw-n, .sw-item.open .sw-row > :last-child { position: relative; z-index: 1; cursor: pointer; }
+  .sw-item.open::after { content: ''; grid-column: 1 / -1; grid-row: 3; align-self: stretch; margin: 0 -8px; background: var(--sheet); border-radius: 0 0 12px 12px; box-shadow: inset 0 0 0 2px var(--track); }
   .sw-item.open .sw-name { font: 700 20px/1.2 var(--display); font-variation-settings: 'SOFT' 100; align-items: center; }
   .sw-item.open .sw-name::before { content: ''; width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
   .sw-det { display: grid; gap: 10px; }
@@ -286,6 +297,12 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
     .sw-pill { grid-column: 2; grid-row: 1; justify-self: end; }
     .sw-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
     .sw-row > span:empty { display: none; }
+    .sw-item.open { grid-template-columns: minmax(0, 1fr) auto 3em; column-gap: 10px; }
+    .sw-item.open .sw-foot { grid-column: 1; grid-row: 3; padding: 12px 0 4px; }
+    .sw-item.open .sw-row > :last-child { grid-column: 2; grid-row: 3; padding-top: 8px; }
+    .sw-item.open .sw-n { grid-column: 3; grid-row: 3; padding-top: 8px; }
+    .sw-item.open .sw-bar { grid-column: 1 / -1; grid-row: 4; margin-bottom: 14px; }
+    .sw-item.open::after { grid-row: 3 / 5; }
   }
   .sw-how { margin-top: 16px; }
   .how-body { display: grid; gap: 8px; padding-top: 12px; }
