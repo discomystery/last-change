@@ -1,8 +1,8 @@
 // Player pages: labels, tooltips, scale ends and plain-language wording for every rating.
 import { clock } from './format';
 
-export type Est = { v: number; pct: number; lo: number; hi: number; ok: boolean; of: number; rank: number; index?: number | null; raw?: number; raw_pct?: number };
-export type EdgeEst = { v: number; pct: number; ok: boolean; of: number; avg: number };
+export type Est = { v: number; pct: number; lo: number; hi: number; ok: boolean; of: number; rank: number; vs?: string; index?: number | null; raw?: number; raw_pct?: number };
+export type EdgeEst = { v: number; pct: number; ok: boolean; of: number; avg: number; vs?: string };
 export type Mode = 'blend' | 'season';
 export type Area = { shots: number; goals: number; share: number; avg: number };
 export type Misses = { n: number; wide: number; high: number; post: number; short: number; other: number; left: number; right: number; crossbar: number } | null;
@@ -15,13 +15,16 @@ export type Role = {
 export type Stats = { gp: number; g: number; a: number; p: number; sog: number; toi: number };
 export type Skater = {
   id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
-  group: 'F' | 'D'; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
+  group: 'F' | 'D'; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
 };
 
 export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
 export const groupWord = { F: 'forwards', D: 'defensemen' } as const;
+/** Who a rating compares him with: all forwards, centers or wingers only (where the two really differ), or defensemen. */
+export const peerWord: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
+export type Competition = Record<Mode, Record<'all' | 'home' | 'road', { v: number; pct: number } | null>>;
 const sign = (v: number, d = 2) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
 
 export type TraitInfo = { label: string; tip: string; lo: string; hi: string; say: (v: number) => string; group: string; raw?: (v: number) => string };
@@ -36,10 +39,12 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'First assists (the last pass before a goal) per 60 minutes at 5-on-5.' },
   powerPlay: { group: 'Scoring', label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,
     tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play will rate lower here than their value.' },
-  onOffense: { group: 'With him on the ice', label: 'Team offense with him', lo: 'Quieter with him', hi: 'Livelier with him', say: (v) => `the team creates ${sign(v)} expected goals per 60 with him on the ice, compared with the rest of the time`,
-    tip: 'Expected goals the team creates per 60 at 5-on-5 with him on the ice, minus the same figure with him on the bench. Adjusted for score and home ice. Linemates and coaching affect this too.' },
-  onDefense: { group: 'With him on the ice', label: 'Team defense with him', lo: 'Leakier with him', hi: 'Tighter with him', say: (v) => `the team allows ${sign(v)} expected goals per 60 with him on the ice, compared with the rest of the time`,
-    tip: 'Expected goals the team allows per 60 at 5-on-5 with him on the ice, minus the same figure with him on the bench. Lower is better. Adjusted for score and home ice. Linemates and the opponents he faces affect this too.' },
+  offImpact: { group: 'Driving play at 5-on-5', label: 'Creating chances', lo: 'Along for the ride', hi: 'Drives play',
+    say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances at 5-on-5`,
+    tip: 'How much he adds to his team’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces, where his shifts start and the score. Every player is rated at once from every shift of this season and last (the regularized plus-minus method public analysts use), and small samples are pulled toward average.' },
+  defImpact: { group: 'Driving play at 5-on-5', label: 'Preventing chances', lo: 'Chances against rise', hi: 'Shuts it down',
+    say: (v) => (Math.abs(v) < 0.01 ? 'about average: no measurable change in the opponent’s chances at 5-on-5' : v > 0 ? `takes ${v.toFixed(2)} expected goals per 60 off the opponent’s chances at 5-on-5` : `opponents get ${Math.abs(v).toFixed(2)} more expected goals per 60 at 5-on-5 with him out there`),
+    tip: 'How much he cuts the opponent’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces (so facing top lines is not held against him), where his shifts start and the score. It sees chances, not the quality of defensive plays that public data does not record.' },
   hits: { group: 'Physical and puck', label: 'Hitting', lo: 'Avoids contact', hi: 'Physical', say: (v) => `a hitting score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} hits recorded per 60`,
     tip: 'Hits per 60 minutes, as an arena-adjusted score (100 is average for his position) because some arenas’ scorers count hits far more generously than others.' },
   blocks: { group: 'Physical and puck', label: 'Shot blocking', lo: 'Rarely blocks', hi: 'Shot blocker', say: (v) => `a shot-blocking score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} blocked shots recorded per 60`,
@@ -53,7 +58,7 @@ export const TRAITS: Record<string, TraitInfo> = {
   faceoffs: { group: 'Penalties and faceoffs', label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
     tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
 };
-export const GROUPS = ['Scoring', 'With him on the ice', 'Physical and puck', 'Penalties and faceoffs'];
+export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Physical and puck', 'Penalties and faceoffs'];
 
 export const EDGE: Record<string, TraitInfo> = {
   topSpeed: { group: 'EDGE', label: 'Top speed', lo: 'Slower', hi: 'Burner', say: (v) => `${v.toFixed(1)} mph at his fastest`, tip: 'His fastest skating speed, measured by the NHL’s puck and player tracking (NHL EDGE).' },
@@ -72,16 +77,16 @@ export const most = (n: number) => (n === 1 ? 'most' : `${ordinal(n)}-most`);
 
 /** Strengths and weak spots: confident departures from the position average, biggest first. */
 export function standouts(p: Skater, mode: Mode) {
-  const out: { key: string; info: TraitInfo; pct: number; v: number; est?: Est; edge?: boolean }[] = [];
+  const out: { key: string; info: TraitInfo; pct: number; v: number; est?: Est; edge?: boolean; vs: string }[] = [];
   for (const [key, info] of Object.entries(TRAITS)) {
     const e = p.traits[key]?.[mode];
     if (!e || !e.ok) continue;
-    if ((e.pct >= 75 && e.lo >= 55) || (e.pct <= 25 && e.hi <= 45)) out.push({ key, info, pct: e.pct, v: e.index ?? e.v, est: e });
+    if ((e.pct >= 75 && e.lo >= 55) || (e.pct <= 25 && e.hi <= 45)) out.push({ key, info, pct: e.pct, v: e.index ?? e.v, est: e, vs: peerWord[e.vs ?? p.group] });
   }
   for (const [key, info] of Object.entries(EDGE)) {
     const e = p.edge?.[mode]?.[key];
     if (!e || !e.ok) continue;
-    if (e.pct >= 85 || e.pct <= 15) out.push({ key, info, pct: e.pct, v: e.v, edge: true });
+    if (e.pct >= 85 || e.pct <= 15) out.push({ key, info, pct: e.pct, v: e.v, edge: true, vs: peerWord[e.vs ?? p.group] });
   }
   const best = out.filter((x) => x.pct >= 50).sort((a, b) => b.pct - a.pct).slice(0, 4);
   const worst = out.filter((x) => x.pct < 50).sort((a, b) => a.pct - b.pct).slice(0, 4);

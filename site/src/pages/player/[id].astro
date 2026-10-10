@@ -11,7 +11,7 @@ import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock } from '../../lib/format';
 import { teamColour } from '../../lib/teams';
-import { TRAITS, EDGE, GROUPS, groupWord, posWord, ordinal, most, standouts, roleTip, toiLine, type Skater, type Mode, type Area } from '../../lib/players';
+import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, toiLine, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import '../../styles/blocks.css';
 
@@ -128,6 +128,24 @@ const statRow = (x: any) => (isG ? null : x);
                   </dd>
                 </div>
               )}
+              {s.competition && (
+                <div>
+                  <dt>Competition</dt>
+                  <dd>
+                    {modes.map(([m, mw]) => {
+                      const c = s.competition![m];
+                      if (!c?.all) return null;
+                      const split = [c.home && `${c.home.pct}% at home, where his coach has the last change`, c.road && `${c.road.pct}% on the road`].filter(Boolean);
+                      return (
+                        <div class={`gmode m-${m}`}>
+                          <p>Faces tougher opponents than <strong>{c.all.pct}%</strong> of {groupWord[s.group]} <Marker pct={c.all.pct} tip={`How dangerous the opponents he faces at 5-on-5 are, ${mw}: tougher than ${c.all.pct}% of ${groupWord[s.group]} face. Not good or bad in itself; it is the job he is given.`} /></p>
+                          {split.length > 0 && <p class="n">{split.join('; ')}. The “Preventing chances” and “Creating chances” ratings already account for this.</p>}
+                        </div>
+                      );
+                    })}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
           {role.notes.length > 0 && (
@@ -136,7 +154,7 @@ const statRow = (x: any) => (isG ? null : x);
           <p class="note">Lines and units come from who has actually played together lately, not from the team’s announced lineup.</p>
         </Section>
 
-        <Section id="standout" title="Where he stands out" placeholder={false} takeaway={`What he does better or worse than most ${groupWord[s.group]}.`}>
+        <Section id="standout" title="Where he stands out" placeholder={false} takeaway={`What he does better or worse than most ${groupWord[s.group]}${s.group === 'F' ? ' (or, where the two jobs differ, most centers or wingers)' : ''}.`}>
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
@@ -147,13 +165,13 @@ const statRow = (x: any) => (isG ? null : x);
               <div class={`gmode m-${m}`}>
                 <div class="two sw">
                   <div class="card">
-                    <p class="mini-h">Better than most {groupWord[s.group]}</p>
-                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${groupWord[s.group]}.`} /></p><p>Better than {pctOf(it)}% of {groupWord[s.group]}: {say(it)}.</p></li>)}</ul>
+                    <p class="mini-h">Better than most at his position</p>
+                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /></p><p>Better than {pctOf(it)}% of {it.vs}: {say(it)}.</p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is above most {groupWord[s.group]}.</p>}
                   </div>
                   <div class="card">
-                    <p class="mini-h">Behind most {groupWord[s.group]}</p>
-                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${groupWord[s.group]}.`} /></p><p>Behind {100 - it.pct}% of {groupWord[s.group]}: {say(it)}.</p></li>)}</ul>
+                    <p class="mini-h">Behind most at his position</p>
+                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /></p><p>Behind {100 - it.pct}% of {it.vs}: {say(it)}.</p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is below most {groupWord[s.group]}.</p>}
                   </div>
                 </div>
@@ -166,6 +184,7 @@ const statRow = (x: any) => (isG ? null : x);
         <Section id="ratings" title="All ratings" placeholder={false} takeaway={`Every rating, against other ${groupWord[s.group]}.`}>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
           <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
+          {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
           <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>
           {GROUPS.map((grp) => (
             <>
@@ -181,9 +200,9 @@ const statRow = (x: any) => (isG ? null : x);
                       {modes.map(([m]) => (
                         <p class={`fpc-line m-${m}`}>
                           {e[m].raw === undefined
-                            ? <><span>{t.say(e[m].v)}</span><em>{e[m].ok ? `better than ${e[m].pct}% of ${groupWord[s.group]}` : 'too small a sample to rate'}</em></>
-                            : <><span class="a-adj">{t.say(e[m].index ?? 100)}</span><em class="a-adj">{e[m].ok ? `better than ${e[m].pct}% of ${groupWord[s.group]}` : 'too small a sample to rate'}</em>
-                                <span class="a-raw">{t.raw!(e[m].raw!)}</span><em class="a-raw">{e[m].ok ? `more than ${e[m].raw_pct}% of ${groupWord[s.group]}` : 'too small a sample to rate'}</em></>}
+                            ? <><span>{t.say(e[m].v)}</span><em>{e[m].ok ? `better than ${e[m].pct}% of ${peerWord[e[m].vs ?? s.group]}` : 'too small a sample to rate'}</em></>
+                            : <><span class="a-adj">{t.say(e[m].index ?? 100)}</span><em class="a-adj">{e[m].ok ? `better than ${e[m].pct}% of ${peerWord[e[m].vs ?? s.group]}` : 'too small a sample to rate'}</em>
+                                <span class="a-raw">{t.raw!(e[m].raw!)}</span><em class="a-raw">{e[m].ok ? `more than ${e[m].raw_pct}% of ${peerWord[e[m].vs ?? s.group]}` : 'too small a sample to rate'}</em></>}
                         </p>
                       ))}
                     </li>
@@ -250,7 +269,7 @@ const statRow = (x: any) => (isG ? null : x);
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
-                        <p class={`fpc-line m-${m}`}>{e ? <><span>{t.say(e.v)}</span><em>{e.ok ? `more than ${e.pct}% of ${groupWord[s.group]}` : 'too few games to rate'}</em></> : <span class="n">No tracking data yet.</span>}</p>
+                        <p class={`fpc-line m-${m}`}>{e ? <><span>{t.say(e.v)}</span><em>{e.ok ? `more than ${e.pct}% of ${peerWord[e.vs ?? s.group]}` : 'too few games to rate'}</em></> : <span class="n">No tracking data yet.</span>}</p>
                       ); })}
                     </li>
                   );

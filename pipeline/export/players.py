@@ -107,6 +107,7 @@ def _combine_edge(now: dict | None, last: dict | None, mode: str) -> dict | None
 
 
 EDGE_HIGHER = {"topSpeed": True, "bursts": True, "shotSpeed": True, "distance": True, "oz": True}
+EDGE_SPLIT = {"shotSpeed", "distance"}  # centres and wingers differ here (standardized gap 0.3+), so each is compared with his own
 
 
 def run(season: int) -> int:
@@ -172,18 +173,20 @@ def run(season: int) -> int:
         edge_vals[pid] = {mode: _combine_edge(now, last, mode) for mode in ("blend", "season")}
     edge_pct = {}
     for mode in ("blend", "season"):
-        for g in ("F", "D"):
-            members = [pid for pid, rec in r["players"].items() if rec["group"] == g]
-            regular = [pid for pid in members if r["players"][pid]["games"] + (r["players"][pid]["games_last"] if mode == "blend" else 0) >= POOL_GAMES[mode]]
-            for k, higher in EDGE_HIGHER.items():
+        for k, higher in EDGE_HIGHER.items():
+            peers: dict[str, list[int]] = {}
+            for pid, rec in r["players"].items():
+                g = rec["sub"] if rec["group"] == "F" and k in EDGE_SPLIT else rec["group"]
+                peers.setdefault(g, []).append(pid)
+            for g, members in peers.items():
+                regular = {pid for pid in members if r["players"][pid]["games"] + (r["players"][pid]["games_last"] if mode == "blend" else 0) >= POOL_GAMES[mode]}
                 pool = np.array([edge_vals[p][mode][k] for p in regular if edge_vals[p][mode] and edge_vals[p][mode][k] is not None])
                 for pid in members:
                     v = edge_vals[pid][mode][k] if edge_vals[pid][mode] else None
                     if v is None or not len(pool):
                         continue
-                    pct = rating._pct(v, pool, higher)
-                    edge_pct.setdefault(pid, {}).setdefault(mode, {})[k] = {"v": round(v, 2), "pct": round(pct), "ok": pid in regular, "of": int(len(pool)),
-                                                                         "avg": round(float(pool.mean()), 2)}
+                    edge_pct.setdefault(pid, {}).setdefault(mode, {})[k] = {"v": round(v, 2), "pct": round(rating._pct(v, pool, higher)), "ok": pid in regular,
+                                                                         "of": int(len(pool)), "avg": round(float(pool.mean()), 2), "vs": g}
 
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -215,7 +218,7 @@ def run(season: int) -> int:
             rec = r["players"].get(pid)
             if rec is None:
                 continue
-            base |= {"group": rec["group"], "traits": rec["traits"], "games": rec["games"], "games_last": rec["games_last"],
+            base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "games": rec["games"], "games_last": rec["games_last"],
                      "role": _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
                      "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}}
             mine = shots.filter(pl.col("p1") == pid)
