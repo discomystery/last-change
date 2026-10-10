@@ -1,4 +1,5 @@
 ---
+import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
@@ -84,7 +85,7 @@ const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === labe
 const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
 const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const homeMu = LN[home]?.matchups?.home;
-const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
+const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
 
 // Special teams
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
@@ -160,7 +161,7 @@ const _ = ordinal;
             <p>{snap.outlook![a].body}</p>
           </div>
         ))}
-        <p class="cite">From this site’s win model, which rates each team on how well they have controlled the chances lately, home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
+        <p class="cite">From this site’s win model, which rates each team on how well they have controlled the chances lately, who is in their lineup (including the league’s injury news), home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
       </div>
     )}
     <ol class="watch">
@@ -176,7 +177,7 @@ const _ = ordinal;
     {notes.length > 0 && (
       <div class="card worth">
         <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
+        <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
@@ -291,7 +292,7 @@ const _ = ordinal;
               <p class="tile-v"><strong>{pkE.v.toFixed(1)}</strong> <span class="n">expected goals allowed per 60 · {ordinal(pkE.rank)} of 32</span></p>
             </li>
           </ul>
-          {P?.faceoff && <div class="card worth"><p class="mini-h">Worth knowing</p><ul><li>{P.faceoff.text}</li></ul></div>}
+          {P?.faceoff && <div class="card worth"><p class="mini-h">Worth knowing</p><ul><li><NoteText text={P.faceoff.text} names={(P.faceoff as any).names} /></li></ul></div>}
           <div class="st3">
             <div class:list={['card', `t-${side(pp)}`]}>
               <h4 class="st-h"><i></i>{place(pp)} power play</h4>
@@ -458,6 +459,8 @@ const _ = ordinal;
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
   .watch + .worth { margin-top: 16px; }
+  .tpill { display: inline-block; background: color-mix(in oklab, var(--team) 16%, transparent); color: var(--ink); padding: 1px 9px; border-radius: 999px; font: 700 13px/1.6 var(--ui); text-decoration: none; margin-right: 2px; }
+  .tpill:hover { background: color-mix(in oklab, var(--team) 28%, transparent); }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
