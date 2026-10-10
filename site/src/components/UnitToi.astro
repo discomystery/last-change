@@ -20,6 +20,6 @@ const tip = toi_sec === null || n === 0
     ? <><strong>{clock(seconds)}</strong> in all</>
     : isNew
       ? <><strong>{clock(toi_sec)}</strong> last game</>
-      : <><strong>{clock(toi_sec)}</strong> a game{n < games && <span class="unit-gp">in {n} of {games}</span>}</>}
+      : <><strong>{clock(toi_sec)}</strong> a game{n < games && <span class="unit-gp">in {n} of last {games}</span>}</>}
   <Marker pct={pct ?? 50} tip={tip} />
 </span>

@@ -22,4 +22,4 @@ def test_notes_never_carry_the_chance():
 
 def test_away_route_uses_its_strongest_edge():
     fp = {"AAA": _fp({"pp": 95}), "BBB": _fp({"pk": 5})}
-    assert outlook._route(fp, "AAA", "BBB")[0] == "if its power play gets going"
+    assert outlook._route(fp, "AAA", "BBB")[0] == "if their power play gets going"
