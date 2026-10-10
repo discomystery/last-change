@@ -1,8 +1,8 @@
 """Track record: how the previews' calls and the win chances have held up, for the Track record page.
 
-Reads the post-game files written by `recaps`, so it runs after it. Calls from previews saved before puck drop make
-the season record; calls from previews rebuilt after the fact (games played before snapshots began) are counted in a
-separate set and never mixed in, because nobody could read them before the game.
+Reads the post-game files written by `recaps`, so it runs after it. Every graded call counts, whether its preview was
+saved before puck drop or rebuilt afterwards from the games before it (the user's decision: the difference isn't
+relevant to fans).
 
 Win chances are never saved before a game. The post-game files carry the chance worked out afterwards from what was
 known that morning, and this scores those against the results, beside the same model tested on the three seasons it
@@ -19,7 +19,7 @@ from pipeline.config import CURRENT_SEASON, FULL_SEASONS, SITE_DATA
 from pipeline.metrics import win_model
 
 VERDICTS = ("held", "partly", "missed")
-LATEST = 40  # most recent graded calls listed on the page, per set
+LATEST = 40  # most recent graded calls listed on the page
 Z80 = 1.2816
 BANDS = ((0.50, 0.55), (0.55, 0.60), (0.60, 0.65), (0.65, 0.70), (0.70, 1.01))  # as in win_model.score
 
@@ -34,11 +34,10 @@ def week_of(day: str) -> str:
     return (d - timedelta(days=d.weekday())).isoformat()
 
 
-def call_sets(recaps: list[dict]) -> dict:
-    """Tallies by set (live, rebuilt), overall, by kind of call and by week, plus the latest graded calls."""
-    sets = {k: {"tally": _count(), "kinds": defaultdict(_count), "weeks": defaultdict(_count), "games": 0, "latest": []} for k in ("live", "rebuilt")}
+def call_record(recaps: list[dict]) -> dict:
+    """Tallies overall, by kind of call and by week, plus the latest graded calls."""
+    s = {"tally": _count(), "kinds": defaultdict(_count), "weeks": defaultdict(_count), "games": 0, "latest": []}
     for r in sorted(recaps, key=lambda r: (r["start"], r["game_id"])):
-        s = sets["rebuilt" if r.get("rebuilt") else "live"]
         graded = [c for c in r["calls"] if c.get("verdict") in VERDICTS]
         if graded:
             s["games"] += 1
@@ -49,11 +48,10 @@ def call_sets(recaps: list[dict]) -> dict:
             s["weeks"][week_of(r["date"])][v] += 1
             s["latest"].append({"game_id": r["game_id"], "date": r["date"], "away": r["away"], "home": r["home"], "kind": c["kind"],
                                 "head": c["head"], "call": c.get("call"), "verdict": v, "usual": c.get("usual"), "tonight": c.get("tonight")})
-    for s in sets.values():
-        s["kinds"] = dict(s["kinds"])
-        s["weeks"] = [{"week": w, **n} for w, n in sorted(s["weeks"].items())]
-        s["latest"] = s["latest"][::-1][:LATEST]
-    return sets
+    s["kinds"] = dict(s["kinds"])
+    s["weeks"] = [{"week": w, **n} for w, n in sorted(s["weeks"].items())]
+    s["latest"] = s["latest"][::-1][:LATEST]
+    return s
 
 
 def _interval(k: int, n: int) -> tuple[float, float]:
@@ -112,19 +110,18 @@ def run(season: int = CURRENT_SEASON) -> dict:
     d = SITE_DATA / "recaps"
     recaps = [json.loads(p.read_text()) for p in sorted(d.glob("2*.json"))]
     recaps = [r for r in recaps if int(str(r["game_id"])[:4]) == season]
-    sets = call_sets(recaps)
+    calls = call_record(recaps)
     snaps = [json.loads(p.read_text()) for p in (SITE_DATA / "previews").glob("2*.json")]
     done = {r["game_id"] for r in recaps}
-    live = [s for s in snaps if not s.get("rebuilt")]
     try:
         past = past_seasons()
     except Exception as e:  # the page still works without the comparison
         print(f"win chance backtest unavailable: {e!r}")
         past = None
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
-           "waiting": sum(1 for s in live if s["game_id"] not in done), "sets": sets, "win": {"season": win_record(recaps), "past": past}}
+           "waiting": sum(1 for s in snaps if s["game_id"] not in done), "calls": calls, "win": {"season": win_record(recaps), "past": past}}
     (SITE_DATA / "track.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
-    return {"live": sum(sets["live"]["tally"].values()), "rebuilt": sum(sets["rebuilt"]["tally"].values())}
+    return {"graded": sum(calls["tally"].values())}
 
 
 if __name__ == "__main__":

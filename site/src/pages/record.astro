@@ -1,11 +1,9 @@
 ---
-// Track record: how the previews' calls have held up this season, kept apart from previews rebuilt after the fact,
-// and how the win chances (never shown before a game, revealed on post-game pages) compare with the results.
+// Track record: how the previews' calls have held up this season, and how the win chances (never shown before a game, revealed on post-game pages) compare with the results.
 import Base from '../layouts/Base.astro';
 import Section from '../components/Section.astro';
 import SectionNav from '../components/SectionNav.astro';
 import '../styles/blocks.css';
-import teamsData from '../../public/data/teams.json';
 import track from '../../public/data/track.json';
 
 type Count = { held: number; partly: number; missed: number };
@@ -14,18 +12,14 @@ type CallSet = { tally: Count; kinds: Record<string, Count>; weeks: ({ week: str
 type Band = { band: string; games: number; said: number; won: number; lo: number; hi: number };
 type Win = { games: number; picked: number; hit_rate: number; home_rate: number; bands: Band[]; puck?: { games: number; picked: number }; seasons?: number[] };
 
-const sets = track.sets as Record<'live' | 'rebuilt', CallSet>;
+const calls = track.calls as CallSet;
 const win = track.win as { season: Win | null; past: Win | null };
 const base = import.meta.env.BASE_URL;
-const place = Object.fromEntries(teamsData.map((t) => [t.abbr, t.place]));
 const total = (c: Count) => c.held + c.partly + c.missed;
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 const day = (iso: string, opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }) =>
   new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
-const liveN = total(sets.live.tally);
-const rebuiltN = total(sets.rebuilt.tally);
-// Open on the real record once it has anything in it.
-const start: 'live' | 'rebuilt' = liveN > 0 || rebuiltN === 0 ? 'live' : 'rebuilt';
+const n = total(calls.tally);
 
 const kindInfo: Record<string, { label: string; rule: string }> = {
   clash: { label: 'Strength meets weakness', rule: 'Held up if the team reached its usual level' },
@@ -46,10 +40,11 @@ const kindRows = (s: CallSet) => {
     .map(([label, c]) => ({ label, rule: Object.values(kindInfo).find((x) => x.label === label)?.rule ?? '', c }))
     .sort((a, b) => total(b.c) - total(a.c));
 };
-const weekMax = Math.max(1, ...[...sets.live.weeks, ...sets.rebuilt.weeks].map(total));
+const weekMax = Math.max(1, ...calls.weeks.map(total));
 const mark = { held: '✓', partly: '≈', missed: '✕' } as const;
 const word = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
 const SHOW = 12;
+const emptyText = `No graded calls yet.${track.waiting > 0 ? ` ${track.waiting} previews are waiting on their games.` : ''}`;
 const seasonsLabel = (s: number[]) => `${s[0]}–${String(s[0] + 1).slice(2)} to ${s[s.length - 1]}–${String(s[s.length - 1] + 1).slice(2)}`;
 // Calibration scale: the favourite's chance runs from 50% up, results can fall below it.
 const LO = 30, HI = 100;
@@ -61,122 +56,74 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   <p class="takeaway lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />
 
-  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Only calls saved before the game count. Bolder is better.">
-    <div class="sets">
-      <div class="card set live">
-        <p class="eyebrow">Made before the game</p>
-        {liveN > 0 ? (
-          <>
-            <p class="big">{pct(sets.live.tally.held, liveN)}%<span> held up</span></p>
-            <div class="stack lg" role="img" aria-label={`${sets.live.tally.held} held up, ${sets.live.tally.partly} partly, ${sets.live.tally.missed} didn’t happen`}>
-              {(['held', 'partly', 'missed'] as const).map((v) => sets.live.tally[v] > 0 && <span class={v} style={`flex-grow:${sets.live.tally[v]}`}>{sets.live.tally[v]}</span>)}
-            </div>
-            <p class="sub">{liveN} calls in {sets.live.games} {sets.live.games === 1 ? 'game' : 'games'}</p>
-          </>
-        ) : (
-          <>
-            <p class="big empty">None graded yet</p>
-            <div class="stack lg"><span class="none"></span></div>
-            <p class="sub">{track.waiting > 0 ? `${track.waiting} previews are saved and waiting on their games.` : 'The first saved previews are waiting on their games.'}</p>
-          </>
-        )}
+  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Every graded call this season. Bolder is better.">
+    {n > 0 ? (
+      <div class="card summary">
+        <p class="big">{pct(calls.tally.held, n)}%<span> held up</span></p>
+        <div class="stack lg" role="img" aria-label={`${calls.tally.held} held up, ${calls.tally.partly} partly, ${calls.tally.missed} didn’t happen`}>
+          {(['held', 'partly', 'missed'] as const).map((v) => calls.tally[v] > 0 && <span class={v} style={`flex-grow:${calls.tally[v]}`}>{calls.tally[v]}</span>)}
+        </div>
+        <p class="sub">{n} calls in {calls.games} {calls.games === 1 ? 'game' : 'games'}</p>
+        <p class="key" aria-hidden="true"><span class="held"></span>Held up <span class="partly"></span>Partly <span class="missed"></span>Didn’t happen</p>
       </div>
-      <div class="card set rebuilt">
-        <p class="eyebrow">Rebuilt after the fact · not counted</p>
-        {rebuiltN > 0 ? (
-          <>
-            <p class="big">{pct(sets.rebuilt.tally.held, rebuiltN)}%<span> held up</span></p>
-            <div class="stack lg" role="img" aria-label={`${sets.rebuilt.tally.held} held up, ${sets.rebuilt.tally.partly} partly, ${sets.rebuilt.tally.missed} didn’t happen`}>
-              {(['held', 'partly', 'missed'] as const).map((v) => sets.rebuilt.tally[v] > 0 && <span class={v} style={`flex-grow:${sets.rebuilt.tally[v]}`}>{sets.rebuilt.tally[v]}</span>)}
-            </div>
-            <p class="sub">{rebuiltN} calls in {sets.rebuilt.games} games played before previews were saved</p>
-          </>
-        ) : <p class="sub">None.</p>}
-      </div>
-    </div>
-    <p class="key" aria-hidden="true"><span class="held"></span>Held up <span class="partly"></span>Partly <span class="missed"></span>Didn’t happen</p>
-    <p class="note">Rebuilt previews were made afterwards, from only the games played before each one, by the same rules. Nobody could read them before the game, so they never count toward the record.</p>
+    ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <div class="pick setpick"><span>Show calls</span>
-    <select id="set-pick" aria-label="Which calls">
-      <option value="live" selected={start === 'live'}>made before the game</option>
-      <option value="rebuilt" selected={start === 'rebuilt'}>rebuilt after the fact</option>
-    </select>
-  </div>
+  <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others.">
+    {n > 0 ? (
+      <ol class="rows">
+        {kindRows(calls).map(({ label, rule, c }) => (
+          <li>
+            <div class="rl"><strong>{label}</strong><span>{rule}</span></div>
+            <div class="stack">{(['held', 'partly', 'missed'] as const).map((v) => c[v] > 0 && <span class={v} style={`flex-grow:${c[v]}`}>{c[v]}</span>)}</div>
+            <p class="rn"><strong>{pct(c.held, total(c))}%</strong> of {total(c)}</p>
+          </li>
+        ))}
+      </ol>
+    ) : <p class="note">{emptyText}</p>}
+  </Section>
 
-  {(['live', 'rebuilt'] as const).map((k) => {
-    const s = sets[k];
-    const n = total(s.tally);
-    const empty = <p class="note">No graded calls made before a game yet. {track.waiting > 0 && `${track.waiting} saved previews are waiting on their games.`}</p>;
-    return (
-      <div class="setview" data-set={k} hidden={k !== start}>
-        <Section id={k === start ? 'kinds' : `kinds-${k}`} title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others.">
-          {n > 0 ? (
-            <ol class="rows">
-              {kindRows(s).map(({ label, rule, c }) => (
-                <li>
-                  <div class="rl"><strong>{label}</strong><span>{rule}</span></div>
-                  <div class="stack">{(['held', 'partly', 'missed'] as const).map((v) => c[v] > 0 && <span class={v} style={`flex-grow:${c[v]}`}>{c[v]}</span>)}</div>
-                  <p class="rn"><strong>{pct(c.held, total(c))}%</strong> of {total(c)}</p>
-                </li>
-              ))}
-            </ol>
-          ) : empty}
-        </Section>
-
-        <Section id={k === start ? 'weeks' : `weeks-${k}`} title="Week by week" placeholder={false} takeaway="Each column is one week of graded calls.">
-          {n > 0 ? (
-            <div class="weeks" style={`--n:${s.weeks.length}`}>
-              {s.weeks.map((w) => (
-                <div class="wk">
-                  <p class="wp">{pct(w.held, total(w))}%</p>
-                  <div class="col" style={`height:${(100 * total(w)) / weekMax}%`} title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
-                    {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
-                  </div>
-                  <p class="wl">{day(w.week)}</p>
-                </div>
-              ))}
+  <Section id="weeks" title="Week by week" placeholder={false} takeaway="Each column is one week of graded calls.">
+    {n > 0 ? (
+      <div class="weeks" style={`--n:${calls.weeks.length}`}>
+        {calls.weeks.map((w) => (
+          <div class="wk">
+            <p class="wp">{pct(w.held, total(w))}%</p>
+            <div class="col" style={`height:${(100 * total(w)) / weekMax}%`} title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+              {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
             </div>
-          ) : empty}
-        </Section>
-
-        <Section id={k === start ? 'latest' : `latest-${k}`} title="Latest calls" placeholder={false} takeaway="The most recent calls and how each one went.">
-          {n > 0 ? (
-            <>
-              <ol class="latest">
-                {s.latest.slice(0, SHOW).map((c) => (
-                  <li>
-                    <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
-                    <div class="lc">
-                      <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
-                      <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              {s.latest.length > SHOW && (
-                <details class="fold">
-                  <summary><span class="more-word">Show {s.latest.length - SHOW} more</span><span class="less-word">Show fewer</span></summary>
-                  <ol class="latest">
-                    {s.latest.slice(SHOW).map((c) => (
-                      <li>
-                        <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
-                        <div class="lc">
-                          <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
-                          <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-            </>
-          ) : empty}
-        </Section>
+            <p class="wl">{day(w.week)}</p>
+          </div>
+        ))}
       </div>
-    );
-  })}
+    ) : <p class="note">{emptyText}</p>}
+  </Section>
+
+  <Section id="latest" title="Latest calls" placeholder={false} takeaway="The most recent calls and how each one went.">
+    {n > 0 ? (
+      <>
+        <ol class="latest">{calls.latest.slice(0, SHOW).map((c) => <li>
+              <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
+              <div class="lc">
+                <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
+              </div>
+            </li>)}</ol>
+        {calls.latest.length > SHOW && (
+          <details class="fold">
+            <summary><span class="more-word">Show {calls.latest.length - SHOW} more</span><span class="less-word">Show fewer</span></summary>
+            <ol class="latest">{calls.latest.slice(SHOW).map((c) => <li>
+              <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
+              <div class="lc">
+                <a class="lh" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
+                <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
+              </div>
+            </li>)}</ol>
+          </details>
+        )}
+      </>
+    ) : <p class="note">{emptyText}</p>}
+  </Section>
 
   <Section id="chances" title="Win chances, after the fact" placeholder={false} takeaway="When we gave a team about 60%, did teams like that win about 60% of the time?">
     {win.season || win.past ? (
@@ -243,18 +190,6 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
 </Base>
 
 <script>
-  const pick = document.getElementById('set-pick') as HTMLSelectElement | null;
-  pick?.addEventListener('change', () => {
-    document.querySelectorAll<HTMLElement>('.setview').forEach((v) => {
-      const on = v.dataset.set === pick.value;
-      v.hidden = !on;
-      // Section ids follow the visible set so the section menu keeps working.
-      v.querySelectorAll<HTMLElement>('section.sec').forEach((s) => {
-        const id = s.id.replace(/-(live|rebuilt)$/, '');
-        s.id = on ? id : `${id}-${v.dataset.set}`;
-      });
-    });
-  });
   const wp = document.getElementById('win-pick') as HTMLSelectElement | null;
   wp?.addEventListener('change', () => document.querySelectorAll<HTMLElement>('[data-win]').forEach((c) => (c.hidden = c.dataset.win !== wp.value)));
 </script>
@@ -264,12 +199,9 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   .eyebrow { font: 600 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
   .big { font: 700 40px / 1.1 var(--display); margin: 8px 0 12px; }
   .big span { font: 500 17px var(--ui); color: var(--ink-2); }
-  .big.empty { font-size: 26px; color: var(--ink-2); }
+  .summary { margin-top: 22px; max-width: 640px; }
   .sub { font: 500 14px var(--ui); color: var(--ink-2); margin-top: 10px; }
 
-  .sets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
-  .set.rebuilt { background: transparent; border-style: dashed; }
-  .set.rebuilt .big { color: var(--ink-2); }
 
   /* Darker is better: held in ink, partly in a mid tone, missed as the pale track. */
   .stack { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--sheet); }
@@ -278,12 +210,9 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   .held { background: var(--ink); color: var(--sheet); }
   .partly { background: color-mix(in oklab, var(--ink) 42%, var(--track)); color: var(--sheet); }
   .missed { background: var(--track); color: var(--ink-2); }
-  .stack .none { flex-grow: 1; background: repeating-linear-gradient(-45deg, var(--track) 0 6px, transparent 6px 12px); }
-  .key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 14px; }
+    .key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 14px; }
   .key span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: -8px; vertical-align: -1px; }
 
-  .setpick { margin-top: 64px; }
-  .setview :global(.sec) { margin-top: 48px; }
 
   .rows { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 14px; }
   .rows li { display: grid; grid-template-columns: minmax(200px, 1.1fr) 2fr 92px; gap: 16px; align-items: center; }
@@ -337,7 +266,7 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   .ticks span { position: absolute; transform: translateX(-50%); font: 500 12px var(--ui); color: var(--ink-3); }
 
   @media (max-width: 719px) {
-    .sets, .tiles { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: 1fr; }
     .rows li { grid-template-columns: 1fr auto; gap: 6px 12px; }
     .rows .stack { grid-column: 1 / -1; grid-row: 2; }
     .rows .rn { grid-row: 1; grid-column: 2; }
