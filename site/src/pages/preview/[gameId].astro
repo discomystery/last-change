@@ -63,7 +63,8 @@ const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-d
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
 const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
 const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
-const traits = fpData.ready.map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
+// Older frozen snapshots can carry a retired trait (point shots); show only traits the site still describes.
+const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
 const gap = (c: any) => Math.abs(c[away].blend.pct - c[home].blend.pct);
 const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a) }));
 const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
