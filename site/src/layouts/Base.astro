@@ -212,6 +212,19 @@ const teamList = teams as { abbr: string; name: string }[];
   h1, h2, h3, h4, p, figure, ul, ol, dl, dd { margin: 0; padding: 0; }
   ul, ol { list-style: none; }
   :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 3px; }
+  /* Every dropdown draws the same chevron with room to its right (browsers' own arrows hug the edge).
+     !important because pages style their selects with scoped `padding` and `background` shorthands. */
+  select {
+    -webkit-appearance: none !important; appearance: none !important;
+    padding-right: 36px !important;
+    background-image: var(--chev) !important; background-repeat: no-repeat !important;
+    background-position: right 14px center !important; background-size: 11px 7px !important;
+  }
+  select::-ms-expand { display: none; }
+  :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%230f1c2b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  @media (prefers-color-scheme: dark) {
+    :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%23e6edf3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  }
 
   .mockbar {
     position: sticky; top: 0; z-index: 20; padding: 8px 16px; font-size: 13px; line-height: 1.35; text-align: center;
