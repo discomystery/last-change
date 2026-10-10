@@ -21,3 +21,13 @@ def test_cut_keeps_only_games_from_earlier_days(tmp_path, monkeypatch):
     assert pl.read_parquet(root / "tables" / "2026" / "games.parquet")["game_id"].to_list() == [1, 2]
     # Earlier seasons are linked, never copied or cut.
     assert (root / "tables" / "2025").is_symlink() and (root / "raw").is_symlink()
+
+
+def test_only_rebuilt_previews_under_older_rules_are_redone(tmp_path):
+    import json
+
+    from pipeline.export import pregame, previews
+    for name, snap in {"live": {"rules": 1}, "old": {"rebuilt": True, "rules": 1}, "new": {"rebuilt": True, "rules": previews.RULES_VERSION},
+                       "legacy": {"rebuilt": True}}.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(snap))
+    assert [pregame._stale(tmp_path / f"{n}.json") for n in ("live", "old", "new", "legacy", "missing")] == [False, True, False, True, True]
