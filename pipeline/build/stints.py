@@ -89,6 +89,16 @@ def on_ice(shifts: list[Shift], t: int, *, faceoff: bool) -> list[Shift]:
     return [s for s in shifts if s.start < t <= s.end]
 
 
+# Penalty shots: the play-by-play situation code is one shooter against one goalie ("1010" home shooting, "0101" away).
+# The shift charts still list five skaters a side, so without this check they read as 5-on-5. They are kept out of
+# every on-ice and 5-on-5 figure (as MoneyPuck does) and kept in the shooter's own shots and goals and the goalie's.
+PENALTY_SHOT = ("1010", "0101")
+
+
+def penalty_shot(situation_code: str | None) -> bool:
+    return situation_code in PENALTY_SHOT
+
+
 def strength(own_skaters: int, opp_skaters: int, own_goalie: bool, opp_goalie: bool) -> str:
     """Strength bucket from one team's point of view."""
     if own_goalie and opp_goalie:

@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import polars as pl
 
+from pipeline.build.stints import penalty_shot
 from pipeline.config import REGULAR, TABLES
 
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
@@ -39,7 +40,7 @@ def game_units(season: int) -> pl.DataFrame:
     events = pl.read_parquet(d / "events.parquet").filter(pl.col("type").is_in([*UNBLOCKED, "blocked-shot", "faceoff"])).join(xg, on=["game_id", "event_id"], how="left")
     for e in events.iter_rows(named=True):
         gid = e["game_id"]
-        if gid not in ids or e["is_home"] is None or not (len(e["home_on"]) == 5 and len(e["away_on"]) == 5 and e["home_goalie"] and e["away_goalie"]):
+        if gid not in ids or e["is_home"] is None or penalty_shot(e["situation_code"]) or not (len(e["home_on"]) == 5 and len(e["away_on"]) == 5 and e["home_goalie"] and e["away_goalie"]):
             continue
         for home, skaters in ((True, e["home_on"]), (False, e["away_on"])):
             mine = e["is_home"] == home
@@ -375,7 +376,7 @@ def special_units(season: int) -> dict[int, dict]:
         ev = pl.read_parquet(dd / "events.parquet").filter(pl.col("type").is_in([*UNBLOCKED, "blocked-shot"])).join(pl.read_parquet(dd / "shots_xg_own.parquet"), on=["game_id", "event_id"], how="left").sort("game_id", "sort")
         for e in ev.iter_rows(named=True):
             gid, home = e["game_id"], e["is_home"]
-            if gid not in id2 or home is None or not (e["home_goalie"] and e["away_goalie"]):
+            if gid not in id2 or home is None or penalty_shot(e["situation_code"]) or not (e["home_goalie"] and e["away_goalie"]):
                 continue
             own, opp = (e["home_on"], e["away_on"]) if home else (e["away_on"], e["home_on"])
             if (len(own), len(opp)) != (5, 4):

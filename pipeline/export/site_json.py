@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.build import join_xg, validate
+from pipeline.build.stints import penalty_shot
 from pipeline.config import OFFLINE, SITE_DATA, TABLES
 from pipeline.metrics.lines import game_units
 
@@ -130,7 +131,7 @@ def export_xg_check(season: int) -> int:
     games = pl.read_parquet(d / "games.parquet").sort("game_id")
     feats = pl.read_parquet(d / "shot_features.parquet").filter(pl.col("type") != "blocked-shot")
     feats = feats.with_columns(ours=pl.Series(xg_model.predict(bundle, feats)))
-    events = pl.read_parquet(d / "events.parquet").select("game_id", "event_id", "p1", "period")
+    events = pl.read_parquet(d / "events.parquet").select("game_id", "event_id", "p1", "period", "situation_code")
     mp = pl.read_parquet(d / "shots_xg.parquet").select("game_id", "event_id", pl.col("xGoal").alias("mp"))
     players = pl.read_parquet(d / "players.parquet")
     shots = feats.join(events, on=["game_id", "event_id"]).join(mp, on=["game_id", "event_id"], how="left")
@@ -150,7 +151,7 @@ def export_xg_check(season: int) -> int:
         rows = []
         for r in pl.concat([s.filter(pl.col("goal")), chances]).sort("sec").iter_rows(named=True):
             clock = r["sec"] - (r["period"] - 1) * 1200
-            strength = "empty net" if r["empty_net"] else f'{r["own_skaters"]}-on-{r["opp_skaters"]}'
+            strength = "penalty shot" if penalty_shot(r["situation_code"]) else "empty net" if r["empty_net"] else f'{r["own_skaters"]}-on-{r["opp_skaters"]}'
             rows.append({"goal": r["goal"], "team": g["home"] if r["is_home"] else g["away"], "who": name.get(r["p1"], "Unknown"),
                          "when": f'P{r["period"]} {clock // 60}:{clock % 60:02d}', "shot": (r["shot_type"] or "shot").replace("-", " "), "feet": round(r["dist"]),
                          "strength": strength, "before": f'{round(r["prev_gap"])}s {before.get(r["prev_type"], "after play")}' if r["prev_type"] != "none" else "after a whistle",
