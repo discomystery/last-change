@@ -15,7 +15,7 @@ import linesData from '../../public/data/lines.json';
 import goalieData from '../../public/data/goalies.json';
 import howData from '../../public/data/goal_sources.json';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../data/mock';
-import { clock } from '../lib/format';
+import { clock, compared } from '../lib/format';
 import '../styles/blocks.css';
 
 type T = { abbr: string; name: string; place: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string };
@@ -89,7 +89,7 @@ const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
   busy: (g) => `${g.sa60} shots faced per 60`,
-  danger: (g) => `the average shot against is worth ${(g.danger ?? 0).toFixed(3)} expected goals`,
+  danger: (g) => (g.danger ? `one expected goal for every ${(1 / g.danger).toFixed(1)} shots he faces` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
@@ -273,10 +273,10 @@ const _ = ordinal;
                 <span class="unames">{u.players.map((n, j) => <PLink id={u.ids?.[j]} name={last(n)} />)}</span>
               </span>
               <span class="uval">
-                <span class="v-share"><strong>{u.share.toFixed(1)}%</strong> of chances<Pips pct={u.pct.share ?? 50} tip={`A better share of chances than ${u.pct.share}% of ${words}.`} /></span>
-                <span class="v-xgf60">creates <strong>{u.xgf60.toFixed(2)}</strong> expected goals per 60<Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${words}.`} /></span>
-                <span class="v-xga60">allows <strong>{u.xga60.toFixed(2)}</strong> expected goals per 60<Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${words}.`} /></span>
-                <span class="v-sec_pg"><strong>{u.toi_sec === null ? '–' : clock(u.toi_sec)}</strong> together a game<Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${words}.`} /></span>
+                <span class="v-share"><strong>{u.share.toFixed(1)}%</strong> of chances<Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share of chances than', 'a worse share of chances than', words)}.`} /></span>
+                <span class="v-xgf60">creates <strong>{u.xgf60.toFixed(2)}</strong> expected goals per 60<Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', words)}.`} /></span>
+                <span class="v-xga60">allows <strong>{u.xga60.toFixed(2)}</strong> expected goals per 60<Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', words)}.`} /></span>
+                <span class="v-sec_pg"><strong>{u.toi_sec === null ? '–' : clock(u.toi_sec)}</strong> together a game<Marker pct={u.pct.sec_pg ?? 50} tip={`${compared(u.pct.sec_pg ?? 50, 'more 5-on-5 ice time together than', 'less 5-on-5 ice time together than', words)}.`} /></span>
               </span>
             </li>
           ))}

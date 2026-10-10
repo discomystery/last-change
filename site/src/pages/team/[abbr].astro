@@ -23,7 +23,7 @@ import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import ShotMap from '../../components/ShotMap.astro';
-import { clock as mmss } from '../../lib/format';
+import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
 
@@ -71,7 +71,7 @@ const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
   busy: (g) => `${g.sa60} shots faced per 60`,
-  danger: (g) => `the average shot against is worth ${(g.danger ?? 0).toFixed(3)} expected goals`,
+  danger: (g) => (g.danger ? `one expected goal for every ${(1 / g.danger).toFixed(1)} shots he faces` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots; ${g.long_wait}% come after three quiet minutes`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
@@ -195,10 +195,10 @@ const _ = ordinal;
                   </div>
                   <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
                   <dl class="stats">
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`A better share than ${u.pct.share}% of ${peer[u.label]}.`} /></div>
-                    <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`More offensive-zone faceoffs than ${u.pct.oz}% of ${peer[u.label]}.`} />}</div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share than', 'a worse share than', peer[u.label])}.`} /></div>
+                    <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
                   </dl>
                 </li>
               ))}
@@ -245,7 +245,7 @@ const _ = ordinal;
                         <li class:list={{ thin: r.minutes < 10 }}>
                           <span class="lab" data-tip={`${unitNames(r.label)}. ${mmss(r.seconds)} of 5-on-5 ${label}.`}><b>{r.label}</b>{lastNames(r.label).join(' · ')}</span>
                           <span class="strip">
-                            {r.share.map((v, j) => <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%, because that is how much of the time those lines are on the ice against ${team.place}.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
+                            {r.share.map((v, j) => <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `${lastNames(r.label).join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time ${label} against opponents’ ${oppName[j]} lines. With no line matching it would be about ${r.expected[j]}%.`}><i>Opp. L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>)}
                           </span>
                         </li>
                       ))}
@@ -277,7 +277,7 @@ const _ = ordinal;
             <h4 class="st-h">Power play</h4>
             {sp.pp.map((u, k) => (
               <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per 60, more than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
+                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per 60, ${compared(u.pct ?? 50, 'more than', 'less than', `${k ? 'second' : 'top'} power-play units`, true)}. ${mmss(u.seconds)} on the ice.`} /></p>
                 <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name} once play is under way. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
               </div>
             ))}
@@ -317,12 +317,12 @@ const _ = ordinal;
                   <div class="g2">
                     <div class="card gcard">
                       <p class="gname"><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
-                      <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Better than ${x.pct.gsax}% of goalies at stopping more than expected, per 60.`} />}</p>
+                      <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                       <dl class="gkv">
                         {(['low', 'medium', 'high'] as const).map((t) => <div><dt>{t[0].toUpperCase() + t.slice(1)}-danger save %</dt><dd>{svp(x.tiers[t].sv)} <span class="n">{x.tiers[t].shots} shots</span></dd></div>)}
-                        <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60} {!few && <Marker pct={x.pct.busy!} tip={`Busier than ${x.pct.busy}% of goalies.`} />}</dd></div>
-                        <div><dt><span class="term" tabindex="0" data-tip="Dangerous chances the team gives up in front of him within seconds of losing the puck, per 60 minutes. A stand-in for chances he faces alone; public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60} {!few && <Marker pct={x.pct.breakdowns!} tip={`His team breaks down in front of him more than ${x.pct.breakdowns}% of goalies’ teams do.`} />}</dd></div>
-                        <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`Steadier than ${x.pct.steady}% of goalies.`} />}</dd></div>
+                        <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60} {!few && <Marker pct={x.pct.busy!} tip={`${compared(x.pct.busy!, 'busier than', 'quieter than', 'goalies')}.`} />}</dd></div>
+                        <div><dt><span class="term" tabindex="0" data-tip="Dangerous chances the team gives up in front of him within seconds of losing the puck, per 60 minutes. A stand-in for chances he faces alone; public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60} {!few && <Marker pct={x.pct.breakdowns!} tip={`${x.pct.breakdowns! > 55 ? `His team breaks down in front of him more often than ${x.pct.breakdowns}% of goalies’ teams do` : x.pct.breakdowns! < 45 ? `His team breaks down in front of him less often than ${100 - x.pct.breakdowns!}% of goalies’ teams do` : 'His team breaks down in front of him about as often as most'}.`} />}</dd></div>
+                        <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`${compared(x.pct.steady!, 'steadier than', 'streakier than', 'goalies')}.`} />}</dd></div>
                       </dl>
                       <div class="gh"><p class="mini-h">Night to night: goals saved above expected in each start</p><Histogram wide team="one" bins={x.bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} /></div>
                     </div>
@@ -388,7 +388,7 @@ const _ = ordinal;
                         return (
                           <li>
                             <span class="term srow-name" tabindex="0" data-tip={tip}>{label}</span>
-                            <span class="sline" tabindex="0" data-tip={`${r.share}% of ${side === 'for' ? `${team.place}’s goals` : `goals against ${team.place}`} (${r.n} of ${x.goals}) ${words}. League average: ${lgSrc[k]}%. With ${x.goals} goals, luck alone would put a league-average team between ${r.band[0]}% and ${r.band[1]}%. Our best estimate of their true rate: ${r.est}%.`}>
+                            <span class="sline" tabindex="0" data-tip={`${r.share}% of ${side === 'for' ? `${team.place}’s goals` : `goals against ${team.place}`} (${r.n} of ${x.goals}) ${words}. League average: ${lgSrc[k]}%. An average team could land anywhere from ${r.band[0]}% to ${r.band[1]}% by luck alone. Allowing for luck, their real level is about ${r.est}%.`}>
                               {band && <span class="sband" style={band}></span>}
                               <span class="slg" style={`left:${at(lgSrc[k])}`}></span>
                               <span class="sdot" style={`left:${at(r.share ?? 0)}`}></span>
@@ -405,7 +405,7 @@ const _ = ordinal;
             })}
           </div>
         ))}
-        <p class="note">Every goal counts once, in the first of these that applies: empty net, power play, shorthanded, goalie pulled, then rebound, turnover, faceoff win, and everyday play. Teams’ goal mixes differ far less than a single season suggests: over three seasons, most of the gap between one team and another in these rows was luck.</p>
+        <p class="note">Every goal counts once, in the first of these that applies: empty net, power play, shorthanded, goalie pulled, then rebound, turnover, faceoff win, and everyday play. These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last.</p>
       </>
     )}
   </Section>

@@ -3,11 +3,11 @@
 // (a "proper" line), so a coach who keeps shuffling does not make every line look like it barely plays.
 // A group that was a line for the first time in the last game is marked New and shows that game's time.
 import Marker from './Marker.astro';
-import { clock } from '../lib/format';
+import { clock, compared } from '../lib/format';
 interface Props { toi_sec: number | null; seconds: number; gp?: number; isNew?: boolean; games: number; pct: number | null; peers: string }
 const { toi_sec, seconds, gp, isNew, games, pct, peers } = Astro.props;
 const n = gp ?? games;
-const rank = pct === null ? '' : ` More 5-on-5 ice time together than ${pct}% of ${peers}.`;
+const rank = pct === null ? '' : ` ${compared(pct, 'more 5-on-5 ice time together than', 'less 5-on-5 ice time together than', peers)}.`;
 const tip = toi_sec === null || n === 0
   ? `Not yet one of the team’s lines in any single game; listed because its players have played together lately (${clock(seconds)} in all).`
   : isNew

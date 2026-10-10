@@ -88,8 +88,8 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             fmt = lambda x: f"{x:.1f} per 60"
         elif m == "quality":
             v = r["xgf_adj"] / r["ff_adj"] if r["ff_adj"] else 0.0
-            txt = f"{team} needed {1 / v:.1f} unblocked shots per expected goal, against its usual {1 / base:.1f}." if v else f"{team} barely got a shot away at 5-on-5."
-            fmt = lambda x: f"1 per {1 / x:.1f} shots" if x else "–"
+            txt = f"{team} got one expected goal every {1 / v:.1f} shots, against its usual {1 / base:.1f}." if v else f"{team} barely got a shot away at 5-on-5."
+            fmt = lambda x: f"1 expected goal per {1 / x:.1f} shots" if x else "–"
         elif m == "turnover":
             v = 100 * r["to_xgf"] / r["xgf5"] if r["xgf5"] else 0.0
             txt = f"{v:.1f}% of {team}’s 5-on-5 chances came right after winning the puck, against its usual {base:.1f}%."
@@ -119,13 +119,13 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
                 "usual": f"{base:.1f} per 60", "tonight": f"{v:.1f} per 60", "league": f"{league:.1f} per 60"}
     if m == "physical":
         if min(r["close_sec"] for r in rows) < MIN_CLOSE_SEC:
-            return {"verdict": "na", "happened": "The game was rarely close, and hit rates are only counted in close games, so this one can’t be judged.", "usual": f"{base:.0f}", "tonight": "–"}
+            return {"verdict": "na", "happened": "The game was rarely close, and hit rates are only counted in close games, so this one can’t be judged.", "usual": f"hit score {base:.0f}", "tonight": "–"}
         est = fp[g["away"]]["dims"]["physical"]["blend"]
         league_rate = est["v"] * 100 / est["index"]
         v = sum(r["hits_adj"] / r["close_sec"] * 3600 for r in rows) / 2 / league_rate * 100
         return {"verdict": grade(v, base, 100, "above"),
                 "happened": f"The two teams’ combined hit score was {v:.0f}, against their usual {base:.0f} (100 is league average, after adjusting for the arena’s scorer).",
-                "usual": f"{base:.0f}", "tonight": f"{v:.0f}", "league": "100"}
+                "usual": f"hit score {base:.0f}", "tonight": f"hit score {v:.0f}", "league": "hit score 100"}
     if m == "matchup_share":
         if "opp_lines" not in chk:
             return {"verdict": "na", "happened": "This call was saved before the site recorded the visitors’ lines, so it can’t be checked."}
