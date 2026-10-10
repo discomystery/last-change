@@ -1,0 +1,29 @@
+---
+// WORKSHOP MOCK-UP: the plain-English blurb at the top of preview and post-game pages.
+import type { Story } from '../data/storySamples';
+interface Props { story: Story }
+const { story } = Astro.props;
+---
+<div class="card story">
+  <p class="mini-h">{story.kicker}</p>
+  <h3>{story.head}</h3>
+  {story.paras.map((p) => <p class="para">{p}</p>)}
+  <p class="mini-h list-h">{story.listHead}</p>
+  <ul>
+    {story.items.map((i) => <li><span class="tag">{i.tag}</span><span>{i.text}</span></li>)}
+  </ul>
+</div>
+<style>
+  .story { margin-bottom: 20px; padding: 22px 24px; }
+  .story h3 { font: 600 28px/1.15 var(--display); margin: 6px 0 12px; }
+  .story .para { font: 400 18px/1.6 var(--body); margin: 0 0 12px; max-width: 80ch; }
+  .story .list-h { margin-top: 18px; }
+  .story ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+  .story li { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: baseline; font: 400 16px/1.5 var(--ui); }
+  .story .tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  @media (max-width: 560px) {
+    .story { padding: 18px 16px; }
+    .story h3 { font-size: 24px; }
+    .story li { grid-template-columns: 1fr; gap: 0; }
+  }
+</style>

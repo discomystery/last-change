@@ -11,6 +11,8 @@ import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
+import GameStory from '../../components/GameStory.astro';
+import { stories } from '../../data/storySamples';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -128,6 +130,7 @@ const srcInfo: [string, string, string][] = [
 ];
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
+const story = stories[snap.game_id];
 const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
@@ -150,7 +153,8 @@ const _ = ordinal;
   <SectionNav items={nav as [string, string][]} pinned />
 
   <Section id="watch" title="The short version" placeholder={false}>
-    {snap.outlook && (
+    {story && <GameStory story={story} />}
+    {!story && snap.outlook && (
       <div class="card outlook">
         {order.filter((a) => snap.outlook![a]).map((a) => (
           <div class={`pov pov-${side(a)}`}>
@@ -166,13 +170,14 @@ const _ = ordinal;
       {snap.claims.map((c) => (
         <li class="card">
           <h3>{c.head}</h3>
-          <p>{c.body}</p>
+          <p>{story?.bodies?.[c.id]?.body ?? c.body}</p>
           {c.call && <p class="call"><span>The call</span> {c.call}</p>}
+          {story?.bodies?.[c.id] && <p class="cite nums">{story.bodies[c.id].nums}</p>}
           <p class="cite">{c.cite}</p>
         </li>
       ))}
     </ol>
-    {notes.length > 0 && (
+    {!story && notes.length > 0 && (
       <div class="card worth">
         <p class="mini-h">Worth knowing</p>
         <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>

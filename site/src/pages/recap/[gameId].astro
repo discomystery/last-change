@@ -10,6 +10,8 @@ import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
 import GameSwing from '../../components/GameSwing.astro';
 import SectionNav from '../../components/SectionNav.astro';
+import GameStory from '../../components/GameStory.astro';
+import { stories } from '../../data/storySamples';
 import '../../styles/blocks.css';
 import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
@@ -95,7 +97,9 @@ const hasJobs = !!jobs?.players.some((c) => c.pos !== 'G');
 const hasGoalieCards = !!jobs?.players.some((c) => c.pos === 'G');
 const scoreFiles = import.meta.glob<{ default: { game_id: number; players: unknown[] } }>('../../../public/data/scores/2*.json', { eager: true });
 const hasImpact = !!Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default.players.length;
+const story = stories[r.game_id];
 const nav = [
+  ...(story ? [['story', 'Short version']] : []),
   ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
   ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
 ];
@@ -110,6 +114,12 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   </section>
 
   <SectionNav items={nav as [string, string][]} />
+
+  {story && (
+    <Section id="story" title="The short version" placeholder={false}>
+      <GameStory story={story} />
+    </Section>
+  )}
 
   {rv && (
     <Section id="chance" title="Our pre-game read" placeholder={false} takeaway="The win chance our model worked out before the game, kept off the site until now.">
