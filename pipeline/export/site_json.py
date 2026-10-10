@@ -164,6 +164,16 @@ def clock(seconds: float) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
+SHUFFLED = 0.33  # listed forward lines covering less than this share of 5v5 trio time = a lineup in flux (league median ~0.5)
+
+
+ORDINAL_WORDS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
+
+
+def ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
 def export_lines(season: int) -> int:
     """Usual lines and pairs for every team, how the last game differed, and notes on changed special-teams roles."""
     from pipeline.metrics import units
@@ -210,6 +220,25 @@ def export_lines(season: int) -> int:
             old = " and ".join(names.get(x, "?") for x in n["fill_old_partners"])
             text += f' {names.get(n["chain"], "?")} has moved into {sub.split(" ", 1)[-1]}\u2019s old spot beside {old}.'
         return text
+    team_names = {t["abbr"]: t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())} if (SITE_DATA / "teams.json").exists() else {}
+
+    def shuffle_note(e: dict, g: dict, place: str, fmt) -> dict | None:
+        """A team whose coach keeps changing the forward lines: say so, and name the most recent lines, since the
+        listed ones are only the groups that happened to play most together and may not be what shows up tonight."""
+        share, rank, typical = e["settled"]["F"], e["settled"]["F_rank"], e["settled"]["F_median"]
+        if share is None or share >= SHUFFLED or e["games"] < 3:
+            return None
+        from_bottom = len(usual) - rank + 1
+        lowest = "the lowest share in the league" if from_bottom == 1 else f"the {ORDINAL_WORDS.get(from_bottom, ordinal(from_bottom))}-lowest in the league"
+        opp = g["away"] if g["home"] == place else g["home"]
+        last = [fmt(u["unit"]) for u in e["last"] if u["label"].startswith("L")]
+        lines = ["\u2013".join(n.split(" ", 1)[-1] for n in p) for p in last]
+        listed = ", ".join(lines[:-1]) + f" and {lines[-1]}" if len(lines) > 1 else "".join(lines)
+        return {"player": None, "kind": "shuffle", "change": "shuffled", "now": round(100 * share), "before": round(100 * typical), "games": e["games"],
+                "text": f'The forward lines keep changing. The four trios listed under Lines cover only {round(100 * share)}% of its forwards\u2019 5-on-5 time over the last {e["games"]} games, '
+                        f'{lowest} (a typical team: {round(100 * typical)}%), so expect different combinations tonight. '
+                        f'Most recently, {"against" if g["home"] == place else "at"} {team_names.get(opp, opp)}, the lines were {listed}.'}
+
     out = {}
     for tid, e in usual.items():
         place = abbr[tid]
@@ -235,14 +264,18 @@ def export_lines(season: int) -> int:
         usual_sets = {u["label"]: u["unit"] for u in e["units"]}
         last_sets = {u["unit"] for u in e["last"]}
         fmt = lambda unit: [names.get(int(i), "?") for i in unit.split("-")]
+        shuffle = shuffle_note(e, g, place, fmt)
+        if shuffle:
+            notes.insert(0, shuffle)
         out[place] = {
             "games": e["games"],
-            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": round(u["sec_pg"] / 60, 1), "toi_sec": round(u["sec_pg"]),
+            "settled": {**{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e["settled"].items()}, "shuffled": shuffle is not None},
+            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": round(u["sec_pg"] / 60, 1), "toi_sec": round(u["sec_pg"]), "gp": u["gp"],
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
-            "notes": sorted(notes, key=lambda n: (n["kind"] != "absence", n.get("order", 0), -abs(n["now"] - n["before"]))),
+            "notes": sorted(notes, key=lambda n: (n["kind"] != "shuffle", n["kind"] != "absence", n.get("order", 0), -abs(n["now"] - n["before"]))),
         }
     for tid, m in units.matchups(season, usual).items():
         if abbr[tid] in out:

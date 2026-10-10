@@ -11,6 +11,7 @@ from pipeline.config import REGULAR, TABLES
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
 WINDOW_GAMES = 10
 SHRINK_MINUTES = 120  # early-season line results are pulled toward the average for that line number
+TOGETHER_SEC = 120  # a group counts as having played a game together with at least two minutes of 5v5 side by side
 
 
 def game_units(season: int) -> pl.DataFrame:
@@ -82,12 +83,22 @@ def usual(season: int) -> dict[int, dict]:
         dates = t.select("game_id", "date").unique().sort("date", "game_id")
         window = dates.tail(WINDOW_GAMES)["game_id"].to_list()
         last = dates["game_id"][-1]
-        recent = t.filter(pl.col("game_id").is_in(window)).group_by("kind", "unit").agg(pl.exclude("game_id", "date", "team_id").sum())
+        together = pl.col("sec") >= TOGETHER_SEC
+        recent = t.filter(pl.col("game_id").is_in(window)).group_by("kind", "unit").agg(
+            pl.exclude("game_id", "date", "team_id").sum(), gp=together.sum(), sec_gp=pl.col("sec").filter(together).sum())
         in_last = t.filter(pl.col("game_id") == last)
-        entry = {"games": len(window), "last_game": last, "units": [], "last": []}
+        entry = {"games": len(window), "last_game": last, "units": [], "last": [], "settled": {}}
         for kind, count, tag in (("F", 4, "L"), ("D", 3, "P")):
-            for i, u in enumerate(_pick(recent.filter(pl.col("kind") == kind), count)):
+            pool = recent.filter(pl.col("kind") == kind)
+            picked = _pick(pool, count)
+            for i, u in enumerate(picked):
+                # Ice time per game counts only the games the group actually played together, so a shuffled lineup
+                # does not make every line look like it barely plays.
+                u["sec_pg"] = u["sec_gp"] / u["gp"] if u["gp"] else u["sec"] / len(window)
                 entry["units"].append({"label": f"{tag}{i + 1}", **u})
+            # How settled the lineup is: the listed groups' share of all the team's 5v5 time in trios (or pairs).
+            total = pool["sec"].sum()
+            entry["settled"][kind] = sum(u["sec"] for u in picked) / total if total else None
             entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"]} for i, u in enumerate(_pick(in_last.filter(pl.col("kind") == kind), count))]
         teams[tid] = entry
 
@@ -108,8 +119,6 @@ def usual(season: int) -> dict[int, dict]:
             fo = u["oz_fo"] + u["dz_fo"]
             u["oz"] = 100 * u["oz_fo"] / fo if fo else None
         for stat, higher in (("xgf60", True), ("xga60", False), ("share", True), ("sec_pg", True), ("oz", True)):
-            for u in group:
-                u["sec_pg"] = u["sec"] / teams_games(teams, u)
             vals = [u[stat] for u in group if u[stat] is not None]
             for u in group:
                 if u[stat] is None:
@@ -117,11 +126,13 @@ def usual(season: int) -> dict[int, dict]:
                     continue
                 below = sum(v < u[stat] for v in vals) if higher else sum(v > u[stat] for v in vals)
                 u[f"{stat}_pct"] = round(100 * (below + 0.5) / len(vals))
+    for kind in ("F", "D"):
+        vals = [e["settled"][kind] for e in teams.values() if e["settled"][kind] is not None]
+        for e in teams.values():
+            v = e["settled"][kind]
+            e["settled"][f"{kind}_rank"] = None if v is None else 1 + sum(x > v for x in vals)
+            e["settled"][f"{kind}_median"] = sorted(vals)[len(vals) // 2] if vals else None
     return teams
-
-
-def teams_games(teams: dict, unit: dict) -> int:
-    return next(e["games"] for e in teams.values() if unit in e["units"])
 
 
 def special_usage(season: int) -> pl.DataFrame:

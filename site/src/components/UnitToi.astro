@@ -1,0 +1,18 @@
+---
+// A line's or pair's 5-on-5 time together per game, counted only over the games it actually played together
+// (two minutes or more), so a coach who keeps shuffling does not make every line look like it barely plays.
+import Marker from './Marker.astro';
+import { clock } from '../lib/format';
+interface Props { toi_sec: number; seconds: number; gp?: number; games: number; pct: number | null; peers: string }
+const { toi_sec, seconds, gp, games, pct, peers } = Astro.props;
+const n = gp ?? games;
+const tip = n === 0
+  ? `Never together for two minutes or more in a game over the last ${games}; ${clock(seconds)} together in all.`
+  : `Together in ${n} of the last ${games} games (two minutes or more), averaging ${clock(toi_sec)} a game in those. More 5-on-5 ice time together than ${pct}% of ${peers}. ${clock(seconds)} together in all.`;
+---
+<span class="unit-toi">
+  {n === 0
+    ? <><strong>{clock(seconds)}</strong> in all</>
+    : <><strong>{clock(toi_sec)}</strong> a game{n < games && <span class="unit-gp">in {n} of {games}</span>}</>}
+  <Marker pct={pct ?? 50} tip={tip} />
+</span>

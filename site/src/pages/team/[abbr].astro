@@ -21,6 +21,7 @@ import KeyPlayers from '../../components/KeyPlayers.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
+import UnitToi from '../../components/UnitToi.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss } from '../../lib/format';
 import '../../styles/blocks.css';
@@ -42,7 +43,7 @@ type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index
 const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
-type Unit = { label: string; players: string[]; minutes: number; seconds: number; toi_sec: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
+type Unit = { label: string; players: string[]; gp?: number; minutes: number; seconds: number; toi_sec: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; seconds: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; seconds: number; share: number; rate: number; pct?: number };
@@ -190,7 +191,7 @@ const _ = ordinal;
                 <li class="card unit">
                   <div class="unit-top">
                     <span class="unit-label">{u.label}</span>
-                    <span class="unit-toi"><strong>{mmss(u.toi_sec)}</strong> a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${mmss(u.seconds)} together in all.`} /></span>
+                    <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} games={ln.games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                   </div>
                   <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
                   <dl class="stats">
