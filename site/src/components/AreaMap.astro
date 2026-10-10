@@ -1,7 +1,8 @@
 ---
 // Offensive zone from above, net at the top, drawn from the shooter's point of view (his left on the left).
 // Two layers: areas of the zone shaded by how much of his shooting comes from each, and every unblocked shot.
-// Area rectangles match pipeline/export/players.py `area()`; keep the two in step.
+// Areas are rings and wedges around the middle of the net with softened corners; the rings and wedges match
+// pipeline/export/players.py `area()` (RINGS, WEDGES); keep the two in step.
 interface AreaStat { shots: number; goals: number; share: number; avg: number }
 interface Props {
   id: string;
@@ -14,30 +15,88 @@ interface Props {
 const { id, areas, shots = [], tip, label, shade } = Astro.props;
 const sx = (y: number) => 42.5 - y;
 const sy = (x: number) => 100 - x;
-// [x from, x to, y from, y to] in feet; y > 0 is the shooter's left.
-const R: Record<string, [number, number, number, number][]> = {
-  behind: [[89, 100, -22, 22]],
-  cornerL: [[69, 89, 37, 42.5], [89, 100, 22, 42.5]], cornerR: [[69, 89, -42.5, -37], [89, 100, -42.5, -22]],
-  lowSlot: [[69, 89, -9, 9]], crease: [[83, 89, -4, 4]],
-  netSideL: [[69, 89, 9, 22]], netSideR: [[69, 89, -22, -9]],
-  circleL: [[54, 69, 9, 37], [69, 89, 22, 37]], circleR: [[54, 69, -37, -9], [69, 89, -37, -22]],
-  highSlot: [[45, 69, -9, 9]],
-  outerL: [[45, 54, 9, 42.5], [54, 69, 37, 42.5]], outerR: [[45, 54, -42.5, -9], [54, 69, -42.5, -37]],
-  point: [[25, 45, -14, 14]], pointL: [[25, 45, 14, 42.5]], pointR: [[25, 45, -42.5, -14]],
+const [CREASE, INNER, MIDDLE, OUTER] = [6, 22, 46, 60];
+const [LOW, SLOT, CORNER] = [28, 15, 72];
+const FAR = 95; // past every board, so the rink outline trims the open-ended areas
+type Pt = [number, number];
+// Rink point (feet) at distance d from the middle of the net, a degrees off straight out (positive toward his left).
+const polar = (d: number, a: number): Pt => { const r = (a * Math.PI) / 180; return [sx(d * Math.sin(r)), sy(89 - d * Math.cos(r))]; };
+// Outline of the ring between d0 and d1 from angle a0 to a1, arcs sampled every degree.
+function sector(d0: number, d1: number, a0: number, a1: number): Pt[] {
+  const steps = Math.max(2, Math.ceil(Math.abs(a1 - a0)));
+  const arc = (d: number, from: number, to: number) => Array.from({ length: steps + 1 }, (_, i) => polar(d, from + ((to - from) * i) / steps));
+  return d0 > 0 ? [...arc(d1, a0, a1), ...arc(d0, a1, a0)] : [...arc(d1, a0, a1), polar(0, 0)];
+}
+// Closed path through the outline with every sharp corner swapped for a curve of about r feet.
+function soft(pts: Pt[], r: number): string {
+  const n = pts.length;
+  const dist = (p: Pt, q: Pt) => Math.hypot(q[0] - p[0], q[1] - p[1]);
+  const S = [0];
+  for (let i = 1; i <= n; i++) S.push(S[i - 1] + dist(pts[i - 1], pts[i % n]));
+  const L = S[n];
+  const turn = (i: number) => {
+    const [p, q, w] = [pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n]];
+    const a = Math.atan2(q[1] - p[1], q[0] - p[0]), b = Math.atan2(w[1] - q[1], w[0] - q[0]);
+    return Math.abs(((b - a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+  };
+  const corners = pts.map((_, i) => i).filter((i) => turn(i) > 0.4);
+  const at = (s: number): Pt => {
+    s = ((s % L) + L) % L;
+    let i = 0;
+    while (S[i + 1] < s) i++;
+    const t = (s - S[i]) / (S[i + 1] - S[i] || 1), [p, q] = [pts[i], pts[(i + 1) % n]];
+    return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  };
+  const gap = (a: number, b: number) => (((S[b] - S[a]) % L) + L) % L || L;
+  const k = corners.length;
+  const rr = corners.map((c, j) => Math.min(r, 0.45 * gap(corners[(j + k - 1) % k], c), 0.45 * gap(c, corners[(j + 1) % k])));
+  const f = (p: Pt) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
+  let d = `M${f(at(S[corners[0]] + rr[0]))}`;
+  for (let j = 0; j < k; j++) {
+    const c = corners[j], next = corners[(j + 1) % k], rn = rr[(j + 1) % k];
+    const end = S[c] + gap(c, next);
+    for (let i = (c + 1) % n; i !== next; i = (i + 1) % n) {
+      const s = S[c] + gap(c, i);
+      if (s > S[c] + rr[j] && s < end - rn) d += ` L${f(pts[i])}`;
+    }
+    d += ` L${f(at(end - rn))} Q${f(pts[next])} ${f(at(end + rn))}`;
+  }
+  return `${d} Z`;
+}
+const both = (key: string, shape: (s: number) => Pt[]) => ({ [`${key}L`]: shape(1), [`${key}R`]: shape(-1) });
+const span = (d0: number, d1: number, a0: number, a1: number) => (s: number) => (s > 0 ? sector(d0, d1, a0, a1) : sector(d0, d1, -a1, -a0));
+const SHAPES: Record<string, Pt[]> = {
+  crease: sector(0, CREASE, -90, 90),
+  behind: sector(0, INNER, 90, 270),
+  lowSlot: sector(CREASE, INNER, -LOW, LOW),
+  ...both('netSide', span(CREASE, INNER, LOW, 90)),
+  ...both('corner', span(INNER, FAR, CORNER, 180)),
+  highSlot: sector(INNER, MIDDLE, -SLOT, SLOT),
+  ...both('circle', span(INNER, MIDDLE, SLOT, CORNER)),
+  ...both('outer', span(MIDDLE, OUTER, SLOT, CORNER)),
+  point: sector(MIDDLE, FAR, -SLOT, SLOT),
+  ...both('point', span(OUTER, FAR, SLOT, CORNER)),
 };
-// Where each area's number sits: the middle of its first rectangle, nudged for the L-shaped ones.
-const at: Record<string, [number, number]> = { cornerL: [95, 33], cornerR: [95, -33], circleL: [63, 24], circleR: [63, -24], outerL: [49, 27], outerR: [49, -27] };
-const centre = (k: string): [number, number] => at[k] ?? [(R[k][0][0] + R[k][0][1]) / 2, (R[k][0][2] + R[k][0][3]) / 2];
-const board = 'M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76';
+const paths = Object.fromEntries(Object.entries(SHAPES).map(([k, pts]) => [k, soft(pts, 3)]));
+// Where each area's number sits, as [distance from the net, degrees off straight out] for the left-hand areas.
+const spot: Record<string, [number, number]> = {
+  crease: [3.4, 0], behind: [6.5, 180], lowSlot: [15, 0], netSideL: [15, 60], cornerL: [30, 96], highSlot: [34, 0],
+  circleL: [34, 44], outerL: [53, 45], point: [55, 0], pointL: [65, 32],
+};
+const centre = (k: string): Pt => {
+  const [d, a] = spot[k] ?? spot[k.replace(/R$/, 'L')];
+  return polar(d, k.endsWith('R') ? -a : a);
+};
+const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
 ---
 <figure class="areamap" id={id}>
   <svg viewBox="-1 -1 87 78" role="img" aria-label="Where his shots come from">
     <defs><clipPath id={`${id}-clip`}><path d={`${board} Z`} /></clipPath></defs>
     <path class="rk-board" d={board} />
     <g clip-path={`url(#${id}-clip)`} class="am-areas">
-      {Object.entries(R).map(([k, rects]) => (
+      {Object.keys(paths).map((k) => (
         <g class="am-area" data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? { shots: 0, goals: 0, share: 0, avg: 0 })}`}>
-          {rects.map(([x0, x1, y0, y1]) => <rect x={sx(y1)} y={sy(x1)} width={y1 - y0} height={x1 - x0} />)}
+          <path d={paths[k]} />
         </g>
       ))}
     </g>
@@ -47,7 +106,7 @@ const board = 'M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76';
     <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
     <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
     <g class="am-labels">
-      {Object.keys(R).map((k) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text x={sx(y)} y={sy(x) + 1.3} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
+      {Object.keys(paths).map((k) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text x={x} y={y + 1.3} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
     </g>
     <g class="am-shots">
       {shots.filter((s) => s[0] >= 25).map(([x, y, xg, goal, cur]) => <circle class:list={['ps', { goal: goal === 1, old: cur === 0 }]} cx={sx(y)} cy={sy(x)} r={0.7 + Math.sqrt(xg / 1000) * 3.6} />)}
@@ -57,14 +116,14 @@ const board = 'M0 76 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V76';
 
 <style is:global>
   .areamap svg { width: 100%; height: auto; display: block; }
-  .am-area rect { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.5; }
+  .am-area path { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.7; stroke-linejoin: round; }
   .am-area { cursor: help; outline: none; }
-  .am-area:hover rect, .am-area:focus rect { stroke: var(--ink); stroke-width: 0.6; }
+  .am-area:hover path, .am-area:focus path { stroke: var(--ink); stroke-width: 0.6; }
   .am-labels text { font: 600 3.4px var(--ui); fill: var(--ink); text-anchor: middle; pointer-events: none; }
   .am-labels text.dark { fill: var(--sheet); }
   .am-shots { display: none; }
   .areamap.dots .am-shots { display: inline; }
-  .areamap.dots .am-area rect { fill: var(--sheet); stroke: none; }
+  .areamap.dots .am-area path { fill: var(--sheet); stroke: none; }
   .areamap.dots .am-labels { display: none; }
   .areamap.dots .am-area { pointer-events: none; }
   .ps { fill: var(--team, var(--ink)); fill-opacity: 0.32; stroke: none; }

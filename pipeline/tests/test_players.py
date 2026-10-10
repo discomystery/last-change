@@ -10,9 +10,9 @@ def test_areas_from_the_shooters_side():
     assert area(86, 0) == "crease"
     assert area(75, 5) == "lowSlot"
     assert area(75, 15) == "netSideL" and area(75, -15) == "netSideR"  # positive y is the shooter's left
-    assert area(60, 25) == "circleL" and area(80, -30) == "circleR"
+    assert area(60, 25) == "circleL" and area(75, -25) == "circleR"
     assert area(60, 0) == "highSlot" and area(50, 0) == "highSlot"
-    assert area(95, 0) == "behind" and area(95, 30) == "cornerL" and area(75, -40) == "cornerR"
+    assert area(95, 0) == "behind" and area(95, 30) == "cornerL" and area(85, -40) == "cornerR"
     assert area(50, 30) == "outerL" and area(60, -40) == "outerR"
     assert area(35, 0) == "point" and area(35, 30) == "pointL" and area(35, -30) == "pointR"
     assert area(10, 0) == "outside"
