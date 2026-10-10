@@ -158,9 +158,9 @@ STYLE = {
 # Two traits that read better as one thought: (trait, end, trait, end) -> phrase.
 PAIRS = {
     ("volume", "hi", "quality", "lo"): "fire from everywhere, though a lot of it is hopeful",
-    ("volume", "lo", "quality", "hi"): "don't shoot much, but they get to the dangerous chances",
+    ("volume", "lo", "quality", "hi"): "pick their spots, but get to the dangerous chances when they shoot",
     ("suppression", "hi", "qualityAllowed", "lo"): "give up very few shots, though the ones they allow are dangerous",
-    ("suppression", "lo", "qualityAllowed", "hi"): "let the other team shoot, but mostly from places that don't hurt",
+    ("suppression", "lo", "qualityAllowed", "hi"): "let the other team shoot, but mostly hopeful shots",
     ("volume", "hi", "suppression", "hi"): "spend most of the night in the other team's end",
     ("volume", "lo", "suppression", "lo"): "spend a lot of the night in their own end",
 }
@@ -169,7 +169,7 @@ EXTRA = {
     "pp": ("their power play is lethal", "their power play has no bite"),
     "pk": ("their penalty kill is airtight", "their penalty kill leaks"),
     "goalie": ("their goaltending has been stealing games", "their goaltending has let them down"),
-    "powerKill": ("they're dangerous even shorthanded", None),
+    "powerKill": ("they create chances even when shorthanded", None),
     "discipline": ("they stay out of the box", "they spend a lot of time in the box"),
 }
 OPPOSED = [{"volume", "pace"}, {"suppression", "pace"}, {"quality", "inClose"}, {"forecheck", "physical"}]
@@ -208,148 +208,138 @@ def team_style(fp: dict) -> tuple[list[str], list[str]]:
     return phrases, used
 
 
-def team_extras(fp: dict) -> tuple[str | None, list[str]]:
-    ext = [(k, end) for k, end, _ in _extremes(fp, EXTRA, 15) if EXTRA[k][0 if end == "hi" else 1]][:2]
-    if not ext:
-        return None, []
-    cl = [EXTRA[k][0 if end == "hi" else 1] for k, end in ext]
-    joint = " and " if len({end for _, end in ext}) == 1 else ", but "
-    return _cap(joint.join(cl)) + ".", [k for k, _ in ext]
+def team_extras(fp: dict) -> list[tuple[str, str]]:
+    """Special teams, goaltending and discipline at the far ends: (trait, "hi"/"lo"), at most two."""
+    return [(k, end) for k, end, _ in _extremes(fp, EXTRA, 15) if EXTRA[k][0 if end == "hi" else 1]][:2]
 
 
 def _record(t: dict) -> str:
     return f"{t['w']}-{t['l']}-{t['otl']}"
 
 
-def _of(k: int, n: int) -> str:
-    if k == 0:
-        return f"none of their {_num(n)}"
-    if k == n:
-        return f"all {_num(n)}" if n > 2 else "both"
-    return f"{_num(k)} of {_num(n)}"
+def _run_streak(recent: list[dict]) -> tuple[int, bool]:
+    """Current run of wins or losses: (games, won)."""
+    if not recent:
+        return 0, False
+    won = recent[-1]["win"]
+    n = 0
+    for r in reversed(recent):
+        if r["win"] != won:
+            break
+        n += 1
+    return n, won
 
 
+# Voice (user, 2026-10-10: the first drafts read "stiff"): written the way a fan would tell a friend about a team.
+# Lead with a verdict that ties the past to the present, then whether the play backs up the record, then how they
+# play, then special teams. Vary the openings; no two sentences start the same way.
 def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict]) -> dict:
-    """Sentences: who they are; are they good this season; have they been good; current form."""
-    the = _cap(_the(t))
+    X, nick = _the(t), _nick(t)
+    key = (abbr,)
+    past = sorted(hist, key=lambda h: h["season"])[-HISTORY:]
+    last = past[-1] if past else None
+    made = sum(1 for h in past if h["playoffs"])
+    dry = 0
+    for h in reversed(past):
+        if h["playoffs"]:
+            break
+        dry += 1
+    gp, x = t["gp"], xg.get(abbr)
+    pts_pct = t["pts"] / (2 * gp) if gp else 0.5
+    rec = "good" if pts_pct >= 0.6 else "bad" if pts_pct < 0.45 else "even"
+    play = None if not x else "good" if x["share"] >= 0.53 else "bad" if x["share"] <= 0.47 else "even"
+    run, won = _run_streak(recent)
+    record = _record(t)
+    out = []
+
+    # 1. The hook: last season and this one in a breath.
+    if not gp:
+        hook = f"{_cap(X)} haven't played yet this season."
+    elif last and last["playoffs"] == 5:
+        hook = {"good": f"The defending champs are picking up right where they left off, {record} out of the gate.",
+                "even": f"The defending champs have had a so-so start at {record}.",
+                "bad": f"Life as defending champs has started slowly: they're {record}."}[rec]
+    elif last and last["playoffs"] == 4:
+        hook = {"good": f"Last spring's runners-up look hungry: they're {record}.",
+                "even": f"Last spring's runners-up are {record}, still finding their feet.",
+                "bad": f"There's no Final hangover quite like this one: last spring's runners-up are {record}."}[rec]
+    elif dry >= 3:
+        hook = {"good": f"Could this be the year? {_cap(X)} haven't made the playoffs in {_num(dry)} seasons, but they're {record} so far.",
+                "even": f"{_cap(X)} are {record}, still looking for their first playoff spot in {_num(dry)} seasons.",
+                "bad": f"The rebuild grinds on in {t['place']}: no playoffs in {_num(dry)} seasons, and a {record} start."}[rec]
+    elif last and not last["playoffs"] and made:
+        hook = {"good": f"After missing the playoffs last spring, {X} have bounced back to {record}.",
+                "even": f"After missing the playoffs last spring, {X} are {record}.",
+                "bad": f"Last season was one to forget in {t['place']}, and this one hasn't started much better: they're {record}."}[rec]
+    elif made == len(past) and past:
+        hook = {"good": _pick([f"Same old {nick}: {record}, and in the mix again.", f"{_cap(X)} are {record}, which is what we've come to expect."], *key),
+                "even": f"{_cap(X)}, playoff regulars, are {record} so far.",
+                "bad": f"{_cap(X)} have made the playoffs {_num(len(past))} years running, but they're {record} this time."}[rec]
+    else:
+        hook = f"{_cap(X)} are {record} so far."
+    if run >= 3 and gp:
+        hook = hook[:-1] + f", {'winners' if won else 'losers'} of {_num(run)} straight."
+    out.append(hook)
+
+    # 2. Does the play back it up?
+    if x and gp:
+        n, k = x["gp"], x["better"]
+        most = "most" if k * 2 > n else "half" if k * 2 == n else "few"
+        say = {
+            ("good", "good"): _pick(["And it's no mirage: they've had the better of the chances in {c}.", "They've earned it, too, with the better of the chances in {c}."], *key, "g").format(c=f"all {_num(n)} games" if k == n else f"{_num(k)} of their {_num(n)} games"),
+            ("good", "even"): "The play has been closer than the record, though.",
+            ("good", "bad"): "Don't get too comfortable, though: they've been outchanced in most of those games, and that tends to catch up with a team.",
+            ("even", "good"): "They've played better than that record, too, winning the battle for chances more often than not.",
+            ("even", "even"): "That's about how they've played, too: some nights on top, some not.",
+            ("even", "bad"): "If anything the record is kind: they've been outchanced more often than not.",
+            ("bad", "good"): "The results haven't come yet, but they've had the better of the chances most nights, so don't write them off.",
+            ("bad", "even"): "They've played better than that, though, so a bit of luck could turn it around.",
+            ("bad", "bad"): "And honestly, they haven't played much better than that.",
+        }[(rec, play)]
+        if most == "few" and play == "bad" and rec != "bad" and k == 0:
+            say = say.replace("in most of those games", "in every one of those games")
+        if gp < 10 and "though" not in say and "write them off" not in say:
+            say += " " + _pick(["Early days, of course.", "It's early, mind you.", "Small sample, sure."], *key, "early")
+        out.append(say)
+
+    # 3. How they play.
     phrases, used = team_style(fp)
     if phrases:
-        out = [f"{the} {_and(phrases)}."]
+        frame = _pick(["Expect them to {p}.", "Night to night, they {p}.", "On the ice, they {p}.", "Their game? They {p}."], *key, "style")
+        out.append(frame.format(p=_and(phrases)))
     else:
-        out = [f"{the} don't lean hard on any one style: nothing in their 5-on-5 game sits far from league average."]
-    extra, used2 = team_extras(fp)
-    if extra:
-        out.append(extra)
+        out.append("Stylewise there's nothing extreme about them: a middle-of-the-road team in almost every way.")
 
-    # This season: the record against the chances.
-    x = xg.get(abbr)
-    gp = t["gp"]
-    if gp and x:
-        pts_pct = t["pts"] / (2 * gp)
-        rec = "good" if pts_pct >= 0.6 else "bad" if pts_pct < 0.45 else "even"
-        play = "good" if x["share"] >= 0.53 else "bad" if x["share"] <= 0.47 else "even"
-        start = f"{_cap(_num(gp))} games in, they're {_record(t)}"
-        ch = f"they've had the better of the chances at 5-on-5 in {_of(x['better'], x['gp'])}"
-        verdict = {
-            ("good", "good"): f"{start}, and it's no fluke: {ch}.",
-            ("good", "even"): f"{start}, a shade better than the play: {ch}.",
-            ("good", "bad"): f"{start}, but the record flatters them: {ch}.",
-            ("even", "good"): f"{start}, and they've played better than that: {ch}.",
-            ("even", "even"): f"{start}, and that's about how they've played: {ch}.",
-            ("even", "bad"): f"{start}, a bit better than the play: {ch}.",
-            ("bad", "good"): f"{start}, which undersells how they've played: {ch}.",
-            ("bad", "even"): f"{start}, a little unlucky given the play: {ch}.",
-            ("bad", "bad"): f"{start}, and the play matches the record: {ch}.",
-        }[(rec, play)]
-        out.append(verdict[:-1] + (". Early days, though." if gp < 10 else "."))
-
-    # History: playoffs and finishes over the seasons we hold.
-    if hist:
-        past = sorted(hist, key=lambda h: h["season"])[-HISTORY:]
-        made = [h for h in past if h["playoffs"]]
-        last = past[-1]
-        best = max(reversed(past), key=lambda h: h["playoffs"])
-        run = {5: "won the Cup", 4: "made the Final", 3: "reached the conference final", 2: "won a round"}
-        n = len(past)
-        if len(made) == n:
-            s = f"They've been good for a while: playoffs in each of the last {_num(n)} seasons"
-        elif not made:
-            s = f"Good seasons have been hard to find: no playoffs in any of the last {_num(n)}"
-        else:
-            s = f"They've made the playoffs in {_num(len(made))} of the last {_num(n)} seasons"
-        if best["playoffs"] >= 2:
-            when = "last spring" if best is last else f"in {best['season'] + 1}"
-            s += f", and {run[best['playoffs']]} {when}"
-        s += "."
-        if not last["playoffs"] and made:
-            s += f" Last season they missed, finishing {_ordinal(last['rank'])} in the league."
-        elif not made and last["rank"] <= 20:
-            s += f" Last season was their best in a while ({_ordinal(last['rank'])} in the league)."
-        elif last["rank"] <= 3:
-            s += f" Last season they finished {_ordinal(last['rank'])} in the league."
-        out.append(s)
-
-    # Form: a streak of three or more.
-    if recent:
-        won = recent[-1]["win"]
-        n = 0
-        for r in reversed(recent):
-            if r["win"] == won:
-                n += 1
-            else:
-                break
-        if n >= 3:
-            out.append(f"They've {'won' if won else 'lost'} {_num(n)} straight.")
-    return {"team": abbr, "name": t["name"], "text": out, "style": used + used2}
+    # 4. Special teams and goaltending, only at the far ends.
+    ext = team_extras(fp)
+    if ext:
+        cl = [EXTRA[k][0 if end == "hi" else 1] for k, end in ext]
+        joint = " and " if len({end for _, end in ext}) == 1 else ", but "
+        out.append(_cap(joint.join(cl)) + ".")
+    return {"team": abbr, "name": t["name"], "text": out, "style": used + [k for k, _ in ext]}
 
 
 # ---------------------------------------------------------------- players
 
-ROLE_LINE = {"L1": "first-line", "L2": "second-line", "L3": "third-line", "L4": "fourth-line",
-             "P1": "top-pair", "P2": "second-pair", "P3": "third-pair"}
 POS_NOUN = {"C": "center", "L": "winger", "R": "winger", "D": "defenseman"}
-# Standout skills (blend percentile 85+ among his peers, likely range clear of the middle). Phrase completes "He ...".
+LINE_WORD = {"L1": "top", "L2": "second", "L3": "third", "L4": "fourth", "P1": "top", "P2": "second", "P3": "third"}
+# Standout skills (blend percentile 85+ among his peers, likely range clear of the middle). Base verbs after "he can"
+# would read oddly, so these complete "He ..." in the third person.
 SKILL = {
-    "offImpact": "drives play at 5-on-5",
+    "offImpact": "tilts the ice when he's out there",
     "defImpact": "shuts down the other team's chances",
     "chances": "gets to dangerous scoring chances",
-    "shooting": "shoots a lot",
+    "shooting": "shoots at every opportunity",
     "finishing": "finishes better than most",
     "playmaking": "sets up a lot of goals",
     "powerPlay": "is a real threat on the power play",
-    "shThreat": "is dangerous even while killing penalties",
-    "hits": "plays a physical game",
-    "blocks": "blocks a lot of shots",
-    "takeaways": "steals a lot of pucks",
+    "shThreat": "stays dangerous even while killing penalties",
+    "hits": "plays a heavy, physical game",
+    "blocks": "throws himself in front of shots",
+    "takeaways": "picks a lot of pockets",
     "drawsPenalties": "draws a lot of penalties",
     "faceoffs": "wins his draws",
 }
-
-
-def _role_words(p: dict, teams: dict) -> list[str]:
-    """"Aho is Carolina's second-line center and their busiest forward." plus a special-teams sentence."""
-    role = p.get("role") or {}
-    team = teams.get(p["team"], {"place": p["team"]})
-    noun = POS_NOUN.get(p["pos"], "player")
-    line = (role.get("line") or {}).get("label")
-    who = f"{team['place']}'s {ROLE_LINE[line]} {noun}" if line in ROLE_LINE else f"a {noun} for {team['place']}"
-    if role.get("toi_rank") == 1 and role.get("gp", 0) >= 2:
-        who += f" and their busiest {'defenseman' if p['pos'] == 'D' else 'forward'}"
-    out = [f"{p['last']} is {who}."]
-    st = []
-    pp = (role.get("pp") or {}).get("label")
-    if pp == "PP1":
-        st.append("quarterbacks the top power-play unit" if (role.get("pp") or {}).get("role") == "Quarterback" else "plays on the top power-play unit")
-    elif pp == "PP2":
-        st.append("plays on the second power-play unit")
-    pk = (role.get("pk") or {}).get("role")
-    if pk == "starter":
-        st.append("starts the penalty kill" + (" and takes the draw" if (role.get("pk") or {}).get("draw") else ""))
-    elif pk == "second":
-        st.append("comes on as the second wave of the penalty kill")
-    if st:
-        out.append(f"He {_and(st)}.")
-    return out
 
 
 def _skills(p: dict) -> list[str]:
@@ -360,6 +350,186 @@ def _skills(p: dict) -> list[str]:
             found.append((k, e["pct"]))
     found.sort(key=lambda kv: -kv[1])
     return [SKILL[k] for k, _ in found[:2]]
+
+
+def _role(p: dict, teams: dict) -> str | None:
+    """"He centers Carolina's second line, plays on the top power-play unit and kills penalties"."""
+    role = p.get("role") or {}
+    place = teams.get(p["team"], {"place": p["team"]})["place"]
+    line = (role.get("line") or {}).get("label")
+    bits = []
+    if line in LINE_WORD:
+        if p["pos"] == "D":
+            bits.append(f"anchors {place}'s {LINE_WORD[line]} pair" if line == "P1" else f"plays on {place}'s {LINE_WORD[line]} pair")
+        elif p["pos"] == "C":
+            bits.append(f"centers {place}'s {LINE_WORD[line]} line")
+        else:
+            bits.append(f"plays on {place}'s {LINE_WORD[line]} line")
+    pp = role.get("pp") or {}
+    if pp.get("label") == "PP1":
+        bits.append("runs the top power play" if pp.get("role") == "Quarterback" else "plays on the top power-play unit")
+    elif pp.get("label") == "PP2":
+        bits.append("plays on the second power-play unit")
+    pk = (role.get("pk") or {}).get("role")
+    if pk in ("starter", "second"):
+        bits.append("kills penalties")
+    if not bits:
+        return None
+    s = "He " + _and(bits)
+    if role.get("toi_rank") == 1 and role.get("gp", 0) >= 2:
+        s += f", and no {teams.get(p['team'], {}).get('nick', '')} {'defenseman' if p['pos'] == 'D' else 'forward'} plays more"
+    return s + "."
+
+
+def _nth(n: int) -> str:
+    return ["zeroth", "first", "second", "third", "fourth", "fifth"][n] if n <= 5 else _ordinal(n)
+
+
+def _usual_ppg(seasons: list[dict]) -> float | None:
+    full = _full(seasons)[-3:]
+    return sum(x["p"] for x in full) / sum(x["gp"] for x in full) if full else None
+
+
+def _label(p: dict, ppg: float | None) -> str | None:
+    if ppg is None:
+        return None
+    if p["pos"] == "D":
+        return "elite" if ppg >= 0.7 else None
+    return "elite" if ppg >= 1.25 else "ppg" if ppg >= 0.95 else None
+
+
+# Voice (user, 2026-10-10: "stiff"): lead with a hook (his start, a new team, or what he is), then fold role, skills
+# and track record into a few varied sentences rather than one fact per line.
+def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | None, today: str,
+                 opp_players: list[dict] | None = None) -> dict:
+    last = p["last"]
+    key = (p["id"],)
+    team = teams.get(p["team"], {"place": p["team"], "nick": p["team"]})
+    seasons = _nhl_seasons(career["landing"]) if career else []
+    games = _games(career["logs"]) if career else []
+    stints = _stints(games) if career else []
+    full = _full(seasons)
+    usual = _usual_ppg(seasons)
+    label = _label(p, usual)
+    s = (p.get("stats") or {}).get("season") or {}
+    gp, pts = s.get("gp", 0), s.get("p", 0)
+    cur = [g for g in games if g["type"] == REGULAR and g["gameId"] // 1_000_000 == CURRENT_SEASON]
+    gn, _ = _streak(cur, "goals")
+    pn, _ = _streak(cur, "points")
+    hot = usual is not None and usual >= 0.3 and gp >= 3 and pts / gp >= 1.4 * usual and pts >= 4
+    cold = usual is not None and usual >= 0.5 and gp >= 4 and pts / gp <= 0.4 * usual
+    new = None
+    if len(stints) >= 2 and stints[-1]["team"] == p["team"] and (date.fromisoformat(today) - date.fromisoformat(stints[-1]["first"])).days <= 200:
+        prev = stints[-2]
+        pt = teams.get(prev["team"], {"place": prev["team"], "nick": prev["team"]})
+        new = {"years": _seasons_span(prev["first"], prev["last"]), "place": pt["place"], "nick": _nick(pt)}
+    out = []
+
+    # 1. Hook.
+    run = f", with goals in {_num(gn)} straight" if gn >= 3 else f", with a point in {_num(pn)} straight" if pn >= 4 else ""
+    if new:
+        were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop in {new['place']}"
+        if hot:
+            out.append(f"{last} has wasted no time in {team['place']}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
+        else:
+            out.append(f"{last} is the new face in {team['place']}, after {were}.")
+    elif hot and label == "elite":
+        out.append(_pick([f"{last} is doing {last} things again: {pts} points in {_num(gp)} games{run}.",
+                          f"Same {last}, different season: {pts} points in {_num(gp)} games{run}."], *key))
+    elif hot:
+        out.append(f"{last} has come out flying: {pts} points in {_num(gp)} games{run}.")
+    elif cold:
+        out.append(f"It's been a quiet start for {last}: {_num(pts)} point{'s' if pts != 1 else ''} in {_num(gp)} games.")
+    elif label and len(full) < 3:
+        what = "one of the league's best" if label == "elite" else "a point-a-game player"
+        out.append(f"{last} is only in his {_nth(len(full) + 1)} season and already {what}.")
+    elif label == "elite":
+        out.append(f"{last} is one of the best {'defensemen' if p['pos'] == 'D' else 'players'} in the league, and {team['place']} knows it.")
+    else:
+        out.append(None)
+
+    # 2. Role, in one sentence (it becomes the opener if there was no hook).
+    role = _role(p, teams)
+    if out[0] is None:
+        out = [role.replace("He ", f"{last} ", 1) if role else f"{last} is a {POS_NOUN.get(p['pos'], 'player')} for {team['place']}."]
+    elif role:
+        out.append(role)
+
+    # 3. What sets him apart.
+    sk = _skills(p)
+    if sk:
+        out.append(_pick(["What sets him apart: he {s}.", "At his best, he {s}.", "His calling card? He {s}."], *key, "sk").format(s=_and(sk)))
+
+    # 4. Track record.
+    if full:
+        lp = full[-1]["p"]
+        goals30 = sum(1 for x in full if x["gp"] >= 60 and x["g"] * 82 / x["gp"] >= 30)
+        years = len(seasons) - (seasons[-1]["season"] // 10000 == CURRENT_SEASON)
+        if label and len(_full(seasons)) >= 3:
+            more = f", and he's scored 30 goals {_num(goals30)} times" if goals30 >= 2 and p["pos"] != "D" else ""
+            out.append(_pick(["None of this is new: he had {lp} points last season{m}.", "He's been doing this for years: {lp} points last season{m}."], *key, "cr").format(lp=lp, m=more))
+        elif label:
+            out.append(f"He had {lp} points last season.")
+        elif lp >= 45 or (p["pos"] == "D" and lp >= 35):
+            out.append(f"He had {lp} points last season.")
+
+    stories = []
+    if career and next_game:
+        p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
+        stories = opponent_notes(p, games, stints, next_game["opp"], teams, next_game["date"] == today)
+        stories += reunions(stints, games, opp_players or [])
+    return {"id": p["id"], "text": [x for x in out if x], "next": stories}
+
+
+def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, teams: dict, tonight: bool) -> list[str]:
+    """Storylines for his next game, against `opp`: a first game back, a run against them, a career record."""
+    out = []
+    o = teams.get(opp, {"place": opp, "nick": opp})
+    O = f"the {_nick(o)}"
+    when = "tonight" if tonight else "next time out"
+    reg = [g for g in games if g["type"] == REGULAR]
+    vs = [g for g in reg if g["opponentAbbrev"] == opp and g["teamAbbrev"] != opp]
+    former = [s for s in stints[:-1] if s["team"] == opp]
+    if former:
+        since = [g for g in vs if g["gameDate"] > former[-1]["last"]]
+        spell = sum(_seasons_span(s["first"], s["last"]) for s in former)
+        drafted = p.get("draft_team") == opp
+        if not since:
+            out.append(f"This one's personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} in {o['place']}"
+                       f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
+        else:
+            out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
+    if len(vs) >= 3:
+        gn, _ = _streak(vs, "goals")
+        pn, pts = _streak(vs, "points")
+        total = sum(g["points"] for g in vs)
+        usual = sum(g["points"] for g in reg) / len(reg)
+        if gn >= 3:
+            out.append(f"{_cap(O)} know him well: he's scored in {_num(gn)} straight games against them.")
+        elif pn >= 5:
+            out.append(_pick([f"{_cap(O)} can't seem to keep him off the scoresheet: he's had a point in {_num(pn)} straight games against them, {pts} points in all.",
+                              f"He loves seeing {O}: a point in {_num(pn)} straight meetings, {pts} points in that run."], p["id"], opp))
+        elif len(vs) >= 10 and usual >= 0.4 and total / len(vs) >= 1.3 * usual:
+            out.append(f"He's always enjoyed playing {O}: {total} points in {len(vs)} career games against them.")
+        elif len(vs) >= 10 and usual >= 0.6 and total / len(vs) <= 0.6 * usual:
+            out.append(f"{_cap(O)} have had his number over the years: just {total} points in {len(vs)} career games.")
+    return out
+
+
+def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> list[str]:
+    """A former long-time teammate (three or more seasons on the same club) on the other side for the first time."""
+    for q in opp_players:
+        now = q["stints"][-1]
+        if any(g["opponentAbbrev"] == now["team"] and g["gameDate"] >= now["first"] for g in games):
+            continue  # they have met since he moved
+        for a in stints:
+            for b in q["stints"][:-1]:
+                if a["team"] != b["team"]:
+                    continue
+                lo, hi = max(a["first"], b["first"]), min(a["last"], b["last"])
+                if hi >= lo and _seasons_span(lo, hi) >= 3:
+                    return [f"He'll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
+    return []
 
 
 def _nhl_seasons(career: dict) -> list[dict]:
@@ -405,65 +575,6 @@ def _full(seasons: list[dict]) -> list[dict]:
     return [s for s in seasons if s["season"] // 10000 < CURRENT_SEASON and s["gp"] >= 40]
 
 
-def career_sentence(p: dict, seasons: list[dict]) -> str | None:
-    """Have they been good: a scoring identity from the last three full seasons."""
-    full = _full(seasons)
-    if not full:
-        return None
-    last = full[-1]
-    recent = full[-3:]
-    ppg = sum(s["p"] for s in recent) / sum(s["gp"] for s in recent)
-    if p["pos"] == "D":
-        label = "one of the league's top-scoring defensemen" if ppg >= 0.7 else None
-    else:
-        label = "one of the league's elite scorers" if ppg >= 1.25 else "a point-a-game player" if ppg >= 0.95 else None
-    goals30 = sum(1 for s in full if s["gp"] >= 60 and s["g"] * 82 / s["gp"] >= 30)
-    nhl_years = len(seasons) - (seasons[-1]["season"] // 10000 == CURRENT_SEASON)
-    if label and len(recent) >= 3:
-        out = f"He's been {label} for years: {last['p']} points last season"
-        if goals30 >= 2 and p["pos"] != "D":
-            out += f", and {_num(goals30)} 30-goal seasons in his career"
-        return out + "."
-    if label:
-        return f"He's already {label}: {last['p']} points last season, his {_ordinal(nhl_years)} in the league."
-    if last["p"] >= 45 or (p["pos"] == "D" and last["p"] >= 35):
-        return f"He had {last['p']} points last season."
-    return None
-
-
-def season_form(p: dict, seasons: list[dict]) -> str | None:
-    s = (p.get("stats") or {}).get("season")
-    full = _full(seasons)[-3:]
-    if not s or s["gp"] < 3 or not full:
-        return None
-    usual = sum(x["p"] for x in full) / sum(x["gp"] for x in full)
-    now = s["p"] / s["gp"]
-    if usual < 0.3:
-        return None
-    if now >= usual * 1.4 and s["p"] >= 4:
-        return f"He's off to a flying start, with {s['p']} points in {_num(s['gp'])} games."
-    if now <= usual * 0.4 and s["gp"] >= 4:
-        return f"It's been a slow start: {_num(s['p'])} point{'s' if s['p'] != 1 else ''} in {_num(s['gp'])} games."
-    return None
-
-
-def move_sentence(p: dict, stints: list[dict], teams: dict, today: str) -> str | None:
-    """A player new to his club (first game with them in the last 200 days): where he came from."""
-    if len(stints) < 2 or stints[-1]["team"] != p["team"]:
-        return None
-    cur, prev = stints[-1], stints[-2]
-    if (date.fromisoformat(today) - date.fromisoformat(cur["first"])).days > 200:
-        return None
-    here = teams[p["team"]]["place"]
-    pt = teams.get(prev["team"])
-    spell = _seasons_span(prev["first"], prev["last"])
-    if _season_of(cur["first"]) != _season_of(prev["last"]):
-        when = "this season"
-    else:
-        when = f"in {date.fromisoformat(cur['first']).strftime('%B')}"
-    if spell >= 3:
-        return f"He's new in {here} {when}, after {_num(spell)} seasons with the {_nick(pt) if pt else prev['team']}."
-    return f"He's new in {here} {when}, arriving from {pt['place'] if pt else prev['team']}."
 
 
 def _streak(games: list[dict], key: str) -> tuple[int, int]:
@@ -478,89 +589,6 @@ def _streak(games: list[dict], key: str) -> tuple[int, int]:
     return n, pts
 
 
-def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, teams: dict, tonight: bool) -> list[str]:
-    """Storylines for his next game, against `opp`: a first game back, a run against them, a career record."""
-    out = []
-    o = teams.get(opp, {"place": opp, "nick": opp})
-    on = "Tonight" if tonight else "His next game"
-    reg = [g for g in games if g["type"] == REGULAR]
-    vs = [g for g in reg if g["opponentAbbrev"] == opp and g["teamAbbrev"] != opp]
-    former = [s for s in stints[:-1] if s["team"] == opp]
-    if former:
-        since_left = [g for g in vs if g["gameDate"] > former[-1]["last"]]
-        drafted = p.get("draft_team") == opp
-        if not since_left:
-            tail = ", the club that drafted him" if drafted else ""
-            out.append(f"{on} is his first game against the {_nick(o)} since leaving {o['place']}{tail}.")
-        else:
-            spell = sum(_seasons_span(s["first"], s["last"]) for s in former)
-            out.append(f"{on} is against the {_nick(o)}, his team for {_num(spell)} season{'s' if spell != 1 else ''}.")
-    if len(vs) >= 3:
-        gn, _ = _streak(vs, "goals")
-        pn, pts = _streak(vs, "points")
-        if gn >= 3:
-            out.append(f"He has scored in {_num(gn)} straight games against the {_nick(o)}.")
-        elif pn >= 5:
-            out.append(f"He has a point in {_num(pn)} straight games against the {_nick(o)}, {pts} points in all.")
-        total = sum(g["points"] for g in vs)
-        usual = sum(g["points"] for g in reg) / len(reg)
-        if gn < 3 and pn < 5 and len(vs) >= 10 and usual >= 0.4 and total / len(vs) >= 1.3 * usual:
-            out.append(f"He has always liked playing the {_nick(o)}: {total} points in {len(vs)} career games against them.")
-        elif len(vs) >= 10 and usual >= 0.6 and total / len(vs) <= 0.6 * usual:
-            out.append(f"The {_nick(o)} have given him trouble over the years: {total} points in {len(vs)} career games.")
-    return out
-
-
-def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> list[str]:
-    """Former long-time teammates (three or more seasons on the same club) on the other side for the first time."""
-    out = []
-    for q in opp_players:
-        now = q["stints"][-1]
-        if any(g["opponentAbbrev"] == now["team"] and g["gameDate"] >= now["first"] for g in games):
-            continue  # they have met since he moved
-        for a in stints:
-            for b in q["stints"][:-1]:
-                if a["team"] != b["team"]:
-                    continue
-                lo, hi = max(a["first"], b["first"]), min(a["last"], b["last"])
-                if hi >= lo and _seasons_span(lo, hi) >= 3:
-                    out.append(f"His teammate of {_num(_seasons_span(lo, hi))} seasons, {q['name']}, is on the other side for the first time.")
-    return out[:1]
-
-
-def own_streak(games: list[dict]) -> str | None:
-    """His current run this season: a goal streak of three or a point streak of four or more."""
-    cur = [g for g in games if g["type"] == REGULAR and g["gameId"] // 1_000_000 == CURRENT_SEASON]
-    if len(cur) < 3:
-        return None
-    gn, _ = _streak(cur, "goals")
-    pn, _ = _streak(cur, "points")
-    if gn >= 3:
-        return f"He has scored in {_num(gn)} straight games."
-    if pn >= 4:
-        return f"He has a point in {_num(pn)} straight games{' to start the season' if pn == len(cur) else ''}."
-    return None
-
-
-def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | None, today: str,
-                 opp_players: list[dict] | None = None) -> dict:
-    out = _role_words(p, teams)
-    skills = _skills(p)
-    if skills:
-        out.append(f"He {_and(skills)}.")
-    stories = []
-    if career:
-        seasons = _nhl_seasons(career["landing"])
-        games = _games(career["logs"])
-        stints = _stints(games)
-        p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
-        for s in (move_sentence(p, stints, teams, today), career_sentence(p, seasons), season_form(p, seasons), own_streak(games)):
-            if s:
-                out.append(s)
-        if next_game:
-            stories = opponent_notes(p, games, stints, next_game["opp"], teams, next_game["date"] == today)
-            stories += reunions(stints, games, opp_players or [])
-    return {"id": p["id"], "text": out, "next": stories}
 
 
 # ---------------------------------------------------------------- export
