@@ -48,3 +48,36 @@ def test_records_count_only_games_finished_before_the_start():
              {"start": "2026-10-03T23:00:00Z", "final": True, "home": "B", "away": "A", "hs": 4, "as": 1, "end": "REG"},
              {"start": "2026-10-05T23:00:00Z", "final": True, "home": "A", "away": "B", "hs": 5, "as": 0, "end": "REG"}]
     assert previews.records(sched, "2026-10-05T23:00:00Z") == {"A": "1-1-0", "B": "1-0-1"}
+
+
+def test_every_call_is_a_graded_prediction(tmp_path, monkeypatch):
+    monkeypatch.setattr(previews, "SITE_DATA", tmp_path)
+    now = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+    _site(tmp_path, (now + timedelta(hours=8)).isoformat().replace("+00:00", "Z"))
+    previews.run(now)
+    snap = json.loads((tmp_path / "previews" / "1.json").read_text())
+    assert snap["rules"] == previews.RULES_VERSION
+    for c in snap["claims"]:
+        assert c["check"] and c["call"]
+    edge = next(c for c in snap["claims"] if c["kind"] == "edge")
+    # The clash already covers shot volume against suppression, so the edge call picks another trait.
+    assert edge["metric"] not in ("volume", "suppression")
+    assert edge["check"]["gap"] >= 0
+
+
+def test_edge_call_graded_on_the_usual_margin():
+    from types import SimpleNamespace
+
+    from pipeline.export import recaps
+    fp = {t: {"dims": {"depth": {"blend": {"v": v, "pct": p, "rank": 1, "index": 100}}}} for t, v, p in (("AAA", 45.0, 90), ("BBB", 39.0, 10))}
+    claim = {"kind": "edge", "metric": "depth", "team": "AAA", "opp": "BBB", "check": previews.edge_check("depth", "AAA", "BBB", fp)}
+    assert claim["check"]["gap"] == 6.0
+    row = lambda b6: {"bottom6_sec": b6, "fwd_sec": 100.0, "sec5": 2400.0}
+    places = {"AAA": "Aville", "BBB": "Btown"}
+    for a, b, want in ((44, 40, "held"), (42, 40, "partly"), (40, 41, "missed")):
+        S = SimpleNamespace(team_id={(1, "AAA"): 10, (1, "BBB"): 20}, rows={(1, 10): row(a), (1, 20): row(b)})
+        assert recaps.measure_edge(S, 1, claim, places, fp)["verdict"] == want
+    # Notes saved under the first rulebook carry no check; they are graded by the same rule.
+    old = {**claim, "kind": "contrast", "check": None}
+    assert recaps.measure_edge(S, 1, old, places, fp)["verdict"] == "missed"
+    assert recaps.measure_edge(S, 1, {**old, "metric": "pace"}, places, fp)["verdict"] == "na"
