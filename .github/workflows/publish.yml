@@ -1,0 +1,68 @@
+# Publish changes: recompute every number from the data already saved and republish the site, without fetching
+# new games. For getting layout, wording and maths changes live between the nightly runs.
+# Started by hand from the Actions tab ("Publish changes" > "Run workflow"). Shares a queue with the nightly
+# update so the two never run at the same time.
+name: Publish changes
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      LC_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Restore data and the last published numbers from the data branch
+        run: |
+          git fetch --depth=1 origin data
+          mkdir -p data
+          git archive FETCH_HEAD | tar -x -C data
+          if [ -d data/site_data ]; then
+            mkdir -p site/public/data
+            cp -R data/site_data/. site/public/data/
+          fi
+          rm -rf data/site_data
+
+      - name: Recompute everything from saved data (no fetching)
+        run: uv run --project pipeline python -m pipeline.run publish
+
+      - name: Run the pipeline tests
+        run: uv run --project pipeline pytest -q pipeline/tests
+
+      - name: Build the site
+        run: |
+          npm ci --prefix site
+          npm --prefix site run build
+
+      - name: Save data to the data branch
+        run: |
+          pipeline/save_data.sh "Data cache, published changes $(date -u +%Y-%m-%dT%H:%MZ)"
+
+      - name: Publish the site
+        run: |
+          pipeline/deploy_site.sh "Publish changes $(date -u +%Y-%m-%dT%H:%MZ)"

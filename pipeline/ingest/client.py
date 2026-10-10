@@ -3,13 +3,15 @@ import time
 
 import httpx
 
-from pipeline.config import REQUESTS_PER_SECOND, USER_AGENT
+from pipeline.config import OFFLINE, REQUESTS_PER_SECOND, USER_AGENT
 
 _client = httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=30)
 _last = 0.0
 
 
 def get(url: str, *, tries: int = 5) -> httpx.Response:
+    if OFFLINE:
+        raise RuntimeError(f"offline run tried to fetch {url}")  # every caller should have used its saved copy
     global _last
     for attempt in range(tries):
         wait = _last + 1 / REQUESTS_PER_SECOND - time.monotonic()

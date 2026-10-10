@@ -7,7 +7,7 @@ from pipeline.config import CURRENT_SEASON
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update", "replays"])
+    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update", "replays", "publish"])
     p.add_argument("--season", type=int, default=CURRENT_SEASON)
     p.add_argument("--limit", type=int)
     a = p.parse_args()
@@ -28,6 +28,8 @@ def main() -> None:
         print(json.dumps(replays.build(a.season)))
     elif a.step == "update":
         print(json.dumps(update(a.season)))
+    elif a.step == "publish":
+        print(json.dumps(publish(a.season)))
 
 
 def update(season: int) -> dict:
@@ -50,6 +52,26 @@ def update(season: int) -> dict:
     units.depth_table(season)
     player_game.build(season)
     out["edge"] = edge.update(season)  # tracking numbers for players who played since the last fetch
+    out["export"] = site_json.run(season)
+    return out
+
+
+def publish(season: int) -> dict:
+    """Recompute every table and number from data already saved, without fetching anything new: for publishing
+    changes to the site or the maths between nightly runs. Run with LC_OFFLINE=1 so nothing can reach the network."""
+    import pickle
+
+    from pipeline.build import games, shot_features
+    from pipeline.export import site_json
+    from pipeline.metrics import player_game, team_game, units, xg_model
+
+    out = {"build": games.build_season(season)}
+    shot_features.build(season)
+    out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
+    team_game.build(season)
+    units.game_units(season)
+    units.depth_table(season)
+    player_game.build(season)
     out["export"] = site_json.run(season)
     return out
 

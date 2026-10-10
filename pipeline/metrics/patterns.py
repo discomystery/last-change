@@ -11,6 +11,7 @@ from collections import defaultdict
 import polars as pl
 
 from pipeline.config import NHL_WEB, RAW, REGULAR, TABLES
+from pipeline.config import OFFLINE
 from pipeline.ingest.client import get
 
 LOOKBACK = 25  # team games at the end of last season that define a "regular"
@@ -24,8 +25,10 @@ def _current_team(player_id: int, today: str) -> str | None:
     if path.exists():
         with gzip.open(path, "rt") as f:
             cached = json.load(f)
-        if cached.get("checked") == today:
+        if cached.get("checked") == today or OFFLINE:
             return cached.get("team")
+    if OFFLINE:
+        return None  # never looked up: treated as not with the club, so no absence note
     data = get(f"{NHL_WEB}/v1/player/{player_id}/landing").json()
     # A player no longer active in the league (retired, overseas) counts as having no club.
     out = {"checked": today, "team": data.get("currentTeamAbbrev") if data.get("isActive") else None, "active": data.get("isActive")}

@@ -1,4 +1,5 @@
 """Paths and constants shared by the pipeline."""
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,6 +13,9 @@ NHL_STATS = "https://api.nhle.com/stats/rest/en"
 MONEYPUCK_DL = "https://peter-tanner.com/moneypuck/downloads"
 USER_AGENT = "last-change-hockey-site/0.1 (non-commercial fan project; github.com/discomystery/last-change)"
 REQUESTS_PER_SECOND = 2.0
+# Offline: recompute and republish from data already saved, without contacting the NHL or MoneyPuck (set by the
+# "Publish changes" workflow). Anything that would fetch keeps the last saved copy instead.
+OFFLINE = os.environ.get("LC_OFFLINE") == "1"
 
 # Seasons are named by start year: 2026 means 2026-27.
 FULL_SEASONS = [2023, 2024, 2025]

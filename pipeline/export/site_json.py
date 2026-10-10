@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.build import join_xg, validate
-from pipeline.config import SITE_DATA, TABLES
+from pipeline.config import OFFLINE, SITE_DATA, TABLES
 from pipeline.metrics.lines import game_units
 
 
@@ -35,12 +35,19 @@ def run(season: int) -> dict:
                     "five_on_five_seconds": units["five_on_five_seconds"], "lines": rows(3, 4), "pairs": rows(2, 3)})
     checks = validate.run(season)
     checks.pop("worst_toi_games", None)
-    xg = join_xg.run(season)
+    if OFFLINE:  # the MoneyPuck file is not kept: carry the last cross-check result forward
+        old = json.loads((SITE_DATA / "last_game_lines.json").read_text()).get("checks", {}) if (SITE_DATA / "last_game_lines.json").exists() else {}
+        xg = {"match_rate_pct": old.get("xg_match_rate_pct"), "moneypuck_shots": old.get("xg_shots")}
+    else:
+        xg = join_xg.run(season)
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
                "checks": {**checks, "xg_match_rate_pct": xg["match_rate_pct"], "xg_shots": xg["moneypuck_shots"]}, "teams": out}
     SITE_DATA.mkdir(parents=True, exist_ok=True)
     (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
-    n_teams, n_games = export_teams_and_schedule(season)
+    if OFFLINE:  # keep the saved standings and schedule
+        n_teams, n_games = len(json.loads((SITE_DATA / "teams.json").read_text())), len(json.loads((SITE_DATA / "schedule.json").read_text())["games"])
+    else:
+        n_teams, n_games = export_teams_and_schedule(season)
     export_fingerprints(season)
     export_lines(season)
     export_goalies(season)
