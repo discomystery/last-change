@@ -48,6 +48,7 @@ const base = import.meta.env.BASE_URL;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const finals = new Set(sched.games.filter((g) => g.final).map((g) => g.id));
     const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
 
@@ -113,10 +114,12 @@ const base = import.meta.env.BASE_URL;
             if (i) side.append(el('p', 'lc', 'Has last change'));
             rink.append(side);
           });
-          const meta = el('p', 'next-meta', `Next game: ${day.format(next.t)}, ${time.format(next.t)} · ${next.venue ?? ''}`);
-          box.append(rink, meta);
-          if (PREVIEWS[next.id]) { const a = el('a', 'g-link', PREVIEWS[next.id]); a.href = `${base}preview/${next.id}/`; meta.append(' · ', a); }
-          else meta.append(' · Preview opens a week before the game');
+          const when = el('div', 'next-when');
+          const at = el('p'); at.append(el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`);
+          when.append(el('p', 'when-day', longDay.format(next.t)), at);
+          if (PREVIEWS[next.id]) { const a = el('a', 'pill', 'Preview ›'); a.href = `${base}preview/${next.id}/`; when.append(a); }
+          else when.append(el('span', 'pill none', 'Preview opens a week before the game'));
+          box.append(rink, when);
         }
         const last = [...mine].reverse().find((g) => g.final && RECAPS.has(g.id));
         const lbox = document.getElementById('latest');

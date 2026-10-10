@@ -51,9 +51,6 @@ const around = [g.away, g.home].map((me) => {
 )}
 
 <style>
-  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
-  .crumbs a { color: inherit; }
-  .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
   /* Under the rink: when the game is in the middle, and each team's previous and next game under its own end of the rink. */
   .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; padding-inline: 5.5%; }
   /* The side padding lines the buttons up with the rink's goal lines, not its rounded ends. */
@@ -66,9 +63,6 @@ const around = [g.away, g.home].map((me) => {
   .who:hover { color: var(--ink); }
   .pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .home .pills { justify-content: flex-end; }
-  .pill { font: 500 13px var(--ui); text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
-  a.pill:hover { border-color: var(--ink); }
-  .pill.none { background: none; color: var(--ink-3); }
   @media (max-width: 719px) {
     .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; }
     .who { display: block; }

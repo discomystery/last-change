@@ -116,6 +116,7 @@ const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 
 const _ = ordinal;
 ---
 <Base section="teams" title={team.name} mock={false}>
+  <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
   <header class="team-top">
     <h1>{team.name}</h1>
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
@@ -425,6 +426,7 @@ const _ = ordinal;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const RECAPS = new Set(JSON.parse(document.getElementById('team-recaps').textContent));
     const PREVIEWS = Object.fromEntries(JSON.parse(document.getElementById('team-previews').textContent).map((id) => [id, 'Preview']));
     const now = new Date();
@@ -442,10 +444,12 @@ const _ = ordinal;
         if (i) side.append(el('p', 'lc', 'Has last change'));
         rink.append(side);
       });
-      const meta = el('p', 'next-meta', `Next game: ${day.format(next.t)}, ${time.format(next.t)} · ${next.venue ?? ''}`);
-      if (PREVIEWS[next.id]) { const a = el('a', 'g-link', PREVIEWS[next.id]); a.href = `${base}preview/${next.id}/`; meta.append(' · ', a); }
-      else meta.append(' · Preview opens a week before the game');
-      box.append(rink, meta);
+      const when = el('div', 'next-when');
+      const at = el('p'); at.append(el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`);
+      when.append(el('p', 'when-day', longDay.format(next.t)), at);
+      if (PREVIEWS[next.id]) { const a = el('a', 'pill', 'Preview ›'); a.href = `${base}preview/${next.id}/`; when.append(a); }
+      else when.append(el('span', 'pill none', 'Preview opens a week before the game'));
+      box.append(rink, when);
     } else {
       box.append(el('p', 'next-meta', 'No upcoming games on the schedule.'));
     }
