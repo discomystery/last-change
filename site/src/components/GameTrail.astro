@@ -36,31 +36,42 @@ const around = [g.away, g.home].map((me) => {
   <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav>
 )}
 {g && part === 'around' && (
-  <nav aria-label="Each team's previous and next game">
-    <ul class="around">
-      {around.map(({ me, prev, next }) => (
-        <li>
-          <a class="who tlink" href={`${base}team/${me}/`}>{place[me] ?? me}</a>
-          {prev ? <a class="step" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="step none">First game</span>}
-          {next ? <a class="step nx" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="step nx none">Last game</span>}
-        </li>
-      ))}
-    </ul>
-  </nav>
+  <div class="under">
+    <div class="when"><slot /></div>
+    {around.map(({ me, prev, next }, i) => (
+      <nav class:list={['around', i ? 'home' : 'away']} aria-label={`${place[me] ?? me}: previous and next game`}>
+        <a class="who tlink" href={`${base}team/${me}/`}>{me}</a>
+        <span class="pills">
+          {prev ? <a class="pill" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="pill none">First game</span>}
+          {next ? <a class="pill" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="pill none">Last game</span>}
+        </span>
+      </nav>
+    ))}
+  </div>
 )}
 
 <style>
   .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
   .crumbs a { color: inherit; }
   .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
-  /* One small panel per team, in rink order: name on top, previous game at the left, next at the right. */
-  .around { display: grid; gap: 8px; margin: 14px 0 8px; font: 400 14px var(--ui); }
-  @media (min-width: 640px) { .around { grid-template-columns: 1fr 1fr; } }
-  .around li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 16px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; }
-  .who { grid-column: 1 / -1; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  /* Under the rink: when the game is in the middle, and each team's previous and next game under its own end of the rink. */
+  .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; }
+  .when { grid-area: when; text-align: center; font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .around { display: grid; gap: 6px; justify-items: start; }
+  .around.away { grid-area: away; }
+  .around.home { grid-area: home; justify-items: end; }
+  /* On wide screens each team's games sit under its own end of the rink, so the name is only needed on phones. */
+  .who { display: none; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .who:hover { color: var(--ink); }
-  .step { color: var(--ink); text-decoration: none; white-space: nowrap; }
-  .step.nx { text-align: right; }
-  .step.none { color: var(--ink-3); }
-  a.step:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .home .pills { justify-content: flex-end; }
+  .pill { font: 500 13px var(--ui); text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
+  a.pill:hover { border-color: var(--ink); }
+  .pill.none { background: none; color: var(--ink-3); }
+  @media (max-width: 719px) {
+    .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; }
+    .who { display: block; }
+    .pills { flex-direction: column; align-items: flex-start; }
+    .home .pills { align-items: flex-end; }
+  }
 </style>

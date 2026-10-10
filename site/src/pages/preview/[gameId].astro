@@ -57,9 +57,6 @@ const colours = matchupColours(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
-const asOf = snap.rebuilt
-  ? (snap.data_through ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${snap.data_through}T12:00:00Z`)) : 'last season')
-  : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
@@ -140,8 +137,7 @@ const _ = ordinal;
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <p class="game-meta">{dateStr} · {timeStr} · {snap.venue} · <span class="asof">Numbers through {asOf}</span></p>
-    <GameTrail id={snap.game_id} part="around" />
+    <GameTrail id={snap.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{timeStr}</strong> · {snap.venue}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.

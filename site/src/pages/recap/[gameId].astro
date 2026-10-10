@@ -103,8 +103,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />
     <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <p class="game-meta">{endWord} · {dateStr} · {r.venue}</p>
-    <GameTrail id={r.game_id} part="around" />
+    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p></GameTrail>
   </section>
 
   <SectionNav items={nav as [string, string][]} />
