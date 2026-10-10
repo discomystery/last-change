@@ -72,7 +72,7 @@ const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a
 const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
 
 // Lines and matchups
-type Unit = { label: string; players: string[]; gp?: number; seconds: number; toi_sec: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null> };
+type Unit = { label: string; players: string[]; gp?: number; new?: boolean; seconds: number; toi_sec: number | null; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null> };
 type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; seconds: number; share: number; rate: number; pct?: number };
 type LT = { games: number; settled?: { shuffled?: boolean }; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
@@ -214,7 +214,7 @@ const _ = ordinal;
       <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
       <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
     </div>
-    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far). With so few games, each group’s results are pulled toward the average for its line number.</p>
+    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far), with each older game counting half as much as the one after it, so the latest combinations come first. With so few games, each group’s results are pulled toward the average for its line number.</p>
     <div class="two">
       {order.map((a) => (
         <div class={`t-${side(a)}`}>
@@ -224,7 +224,7 @@ const _ = ordinal;
               <li class="card unit">
                 <div class="unit-top">
                   <span class="unit-label">{u.label}</span>
-                  <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
+                  <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
                 <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
                 <dl class="stats">
@@ -244,7 +244,7 @@ const _ = ordinal;
     {homeMu && homeMu.games > 0 ? (
       <>
         <p class="takeaway">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
-        {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing its forward lines, so the four named here (its most-used trios over recent games) may not be the ones it sends out tonight.</p>}
+        {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing its forward lines, so the four named here (from its latest games) may not be the ones it sends out tonight.</p>}
         <div class="card stripcard">
           <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
           {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (

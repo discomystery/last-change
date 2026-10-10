@@ -9,7 +9,7 @@ export type Misses = { n: number; wide: number; high: number; post: number; shor
 export type Unit = { label: string; role?: string | null; both?: boolean; share?: number; mates: { id: number; name: string }[] };
 export type Role = {
   team_games: number; gp?: number; toi_rank?: number; toi_of?: number; toi?: { toi: number; toi5: number; toi_pp: number; toi_pk: number };
-  line?: { label: string; mates: { id: number; name: string }[]; toi_sec: number; share: number; pct: number | null };
+  line?: { label: string; mates: { id: number; name: string }[]; toi_sec: number | null; share: number; pct: number | null };
   pp?: Unit; pk?: PkRole | null; faceoff?: string; notes: string[];
 };
 export type PkRole = { kills: number; role: 'starter' | 'second' | 'spot' | null; kills_in?: number; starts?: number; per_kill?: number; draw?: boolean };
