@@ -265,7 +265,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         if p.name != "index.json":
             s = json.loads(p.read_text())
             snaps[s["game_id"]] = s
-    index, tally, tally_rebuilt = [], defaultdict(int), defaultdict(int)
+    index, tally = [], defaultdict(int)
     from pipeline.export import outlook
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
     try:
@@ -291,10 +291,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             res = measure(S, gid, c, places, fp_pre)
             calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "cite": c["cite"], **res})
             if res.get("verdict") in ("held", "partly", "missed"):
-                # Rebuilt previews were never seen before the game, so they get their own count, not the season tally.
-                (tally_rebuilt if rebuilt else tally)[res["verdict"]] += 1
-                if not rebuilt:
-                    by_kind[c["kind"]][res["verdict"]] += 1
+                tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
+                by_kind[c["kind"]][res["verdict"]] += 1
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
@@ -306,6 +304,6 @@ def run(season: int = CURRENT_SEASON) -> dict:
                       "rebuilt": rebuilt, "calls": len(graded), "held": graded.count("held"), "partly": graded.count("partly"), "missed": graded.count("missed")})
     summary = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
                "tally": {k: tally[k] for k in ("held", "partly", "missed")},
-               "tally_rebuilt": {k: tally_rebuilt[k] for k in ("held", "partly", "missed")}, "by_kind": {k: dict(v) for k, v in by_kind.items()}, "games": index}
+               "by_kind": {k: dict(v) for k, v in by_kind.items()}, "games": index}
     (out_dir / "index.json").write_text(json.dumps(summary, separators=(",", ":")))
     return {"recaps": len(index), "graded": sum(tally.values())}
