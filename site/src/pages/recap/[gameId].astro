@@ -6,6 +6,7 @@ import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
 import PLink from '../../components/PLink.astro';
+import PlayerJobs from '../../components/PlayerJobs.astro';
 import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
@@ -197,6 +198,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
       <ul class="two surp">{r.surprises.map((s) => <li class="card"><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
     </Section>
   )}
+
+  <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
   <Section id="goalies" title="In net" placeholder={false} takeaway="How many goals each goalie stopped beyond what the shots he faced were worth.">
     <ul class="two gl">
