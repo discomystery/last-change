@@ -6,7 +6,7 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 
 type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
-type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'big' | 'rough' | null; night_why: string | null };
+type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'big' | 'rough' | null; night_why: string | null; lifted?: string | null };
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
@@ -55,6 +55,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
               : c.summary && <span class:list={['pc-sum', c.summary]}>{summaryWord[c.summary]}</span>}
           </div>
           {c.night && <p class="pc-night">{c.night_why}{nightNote(c)}</p>}
+          {!c.night && c.lifted && <p class="pc-night">{c.box.g === 1 ? 'A goal' : `${c.box.g} goals`}, from a player who scores in {c.lifted}, so it counts for more.</p>}
           <dl class="pc-box">
             <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={`All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
             <div><dt>G</dt><dd>{c.box.g}</dd></div>
@@ -88,7 +89,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       );
     })}
     <p class="note">
-      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary.
+      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary. A goal from a player who scores in fewer than one game in five lifts the summary a step (<strong>Off night</strong> to <strong>Mixed night</strong>, <strong>Mixed night</strong> to <strong>Did his job</strong>); for a regular scorer a goal is part of an ordinary night.
       Listed by ice time, most first. Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
     </p>
     <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>

@@ -147,12 +147,25 @@ def night(box: dict, xg_share: float | None) -> tuple[str | None, str | None]:
     return None, None
 
 
-def summary(verdicts: list[str]) -> str | None:
-    """did: two thirds of the way or better (held counts 1, partly a half); didnt: a third or less; else mixed."""
+RARE_GOAL = 0.2  # a goal lifts the summary only for a player who scores in fewer than one game in five
+
+
+def summary(verdicts: list[str], rare_goal: bool = False) -> str | None:
+    """did: two thirds of the way or better (held counts 1, partly a half); didnt: a third or less; else mixed.
+    A goal from a player who rarely scores lifts the summary one step (off night to mixed, mixed to did); for a
+    regular scorer a goal is part of an ordinary night, so it changes nothing."""
     if not verdicts:
         return None
     score = sum({"held": 1.0, "partly": 0.5}.get(v, 0.0) for v in verdicts) / len(verdicts)
-    return "did" if score >= 2 / 3 - 1e-9 else "didnt" if score <= 1 / 3 + 1e-9 else "mixed"
+    out = "did" if score >= 2 / 3 - 1e-9 else "didnt" if score <= 1 / 3 + 1e-9 else "mixed"
+    return {"didnt": "mixed", "mixed": "did"}.get(out, out) if rare_goal else out
+
+
+def scoring_odds(goals_before: float, games_before: int, group_avg: float) -> float:
+    """Chance he scores in a game, from his goals per game before tonight (shrunk toward his position's average
+    with 20 games' weight, so a hot start or a short history can't make him look like a sniper or a stone)."""
+    lam = shrink(games_before, goals_before / games_before if games_before else 0.0, 20, group_avg)
+    return 1 - math.exp(-lam)
 
 
 def shrink(n: float, v: float, k: float, prior: float) -> float:
@@ -245,11 +258,13 @@ def run(season: int = CURRENT_SEASON) -> dict:
     typical = typical_ratios(last)
     fac = {r["team_id"]: r for r in rink_bias.factors().iter_rows(named=True)}
     hr = rink_bias.home_road()
-    special_cols = ["sec_pp", "pp_xgf", "sec_pk", "sh_xga", "fow", "fol"]
+    special_cols = ["sec_pp", "pp_xgf", "sec_pk", "sh_xga", "fow", "fol", "g"]
     lt = last.select(special_cols).sum().row(0, named=True)
     # League power-play and penalty-kill rates per 60: every skater on the ice shares the same chances and the same
     # seconds, so the ratio of the sums is the team rate.
-    league = {"pp": 3600 * lt["pp_xgf"] / lt["sec_pp"], "pk": 3600 * lt["sh_xga"] / lt["sec_pk"]}
+    league = {"pp": 3600 * lt["pp_xgf"] / lt["sec_pp"], "pk": 3600 * lt["sh_xga"] / lt["sec_pk"],
+              # goals per game by position group, for players with too few games to have a scoring pace of their own
+              **{f"g_{k}": v for k, v in last.group_by(pl.col("pos").replace_strict({"D": "D"}, default="F")).agg(pl.col("g").mean()).iter_rows()}}
     prev_all = {pid: (g.height, g.select(P.COLS).to_numpy().sum(axis=0), g.select(special_cols).sum().row(0, named=True))
                 for (pid,), g in last.group_by("player_id")}
     grp = {**ref.grp, **P._groups(now)}
@@ -418,9 +433,14 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
     jobs = jobs[:MAX_JOBS]
     for j in jobs:
         j["unit"] = UNIT[j["key"]]
+    verdicts = [j["verdict"] for j in jobs if j["verdict"] != "na"]
+    odds = scoring_odds(before_sp["g"], n_before, league["g_D" if g == "D" else "g_F"])
+    rare = int(e["g"]) >= 1 and odds < RARE_GOAL
+    lifted = summary(verdicts) != summary(verdicts, rare)
     return {"team_id": e["team_id"], "pos": e["pos"], "toi_sec": round(sec), "toi": clock(sec), "toi5": clock(sec5), "toi_pp": clock(T("sec_pp")), "toi_pk": clock(T("sec_pk")),
             "box": {"g": int(e["g"]), "a": int(e["a1"] + e["a2"]), "sog": int(e["sog"]), "hits": int(e["hits"]), "blocks": int(e["blocks"])},
-            "jobs": jobs, "summary": summary([j["verdict"] for j in jobs if j["verdict"] != "na"]), "standouts": outs}
+            "jobs": jobs, "summary": summary(verdicts, rare),
+            "lifted": f"about 1 game in {round(1 / odds)}" if lifted else None, "standouts": outs}
 
 
 def special_job(key: str, e: dict, sec: float, xg: float, sec_before: float, xg_before: float, league: float, per_game: float, ratio: float) -> dict:

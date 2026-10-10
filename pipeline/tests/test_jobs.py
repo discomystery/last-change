@@ -6,7 +6,7 @@ import pytest
 
 from pipeline.config import SITE_DATA
 from pipeline.config import RAW, TABLES
-from pipeline.export.jobs import binom_tail, grade, night, plus_minus, poisson_median, poisson_tail, summary
+from pipeline.export.jobs import binom_tail, grade, night, plus_minus, poisson_median, poisson_tail, summary, scoring_odds, RARE_GOAL
 
 
 def test_typical_night_is_the_median_count():
@@ -39,6 +39,18 @@ def test_summary():
     assert summary(["held", "missed"]) == "mixed"
     assert summary(["held", "missed", "missed"]) == "didnt"
     assert summary(["partly", "partly"]) == "mixed"
+    # a goal from a rare scorer lifts one step, and no further
+    assert summary(["missed", "missed"], rare_goal=True) == "mixed"
+    assert summary(["held", "missed"], rare_goal=True) == "did"
+    assert summary(["held", "held"], rare_goal=True) == "did"
+
+
+def test_scoring_odds():
+    # a defenseman with 3 goals in 80 games rarely scores; a 40-goal pace forward does
+    assert scoring_odds(3, 80, 0.08) < RARE_GOAL
+    assert scoring_odds(40, 80, 0.25) > RARE_GOAL
+    # two goals in two games is mostly the position average, not a sniper
+    assert scoring_odds(2, 2, 0.08) < RARE_GOAL
 
 
 @pytest.mark.skipif(not (SITE_DATA / "jobs").exists(), reason="needs exported report cards")
