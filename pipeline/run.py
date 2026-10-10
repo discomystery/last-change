@@ -38,7 +38,7 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import coaches, edge, moneypuck, nhl, rosters
+    from pipeline.ingest import careers, coaches, edge, moneypuck, nhl, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
@@ -57,6 +57,8 @@ def update(season: int) -> dict:
     units.depth_table(season)
     player_game.build(season)
     out["edge"] = edge.update(season)  # tracking numbers for players who played since the last fetch
+    if season == CURRENT_SEASON:
+        out["careers"] = careers.update(season)  # NHL career history for the page intros, a capped batch per run
     out["export"] = site_json.run(season)
     return out
 

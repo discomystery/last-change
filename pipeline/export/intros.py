@@ -65,6 +65,18 @@ def _the(t: dict) -> str:
     return f"the {_nick(t)}"
 
 
+def _poss(t: dict) -> str:
+    """"Carolina's", but "the Rangers'" for the two New York clubs (a place like "NY Rangers" reads badly)."""
+    if t["place"].startswith("NY "):
+        return f"the {_nick(t)}\u2019"
+    return f"{t['place']}'s"
+
+
+def _in(t: dict) -> str:
+    """"in Columbus", but "on the Rangers" for the two New York clubs."""
+    return f"on the {_nick(t)}" if t["place"].startswith("NY ") else f"in {t['place']}"
+
+
 def _rank_words(rank: int, n: int = 32) -> str:
     """A league rank in words, never a bare "14th of 32"."""
     if rank == 1:
@@ -355,27 +367,31 @@ def _skills(p: dict) -> list[str]:
 def _role(p: dict, teams: dict) -> str | None:
     """"He centers Carolina's second line, plays on the top power-play unit and kills penalties"."""
     role = p.get("role") or {}
-    place = teams.get(p["team"], {"place": p["team"]})["place"]
+    place = _poss(teams.get(p["team"], {"place": p["team"]}))
     line = (role.get("line") or {}).get("label")
     bits = []
     if line in LINE_WORD:
         if p["pos"] == "D":
-            bits.append(f"anchors {place}'s {LINE_WORD[line]} pair" if line == "P1" else f"plays on {place}'s {LINE_WORD[line]} pair")
+            bits.append(f"anchors {place} {LINE_WORD[line]} pair" if line == "P1" else f"plays on {place} {LINE_WORD[line]} pair")
         elif p["pos"] == "C":
-            bits.append(f"centers {place}'s {LINE_WORD[line]} line")
+            bits.append(f"centers {place} {LINE_WORD[line]} line")
         else:
-            bits.append(f"plays on {place}'s {LINE_WORD[line]} line")
+            bits.append(f"plays on {place} {LINE_WORD[line]} line")
     pp = role.get("pp") or {}
     if pp.get("label") == "PP1":
-        bits.append("runs the top power play" if pp.get("role") == "Quarterback" else "plays on the top power-play unit")
+        bits.append("runs the top power play" if pp.get("role") == "Quarterback" else "is on the top power-play unit")
     elif pp.get("label") == "PP2":
-        bits.append("plays on the second power-play unit")
+        bits.append("is on the second power-play unit")
     pk = (role.get("pk") or {}).get("role")
     if pk in ("starter", "second"):
         bits.append("kills penalties")
     if not bits:
         return None
-    s = "He " + _and(bits)
+    if not line:  # no settled line yet: say what he is first
+        bits.insert(0, f"is a {POS_NOUN.get(p['pos'], 'player')} for {teams.get(p['team'], {'place': p['team']})['place']} who")
+        s = "He " + bits[0] + " " + _and(bits[1:])
+    else:
+        s = "He " + _and(bits)
     if role.get("toi_rank") == 1 and role.get("gp", 0) >= 2:
         s += f", and no {teams.get(p['team'], {}).get('nick', '')} {'defenseman' if p['pos'] == 'D' else 'forward'} plays more"
     return s + "."
@@ -430,9 +446,9 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     if new:
         were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop in {new['place']}"
         if hot:
-            out.append(f"{last} has wasted no time in {team['place']}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
+            out.append(f"{last} has wasted no time {_in(team)}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
         else:
-            out.append(f"{last} is the new face in {team['place']}, after {were}.")
+            out.append(f"{last} is the new face {_in(team)}, after {were}.")
     elif hot and label == "elite":
         out.append(_pick([f"{last} is doing {last} things again: {pts} points in {_num(gp)} games{run}.",
                           f"Same {last}, different season: {pts} points in {_num(gp)} games{run}."], *key))
@@ -478,7 +494,8 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
         p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
         stories = opponent_notes(p, games, stints, next_game["opp"], teams, next_game["date"] == today)
         stories += reunions(stints, games, opp_players or [])
-    return {"id": p["id"], "text": [x for x in out if x], "next": stories}
+    text = [x.replace("He is ", "He\u2019s ").replace("he is ", "he\u2019s ") for x in out if x]
+    return {"id": p["id"], "text": text, "next": stories}
 
 
 def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, teams: dict, tonight: bool) -> list[str]:
@@ -497,7 +514,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
         if not since:
             out.append(f"This one's personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} in {o['place']}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
-        else:
+        elif spell >= 2:
             out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
     if len(vs) >= 3:
         gn, _ = _streak(vs, "goals")
@@ -519,6 +536,8 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
 def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> list[str]:
     """A former long-time teammate (three or more seasons on the same club) on the other side for the first time."""
     for q in opp_players:
+        if not q["stints"]:
+            continue
         now = q["stints"][-1]
         if any(g["opponentAbbrev"] == now["team"] and g["gameDate"] >= now["first"] for g in games):
             continue  # they have met since he moved
@@ -527,7 +546,7 @@ def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> 
                 if a["team"] != b["team"]:
                     continue
                 lo, hi = max(a["first"], b["first"]), min(a["last"], b["last"])
-                if hi >= lo and _seasons_span(lo, hi) >= 3:
+                if hi >= lo and _seasons_span(lo, hi) >= 4:
                     return [f"He'll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
     return []
 
@@ -546,7 +565,7 @@ def _nhl_seasons(career: dict) -> list[dict]:
 
 def _games(logs: dict) -> list[dict]:
     """Every NHL game from the career logs, oldest first."""
-    out = [{**g, "type": int(key.split("-")[1])} for key, gl in logs.items() for g in gl]
+    out = [{**g, "type": int(key.split("-")[1]) if "-" in key else REGULAR} for key, gl in logs.items() for g in gl]
     return sorted(out, key=lambda g: (g["gameDate"], g["gameId"]))
 
 
