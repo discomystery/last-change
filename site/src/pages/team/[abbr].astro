@@ -120,16 +120,50 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 };
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
+// MOCK-UP: four looks for the intro, switched with ?intro=a|b|c|d while the user picks one.
+const ti = teamIntro(abbr);
+const tiText = ti?.text ?? [];
+const tiDims = (fpData as any).teams?.[abbr]?.dims ?? {};
+const tiTags = (ti?.style ?? []).flatMap((k: string) => {
+  const m = fpInfo[k]; const pct = tiDims[k]?.blend?.pct;
+  return m && pct != null ? [{ word: pct >= 50 ? m.hi : m.lo, trait: m.label }] : [];
+});
+const tiSpecial = (ti?.style ?? []).some((k: string) => ['pp', 'pk', 'powerKill'].includes(k));
+const tiRows = tiText.map((t, i) => [['This season', 'The chances', 'How they play', tiSpecial ? 'Special teams' : 'Also'][i], t]);
 ---
 <Base section="teams" title={team.name} mock={false}>
   <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
-  <header class="team-top">
+  <script is:inline>(function(){var v=new URLSearchParams(location.search).get('intro');if(/^[abcd]$/.test(v||''))document.documentElement.dataset.iv=v;})()</script>
+  <header class="team-top plain">
     <h1>{team.name}</h1>
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
     <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
   </header>
+  <div class="iv iv-b" style={`--team:${teamColour(abbr)}`}>
+    <div class="card tcard">
+      <span class="tabbr" aria-hidden="true">{abbr}</span>
+      <header class="team-top">
+        <p class="h1">{team.name}</p>
+        <p class="rec">{team.w}-{team.l}-{team.otl}</p>
+        <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
+      </header>
+    </div>
+    <Intro text={tiText} colour={teamColour(abbr)} class="tstory" />
+  </div>
   <SectionNav items={nav as [string, string][]} />
-  <Intro text={teamIntro(abbr)?.text ?? []} colour={teamColour(abbr)} />
+  <div class="iv iv-a"><Intro text={tiText} colour={teamColour(abbr)} /></div>
+  {tiText.length > 0 && (
+    <div class="iv iv-c tverdict" style={`--team:${teamColour(abbr)}`}>
+      <p class="intro-lead">{tiText[0]}</p>
+      {tiTags.length > 0 && <ul class="ttags">{tiTags.map((t) => <li title={t.trait}><span>{t.trait}</span>{t.word}</li>)}</ul>}
+      <p class="intro-text">{tiText.slice(1).join(' ')}</p>
+    </div>
+  )}
+  {tiText.length > 0 && (
+    <dl class="iv iv-d trows" style={`--team:${teamColour(abbr)}`}>
+      {tiRows.map(([k, t], i) => <div class:list={[i === 0 && 'first']}><dt>{k}</dt><dd>{t}</dd></div>)}
+    </dl>
+  )}
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div id="next-card"></div>
@@ -544,3 +578,38 @@ const _ = ordinal;
     sel.addEventListener('change', () => document.querySelectorAll('[data-g]').forEach((b) => { b.hidden = b.dataset.g !== sel.value; }));
   })();
 </script>
+
+<style>
+  /* MOCK-UP: intro looks */
+  .iv { display: none; }
+  :global(:root:not([data-iv])) .iv-a, :global(:root[data-iv='a']) .iv-a, :global(:root[data-iv='b']) .iv-b, :global(:root[data-iv='c']) .iv-c { display: block; }
+  :global(:root[data-iv='d']) .iv-d { display: grid; }
+  :global(:root[data-iv='b']) .team-top.plain { display: none; }
+  .tcard { position: relative; overflow: hidden; isolation: isolate; margin-top: 4px; padding: 26px 28px 22px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .tcard .team-top { margin: 0; }
+  .tcard .h1 { margin: 0; font: 700 40px/1.1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .tcard .tabbr { position: absolute; z-index: -1; right: 230px; bottom: -48px; font: 700 170px/1 var(--ui); letter-spacing: -0.03em; color: color-mix(in oklab, var(--team) 14%, var(--sheet)); pointer-events: none; user-select: none; }
+  .iv-b :global(.tstory) { max-width: none; margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 4px 28px 24px; }
+  .tverdict { margin: 22px 0 8px; max-width: 820px; }
+  .tverdict p { margin: 0; }
+  .tverdict .intro-lead { font: 600 25px/1.35 var(--display); font-variation-settings: 'SOFT' 100; }
+  .tverdict .intro-text { font: 400 18px/1.65 var(--body); color: var(--ink-2); }
+  .ttags { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; padding: 0; }
+  .ttags li { display: flex; flex-direction: column; padding: 8px 14px 9px; background: var(--sheet); border-radius: 12px; border-top: 3px solid var(--team); font: 700 17px/1.2 var(--ui); }
+  .ttags li span { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px; }
+  .trows { margin: 22px 0 8px; max-width: 860px; grid-template-columns: 150px minmax(0, 1fr); border-left: 4px solid var(--team); padding-left: 20px; row-gap: 12px; }
+  .trows div { display: contents; }
+  .trows dt { font: 700 12px/1.9 var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding-top: 3px; }
+  .trows dd { margin: 0; font: 400 18px/1.6 var(--body); }
+  .trows .first dd { font: 600 21px/1.4 var(--display); font-variation-settings: 'SOFT' 100; }
+  .trows .first dt { padding-top: 4px; }
+  @media (max-width: 719px) {
+    .tcard { padding: 20px 16px 16px; }
+    .tcard .h1 { font-size: 30px; }
+    .tcard .tabbr { font-size: 104px; bottom: -22px; right: 8px; }
+    .iv-b :global(.tstory) { padding: 2px 16px 18px; }
+    .trows { grid-template-columns: 1fr; row-gap: 2px; padding-left: 14px; }
+    .trows dd { margin-bottom: 12px; }
+    .ttags li { font-size: 15px; padding: 7px 11px 8px; }
+  }
+</style>
