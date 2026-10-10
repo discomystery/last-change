@@ -15,6 +15,9 @@ import Histogram from '../../components/Histogram.astro';
 import linesData from '../../../public/data/lines.json';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
+import SectionNav from '../../components/SectionNav.astro';
+import PkRoles from '../../components/PkRoles.astro';
+import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss } from '../../lib/format';
@@ -40,13 +43,6 @@ const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }
 type Unit = { label: string; players: string[]; minutes: number; seconds: number; toi_sec: number; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; seconds: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
-const roleTip: Record<string, string> = {
-  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
-  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
-  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
-  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
-  Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
-};
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; seconds: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string; player: string } | null; shots: { x: number; y: number; xg: number }[] } | undefined;
 type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
@@ -122,7 +118,7 @@ const _ = ordinal;
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
     <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
   </header>
-  <nav class="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+  <SectionNav items={nav as [string, string][]} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div id="next-card"></div>
@@ -261,7 +257,7 @@ const _ = ordinal;
   <Section id="special" title="Special teams" placeholder={false} takeaway={`Who ${team.place} sends out with a man up and a man down.`}>
     {sp && (
       <>
-        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Penalty-kill units are the forwards and defensemen who kill most. Each unit’s expected goals per 60 are pulled toward league average while samples are small. Point at a power-play name to see his shots on the map.</p>
+        <p class="note">Each power-play unit is built around its quarterback, the defenseman running it, plus the four players most often out with him over the last {linesData.window} games ({ln.games} so far). Power-play units’ expected goals per 60 are pulled toward league average while samples are small. Penalty kills are too loose for fixed units (the most common foursome covers only about a tenth of a typical team’s shorthanded time), so penalty killers are grouped by when they go on: the ones who start kills, the second wave who come on after the first change, and spot duty. Point at a power-play name to see his shots on the map.</p>
         {sp.faceoff && (
           <div class="card worth">
             <p class="mini-h">Worth knowing</p>
@@ -284,12 +280,9 @@ const _ = ordinal;
           </div>
           <div class="card">
             <h4 class="st-h">Penalty kill</h4>
-            {sp.pk.map((u, k) => (
-              <div class="stunit">
-                <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice. A unit is the two forwards and two defensemen who kill penalties most (PK1) and the next two of each (PK2).">{u.share}% of the time</span></p><p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Allows ${u.rate.toFixed(1)} expected goals per 60, stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
-                <ul class="roles-list">{u.players.map((pl) => <li><PLink id={pl.id} name={pl.name} /></li>)}</ul>
-              </div>
-            ))}
+            <p class="n m-blend">Kills allow {mine.dims.pk.blend.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.blend.rank)} of 32 (this season and last).</p>
+            <p class="n m-season">Kills allow {mine.dims.pk.season.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.season.rank)} of 32 this season.</p>
+            <PkRoles roles={(sp as any).pk_roles} />
           </div>
         </div>
         <dl class="tagkey">

@@ -13,7 +13,8 @@ import recapIndex from '../../../public/data/recaps/index.json';
 type Call = { id: string; kind: string; head: string; body: string; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[] };
+type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { head: string; body: string }[]; replays?: Replays | null };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Recap }>('../../../public/data/recaps/2*.json', { eager: true });
@@ -46,6 +47,26 @@ const rows: [string, string, (n: Nums) => string][] = [
   ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked.', (n) => String(n.cf5)],
   ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
 ];
+// Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
+const dw = r.replays ?? null;
+const replays = (() => {
+  if (!dw) return null;
+  const raw = [dw.regulation[away], dw.regulation.tie, dw.regulation[home]].map((p) => p * 100);
+  const n = raw.map(Math.floor);
+  const order = raw.map((v, i) => [v - Math.floor(v), i] as const).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < 100 - n.reduce((a, b) => a + b, 0); k++) n[order[k][1]] += 1;
+  return { away: n[0], tie: n[1], home: n[2] };
+})();
+const winner = r.score[home] > r.score[away] ? home : away;
+const loser = winner === home ? away : home;
+const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
+const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
+  : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
+const replayBody = !dw ? '' : pct(loser) >= 60
+  ? `Replaying this game’s chances, ${place(loser)} comes out ahead ${pct(loser)} times in 100. The goals went the other way.`
+  : pct(winner) >= 60 ? `Replaying this game’s chances, ${place(winner)} comes out ahead ${pct(winner)} times in 100.`
+  : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
+const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
 <Base section="games" title={`${away} at ${home}, final`} mock={false}>
   <style is:inline set:html={colourCss}></style>
@@ -94,6 +115,28 @@ const rows: [string, string, (n: Nums) => string][] = [
     <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better; <strong>partly</strong> means it beat the league average (or, for a matchup, the share with no line matching) but fell short of its usual level. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls.</p>}
   </Section>
+
+  {dw && replays && (
+    <Section id="replays" title="Run it back" placeholder={false} takeaway="We replayed this game’s chances 100 times. Here is how often each team came out ahead.">
+      <div class="card meter">
+        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are level after regulation.`}>
+          {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
+        </div>
+        <div class="meter-text">
+          <h3 class="h">{replayHead}</h3>
+          <p>{replayBody}</p>
+          <dl class="compare">
+            {order.map((a) => (
+              <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: wins {replays[side(a)]} of 100, plus half of the {replays.tie} level ones</span></div>
+            ))}
+          </dl>
+          <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
+        </div>
+      </div>
+      <p class="note">How it works: every regulation shot that reached the net or missed it is a chance that goes in as often as this site’s <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says. The game is replayed with those chances, and a replay that ends level after regulation counts as half a win for each team, because overtime and shootouts are close to coin flips. A rebound scramble counts once, since only one shot in it can go in. Empty-net shots are left out.</p>
+      <p class="note">It knows nothing about goalies or finishing skill, or about passes before a shot. It also leans toward the team that was chasing, because a team with a lead tends to sit back and give up chances. Over the last three seasons, teams it gave 80% or more won about two games in three.</p>
+    </Section>
+  )}
 
   <Section id="numbers" title="The numbers" placeholder={false} takeaway="How the game went, beyond the score.">
     <div class="card">
@@ -153,6 +196,15 @@ const rows: [string, string, (n: Nums) => string][] = [
   .numbers td { font-weight: 600; font-variant-numeric: tabular-nums; width: 22%; }
   .numbers tr:first-child td { font: 700 22px/1 var(--display); }
   .surp, .gl { margin-top: 18px; }
+  .meter { margin-top: 18px; display: grid; gap: 22px; align-items: center; }
+  @media (min-width: 640px) { .meter { grid-template-columns: auto 1fr; gap: 32px; } }
+  .replays { display: grid; grid-template-columns: repeat(10, 10px); gap: 5px; justify-content: start; }
+  .replays i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .replays i.tie { background: var(--ink-3); opacity: 0.4; }
+  .meter-text > p:not(.detail) { margin-bottom: 4px; }
+  .meter .compare { margin-bottom: 12px; }
+  .meter .compare dd { display: inline-flex; align-items: center; gap: 8px; }
+  .meter .compare dd i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
   .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .job-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }

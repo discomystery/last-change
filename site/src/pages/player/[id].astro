@@ -4,6 +4,7 @@
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import AreaMap from '../../components/AreaMap.astro';
+import SectionNav from '../../components/SectionNav.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
@@ -11,7 +12,7 @@ import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock } from '../../lib/format';
 import { teamColour } from '../../lib/teams';
-import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, toiLine, type Skater, type Mode, type Area } from '../../lib/players';
+import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, toiLine, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import '../../styles/blocks.css';
 
@@ -43,6 +44,17 @@ const lineWord: Record<string, string> = { L: 'trio', P: 'pair' };
 const role = isG ? null : s.role;
 const nameLink = (m: { id: number; name: string }) => ({ ...m, href: href(m.id) });
 const unitWord = (label: string) => (label.endsWith('1') ? 'first' : 'second');
+const games = (n: number) => `${n} ${n === 1 ? 'game' : 'games'}`;
+const pkLine: string[] = (() => {
+  const k = role?.pk;
+  const span = `over the last ${games(Math.min(role?.team_games ?? 0, 10))}`;
+  if (!k || !k.kills) return ['The team has not killed a penalty in this stretch.'];
+  if (!k.role) return [`Rarely kills penalties: not a regular in ${team?.place ?? p.team}’s ${k.kills} kills ${span}.`];
+  const usage = `On the ice for ${k.kills_in} of ${team?.place ?? p.team}’s ${k.kills} kills ${span}, ${clock(k.per_kill!)} a kill`;
+  if (k.role === 'starter') return [`${usage}; out at the start of ${k.starts} of them${k.draw ? ', usually to take the defensive-zone faceoff' : ''}.`];
+  if (k.role === 'second') return [`${usage}, coming on after the first change${k.starts ? ` (out at the start of only ${k.starts})` : ' and never out at the start'}.`];
+  return [`${usage}.`];
+})();
 let strengths: ReturnType<typeof standouts> | null = null;
 const strengthsBy = isG ? null : Object.fromEntries(modes.map(([m]) => [m, standouts(s, m)])) as Record<Mode, ReturnType<typeof standouts>>;
 
@@ -68,7 +80,9 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : [['role', 'Role'], ['standout', 'Stands out'], ['ratings', 'All ratings'], ['shots', 'Shots'], ['edge', 'Skating and shot']];
+const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+// Season line: full words on wide screens, hockey's usual abbreviations on phones.
+const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
 ---
 <Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
@@ -78,15 +92,15 @@ const statRow = (x: any) => (isG ? null : x);
       <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
     </header>
     <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
+    <SectionNav items={nav as [string, string][]} />
     {!isG && (
       <table class="pstats">
-        <thead><tr><th></th><th>Games</th><th>Goals</th><th>Assists</th><th>Points</th><th>Shots</th><th><span class="term" tabindex="0" data-tip="Average ice time per game, all situations.">Ice time</span></th></tr></thead>
+        <thead><tr><th></th>{cols.map(([full, short, tip]) => <th>{tip ? <span class="term" tabindex="0" data-tip={tip}><span class="full">{full}</span><span class="short">{short}</span></span> : <><span class="full">{full}</span><abbr class="short" title={full}>{short}</abbr></>}</th>)}</tr></thead>
         <tbody>
           {([['season', 'This season'], ['last', 'Last season']] as const).map(([k, label]) => { const x = s.stats[k]; return x && <tr><th>{label}</th><td>{x.gp}</td><td>{x.g}</td><td>{x.a}</td><td>{x.p}</td><td>{x.sog}</td><td>{clock(x.toi)}</td></tr>; })}
         </tbody>
       </table>
     )}
-    <nav class="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
 
     {!isG && role && (
       <>
@@ -113,11 +127,12 @@ const statRow = (x: any) => (isG ? null : x);
                     <p>{unitWord(role.pp.label)[0].toUpperCase() + unitWord(role.pp.label).slice(1)} unit ({role.pp.label}){role.pp.role && <>, as its <span class="chip tag" tabindex="0" data-tip={roleTip[role.pp.role]}>{role.pp.role}</span></>}{role.pp.both && ', and he often stays out when the second unit comes on'}.</p>
                   ) : <p>Not on either of the team’s power-play units.</p>}
                   {role.faceoff && <p class="n">{role.faceoff}</p>}
+                  {role.pp && s.moved_from && !role.pp.role && <p class="n">Power-play role tags count only games with his current team, and he has too few power-play shots with {team?.place ?? p.team} yet to earn one.</p>}
                 </dd>
               </div>
               <div>
                 <dt>Penalty kill</dt>
-                <dd>{role.pk ? <p>{unitWord(role.pk.label)[0].toUpperCase() + unitWord(role.pk.label).slice(1)} unit ({role.pk.label}).</p> : <p>Not one of the team’s regular penalty killers.</p>}</dd>
+                <dd>{pkLine.map((t, i) => <p class={i ? 'n' : undefined}>{i === 0 && role.pk?.role ? <><span class="chip tag" tabindex="0" data-tip={pkRoleTip[role.pk.role]}>{pkRoleWord[role.pk.role]}</span> </> : null}{t}</p>)}</dd>
               </div>
               {role.toi && (
                 <div>
@@ -154,7 +169,7 @@ const statRow = (x: any) => (isG ? null : x);
           <p class="note">Lines and units come from who has actually played together lately, not from the team’s announced lineup.</p>
         </Section>
 
-        <Section id="standout" title="Where he stands out" placeholder={false} takeaway={`What he does better or worse than most ${groupWord[s.group]}${s.group === 'F' ? ' (or, where the two jobs differ, most centers or wingers)' : ''}.`}>
+        <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
@@ -184,6 +199,7 @@ const statRow = (x: any) => (isG ? null : x);
         <Section id="ratings" title="All ratings" placeholder={false} takeaway={`Every rating, against other ${groupWord[s.group]}.`}>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
           <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
+          {s.moved_from && <p class="note m-blend">He played for {(teams.find((t) => t.abbr === s.moved_from)?.name) ?? s.moved_from} last season. Habits that travel with a player (shooting, hitting, penalties) still use that season in full; setting up goals, finishing, faceoffs and power-play chances depend more on linemates and role, so they lean on it less. We measured how much each one carries over for players who change teams.</p>}
           {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
           <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>
           {GROUPS.map((grp) => (
@@ -360,18 +376,28 @@ const statRow = (x: any) => (isG ? null : x);
 <style>
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
   .rec a { color: inherit; }
-  .pstats { margin-top: 16px; border-collapse: collapse; font-size: 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; display: block; max-width: 100%; width: max-content; overflow-x: auto; }
-  .pstats th, .pstats td { padding: 8px 14px; text-align: right; white-space: nowrap; }
+  .pstats { margin-top: 18px; border-collapse: collapse; font: 400 14px var(--ui); background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+  .pstats th, .pstats td { padding: 9px 14px; text-align: right; white-space: nowrap; }
   .pstats thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
   .pstats tbody th { text-align: left; font-weight: 600; }
   .pstats tbody tr { border-top: 1px solid var(--rule); }
+  .pstats .short { display: none; text-decoration: none; }
+  @media (max-width: 560px) {
+    .pstats { width: 100%; font-size: 13px; }
+    .pstats th, .pstats td { padding: 8px 5px; }
+    .pstats th:first-child { padding-left: 12px; }
+    .pstats td:last-child, .pstats thead th:last-child { padding-right: 12px; }
+    .pstats tbody th { white-space: normal; line-height: 1.2; }
+    .pstats .full { display: none; }
+    .pstats .short { display: inline; }
+  }
   .prole { margin-top: 22px; }
   .rl > div { display: grid; grid-template-columns: 130px 1fr; gap: 6px 16px; padding: 14px 0; border-top: 1px solid var(--rule); }
   .rl > div:first-child { border-top: 0; padding-top: 0; }
   .rl > div:last-child { padding-bottom: 0; }
   .rl dt { font: 600 11px/2.2 var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-  .rl dd { font: 400 17px/1.5 var(--body); display: grid; gap: 4px; }
-  .rl dd .n { font-size: 14px; }
+  .rl dd { font: 400 16px/1.5 var(--ui); display: grid; gap: 4px; }
+  .rl dd .n { font-size: 14px; line-height: 1.45; }
   @media (max-width: 560px) { .rl > div { grid-template-columns: 1fr; } }
   .sw .card { align-content: start; }
   .swl { display: grid; gap: 14px; }

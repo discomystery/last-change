@@ -339,6 +339,10 @@ def special_units(season: int) -> dict[int, dict]:
                 if taker:
                     draws[tid][taker] += 1
 
+    # Role tags read each player's own power-play shots and assists over this season and last, but only with the team
+    # he plays for now: a player who has changed teams is judged on his new role, not his old one.
+    current = pl.read_parquet(d / "players.parquet").join(games.select("game_id", "date"), on="game_id").sort("date", "game_id").unique("player_id", keep="last")
+    now_team = dict(zip(current["player_id"].to_list(), current["team_id"].to_list()))
     ind = defaultdict(lambda: defaultdict(float))
     shots = defaultdict(list)
     chances = defaultdict(list)  # (team, kind) -> [(xg, skaters)] in the window
@@ -357,14 +361,15 @@ def special_units(season: int) -> dict[int, dict]:
                 continue
             tid, opp_tid = id2[gid][0 if home else 1], id2[gid][1 if home else 0]
             xg = e["xg"] or 0.0
-            p = ind[e["p1"]]
+            mine = now_team.get(e["p1"], tid) == tid
+            p = ind[e["p1"]] if mine else defaultdict(float)  # with another team: not counted toward his tags
             p["att"] += 1
             p["ixg"] += xg
             if e["x_norm"] is not None:
                 p["close"] += ((89 - e["x_norm"]) ** 2 + e["y_norm"] ** 2) ** 0.5 <= 15
                 p["located"] += 1
             p["is_d"] = ppos.get((gid, e["p1"])) == "D"
-            if e["type"] == "goal" and e["p2"]:
+            if e["type"] == "goal" and e["p2"] and now_team.get(e["p2"], tid) == tid:
                 ind[e["p2"]]["a1"] += 1
             if e["type"] in UNBLOCKED and e["x_norm"] is not None:
                 shots[tid].append({"x": int(e["x_norm"]), "y": int(e["y_norm"]), "xg": round(xg, 3), "game_id": gid, "p": e["p1"]})
@@ -519,3 +524,92 @@ def matchups(season: int, usual_units: dict[int, dict]) -> dict[int, dict]:
             entry[venue] = block
         out[tid] = entry
     return out
+
+
+KILL_MIN_SEC = 30  # kills shorter than this (a quick goal, an offsetting call) say little about who starts them
+
+
+def pk_roles(season: int) -> dict[int, dict]:
+    """Penalty-kill roles over each team's recent window, instead of fixed units (PK groupings are loose: the most common
+    exact foursome covers only about 11% of a team's shorthanded time). A kill is one unbroken shorthanded stretch.
+
+    Starter: in at least 40% of the team's kills and on the ice when most of them begin (usually the defensive-zone draw).
+    Second wave: in at least 40% of kills but usually comes on after the first change.
+    Spot duty: in 10-40% of kills, at 20+ seconds a kill. "Takes the draw": wins or loses the opening faceoff in at least half the kills he starts.
+    """
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
+    stints = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(list(ids))).sort("game_id", "start")
+    have = set(stints["game_id"].unique().to_list())
+    recent = {}
+    for tid in set(games["home_id"]) | set(games["away_id"]):
+        mine = games.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid)).sort("date", "game_id")["game_id"].to_list()
+        recent[tid] = set([g for g in mine if g in have][-WINDOW_GAMES:])
+    pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
+    draws = {}
+    for e in pl.read_parquet(d / "events.parquet").filter(pl.col("type") == "faceoff").iter_rows(named=True):
+        draws.setdefault((e["game_id"], e["sec"]), (e["p1"], e["p2"]))
+
+    kills = []  # (team, game, start, end, [(seconds, skaters)])
+    for (gid,), g in stints.group_by("game_id", maintain_order=True):
+        for home in (True, False):
+            tid = ids[gid][0 if home else 1]
+            if gid not in recent[tid]:
+                continue
+            cur = None
+            for s in g.iter_rows(named=True):
+                own, opp = (s["n_home"], s["n_away"]) if home else (s["n_away"], s["n_home"])
+                short = s["home_goalie"] is not None and s["away_goalie"] is not None and 3 <= own < opp
+                on = s["home_skaters"] if home else s["away_skaters"]
+                if short and cur is not None and s["start"] == cur[3]:
+                    cur[4].append((s["duration"], on))
+                    cur[3] = s["end"]
+                elif short:
+                    if cur:
+                        kills.append(cur)
+                    cur = [tid, gid, s["start"], s["end"], [(s["duration"], on)]]
+                else:
+                    if cur:
+                        kills.append(cur)
+                    cur = None
+            if cur:
+                kills.append(cur)
+
+    out: dict[int, dict] = {}
+    for tid, gid, start, end, parts in kills:
+        if end - start < KILL_MIN_SEC:
+            continue
+        team = out.setdefault(tid, {"kills": 0, "players": defaultdict(lambda: {"kills": 0, "starts": 0, "sec": 0.0, "draws": 0, "pos": None})})
+        team["kills"] += 1
+        first = set(parts[0][1])
+        opener = draws.get((gid, start))
+        seen = set()
+        for sec, on in parts:
+            for p in on:
+                rec = team["players"][p]
+                rec["sec"] += sec
+                rec["pos"] = rec["pos"] or pos.get((gid, p))
+                if p not in seen:
+                    seen.add(p)
+                    rec["kills"] += 1
+                    if p in first:
+                        rec["starts"] += 1
+                        if opener and p in opener:
+                            rec["draws"] += 1
+    result = {}
+    for tid, team in out.items():
+        n = team["kills"]
+        rows = []
+        for pid, r in team["players"].items():
+            share = r["kills"] / n
+            if share < 0.10 or r["sec"] / r["kills"] < 20:
+                continue  # also skips players who only hop on as the penalty runs out
+            start_rate = r["starts"] / r["kills"]
+            role = ("starter" if start_rate >= 0.5 else "second") if share >= 0.4 else "spot"
+            rows.append({"id": pid, "d": r["pos"] == "D", "kills_in": r["kills"], "starts": r["starts"], "sec": round(r["sec"]), "per_kill": round(r["sec"] / r["kills"]),
+                         "role": role, "draw": r["starts"] >= 3 and r["draws"] >= 0.5 * r["starts"]})
+        order = {"starter": 0, "second": 1, "spot": 2}
+        rows.sort(key=lambda x: (order[x["role"]], x["d"], -x["sec"]))
+        result[tid] = {"kills": n, "players": rows}
+    return result
