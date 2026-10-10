@@ -48,8 +48,8 @@ html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezi
 
 /* Cards that are links lift a little under the pointer. Uses `translate`, separate from the reveal's `transform`. */
 @media (hover: hover) {
-  html.motion :is(.tcard, .gcard, .prow) { transition: translate 0.2s ease, box-shadow 0.2s ease; }
-  html.motion :is(.tcard, .gcard, .prow):hover { translate: 0 -2px; box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--ink) 45%, transparent); }
+  html.motion .card.go { transition: translate 0.2s ease, box-shadow 0.2s ease, border-color 0.15s ease; }
+  html.motion .card.go:hover { translate: 0 -2px; box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--ink) 45%, transparent); }
 }
 
 @keyframes lc-fade { from { opacity: 0; } }

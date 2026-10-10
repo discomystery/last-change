@@ -52,24 +52,21 @@ const base = import.meta.env.BASE_URL;
     const finals = new Set(sched.games.filter((g) => g.final).map((g) => g.id));
     const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
 
+    // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
     const row = (g, me) => {
-      const li = el('li', 'card row game');
+      const li = el('li', 'card row game go');
       const opp = me ? (g.home === me ? g.away : g.home) : null;
-      const tl = el('span', 'g-title');
-      const link = (x) => { const l = el('a', 'tlink', me ? (byAbbr[x]?.name ?? x) : x); l.href = `${base}team/${x}/`; return l; };
-      if (me) tl.append(`${g.home === me ? 'vs' : 'at'} `, link(opp)); else tl.append(link(g.away), ' at ', link(g.home));
+      const tl = el('a', 'g-title go-link', me ? `${g.home === me ? 'vs' : 'at'} ${byAbbr[opp]?.name ?? opp}` : `${g.away} at ${g.home}`);
+      tl.href = g.final && RECAPS.has(g.id) ? `${base}recap/${g.id}/` : !g.final && PREVIEWS[g.id] ? `${base}preview/${g.id}/` : `${base}games/#${g.date}`;
       li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), tl);
       if (g.final) {
         const mine = me ? (g.home === me ? [g.hs, g.as] : [g.as, g.hs]) : [g.as, g.hs];
         const extra = g.end && g.end !== 'REG' ? ` (${g.end})` : '';
         const res = me ? (mine[0] > mine[1] ? 'W ' : 'L ') : '';
-        const sc = el(RECAPS.has(g.id) ? 'a' : 'span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`);
-        if (RECAPS.has(g.id)) { sc.href = `${base}recap/${g.id}/`; sc.title = 'How the game went, and how the preview held up'; }
-        li.append(sc);
+        li.append(el('span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`));
+        if (RECAPS.has(g.id)) li.title = 'How the game went, and how the preview held up';
       } else if (PREVIEWS[g.id]) {
-        const a = el('a', 'g-link', PREVIEWS[g.id]);
-        a.href = `${base}preview/${g.id}/`;
-        li.append(a);
+        li.append(el('span', 'g-link', `${PREVIEWS[g.id]} ›`));
       } else {
         li.append(el('span', 'g-soon', g.venue ?? ''));
       }
@@ -128,7 +125,7 @@ const base = import.meta.env.BASE_URL;
           const info = rc.games.find((x) => x.id === last.id);
           const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
           const opp = last.home === me ? last.away : last.home;
-          const c = el('a', 'card latest');
+          const c = el('a', 'card latest go');
           c.href = `${base}recap/${last.id}/`;
           c.append(el('span', 'eyebrow', `Latest post-game · ${day.format(last.t)}`),
                    el('span', 'l-score', `${ms > ts ? 'Won' : 'Lost'} ${ms}–${ts}${last.end && last.end !== 'REG' ? ` (${last.end})` : ''} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`),
@@ -163,7 +160,6 @@ const base = import.meta.env.BASE_URL;
   /* Same look as a section heading on every other page. */
   #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 56px 0 16px; }
   #home .latest { display: grid; gap: 4px; margin-top: 14px; padding: 16px 18px; text-decoration: none; color: var(--ink); }
-  #home .latest:hover { border-color: var(--ink); }
   #home .l-score { font: 600 22px/1.2 var(--display); }
   #home .l-sub { font: 400 14px var(--ui); color: var(--ink-2); }
   #home .more-link { margin-top: 12px; font: 600 14px var(--ui); }

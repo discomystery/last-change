@@ -453,18 +453,18 @@ const _ = ordinal;
     } else {
       box.append(el('p', 'next-meta', 'No upcoming games on the schedule.'));
     }
+    // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
     const row = (g) => {
-      const li = el('li', 'card row game');
+      const li = el('li', 'card row game go');
       const opp = g.home === me ? g.away : g.home;
-      const title = el('span', 'g-title', `${g.home === me ? 'vs' : 'at'} `);
-      const ol = el('a', 'tlink', names[opp] ?? opp); ol.href = `${base}team/${opp}/`; title.append(ol);
+      const title = el('a', 'g-title go-link', `${g.home === me ? 'vs' : 'at'} ${names[opp] ?? opp}`);
+      title.href = g.final && RECAPS.has(g.id) ? `${base}recap/${g.id}/` : !g.final && PREVIEWS[g.id] ? `${base}preview/${g.id}/` : `${base}games/#${g.date}`;
       li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), title);
       if (g.final) {
         const s = g.home === me ? [g.hs, g.as] : [g.as, g.hs];
-        const sc = el(RECAPS.has(g.id) ? 'a' : 'span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`);
-        if (RECAPS.has(g.id)) { sc.href = `${base}recap/${g.id}/`; sc.title = 'How the game went, and how the preview held up'; }
-        li.append(sc);
-      } else if (PREVIEWS[g.id]) { const a = el('a', 'g-link', PREVIEWS[g.id]); a.href = `${base}preview/${g.id}/`; li.append(a); }
+        li.append(el('span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`));
+        if (RECAPS.has(g.id)) li.title = 'How the game went, and how the preview held up';
+      } else if (PREVIEWS[g.id]) li.append(el('span', 'g-link', `${PREVIEWS[g.id]} ›`));
       else li.append(el('span', 'g-soon', g.venue ?? ''));
       return li;
     };
