@@ -14,13 +14,17 @@ Z80 = 1.2816
 
 COLS = ["sec", "sec5", "sec_pp", "icf5", "ixg5", "ixg_pp", "ixg_net", "iff_net", "g_net", "a1_5", "a1_pp", "on_xgf_adj", "on_xga_adj",
         "t_xgf_adj", "t_xga_adj", "t_sec5", "hits", "hits_adj", "takes", "takes_adj", "blocks", "blocks_adj", "gives", "gives_adj", "fow", "fol",
-        "pen_taken", "pen_drawn"]
+        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf"]
 C = {c: i for i, c in enumerate(COLS)}
 GROUP = {"C": "F", "L": "F", "R": "F", "D": "D"}
 SUB = {"C": "C", "L": "W", "R": "W", "D": "D"}
 # Traits where centres and wingers really differ (standardized gap of 0.3 or more over 2024-26 regulars): these compare
 # centres with centres and wingers with wingers. Everything else compares all forwards together.
 SPLIT = {"shooting", "chances", "blocks"}
+# How much of last season to carry for a player who has changed teams, per trait. Measured 2023-24 to 2025-26: the
+# slope of next season on this season for forwards who moved, divided by the slope for those who stayed. Personal
+# habits (shooting, hitting, penalties) carry fully; traits that depend on linemates and role carry partly.
+CARRY_IF_MOVED = {"powerPlay": 0.35, "finishing": 0.45, "playmaking": 0.5, "faceoffs": 0.6}
 RAPM_LAMBDA = 40000.0  # ridge penalty in seconds of 5v5 play, chosen by cross-validation on held-out 2025-26 games
 POOL_GAMES = {"blend": 20, "season": 3}  # games (this season, plus last in blend mode) to count as a regular at the position
 BOOTSTRAPS = 200
@@ -50,6 +54,7 @@ TRAITS = {
     "finishing": (_finishing, "iff_net", True, None),
     "playmaking": (_rate("a1_5", "sec5"), "sec5", True, None),
     "powerPlay": (_rate("ixg_pp", "sec_pp"), "sec_pp", True, {"blend": 3600, "season": 600}),
+    "shThreat": (_rate("sh_xgf", "sec_pk"), "sec_pk", True, {"blend": 1800, "season": 300}),
     "hits": (_rate("hits_adj", "sec"), "sec", True, None),
     "blocks": (_rate("blocks_adj", "sec"), "sec", True, None),
     "takeaways": (_rate("takes_adj", "sec"), "sec", True, None),
@@ -82,6 +87,13 @@ def _groups(pg: pl.DataFrame, table: dict[str, str] = GROUP) -> dict[int, str]:
     """Each player's position group (or, with SUB, centre / wing / defense): the one he played most games at."""
     top = pg.group_by("player_id", "pos").len().sort("len", descending=True).unique("player_id", keep="first")
     return {r["player_id"]: table[r["pos"]] for r in top.iter_rows(named=True)}
+
+
+def _teams(pg: pl.DataFrame, latest: bool = False) -> dict[int, int]:
+    """Each player's team in a season: the one he played the most games for, or with latest=True the one he plays for now."""
+    t = pg.group_by("player_id", "team_id").agg(pl.len().alias("n"), pl.col("game_id").max().alias("last"))
+    t = t.sort("last", descending=True) if latest else t.sort(["n", "last"], descending=True)
+    return dict(zip(*t.unique("player_id", keep="first").select("player_id", "team_id").to_dict(as_series=False).values()))
 
 
 def peer(group: str, sub: str, trait: str) -> str:
@@ -149,29 +161,33 @@ def run(season: int = CURRENT_SEASON) -> dict:
         base = "D" if g == "D" else "F"
         mu[g] = {t: float(_value(t, tot)) for t in stab[base]}
 
-    def estimate(t: str, g: str, pg_: str, s_now: np.ndarray, s_prev: np.ndarray | None, mode: str) -> np.ndarray:
+    def estimate(t: str, g: str, pg_: str, s_now: np.ndarray, s_prev: np.ndarray | None, mode: str, moved: bool = False) -> np.ndarray:
         k = stab[g][t]["k"]
         n, v = _weight(t, s_now), np.nan_to_num(_value(t, s_now))
         prior = mu[pg_][t]
         if mode == "blend" and s_prev is not None:
             n_p, v_p = _weight(t, s_prev), np.nan_to_num(_value(t, s_prev))
+            if moved:
+                n_p = n_p * CARRY_IF_MOVED.get(t, 1.0)
             prior = (n_p * v_p + k * prior) / (n_p + k)
         return (n * v + k * prior) / (n + k)
 
+    team_now, team_last = _teams(now_pg, latest=True), _teams(last_pg)
     players = {}
     for pid, m in now.items():
         g, sb = grp[pid], sub[pid]
         prev = last.get(pid)
+        moved = prev is not None and team_last.get(pid) != team_now.get(pid)
         s_now, s_prev = m.sum(axis=0), None if prev is None else prev.sum(axis=0)
         boot_now = rng.multinomial(len(m), np.full(len(m), 1 / len(m)), size=BOOTSTRAPS) @ m
         boot_prev = None if prev is None else rng.multinomial(len(prev), np.full(len(prev), 1 / len(prev)), size=BOOTSTRAPS) @ prev
-        p = {"group": g, "sub": sb, "games": len(m), "games_last": 0 if prev is None else len(prev), "sums": {"season": s_now, "last": s_prev}, "est": {}, "boot": {}}
+        p = {"group": g, "sub": sb, "moved_from": team_last.get(pid) if moved else None, "games": len(m), "games_last": 0 if prev is None else len(prev), "sums": {"season": s_now, "last": s_prev}, "est": {}, "boot": {}}
         for mode in ("blend", "season"):
             p["est"][mode], p["boot"][mode] = {}, {}
             for t in stab[g]:
                 pg_ = peer(g, sb, t)
-                p["est"][mode][t] = float(estimate(t, g, pg_, s_now, s_prev, mode))
-                p["boot"][mode][t] = estimate(t, g, pg_, boot_now, boot_prev, mode)
+                p["est"][mode][t] = float(estimate(t, g, pg_, s_now, s_prev, mode, moved))
+                p["boot"][mode][t] = estimate(t, g, pg_, boot_now, boot_prev, mode, moved)
         players[pid] = p
 
     def both(p: dict, mode: str) -> np.ndarray:
@@ -180,7 +196,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     def regular(p: dict, mode: str) -> bool:
         return p["games"] + (p["games_last"] if mode == "blend" else 0) >= POOL_GAMES[mode]
 
-    out = {pid: {"group": p["group"], "sub": p["sub"], "games": p["games"], "games_last": p["games_last"], "traits": {}} for pid, p in players.items()}
+    out = {pid: {"group": p["group"], "sub": p["sub"], "moved_from": p["moved_from"], "games": p["games"], "games_last": p["games_last"], "traits": {}} for pid, p in players.items()}
     for mode in ("blend", "season"):
         for t, (_, _, higher, min_w) in TRAITS.items():
             peers: dict[str, list[int]] = {}

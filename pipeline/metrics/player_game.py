@@ -70,6 +70,15 @@ def build(season: int) -> pl.DataFrame:
         _sum(pl.col("xg") * pl.col("w_xgf"), pl.col("mine") & pl.col("unb")).alias(f"{prefix}xgf_adj"), _sum(pl.col("xg") * pl.col("w_xgf"), ~pl.col("mine") & pl.col("unb")).alias(f"{prefix}xga_adj"),
         _sum(pl.lit(1.0), pl.col("mine") & pl.col("goal")).alias(f"{prefix}gf"), _sum(pl.lit(1.0), ~pl.col("mine") & pl.col("goal")).alias(f"{prefix}ga")]
     onice = on.explode("player_id").group_by("game_id", "player_id").agg(agg("on_"))
+
+    # Shorthanded: chances his team creates while killing a penalty with him on (the "power kill"), and allows.
+    shorthanded = pl.col("own_g") & pl.col("opp_g") & pl.col("unb")
+    own_on = pl.when(pl.col("is_home")).then(pl.col("home_on")).otherwise(pl.col("away_on"))
+    opp_on = pl.when(pl.col("is_home")).then(pl.col("away_on")).otherwise(pl.col("home_on"))
+    sh_for = shots.filter(shorthanded & (pl.col("n_own") < pl.col("n_opp"))).select("game_id", own_on.alias("player_id"), "xg").explode("player_id")
+    sh_against = shots.filter(shorthanded & (pl.col("n_own") > pl.col("n_opp"))).select("game_id", opp_on.alias("player_id"), "xg").explode("player_id")
+    sh = sh_for.group_by("game_id", "player_id").agg(pl.col("xg").sum().alias("sh_xgf")).join(
+        sh_against.group_by("game_id", "player_id").agg(pl.col("xg").sum().alias("sh_xga")), on=["game_id", "player_id"], how="full", coalesce=True)
     team = on.group_by("game_id", "home").agg(agg("t_")).join(team_sec5, on=["game_id", "home"], how="full", coalesce=True)
 
     # His own shots, goals and assists.
@@ -108,7 +117,7 @@ def build(season: int) -> pl.DataFrame:
     drawn = pen.filter(pl.col("p2").is_not_null()).group_by("game_id", pl.col("p2").alias("player_id")).agg(pl.len().cast(pl.Float64).alias("pen_drawn"))
 
     out = roster.join(games.select("game_id"), on="game_id").join(toi, on=["game_id", "player_id"])
-    for part in (onice, ind, a1, a2, credited, hit_on, fow, fol, taken, drawn):
+    for part in (onice, sh, ind, a1, a2, credited, hit_on, fow, fol, taken, drawn):
         out = out.join(part, on=["game_id", "player_id"], how="left")
     out = out.join(team.rename({"home": "is_home"}), on=["game_id", "is_home"], how="left")
     num = [c for c, t in out.schema.items() if t == pl.Float64]

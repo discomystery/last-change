@@ -218,7 +218,7 @@ def run(season: int) -> int:
             rec = r["players"].get(pid)
             if rec is None:
                 continue
-            base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "games": rec["games"], "games_last": rec["games_last"],
+            base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
                      "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}}
             mine = shots.filter(pl.col("p1") == pid)
@@ -264,7 +264,10 @@ def _role(pid: int, row: dict, ln: dict, per: pl.DataFrame, team_games: int) -> 
         mates = [{"id": i, "name": n} for i, n in zip(unit["ids"], unit["players"]) if i != pid]
         out["line"] = {"label": unit["label"], "mates": mates, "toi_sec": unit["toi_sec"], "share": unit["share"], "pct": unit["pct"].get("share")}
     sp = ln.get("special") or {}
-    for kind in ("pp", "pk"):
+    kr = sp.get("pk_roles") or {"kills": 0, "players": []}
+    me = next((r for r in kr["players"] if r["id"] == pid), None)
+    out["pk"] = {"kills": kr["kills"], **({k: me[k] for k in ("role", "kills_in", "starts", "per_kill", "draw")} if me else {"role": None})} if kr["kills"] else None
+    for kind in ("pp",):
         for u in sp.get(kind, []):
             me = next((p for p in u["players"] if p["id"] == pid), None)
             if me:

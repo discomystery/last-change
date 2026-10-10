@@ -1,0 +1,31 @@
+---
+// Penalty killers grouped by when they go on (kills are too loose for fixed units): starters, second wave, spot duty.
+import PLink from './PLink.astro';
+import { clock } from '../lib/format';
+import { pkRoleWord, pkRoleTip } from '../lib/players';
+type Killer = { id: number; name: string; d: boolean; kills_in: number; starts: number; per_kill: number; role: 'starter' | 'second' | 'spot'; draw: boolean };
+interface Props { roles?: { kills: number; players: Killer[] } }
+const { roles } = Astro.props;
+const order = ['starter', 'second', 'spot'] as const;
+---
+{!roles || roles.kills === 0 ? <p class="n">No penalties killed in this stretch yet.</p> : order.map((r) => {
+  const list = roles.players.filter((p) => p.role === r);
+  return list.length > 0 && (
+    <div class="stunit">
+      <p class="stunit-h"><span class="pk-role term" tabindex="0" data-tip={pkRoleTip[r]}>{pkRoleWord[r]}</span></p>
+      <ul class="roles-list pk-list">
+        {list.map((p) => (
+          <li>
+            <span><PLink id={p.id} name={p.name} />{p.d && <span class="n both">D</span>}</span>
+            <span class="n">{p.kills_in} of {roles.kills} kills · {clock(p.per_kill)} a kill{p.draw && ' · takes the draw'}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+})}
+
+<style is:global>
+  .pk-role { font: 600 15px var(--ui); }
+  .pk-list li { flex-wrap: wrap; row-gap: 0; }
+</style>
