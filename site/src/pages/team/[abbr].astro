@@ -449,7 +449,7 @@ const _ = ordinal;
       box.append(el('p', 'next-meta', 'No upcoming games on the schedule.'));
     }
     const row = (g) => {
-      const li = el('li', 'card game');
+      const li = el('li', 'card row game');
       const opp = g.home === me ? g.away : g.home;
       const title = el('span', 'g-title', `${g.home === me ? 'vs' : 'at'} `);
       const ol = el('a', 'tlink', names[opp] ?? opp); ol.href = `${base}team/${opp}/`; title.append(ol);

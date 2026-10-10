@@ -6,13 +6,13 @@ const base = import.meta.env.BASE_URL;
 <Base section="home" title="Last Change" mock={false}>
   <div id="home" data-base={base}>
     <section id="pick" hidden>
-      <h1>Pick your team</h1>
+      <h1 class="page-top">Pick your team</h1>
       <p class="lede">Choose a team and this page becomes theirs. Your choice is remembered on this device, and you can change it at the top of any page.</p>
       <ul class="teamgrid" id="teamgrid"></ul>
     </section>
 
     <section id="mine" hidden>
-      <p class="eyebrow" id="mine-eyebrow"></p>
+      <p class="mine-meta" id="mine-eyebrow"></p>
       <div id="next"></div>
       <div id="latest"></div>
       <div class="cols">
@@ -52,7 +52,7 @@ const base = import.meta.env.BASE_URL;
     const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
 
     const row = (g, me) => {
-      const li = el('li', 'card game');
+      const li = el('li', 'card row game');
       const opp = me ? (g.home === me ? g.away : g.home) : null;
       const tl = el('span', 'g-title');
       const link = (x) => { const l = el('a', 'tlink', me ? (byAbbr[x]?.name ?? x) : x); l.href = `${base}team/${x}/`; return l; };
@@ -83,7 +83,7 @@ const base = import.meta.env.BASE_URL;
       if (!me) {
         const grid = document.getElementById('teamgrid');
         grid.replaceChildren(...teams.map((t) => {
-          const b = el('button', 'card teambtn');
+          const b = el('button', 'card row teambtn');
           b.type = 'button';
           b.append(el('span', 'tb-abbr', t.abbr), el('span', 'tb-name', t.name));
           b.addEventListener('click', () => window.lcPrefs.set('team', t.abbr));
@@ -127,7 +127,7 @@ const base = import.meta.env.BASE_URL;
           const opp = last.home === me ? last.away : last.home;
           const c = el('a', 'card latest');
           c.href = `${base}recap/${last.id}/`;
-          c.append(el('span', 'l-eyebrow', `Latest post-game · ${day.format(last.t)}`),
+          c.append(el('span', 'eyebrow', `Latest post-game · ${day.format(last.t)}`),
                    el('span', 'l-score', `${ms > ts ? 'Won' : 'Lost'} ${ms}–${ts}${last.end && last.end !== 'REG' ? ` (${last.end})` : ''} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`),
                    el('span', 'l-sub', info && info.calls ? `How the preview held up: ${info.held} of ${info.calls} calls held, ${info.partly} partly` : 'The numbers, the surprises and the goalies'));
           lbox.append(c);
@@ -157,18 +157,16 @@ const base = import.meta.env.BASE_URL;
 </script>
 
 <style is:global>
-  #home h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 26px; }
-  #home h2 { font: 700 26px/1.1 var(--display); border-bottom: 5px solid var(--line-blue); padding-bottom: 8px; margin: 44px 0 14px; }
-  #home .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
+  /* Same look as a section heading on every other page. */
+  #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 56px 0 16px; }
   #home .latest { display: grid; gap: 4px; margin-top: 14px; padding: 16px 18px; text-decoration: none; color: var(--ink); }
   #home .latest:hover { border-color: var(--ink); }
-  #home .l-eyebrow { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   #home .l-score { font: 600 22px/1.2 var(--display); }
   #home .l-sub { font: 400 14px var(--ui); color: var(--ink-2); }
   #home .more-link { margin-top: 12px; font: 600 14px var(--ui); }
-  #home .eyebrow { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
+  #home .mine-meta { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
   .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }
-  .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); padding: 12px 16px; font: inherit; }
+  .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
   .teambtn:hover { border-color: var(--ink); }
   .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
   .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
@@ -176,11 +174,9 @@ const base = import.meta.env.BASE_URL;
   @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
   .games { display: grid; gap: 8px; }
   .games.slate { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
-  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 12px 16px; border-radius: 14px; }
+  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
   .g-when { grid-column: 1 / -1; font: 400 12px var(--ui); color: var(--ink-3); }
   .g-title { font-weight: 600; }
-  .tlink { color: inherit; text-decoration: none; }
-  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
   .g-score { font: 700 16px var(--ui); white-space: nowrap; }
   .g-soon { font: 400 12px var(--ui); color: var(--ink-3); text-align: right; }
   .g-link { font: 600 13px var(--ui); }

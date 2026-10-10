@@ -78,11 +78,8 @@ const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, 
 </script>
 
 <style>
-  .page-top h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 22px; }
-  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0 6px; font: 600 20px var(--display); }
-  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer; }
   .mine { margin-top: 20px; }
-  .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 6px; }
+  .mine .mini-h, .divs .mini-h { margin-bottom: 6px; }
   .conf { margin-top: 30px; }
   .conf-h { font: 600 23px/1.15 var(--display); margin-bottom: 14px; }
   .divs { display: grid; gap: 22px 24px; }

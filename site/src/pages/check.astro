@@ -7,7 +7,7 @@ const day = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', da
 const c = data.checks;
 ---
 <Base title="Real data check" mock={false}>
-  <h1>Real lines from each team’s last game</h1>
+  <h1 class="page-top">Real lines from each team’s last game</h1>
   <p class="lede">The first real output of the data pipeline: who actually played together at 5-on-5, for how long, and what happened while they were out there. Find a game you watched and see if it matches.</p>
   <ul class="checks">
     <li><strong>{c.games}</strong> games this season processed</li>
@@ -38,8 +38,6 @@ const c = data.checks;
 </Base>
 
 <style>
-  h1 { font: 700 clamp(30px, 6vw, 44px) / 1.1 var(--display); margin-top: 24px; }
-  .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
   .checks { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 18px; font: 400 14px var(--ui); color: var(--ink-2); }
   .checks strong { font: 700 22px/1 var(--display); color: var(--ink); margin-right: 4px; }
   .jump { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 22px; font-family: var(--ui); }
@@ -51,7 +49,7 @@ const c = data.checks;
   .card { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
   th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-  thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); white-space: normal; }
+  thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); white-space: normal; }
   th:first-child { text-align: left; }
   tbody th { font-weight: 600; }
   tr.gap > * { border-top: 3px solid var(--line-red); }

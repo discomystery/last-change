@@ -6,7 +6,7 @@ const day = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', da
 const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%`);
 ---
 <Base title="Expected goals check" mock={false}>
-  <h1 class="page-h">How dangerous was that chance?</h1>
+  <h1 class="page-top">How dangerous was that chance?</h1>
   <p class="lede">Our own expected-goals model rates every shot by how often shots like it go in. Here is every goal and the eight best chances that didn’t go in, from each team’s most recent game. Pick a game you watched and see whether the ratings match your memory.</p>
   <div class="pick"><span>Show</span>
     <select id="xg-game" aria-label="Game">{data.games.map((g) => <option value={String(g.id)} data-teams={`${g.home} ${g.away}`}>{g.away} at {g.home}, {day(g.date)}</option>)}</select>
@@ -47,15 +47,12 @@ const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%
 </script>
 
 <style>
-  .page-h { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 26px; }
-  .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
-  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 24px 0 14px; font: 600 20px var(--display); }
-  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; }
+  .pick { margin: 24px 0 14px; }
   .sum { font: 400 15px/1.5 var(--ui); color: var(--ink-2); margin-bottom: 12px; }
   .tablecard { overflow-x: auto; }
   .xt { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 760px; }
   .xt th, .xt td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-  .xt thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+  .xt thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .xt tbody th { font-weight: 600; }
   .xt .tm { font-weight: 400; color: var(--ink-3); margin: 0 6px 0 2px; }
   .xt .num { text-align: right; font-weight: 700; font-size: 15px; }
