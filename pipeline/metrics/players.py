@@ -71,10 +71,10 @@ def _weight(trait: str, s: np.ndarray) -> np.ndarray:
     return w(s) if callable(w) else s[..., C[w]]
 
 
-def load(season: int) -> pl.DataFrame:
+def load(season: int, need: tuple[str, ...] = ()) -> pl.DataFrame:
     path = TABLES / str(season) / "player_game.parquet"
     # Rebuild when missing or built by an older version that lacks a column we now need (saved past seasons).
-    if not path.exists() or not set(COLS) <= set(pl.read_parquet_schema(path)):
+    if not path.exists() or not set(COLS) | set(need) <= set(pl.read_parquet_schema(path)):
         from pipeline.metrics import player_game
         player_game.build(season)
     return pl.read_parquet(path).filter(pl.col("pos") != "G").sort("player_id", "game_id")

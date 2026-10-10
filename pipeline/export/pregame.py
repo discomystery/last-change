@@ -41,9 +41,13 @@ def cut_tables(season: int, day: str, root: Path) -> int:
     keep = games["game_id"].to_list()
     for f in src.glob("*.parquet"):
         t = pl.read_parquet(f)
-        if "game_id" not in t.columns:
-            raise ValueError(f"{f.name} has no game_id, so it can't be cut back to a date")
-        t.filter(pl.col("game_id").is_in(keep)).write_parquet(dst / f.name)
+        if "game_id" in t.columns:
+            t = t.filter(pl.col("game_id").is_in(keep))
+        elif "date" in t.columns:  # dated records with no game (the daily roster history): keep earlier days
+            t = t.filter(pl.col("date") < day)
+        else:
+            raise ValueError(f"{f.name} has neither game_id nor date, so it can't be cut back to a date")
+        t.write_parquet(dst / f.name)
     return games.height
 
 
