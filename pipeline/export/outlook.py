@@ -38,12 +38,12 @@ BANDS = [
 # A team's way to win, from its strongest trait against the matching trait of the other team.
 ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare phrase)
     "volume": ("suppression", "if they keep the shots coming", "piling up shots"),
-    "quality": ("qualityAllowed", "if they get to the dangerous areas", "getting to the dangerous areas"),
+    "quality": ("qualityAllowed", "if they get good looks", "getting good looks"),
     "pp": ("pk", "if their power play gets going", "a power play that gets going"),
     "pk": ("pp", "if their penalty kill holds up", "a penalty kill that holds up"),
     "turnover": ("breakdowns", "if they pounce on loose pucks", "pouncing on loose pucks"),
     "suppression": ("volume", "if they keep shots to a minimum", "keeping shots to a minimum"),
-    "qualityAllowed": ("quality", "if they keep the shots to the outside", "keeping the shots to the outside"),
+    "qualityAllowed": ("quality", "if they keep dangerous shots away", "keeping dangerous shots away"),
 }
 
 

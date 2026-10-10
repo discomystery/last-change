@@ -21,6 +21,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import FULL_SEASONS
+from pipeline.export.previews import a_pct
 from pipeline.metrics import adjust, goalies, team_style
 
 BIG, SMALL = 1.75, 1.0  # scores for a surprise and for a smaller twist
@@ -160,9 +161,9 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
     T, O = places[t], places[o]
     up = x > usual
     if kind == "quality":
-        head = f"{T} got to the dangerous areas" if up else f"{T} was kept to the outside"
-        body = (f"{T}’s shots at 5-on-5 were {'more' if up else 'less'} dangerous than usual: one expected goal every {1 / x:.1f} shots, "
-                f"against their usual {1 / usual:.1f} (league average {1 / league:.1f}).")
+        head = f"{T} got the good looks" if up else f"{T} couldn’t get good looks"
+        body = (f"{T}’s shots at 5-on-5 were {'more' if up else 'less'} dangerous than usual: {a_pct(x)} chance of scoring on the average shot, "
+                f"against their usual {100 * usual:.1f}% (league average {100 * league:.1f}%).")
         cat = "chances"
     elif kind == "pp":
         head = f"{T}’s power play came alive" if up else f"{O} shut down {T}’s power play"

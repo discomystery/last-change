@@ -90,8 +90,8 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             fmt = lambda x: f"{x:.1f} per 60"
         elif m == "quality":
             v = r["xgf_adj"] / r["ff_adj"] if r["ff_adj"] else 0.0
-            txt = f"{team} got one expected goal every {1 / v:.1f} shots, against their usual {1 / base:.1f}." if v else f"{team} barely got a shot away at 5-on-5."
-            fmt = lambda x: f"1 expected goal per {1 / x:.1f} shots" if x else "–"
+            txt = f"{team}’s average shot had {previews.a_pct(v)} chance of going in, against their usual {100 * base:.1f}%." if v else f"{team} barely got a shot away at 5-on-5."
+            fmt = lambda x: f"{100 * x:.1f}% a shot" if x else "–"
         elif m == "turnover":
             v = 100 * r["to_xgf"] / r["xgf5"] if r["xgf5"] else 0.0
             txt = f"{v:.1f}% of {team}’s 5-on-5 chances came right after winning the puck, against their usual {base:.1f}%."
@@ -124,7 +124,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         usual = (f"the {'faster' if chk['direction'] == 'above' else 'slower'} team’s usual {base:.1f}" if "average" in chk
                  else f"the two teams’ usual {base:.1f}")  # rules 3 set the bar at the faster (or slower) team's usual
         return {"verdict": grade(v, base, league, chk["direction"]),
-                "happened": f"The game ran at {v:.1f} unblocked shots per 60 at 5-on-5, both teams combined, against {usual} and a league average of {league:.1f}.",
+                "happened": f"The game ran at {v:.1f} shots per 60 at 5-on-5, both teams combined, against {usual} and a league average of {league:.1f}.",
                 "usual": f"{base:.1f} per 60", "tonight": f"{v:.1f} per 60", "league": f"{league:.1f} per 60"}
     if m == "physical":
         if min(r["close_sec"] for r in rows) < MIN_CLOSE_SEC:

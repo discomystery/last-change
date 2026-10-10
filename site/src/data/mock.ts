@@ -43,7 +43,7 @@ export const teams = Object.fromEntries(
 export type Dim = { key: string; label: string; tip: string; CAR: number; EDM: number; neutral?: boolean };
 export const fingerprint: Dim[] = [
   { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts the team takes per 60 minutes of 5-on-5 play.', CAR: 96, EDM: 71 },
-  { key: 'quality', label: 'Shot quality', tip: 'How dangerous the average unblocked shot is, by expected goals.', CAR: 22, EDM: 88 },
+  { key: 'quality', label: 'Shot quality', tip: 'How dangerous the average shot is: its chance of going in, by expected goals.', CAR: 22, EDM: 88 },
   { key: 'suppression', label: 'Shot suppression', tip: 'How few shot attempts the team allows. Further right means fewer allowed.', CAR: 94, EDM: 48 },
   { key: 'qualityAllowed', label: 'Quality allowed', tip: 'How dangerous the average shot against is. Further right means safer shots against.', CAR: 31, EDM: 55 },
   { key: 'pace', label: 'Pace', tip: 'Total shots both ways per 60. High-pace teams play track meets.', CAR: 78, EDM: 66, neutral: true },
@@ -298,21 +298,23 @@ export function ordinal(n: number) {
 // ---------- Fingerprint cards: plain-language stats, end labels, and the season switch ----------
 type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: number; say: (v: number) => string; raw?: (pct: number) => string };
 const f1 = (v: number) => v.toFixed(1);
+// A chance with its article: "a 6.3%", "an 8.1%".
+const aPct = (v: number) => { const s = `${f1(100 * v)}%`; return (s[0] === '8' || /^1[18]\./.test(s) ? 'an ' : 'a ') + s; };
 export const fpGroups = ['Offense', 'Defense', 'Tempo and edge', 'Special teams'];
 const fpMeta: Record<string, FpMeta> = {
   volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `${f1(v)} shot attempts per 60` },
-  quality: { group: 'Offense', lo: 'Perimeter', hi: 'Point-blank', at0: 0.062, at100: 0.092, say: (v) => `one expected goal for every ${f1(1 / v)} shots` },
+  quality: { group: 'Offense', lo: 'Hopeful', hi: 'Dangerous', at0: 0.062, at100: 0.092, say: (v) => `${aPct(v)} chance of scoring on the average shot` },
   rebounds: { group: 'Offense', lo: 'One-and-done', hi: 'Crashers', at0: 5, at100: 13, say: (v) => `${f1(v)}% of chances come from rebounds` },
   turnover: { group: 'Offense', lo: 'Patient', hi: 'Opportunist', at0: 5, at100: 14, say: (v) => `${f1(v)}% of chances come right after a turnover` },
   point: { group: 'Offense', lo: 'Down low', hi: 'Point-heavy', at0: 26, at100: 44, say: (v) => `${f1(v)}% of shot attempts come from the point` },
   suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per 60` },
-  qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `one expected goal against for every ${f1(1 / v)} shots` },
+  qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `${aPct(v)} chance of scoring on the average shot against` },
   breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${v.toFixed(2)} defensive breakdowns per 60` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per 60, both teams combined` },
   forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
   physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per 60` },
-  depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `the bottom six get ${f1(v)}% of the forwards’ 5-on-5 ice time` },
+  depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `${f1(v)}% of forward ice time at 5-on-5 goes to the bottom six` },
   pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per 60 on the power play` },
   pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per 60 shorthanded` },
   powerKill: { group: 'Special teams', lo: 'Bunkered', hi: 'Predatory', at0: 0.3, at100: 1.4, say: (v) => `${f1(v)} expected goals created per 60 shorthanded` },

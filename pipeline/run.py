@@ -38,7 +38,7 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import edge, moneypuck, nhl, rosters
+    from pipeline.ingest import coaches, edge, moneypuck, nhl, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
@@ -46,6 +46,8 @@ def update(season: int) -> dict:
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
     moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
     out["build"] = games.build_season(season)
+    if season == CURRENT_SEASON:
+        out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
