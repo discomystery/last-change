@@ -123,26 +123,32 @@ def _pct(value: float, league: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * below, 1, 99))
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
+    """With `idle`, teams that have not played yet this season are included too: their blended estimate is last
+    season pulled toward the league, and their season-only estimate is empty (None). Used for previews rebuilt as of
+    a past date, when some teams had yet to open their season."""
     w = adjust.weights()
     k = stabilization(w)
     now, last = _matrix(per_game(season, w)), _matrix(per_game(season - 1, w))
+    if idle:
+        now |= {tid: np.empty((0, len(COLS))) for tid in last if tid not in now}
     league_last = {dim: float(np.nanmean([_values(m)[dim] for m in last.values()])) for dim in DIMS}
     rng = np.random.default_rng(season)
 
     def estimates(mat: np.ndarray, tid: int) -> dict[str, dict[str, float]]:
-        n, obs = len(mat), _values(mat)
+        n = len(mat)
+        obs = _values(mat) if n else {dim: None for dim in DIMS}
         prev = _values(last[tid]) if tid in last else league_last
         out = {"season": obs, "blend": {}}
         for dim in DIMS:
             kk = k[dim]["k_games"]
             n_prev = len(last[tid]) if tid in last else 0
             prior = (n_prev * prev[dim] + kk * league_last[dim]) / (n_prev + kk)  # last season, itself pulled toward the league
-            out["blend"][dim] = (n * obs[dim] + kk * prior) / (n + kk)
+            out["blend"][dim] = (n * obs[dim] + kk * prior) / (n + kk) if n else prior
         return out
 
     point = {tid: estimates(mat, tid) for tid, mat in now.items()}
-    boots = {tid: [estimates(mat[rng.integers(0, len(mat), len(mat))], tid) for _ in range(BOOTSTRAPS)] for tid, mat in now.items()}
+    boots = {tid: [estimates(mat[rng.integers(0, len(mat), len(mat))], tid) for _ in range(BOOTSTRAPS)] for tid, mat in now.items() if len(mat)}
 
     teams = {}
     for tid, mat in now.items():
@@ -150,13 +156,17 @@ def run(season: int = CURRENT_SEASON) -> dict:
         for dim, (_, _, _, higher) in DIMS.items():
             dims[dim] = {}
             for mode in ("blend", "season"):
-                league = np.array([point[t][mode][dim] for t in now])
+                ok = lambda x: x is not None and not np.isnan(x)
+                league = np.array([point[t][mode][dim] for t in now if ok(point[t][mode][dim])])
                 v = point[tid][mode][dim]
-                draws = np.array([b[mode][dim] for b in boots[tid]])
+                if not ok(v):  # no games yet (or, a game or two in, none of what this trait counts): nothing to show
+                    dims[dim][mode] = {"v": None, "pct": None, "lo": None, "hi": None, "rank": None, "index": None}
+                    continue
+                draws = np.array([b[mode][dim] for b in boots[tid]]) if tid in boots else np.array([v])
                 lo, hi = np.nanpercentile(draws, [10, 90])
                 p_lo, p_hi = sorted((_pct(lo, league, higher), _pct(hi, league, higher)))
                 better = (league > v).sum() if higher else (league < v).sum()
                 dims[dim][mode] = {"v": round(v, 4), "pct": round(100 * (len(league) - better - 0.5) / len(league)), "lo": round(p_lo), "hi": round(p_hi), "rank": int(better) + 1,
-                                   "index": round(100 * v / float(np.mean(league)))}
+                                   "index": round(100 * v / float(np.mean(league))) if np.mean(league) else None}
         teams[tid] = {"games": len(mat), "dims": dims}
     return {"season": season, "stabilization": k, "weights": w.to_dicts(), "teams": teams}
