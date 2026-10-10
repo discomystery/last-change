@@ -231,6 +231,7 @@ def export_lines(season: int) -> int:
         if abbr[tid] in out:
             out[abbr[tid]]["matchups"] = m
     special = units.special_units(season)
+    pk_roles = units.pk_roles(season)  # penalty killers by role; PK groupings are too loose for fixed units
     for tid, sp in special.items():
         if abbr[tid] not in out:
             continue
@@ -250,7 +251,9 @@ def export_lines(season: int) -> int:
                                  "after": names.get(after[str(p)]) if str(p) in after else None} for p in u["players"]]
                 u.pop("both", None)
                 del u["roles"]
-        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk": sp["pk"], "faceoff": faceoff, "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
+        kr = pk_roles.get(tid, {"kills": 0, "players": []})
+        roles_pk = {"kills": kr["kills"], "players": [{**r, "name": names.get(r["id"], "?")} for r in kr["players"]]}
+        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk_roles": roles_pk, "faceoff": faceoff, "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)

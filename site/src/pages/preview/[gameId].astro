@@ -9,6 +9,8 @@ import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import PLink from '../../components/PLink.astro';
+import PkRoles from '../../components/PkRoles.astro';
+import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import FpPair from '../../components/FpPair.astro';
 import { clock as mmss } from '../../lib/format';
@@ -71,13 +73,6 @@ const homeMu = LN[home]?.matchups?.home;
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
 
 // Special teams
-const roleTip: Record<string, string> = {
-  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
-  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
-  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
-  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
-  Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
-};
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
 
 // Goalies
@@ -281,19 +276,13 @@ const _ = ordinal;
             </div>
             <div class:list={['card', `t-${side(pk)}`]}>
               <h4 class="st-h"><i></i>{place(pk)} penalty kill</h4>
-              {(K?.pk ?? []).map((u, k) => (
-                <div class="stunit">
-                  <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s shorthanded time when most of this group was on the ice.">{u.share}% of the time</span></p>
-                  <p class="stunit-rate"><span>Allows <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Stingier than ${u.pct}% of ${k ? 'second' : 'top'} penalty-kill units. ${mmss(u.seconds)} on the ice.`} /></p>
-                  <ul class="roles-list">{u.players.map((pl) => <li><PLink id={pl.id} name={pl.name} /></li>)}</ul>
-                </div>
-              ))}
+              <PkRoles roles={(K as any)?.pk_roles} />
             </div>
           </div>
         </div>
       );
     })}
-    <p class="note">Units use each team’s last {linesData.window} games; role tags use two seasons; the map shows the last 140 power-play shots. Point at a power-play name to see his shots on the map.</p>
+    <p class="note">Units and penalty-kill roles use each team’s last {linesData.window} games; power-play role tags use this season and last, counting only games with the player’s current team; the map shows the last 140 power-play shots. Point at a power-play name to see his shots on the map.</p>
   </Section>
 
   <Section id="goalies" title="Goaltending" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">

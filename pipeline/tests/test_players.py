@@ -40,3 +40,18 @@ def test_player_game_matches_raw_counts():
     assert pg["g"].sum() == ev.filter((pl.col("type") == "goal") & pl.col("p1").is_not_null()).height
     # Every skater's 5v5 time fits inside his team's.
     assert (pg["sec5"] <= pg["t_sec5"] + 1).all()
+
+
+@pytest.mark.skipif(not (TABLES / "2025" / "stints.parquet").exists(), reason="needs the built 2025 tables")
+def test_penalty_kill_roles_are_consistent():
+    from pipeline.metrics import units
+
+    roles = units.pk_roles(2025)
+    assert len(roles) == 32
+    for team in roles.values():
+        assert team["kills"] > 0
+        for r in team["players"]:
+            assert 0 < r["kills_in"] <= team["kills"] and r["starts"] <= r["kills_in"]
+            assert r["role"] in ("starter", "second", "spot") and r["per_kill"] >= 20
+            share = r["kills_in"] / team["kills"]
+            assert (r["role"] == "spot") == (share < 0.4)

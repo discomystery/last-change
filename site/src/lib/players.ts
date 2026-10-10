@@ -10,12 +10,20 @@ export type Unit = { label: string; role?: string | null; both?: boolean; share?
 export type Role = {
   team_games: number; gp?: number; toi_rank?: number; toi_of?: number; toi?: { toi: number; toi5: number; toi_pp: number; toi_pk: number };
   line?: { label: string; mates: { id: number; name: string }[]; toi_sec: number; share: number; pct: number | null };
-  pp?: Unit; pk?: Unit; faceoff?: string; notes: string[];
+  pp?: Unit; pk?: PkRole | null; faceoff?: string; notes: string[];
 };
+export type PkRole = { kills: number; role: 'starter' | 'second' | 'spot' | null; kills_in?: number; starts?: number; per_kill?: number; draw?: boolean };
+/** Penalty-kill roles: kills are loose, so players are grouped by when they go on rather than into fixed units. */
+export const pkRoleWord = { starter: 'Starts the kill', second: 'Second wave', spot: 'Spot duty' } as const;
+export const pkRoleTip = {
+  starter: 'Starts the kill: on the ice when most of the kills he plays begin, usually for the defensive-zone faceoff.',
+  second: 'Second wave: kills often, but usually comes on after the first change rather than at the start.',
+  spot: 'Spot duty: used in some kills (10% to 40% of them), for at least 20 seconds at a time.',
+} as const;
 export type Stats = { gp: number; g: number; a: number; p: number; sog: number; toi: number };
 export type Skater = {
   id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
-  group: 'F' | 'D'; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
+  group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
 };
@@ -37,7 +45,7 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'Goals he scores compared with what an average shooter would score from the same shots, per 100 unblocked shots (empty nets left out). Finishing takes a long time to tell apart from luck, so small samples are pulled hard toward average.' },
   playmaking: { group: 'Scoring', label: 'Setting up goals', lo: 'Rarely sets up', hi: 'Playmaker', say: (v) => `${v.toFixed(2)} first assists per 60 at 5-on-5`,
     tip: 'First assists (the last pass before a goal) per 60 minutes at 5-on-5.' },
-  powerPlay: { group: 'Scoring', label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,
+  powerPlay: { group: 'Special teams', label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,
     tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play will rate lower here than their value.' },
   offImpact: { group: 'Driving play at 5-on-5', label: 'Creating chances', lo: 'Along for the ride', hi: 'Drives play',
     say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances at 5-on-5`,
@@ -45,6 +53,8 @@ export const TRAITS: Record<string, TraitInfo> = {
   defImpact: { group: 'Driving play at 5-on-5', label: 'Preventing chances', lo: 'Chances against rise', hi: 'Shuts it down',
     say: (v) => (Math.abs(v) < 0.01 ? 'about average: no measurable change in the opponent’s chances at 5-on-5' : v > 0 ? `takes ${v.toFixed(2)} expected goals per 60 off the opponent’s chances at 5-on-5` : `opponents get ${Math.abs(v).toFixed(2)} more expected goals per 60 at 5-on-5 with him out there`),
     tip: 'How much he cuts the opponent’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces (so facing top lines is not held against him), where his shifts start and the score. It sees chances, not the quality of defensive plays that public data does not record.' },
+  shThreat: { group: 'Special teams', label: 'Shorthanded threat', lo: 'Pure defense', hi: 'Power kill', say: (v) => `his team creates ${v.toFixed(2)} expected goals per 60 while killing penalties with him on the ice`,
+    tip: 'Chances his team creates while shorthanded with him on the ice, in expected goals per 60 of penalty-kill time: the “power kill”. It holds up well from season to season, so it is a real skill, not luck. Only rated for players with real penalty-kill time.' },
   hits: { group: 'Physical and puck', label: 'Hitting', lo: 'Avoids contact', hi: 'Physical', say: (v) => `a hitting score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} hits recorded per 60`,
     tip: 'Hits per 60 minutes, as an arena-adjusted score (100 is average for his position) because some arenas’ scorers count hits far more generously than others.' },
   blocks: { group: 'Physical and puck', label: 'Shot blocking', lo: 'Rarely blocks', hi: 'Shot blocker', say: (v) => `a shot-blocking score of ${Math.round(v)}`, raw: (v) => `${v.toFixed(2)} blocked shots recorded per 60`,
@@ -58,7 +68,7 @@ export const TRAITS: Record<string, TraitInfo> = {
   faceoffs: { group: 'Penalties and faceoffs', label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
     tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
 };
-export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Physical and puck', 'Penalties and faceoffs'];
+export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Special teams', 'Physical and puck', 'Penalties and faceoffs'];
 
 export const EDGE: Record<string, TraitInfo> = {
   topSpeed: { group: 'EDGE', label: 'Top speed', lo: 'Slower', hi: 'Burner', say: (v) => `${v.toFixed(1)} mph at his fastest`, tip: 'His fastest skating speed, measured by the NHL’s puck and player tracking (NHL EDGE).' },
@@ -95,9 +105,9 @@ export function standouts(p: Skater, mode: Mode) {
 
 export const roleTip: Record<string, string> = {
   Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
-  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over the last two seasons.',
-  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over the last two seasons.',
-  'Net-front': 'Net-front: at least 40% of his power-play shots come from within 15 feet of the net.',
+  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over this season and last, counting only games with his current team.',
+  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over this season and last, counting only games with his current team.',
+  'Net-front': 'Net-front: at least 40% of his power-play shots with his current team come from within 15 feet of the net.',
   Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
 };
 
