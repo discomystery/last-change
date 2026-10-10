@@ -1,0 +1,63 @@
+/* Gentle motion, for fun. Everything here is decoration: with reduced motion asked for, without
+   JavaScript, or in automated browsers the page looks exactly as it would without this file. */
+
+/* Page changes: a soft cross-fade between pages, with the header and phone tab bar held still.
+   Browsers without cross-document view transitions simply load the next page as before. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  .site-head { view-transition-name: site-head; }
+  .tabbar { view-transition-name: tabbar; }
+  ::view-transition-old(root) { animation: 160ms ease-in both lc-fade-out; }
+  ::view-transition-new(root) { animation: 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both lc-rise-in; }
+}
+@keyframes lc-fade-out { to { opacity: 0; } }
+@keyframes lc-rise-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* Cards and section headings ease up as they scroll into view. `html.motion` and `.rv` are set by the
+   script in Base.astro, which also adds `.seen` when the element is on screen. */
+html.motion .rv:not(.seen) { opacity: 0; transform: translateY(14px); }
+html.motion .rv.seen {
+  transition: opacity 0.5s ease var(--rv-delay, 0ms), transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--rv-delay, 0ms), translate 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Inside a card that has just come into view, the data draws itself. `backwards` holds the start
+   frame through each delay and hands back to the normal styles once done, so later changes
+   (the season switch, pickers) keep their own transitions. */
+html.motion .seen .dot { animation: lc-dot 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
+html.motion .seen .whisk { animation: lc-wipe 0.8s ease-out backwards; animation-delay: calc(var(--rv-delay, 0ms) + 250ms); }
+html.motion .seen .bar-fill { animation: lc-fill 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
+html.motion .seen .marker i { animation: lc-slide 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
+html.motion .seen .pips i.on { animation: lc-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) backwards; }
+html.motion .seen .pips i.on:nth-child(1) { animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
+html.motion .seen .pips i.on:nth-child(2) { animation-delay: calc(var(--rv-delay, 0ms) + 260ms); }
+html.motion .seen .pips i.on:nth-child(3) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
+html.motion .seen .pips i.on:nth-child(4) { animation-delay: calc(var(--rv-delay, 0ms) + 380ms); }
+html.motion .seen .pips i.on:nth-child(5) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
+html.motion .seen .histo-bar { transform-box: fill-box; transform-origin: bottom; animation: lc-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
+html.motion .seen .q-pt, html.motion .seen .quad g[class^='t-'] { animation: lc-fade 0.6s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
+html.motion .seen .shot { transform-box: fill-box; transform-origin: center; animation: lc-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
+html.motion .seen .shot:nth-child(3n) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
+html.motion .seen .shot:nth-child(3n + 1) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
+html.motion .seen .am-area use { animation: lc-fade 0.7s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
+
+/* Run it back: the 100 replays drop in one after another, away wins, ties, then home wins. */
+html.motion .seen .replays i { animation: lc-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 14ms + 150ms); }
+
+/* Folds open with a short slide instead of a jump. */
+html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+/* Cards that are links lift a little under the pointer. Uses `translate`, separate from the reveal's `transform`. */
+@media (hover: hover) {
+  html.motion :is(.tcard, .gcard, .prow) { transition: translate 0.2s ease, box-shadow 0.2s ease; }
+  html.motion :is(.tcard, .gcard, .prow):hover { translate: 0 -2px; box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--ink) 45%, transparent); }
+}
+
+@keyframes lc-fade { from { opacity: 0; } }
+@keyframes lc-dot { from { left: 50%; opacity: 0; } }
+@keyframes lc-wipe { from { clip-path: inset(0 50% 0 50%); } }
+@keyframes lc-fill { from { width: 0; } }
+@keyframes lc-slide { from { left: 0; opacity: 0; } }
+@keyframes lc-pop { from { opacity: 0; transform: scale(0.3); } }
+@keyframes lc-grow { from { transform: scaleY(0); } }
+
+@media print { html.motion .rv:not(.seen) { opacity: 1; transform: none; } }

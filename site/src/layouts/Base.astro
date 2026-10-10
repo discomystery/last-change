@@ -1,5 +1,6 @@
 ---
 import teams from '../../public/data/teams.json';
+import '../styles/motion.css';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
@@ -23,6 +24,14 @@ const teamList = teams as { abbr: string; name: string }[];
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
+    <script is:inline>
+      // Motion (styles/motion.css) only for visitors who have not asked for less of it, and never in automated browsers,
+      // so screenshots and checks see every card. If the reveal script below never starts, the class comes off again.
+      if (!navigator.webdriver && matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+        document.documentElement.classList.add('motion');
+        setTimeout(() => { if (!window.lcMotion) document.documentElement.classList.remove('motion'); }, 3000);
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Young+Serif&display=swap" rel="stylesheet" />
@@ -156,6 +165,35 @@ const teamList = teams as { abbr: string; name: string }[];
         document.addEventListener('click', (e) => { const el = target(e); if (!el) return hide(); current === el && !tip.hidden && e.pointerType === 'touch' ? hide() : show(el); });
         window.addEventListener('scroll', hide, { passive: true });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      })();
+    </script>
+    <script is:inline>
+      // Reveal cards, headings and charts as they scroll into view (see styles/motion.css). Cards a page script adds
+      // later, like a day's games, are picked up too. Ones that arrive together come in one after another.
+      (() => {
+        window.lcMotion = true;
+        const root = document.documentElement;
+        if (!root.classList.contains('motion') || !('IntersectionObserver' in window)) return root.classList.remove('motion');
+        const main = document.querySelector('main');
+        const SEL = '.card, .sec-head, .takeaway, .fold';
+        const io = new IntersectionObserver((entries) => {
+          let n = 0;
+          entries.filter((e) => e.isIntersecting).forEach((e) => {
+            e.target.style.setProperty('--rv-delay', Math.min(n++, 6) * 70 + 'ms');
+            e.target.classList.add('seen');
+            io.unobserve(e.target);
+          });
+        });
+        const watch = (el) => {
+          // A copied card (the teams page clones some) may carry `rv` without having been seen: watch it again.
+          if (el.classList.contains('rv')) return el.classList.contains('seen') || io.observe(el);
+          if (el.parentElement?.closest('.rv')) return;
+          el.classList.add('rv');
+          io.observe(el);
+        };
+        const scan = (node) => { if (node.matches?.(SEL)) watch(node); node.querySelectorAll?.(SEL).forEach(watch); };
+        scan(main);
+        new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((node) => node.nodeType === 1 && scan(node)))).observe(main, { childList: true, subtree: true });
       })();
     </script>
   </body>
