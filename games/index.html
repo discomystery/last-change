@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Games</title><meta name="description" content="Every NHL game: previews before puck drop, post-game pages after."><meta name="robots" content="noindex"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Young+Serif&display=swap" rel="stylesheet"><style>.page-top h1{font:700 clamp(34px, 7vw, 52px) / 1.05 var(--display);letter-spacing:-.02em;margin-top:22px}.pick{font:600 20px var(--display);flex-wrap:wrap;align-items:center;gap:10px;margin:18px 0 6px;display:flex}.pick select{font:600 17px var(--ui);color:var(--ink);background:var(--sheet);border:0;border-bottom:3px solid var(--ink);cursor:pointer;border-radius:8px 8px 0 0;padding:8px 10px}.strip-wrap{grid-template-columns:auto 1fr auto;align-items:center;gap:6px;margin-top:16px;display:grid}.days{scrollbar-width:none;gap:6px;padding:2px;display:flex;overflow-x:auto}.step{font:600 22px/1 var(--ui);border:1px solid var(--rule);background:var(--sheet);width:34px;height:54px;color:var(--ink);cursor:pointer;border-radius:10px}.day{border:1px solid var(--rule);background:var(--sheet);min-width:76px;color:var(--ink);cursor:pointer;font-family:var(--ui);border-radius:12px;justify-items:center;gap:1px;padding:7px 8px;display:grid}.day .d1{text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-size:11px;font-weight:600}.day .d2{font-size:15px;font-weight:700}.day .d3{color:var(--ink-3);font-size:11px}.day.today{border-color:var(--ink-3)}.day[aria-pressed=true]{background:var(--ink);color:var(--sheet);border-color:var(--ink)}.day[aria-pressed=true] span{color:var(--sheet)}.day-h{font:600 23px/1.15 var(--display);margin:26px 0 10px}.glist{gap:8px;display:grid}@media (width>=820px){.glist{grid-template-columns:1fr 1fr}}.gcard{border-radius:14px;grid-template-columns:1fr auto;align-items:center;gap:6px 14px;padding:12px 16px;display:grid}.gcard .g-when{font:600 12px var(--ui);color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;grid-column:1/-1}.gcard .g-teams{gap:4px;display:grid}.gcard .g-team{font:600 16px var(--ui);justify-content:space-between;gap:12px;display:flex}.gcard .g-sc{font:700 17px var(--display)}.gcard .g-acts{justify-self:end}.gcard .g-btn{font:600 13px var(--ui);border:1px solid var(--ink);white-space:nowrap;border-radius:999px;padding:7px 13px;text-decoration:none;display:inline-block}.gcard .g-btn:hover{background:var(--ink);color:var(--sheet)}.gcard .g-venue{grid-column:1/-1;font-size:12px}.gcard.next{outline:2px solid var(--ink)}.tlink{color:inherit;text-decoration:none}.tlink:hover{text-underline-offset:4px;text-decoration:underline}
+</style><link rel="stylesheet" href="/last-change/_astro/Base.BcYU6QFF.css"></head><body><div class="mockbar real" role="note"><strong>Real data.</strong> Everything on this page is computed from actual games.</div><header class="site-head"><div class="brand"><a class="wordmark" href="/last-change/">Last Change</a><span class="wordmark-note">working title</span><nav class="site-nav" aria-label="Site"><a id="my-team-link" class="my-team" href="/last-change/" data-base="/last-change/" hidden></a><a href="/last-change/games/" aria-current="page">Games</a><a href="/last-change/teams/">Teams</a><a href="/last-change/players/">Players</a><a href="/last-change/league/">League</a><a href="/last-change/record/">Track record</a><a class="minor" href="/last-change/methods/">Methods</a></nav></div><button type="button" class="prefs-toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs">Settings</button><div class="prefs" id="prefs" aria-label="Your settings"><label class="pref"><span>Your team</span><select id="team-pick"><option value="">Choose a team</option><option value="ANA">Anaheim Ducks</option><option value="BOS">Boston Bruins</option><option value="BUF">Buffalo Sabres</option><option value="CGY">Calgary Flames</option><option value="CAR">Carolina Hurricanes</option><option value="CHI">Chicago Blackhawks</option><option value="COL">Colorado Avalanche</option><option value="CBJ">Columbus Blue Jackets</option><option value="DAL">Dallas Stars</option><option value="DET">Detroit Red Wings</option><option value="EDM">Edmonton Oilers</option><option value="FLA">Florida Panthers</option><option value="LAK">Los Angeles Kings</option><option value="MIN">Minnesota Wild</option><option value="MTL">Montréal Canadiens</option><option value="NSH">Nashville Predators</option><option value="NJD">New Jersey Devils</option><option value="NYI">New York Islanders</option><option value="NYR">New York Rangers</option><option value="OTT">Ottawa Senators</option><option value="PHI">Philadelphia Flyers</option><option value="PIT">Pittsburgh Penguins</option><option value="SJS">San Jose Sharks</option><option value="SEA">Seattle Kraken</option><option value="STL">St. Louis Blues</option><option value="TBL">Tampa Bay Lightning</option><option value="TOR">Toronto Maple Leafs</option><option value="UTA">Utah Mammoth</option><option value="VAN">Vancouver Canucks</option><option value="VGK">Vegas Golden Knights</option><option value="WSH">Washington Capitals</option><option value="WPG">Winnipeg Jets</option></select></label><div class="pref"><span>Numbers from</span><div class="mode" role="group" aria-label="Which seasons the numbers use"><button type="button" data-pref="mode" data-value="blend">This season and last</button><button type="button" data-pref="mode" data-value="season">This season only</button></div></div><div class="pref"><span class="term" tabindex="0" data-tip="Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Arena-adjusted turns them into a score that corrects for that. Raw shows the numbers exactly as recorded.">Hits and takeaways</span><div class="mode" role="group" aria-label="Arena-adjusted scores or raw recorded numbers"><button type="button" data-pref="arena" data-value="adjusted">Arena-adjusted</button><button type="button" data-pref="arena" data-value="raw">Raw</button></div></div></div></header><main><header class="page-top"><h1>Games</h1></header><div class="pick" id="games-pick" data-base="/last-change/"><span>Show</span><select id="games-scope" aria-label="Which games"><option value="all">every game</option></select></div><div id="day-view"><div class="strip-wrap"><button type="button" class="step" id="prev-day" aria-label="Previous day">‹</button><ol class="days" id="days"></ol><button type="button" class="step" id="next-day" aria-label="Next day">›</button></div><h2 class="day-h" id="day-h"></h2><ul class="glist" id="day-games"></ul></div><div id="team-view" hidden></div><p class="note">Times are shown in your own time zone. Previews open a week before each game; post-game pages appear once the nightly update has the final result.</p></main><nav class="tabbar" aria-label="Site"><a href="/last-change/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z"></path></svg>Home</a><a href="/last-change/games/" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>Games</a><a href="/last-change/teams/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z"></path></svg>Teams</a><a href="/last-change/players/"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>Players</a><button type="button" id="more-toggle" aria-expanded="false" aria-controls="more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>More</button></nav><div class="more" id="more" hidden><a id="more-my-team" href="/last-change/" data-base="/last-change/" hidden>My team</a><a href="/last-change/league/">League</a><a href="/last-change/record/">Track record</a><a href="/last-change/methods/">Methods</a><a href="/last-change/check/">Real lines check</a><a href="/last-change/xg-check/">Chance check</a></div><footer class="site-foot"><p>Expected goals data from <a href="https://moneypuck.com">MoneyPuck.com</a>. Game data: NHL.</p><p>A fan project. Not affiliated with the NHL or any of its teams.</p><p class="checks">Behind the numbers: <a href="/last-change/methods/">Methods</a> · <a href="/last-change/check/">Real lines check</a> · <a href="/last-change/xg-check/">Chance check</a></p></footer><div id="tip" role="tooltip" hidden></div><script>
+      // Visitor settings: remembered in this browser only, applied before anything else runs.
+      (() => {
+        const defaults = { team: '', mode: 'blend', arena: 'adjusted' };
+        const read = (k) => { try { return localStorage.getItem('lc-' + k) || defaults[k]; } catch { return defaults[k]; } };
+        const root = document.documentElement;
+        const apply = (k, v) => {
+          root.dataset[k] = v;
+          document.querySelectorAll(`[data-pref="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
+          if (k === 'team') document.getElementById('team-pick').value = v;
+          if (k === 'team') {
+            ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
+            if (v) document.getElementById('my-team-link').textContent = v;
+          }
+        };
+        const set = (k, v) => {
+          try { localStorage.setItem('lc-' + k, v); } catch {}
+          apply(k, v);
+          document.dispatchEvent(new CustomEvent('prefs', { detail: { key: k, value: v } }));
+        };
+        window.lcPrefs = { get: (k) => root.dataset[k] ?? defaults[k], set };
+        Object.keys(defaults).forEach((k) => apply(k, read(k)));
+        document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
+        document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
+        const more = document.getElementById('more'), moreBtn = document.getElementById('more-toggle');
+        const setMore = (open) => { more.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
+        moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(more.hidden); });
+        document.addEventListener('click', (e) => { if (!more.hidden && !more.contains(e.target)) setMore(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
+        const toggle = document.getElementById('prefs-toggle');
+        toggle.addEventListener('click', () => {
+          const open = document.getElementById('prefs').classList.toggle('open');
+          toggle.setAttribute('aria-expanded', String(open));
+        });
+      })();
+    </script><script>
+      (() => {
+        const tip = document.getElementById('tip');
+        let current = null;
+        const show = (el) => {
+          current = el;
+          tip.textContent = el.dataset.tip;
+          tip.hidden = false;
+          const r = el.getBoundingClientRect();
+          const t = tip.getBoundingClientRect();
+          const left = Math.max(8, Math.min(window.innerWidth - t.width - 8, r.left + r.width / 2 - t.width / 2));
+          const above = r.top - t.height - 8;
+          tip.style.left = left + 'px';
+          tip.style.top = (above > 8 ? above : r.bottom + 8) + 'px';
+        };
+        const hide = () => { current = null; tip.hidden = true; };
+        const target = (e) => (e.target instanceof Element ? e.target.closest('[data-tip]') : null);
+        document.addEventListener('pointerover', (e) => { const el = target(e); if (el && e.pointerType !== 'touch') show(el); });
+        document.addEventListener('pointerout', (e) => { if (target(e) && e.pointerType !== 'touch') hide(); });
+        document.addEventListener('focusin', (e) => { const el = target(e); if (el) show(el); });
+        document.addEventListener('focusout', hide);
+        document.addEventListener('click', (e) => { const el = target(e); if (!el) return hide(); current === el && !tip.hidden && e.pointerType === 'touch' ? hide() : show(el); });
+        window.addEventListener('scroll', hide, { passive: true });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      })();
+    </script></body></html><script>
+  (async () => {
+    const host = document.getElementById('games-pick'), base = host.dataset.base;
+    const get = (n) => fetch(`${base}data/${n}.json`).then((r) => r.json());
+    const [teams, sched, pv, rc] = await Promise.all([get('teams'), get('schedule'), get('previews/index'), get('recaps/index')]);
+    const T = Object.fromEntries(teams.map((t) => [t.abbr, t]));
+    const PREVIEWS = new Set(pv.map((p) => p.id));
+    const RECAPS = new Set(rc.games.map((g) => g.id));
+    const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    const dayLong = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    const dayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const asDate = (d) => new Date(d + 'T12:00:00Z');
+    const teamLink = (a) => { const x = el('a', 'tlink', T[a]?.name ?? a); x.href = `${base}team/${a}/`; return x; };
+
+    const card = (g, me) => {
+      const li = el('li', 'card gcard');
+      const when = el('span', 'g-when', g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : time.format(g.t));
+      if (me) when.textContent = dayShort.format(asDate(g.date)) + ' · ' + when.textContent;
+      const row = (a, score) => { const r = el('span', 'g-team'); r.append(teamLink(a)); if (g.final) r.append(el('strong', 'g-sc', String(score))); return r; };
+      const teamsBox = el('span', 'g-teams');
+      teamsBox.append(row(g.away, g.as), row(g.home, g.hs));
+      const acts = el('span', 'g-acts');
+      if (g.final && RECAPS.has(g.id)) { const a = el('a', 'g-btn', 'Post-game'); a.href = `${base}recap/${g.id}/`; acts.append(a); }
+      else if (!g.final && PREVIEWS.has(g.id)) { const a = el('a', 'g-btn', 'Preview'); a.href = `${base}preview/${g.id}/`; acts.append(a); }
+      else if (!g.final) acts.append(el('span', 'n', 'Preview opens a week before'));
+      li.append(when, teamsBox, acts, el('span', 'g-venue n', g.venue ?? ''));
+      if (me) li.classList.add(g.home === me ? 'home' : 'road');
+      return li;
+    };
+
+    // Day view: a strip of every date with games; opens on today (or the next day with games).
+    const dates = [...new Set(games.map((g) => g.date))];
+    const today = new Date().toLocaleDateString('en-CA');
+    let current = location.hash.slice(1);
+    if (!dates.includes(current)) current = dates.find((d) => d >= today) ?? dates[dates.length - 1];
+    const strip = document.getElementById('days');
+    dates.forEach((d) => {
+      const li = el('li');
+      const b = el('button', 'day');
+      b.type = 'button';
+      b.dataset.date = d;
+      b.append(el('span', 'd1', dayShort.format(asDate(d)).replace(/,.*/, '')), el('span', 'd2', dayShort.format(asDate(d)).replace(/^[^,]*,\s*/, '')), el('span', 'd3', `${games.filter((g) => g.date === d).length} games`));
+      if (d === today) b.classList.add('today');
+      b.addEventListener('click', () => showDay(d));
+      li.append(b);
+      strip.append(li);
+    });
+    const showDay = (d) => {
+      current = d;
+      history.replaceState(null, '', '#' + d);
+      strip.querySelectorAll('.day').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.date === d)));
+      strip.querySelector(`[data-date="${d}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+      document.getElementById('day-h').textContent = (d === today ? 'Today, ' : '') + dayLong.format(asDate(d));
+      document.getElementById('day-games').replaceChildren(...games.filter((g) => g.date === d).map((g) => card(g)));
+    };
+    const step = (k) => { const i = dates.indexOf(current) + k; if (i >= 0 && i < dates.length) showDay(dates[i]); };
+    document.getElementById('prev-day').addEventListener('click', () => step(-1));
+    document.getElementById('next-day').addEventListener('click', () => step(1));
+
+    // Team view: the visitor's team's whole season, months as headings, scrolled to the next game.
+    const scope = document.getElementById('games-scope');
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const showTeam = (me) => {
+      const box = document.getElementById('team-view');
+      box.replaceChildren();
+      let cur = null, list = null;
+      games.filter((g) => g.home === me || g.away === me).forEach((g) => {
+        const m = month.format(asDate(g.date));
+        if (m !== cur) { cur = m; box.append(el('h2', 'day-h', m)); list = el('ul', 'glist'); box.append(list); }
+        const c = card(g, me);
+        if (!g.final && !box.querySelector('.next')) c.classList.add('next');
+        list.append(c);
+      });
+      box.querySelector('.next')?.scrollIntoView({ block: 'center' });
+    };
+    const apply = () => {
+      const mine = scope.value !== 'all';
+      document.getElementById('day-view').hidden = mine;
+      document.getElementById('team-view').hidden = !mine;
+      if (mine) showTeam(scope.value); else showDay(current);
+    };
+    const mine = window.lcPrefs?.get('team');
+    if (mine && T[mine]) { const o = el('option', null, `${T[mine].place}’s games`); o.value = mine; scope.append(o); }
+    scope.addEventListener('change', apply);
+    apply();
+  })();
+</script>
