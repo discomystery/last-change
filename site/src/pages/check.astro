@@ -8,11 +8,11 @@ const c = data.checks;
 ---
 <Base title="Real data check" mock={false}>
   <h1 class="page-top">Real lines from each team’s last game</h1>
-  <p class="lede">The first real output of the data pipeline: who actually played together at 5-on-5, for how long, and what happened while they were out there. Find a game you watched and see if it matches.</p>
+  <p class="lede">Who actually played together at 5-on-5, for how long, and what happened while they were out there. Find a game you watched and see if it matches.</p>
   <ul class="checks">
     <li><strong>{c.games}</strong> games this season processed</li>
     <li><strong>{c.toi_within_5s_pct}%</strong> of players’ ice time matches the official boxscore within 5 seconds</li>
-    <li><strong>{c.xg_match_rate_pct}%</strong> of {c.xg_shots.toLocaleString('en-US')} expected-goal shots matched to NHL events</li>
+    <li><strong>{c.xg_match_rate_pct}%</strong> of {c.xg_shots.toLocaleString('en-US')} of MoneyPuck’s shots matched to NHL events (we compare our expected goals with theirs as a check)</li>
   </ul>
   <nav class="jump" aria-label="Teams">{data.teams.map((t) => <a href={`#${t.team}`}>{t.team}</a>)}</nav>
   {data.teams.map((t) => (
