@@ -14,8 +14,9 @@ import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
+import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
-import { clock as mmss } from '../../lib/format';
+import { clock as mmss, compared } from '../../lib/format';
 import { matchupColours } from '../../lib/teams';
 import '../../styles/blocks.css';
 import teamsData from '../../../public/data/teams.json';
@@ -68,10 +69,10 @@ const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a
 const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
 
 // Lines and matchups
-type Unit = { label: string; players: string[]; seconds: number; toi_sec: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null> };
+type Unit = { label: string; players: string[]; gp?: number; new?: boolean; seconds: number; toi_sec: number | null; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null> };
 type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; seconds: number; share: number; rate: number; pct?: number };
-type LT = { games: number; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
+type LT = { games: number; settled?: { shuffled?: boolean }; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
 const LN = linesData.teams as unknown as Record<string, LT>;
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
 const lastName = (n: string) => n.split(' ').slice(1).join(' ');
@@ -101,7 +102,7 @@ const gModes = [['blend', 'this season and last'], ['season', 'this season']] as
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
   busy: (g) => `${g.sa60} shots faced per 60`,
-  danger: (g) => `the average shot against is worth ${(g.danger ?? 0).toFixed(3)} expected goals`,
+  danger: (g) => (g.danger ? `one expected goal for every ${(1 / g.danger).toFixed(1)} shots he faces` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
@@ -206,7 +207,7 @@ const _ = ordinal;
       <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
       <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
     </div>
-    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far). With so few games, each group’s results are pulled toward the average for its line number.</p>
+    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far), with each older game counting half as much as the one after it, so the latest combinations come first. With so few games, each group’s results are pulled toward the average for its line number.</p>
     <div class="two">
       {order.map((a) => (
         <div class={`t-${side(a)}`}>
@@ -216,14 +217,14 @@ const _ = ordinal;
               <li class="card unit">
                 <div class="unit-top">
                   <span class="unit-label">{u.label}</span>
-                  <span class="unit-toi"><strong>{mmss(u.toi_sec)}</strong> a game <Marker pct={u.pct.sec_pg ?? 50} tip={`More 5-on-5 ice time together than ${u.pct.sec_pg}% of ${peer[u.label]}. ${mmss(u.seconds)} together in all.`} /></span>
+                  <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
                 <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
                 <dl class="stats">
-                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`Creates more than ${u.pct.xgf60}% of ${peer[u.label]}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`Stingier than ${u.pct.xga60}% of ${peer[u.label]}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`A better share than ${u.pct.share}% of ${peer[u.label]}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`More offensive-zone faceoffs than ${u.pct.oz}% of ${peer[u.label]}.`} />}</div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share than', 'a worse share than', peer[u.label])}.`} /></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
                 </dl>
               </li>
             ))}
@@ -236,6 +237,7 @@ const _ = ordinal;
     {homeMu && homeMu.games > 0 ? (
       <>
         <p class="takeaway">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
+        {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing its forward lines, so the four named here (from its latest games) may not be the ones it sends out tonight.</p>}
         <div class="card stripcard">
           <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
           {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
@@ -294,7 +296,7 @@ const _ = ordinal;
               {(P?.pp ?? []).map((u, k) => (
                 <div class="stunit">
                   <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice.">{u.share}% of the time</span></p>
-                  <p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`More than ${u.pct}% of ${k ? 'second' : 'top'} power-play units. ${mmss(u.seconds)} on the ice.`} /></p>
+                  <p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`${compared(u.pct ?? 50, 'more than', 'less than', `${k ? 'second' : 'top'} power-play units`)}. ${mmss(u.seconds)} on the ice.`} /></p>
                   <ul class="roles-list">{u.players.map((pl) => <li><span><span class="plink" tabindex="0" data-shooter={pl.id}>{pl.name}</span>{pl.after && <span class="n both term" tabindex="0" data-tip={`${pl.after} usually takes the faceoff, then changes for ${pl.name}. Their ice time is counted together here.`}>({pl.after})</span>}{pl.both && <span class="n both term" tabindex="0" data-tip="He regularly stays out when the units change, so he is listed on both.">both units</span>}</span>{pl.role && <span class="chip tag" tabindex="0" data-tip={roleTip[pl.role]}>{pl.role}</span>}</li>)}</ul>
                 </div>
               ))}
@@ -335,12 +337,12 @@ const _ = ordinal;
             return (
               <div class:list={['card', 'gcard', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}>
                 <p class="gname"><i></i><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots, {words}</span></p>
-                <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Better than ${x.pct.gsax}% of goalies at stopping more than expected, per 60.`} />}</p>
+                <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                 <dl class="gkv">
                   {(['low', 'medium', 'high'] as const).map((t) => <div><dt>{t[0].toUpperCase() + t.slice(1)}-danger save %</dt><dd>{svp(x.tiers[t].sv)} <span class="n">{x.tiers[t].shots} shots</span></dd></div>)}
-                  <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60 ?? '–'} {!few && <Marker pct={x.pct.busy!} tip={`Busier than ${x.pct.busy}% of goalies.`} />}</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Dangerous chances his team gives up in front of him within seconds of losing the puck, per 60. Public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60 ?? '–'} {!few && <Marker pct={x.pct.breakdowns!} tip={`His team breaks down in front of him more than ${x.pct.breakdowns}% of goalies’ teams do.`} />}</dd></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`Steadier than ${x.pct.steady}% of goalies.`} />}</dd></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60 ?? '–'} {!few && <Marker pct={x.pct.busy!} tip={`${compared(x.pct.busy!, 'busier than', 'quieter than', 'goalies')}.`} />}</dd></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Dangerous chances his team gives up in front of him within seconds of losing the puck, per 60. Public data cannot see where defenders are.">Defensive breakdowns per 60</span></dt><dd>{x.bd60 ?? '–'} {!few && <Marker pct={x.pct.breakdowns!} tip={`${x.pct.breakdowns! > 55 ? `His team breaks down in front of him more often than ${x.pct.breakdowns}% of goalies’ teams do` : x.pct.breakdowns! < 45 ? `His team breaks down in front of him less often than ${100 - x.pct.breakdowns!}% of goalies’ teams do` : 'His team breaks down in front of him about as often as most'}.`} />}</dd></div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Share of starts where he gave his team a fair chance to win: a save percentage at or above league average, or at least .885 on a light night.">Quality starts</span></dt><dd>{x.qs === null ? '–' : `${x.qs}%`} {!few && <Pips pct={x.pct.steady!} tip={`${compared(x.pct.steady!, 'steadier than', 'streakier than', 'goalies')}.`} />}</dd></div>
                 </dl>
               </div>
             );
@@ -420,7 +422,7 @@ const _ = ordinal;
         })}
       </div>
     ))}
-    <p class="note">Teams’ goal mixes differ far less than a season suggests: over three seasons, most of the gap between one team and another in these rows was luck. Each team page shows how far luck alone could move each row.</p>
+    <p class="note">These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last. Each team page shows how much luck alone can move each row.</p>
   </Section>
 
   <Section id="notes" title="Data notes" placeholder={false}>
@@ -430,7 +432,7 @@ const _ = ordinal;
       <li><strong>Percentiles and ranks</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
       <li><strong>Blind spots.</strong> Public game data doesn’t record passes before a shot, where defenders are standing, or rushes up the ice, so the site shows none of those.</li>
       <li><strong>Hits, giveaways and takeaways</strong> depend on each arena’s scorer; anything built on them is arena-adjusted. <a href={`${base}methods/`}>How it works</a>.</li>
-      <li><strong>Key players</strong> will be added once player-level numbers are ready.</li>
+      <li><strong>Key players</strong> for each side are on the team pages.</li>
     </ul>
     <p class="note">Team pages: <a href={`${base}team/${away}/`}>{full(away)}</a> · <a href={`${base}team/${home}/`}>{full(home)}</a></p>
   </Section>

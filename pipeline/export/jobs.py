@@ -590,7 +590,7 @@ def count(n: int, one: str, many: str) -> str:
 
 
 def word(peer: str) -> str:
-    return {"F": "forward", "D": "defenseman", "C": "centre", "W": "winger"}[peer]
+    return {"F": "forward", "D": "defenseman", "C": "center", "W": "winger"}[peer]
 
 
 if __name__ == "__main__":

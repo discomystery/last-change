@@ -5,7 +5,7 @@ import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
 import { posWord, groupWord, ordinal, type Mode } from '../lib/players';
-import { clock } from '../lib/format';
+import { clock, compared } from '../lib/format';
 
 interface Props { abbr: string; place: string }
 const { abbr, place } = Astro.props;
@@ -42,12 +42,12 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
                   <ul class="kp-rows">
                     {best.map((it) => (
                       <li tabindex="0" data-tip={`${it.info.label}: better than ${it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
-                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
                       </li>
                     ))}
                     {worst.map((it) => (
                       <li class="weak" tabindex="0" data-tip={`${it.info.label}: behind ${100 - it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
-                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
                       </li>
                     ))}
                   </ul>

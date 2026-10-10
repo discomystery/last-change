@@ -22,7 +22,7 @@ const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
 const verdictWord = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
 const pillWord = { huge: 'Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
 const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
-const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centres', W: 'wingers' };
+const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
 const whyTag = (j: Job) => (j.why === 'role' ? 'Relied on' : 'Better than most'); // goalies' jobs ('core') carry no tag: the In net note says every goalie has the same three
 const whyTip = (j: Job) => {
   if (j.key === 'pp') return `He has averaged ${j.per_game} a game on the power play coming into this game.`;
@@ -41,7 +41,7 @@ const nightNote = (c: Card) => {
   if (c.night === 'rough' && c.summary === 'did') return ', though he still did his usual jobs.';
   return '.';
 };
-const posWord: Record<string, string> = { C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
+const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
 const signed = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${(-v).toFixed(1)}` : '0.0');
 const skaters = d ? d.players.filter((c) => c.pos !== 'G') : [];
 const gcards = d ? d.players.filter((c) => c.pos === 'G') : [];

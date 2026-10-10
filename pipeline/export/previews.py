@@ -42,14 +42,14 @@ MEASURE = {
 # The prediction itself, in plain words, for the team named first: the recap checks exactly this.
 CLASH_CALL = {
     "volume": lambda X, v: f"{X} takes at least its usual {v:.1f} shot attempts per 60 at 5-on-5.",
-    "quality": lambda X, v: f"{X} needs no more than its usual {1 / v:.1f} unblocked shots per expected goal.",
+    "quality": lambda X, v: f"{X} gets one expected goal from its usual {1 / v:.1f} shots or fewer.",
     "turnover": lambda X, v: f"At least its usual {v:.1f}% of {X}’s 5-on-5 chances come right after winning the puck.",
     "pp": lambda X, v: f"{X}’s power play creates at least its usual {v:.1f} expected goals per 60.",
 }
 # How each trait's value reads in a sentence, and whether its name takes a plural verb.
 SAY = {
     "volume": lambda v: f"{v:.1f} shot attempts per 60 at 5-on-5",
-    "quality": lambda v: f"one expected goal for every {1 / v:.1f} unblocked shots",
+    "quality": lambda v: f"one expected goal for every {1 / v:.1f} shots",
     "turnover": lambda v: f"{v:.1f}% of its chances come right after winning the puck",
     "pp": lambda v: f"{v:.1f} expected goals per 60",
 }
@@ -192,12 +192,12 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict) -> 
 # trait: (name, low end, high end, what the recap compares, how a single figure reads)
 EDGE = {
     "volume": ("shot volume", "selective", "relentless", "5-on-5 shot attempts per 60", lambda v: f"{v:.1f} per 60"),
-    "quality": ("shot quality", "perimeter", "point-blank", "how dangerous the average unblocked shot was", lambda v: f"1 goal per {1 / v:.1f} shots" if v else "–"),
+    "quality": ("shot quality", "perimeter", "point-blank", "how dangerous the average unblocked shot was", lambda v: f"1 expected goal per {1 / v:.1f} shots" if v else "–"),
     "suppression": ("shot suppression", "porous", "stingy", "5-on-5 shot attempts allowed per 60", lambda v: f"{v:.1f} per 60"),
-    "qualityAllowed": ("quality allowed", "exposed", "sheltered", "how dangerous the average shot allowed was", lambda v: f"1 goal per {1 / v:.1f} shots" if v else "–"),
+    "qualityAllowed": ("quality allowed", "exposed", "sheltered", "how dangerous the average shot allowed was", lambda v: f"1 expected goal per {1 / v:.1f} shots" if v else "–"),
     "point": ("point-shot reliance", "down low", "point-heavy", "share of 5-on-5 shot attempts from the point", lambda v: f"{v:.0f}%"),
-    "forecheck": ("forecheck pressure", "passive", "hounding", "forecheck score (arena-adjusted, 100 is league average)", lambda v: f"{v:.0f}"),
-    "physical": ("physicality", "finesse", "bruising", "hit score in close games (arena-adjusted, 100 is league average)", lambda v: f"{v:.0f}"),
+    "forecheck": ("forecheck pressure", "passive", "hounding", "forecheck score (arena-adjusted, 100 is league average)", lambda v: f"forecheck score {v:.0f}"),
+    "physical": ("physicality", "finesse", "bruising", "hit score in close games (arena-adjusted, 100 is league average)", lambda v: f"hit score {v:.0f}"),
     "depth": ("depth", "top-heavy", "deep", "bottom-six share of forward ice time", lambda v: f"{v:.0f}%"),
     "pp": ("power play", "harmless", "lethal", "power-play expected goals per 60", lambda v: f"{v:.1f} per 60"),
     "pk": ("penalty kill", "leaky", "airtight", "expected goals allowed per 60 on the penalty kill", lambda v: f"{v:.1f} per 60"),
