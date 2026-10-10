@@ -9,8 +9,8 @@ Nothing from the game day itself or later is used, with one exception: whether a
 his club (lines notes) comes from today's league listing, which keeps no history. Earlier seasons, the arena factors,
 score-and-venue weights and the xG model are all built from 2023-24 to 2025-26 only.
 
-Rebuilt calls are graded on the post-game page like any other but kept out of the season tally, because nobody could
-read them before the game.
+Rebuilt calls are graded on the post-game page like any other and count in the season tally like live ones (the
+user decided the difference is not relevant to fans).
 """
 import json
 import os
