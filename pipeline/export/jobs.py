@@ -62,7 +62,7 @@ UNIT = {"shooting": "shot attempts at 5-on-5", "chances": "expected goals from h
 RAW_COL = {"hits": "hits", "blocks": "blocks", "takeaways": "takes"}
 LABEL = {"shooting": "Shooting", "chances": "Getting to dangerous spots", "hits": "Hitting", "blocks": "Blocking shots",
          "takeaways": "Taking the puck away", "faceoffs": "Faceoffs", "offImpact": "Creating chances at 5-on-5",
-         "defImpact": "Preventing chances at 5-on-5", "pp": "Power play", "pk": "Penalty kill"}
+         "defImpact": "Preventing chances at 5-on-5", "pp": "Power play", "pk": "Kills penalties"}
 
 
 def clock(sec: float) -> str:
