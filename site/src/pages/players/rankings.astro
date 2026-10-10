@@ -1,0 +1,245 @@
+---
+// Skater rankings: who leads the league on each rating. With no rating chosen it opens on a board of leaders (top five
+// on every rating); picking one, or arriving from a percentile on a player page, shows the whole ranked list.
+import Base from '../../layouts/Base.astro';
+import teams from '../../../public/data/teams.json';
+import { skaters, RATINGS, ratingGroups, groupOf, ratingRows, roster, ordered, GROUP_PICK, modes } from '../../lib/leaders';
+import '../../styles/blocks.css';
+
+const base = import.meta.env.BASE_URL;
+const who = roster();
+const byId = new Map(who.map((p) => [p.id, p]));
+const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+// The board: top five on every rating for every comparison group and season mode, small enough to sit in the page.
+const board = Object.fromEntries(RATINGS.map((r) => {
+  const rows = ratingRows(r.key);
+  return [r.key, Object.fromEntries(GROUP_PICK.map(([g]) => [g, Object.fromEntries(modes.map((m) => [m, ordered(rows[m], g, byId).slice(0, 5).map((x) => ({ id: x.id, n: x.n, s: x.s, t: x.t }))]))]))];
+}));
+const info = Object.fromEntries(RATINGS.map((r) => [r.key, { label: r.info.label, tip: r.info.tip, lo: r.info.lo, hi: r.info.hi, edge: r.edge, raw: !!r.info.raw }]));
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(skaters[0]?.generated_at ?? Date.now()));
+---
+<Base section="players" title="Skater rankings" mock={false} description="Every NHL skater ranked on every rating: who creates the most chances, shoots the most, kills penalties best, skates fastest.">
+  <header class="page-top"><h1>Skater rankings</h1></header>
+  <p class="lede">Who leads the league on each rating. Pick a rating to see every regular ranked, or start from the leaders below.</p>
+  <nav class="ptabs" aria-label="Players"><a href={`${base}players/`}>Find a player</a><a href={`${base}players/rankings/`} aria-current="page">Rankings</a></nav>
+
+  <div class="pick" id="pick">
+    <span>Rank</span>
+    <select id="grp" aria-label="Which players">{GROUP_PICK.map(([v, w]) => <option value={v}>{w}</option>)}</select>
+    <span>by</span>
+    <select id="rating" aria-label="Rating">
+      <option value="">every rating (leaders)</option>
+      {ratingGroups.map((g) => <optgroup label={g}>{RATINGS.filter((r) => groupOf(r) === g).map((r) => <option value={r.key}>{r.info.label.toLowerCase()}</option>)}</optgroup>)}
+    </select>
+    <span class="on-team">on</span>
+    <select id="team" class="on-team" aria-label="Team">
+      <option value="">every team</option>
+      {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
+    </select>
+  </div>
+
+  <!-- The board of leaders. -->
+  <div id="board">
+    {ratingGroups.map((g) => (
+      <section class="lb-group">
+        <h2 class="lb-h">{g}</h2>
+        <div class="lb-grid">
+          {RATINGS.filter((r) => groupOf(r) === g).map((r) => (
+            <a class="card lb-card" href={`?t=${r.key}`} data-key={r.key}>
+              <p class="lb-title">{r.info.label}<span class="lb-more">See all →</span></p>
+              <ol class="lb-top" data-key={r.key}></ol>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+
+  <!-- One full ranking. -->
+  <div id="one" hidden>
+    <label class="search">
+      <span class="sr">Find a player in this ranking</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+      <input id="q" type="search" placeholder="Find someone in this list" autocomplete="off" spellcheck="false" />
+    </label>
+    <div class="card rank-card">
+      <p class="rank-tip"><span class="term" id="r-label" tabindex="0"></span>: <span id="r-tip"></span></p>
+      <p class="note" id="r-who"></p>
+      <div class="key"><span class="rng">Likely range</span><span class="you">Your team</span></div>
+      <div class="rank-ends"><span></span><span></span><div class="ends"><span id="r-lo"></span><span id="r-hi"></span></div></div>
+      <ol class="ranks pranks" id="list"></ol>
+      <p class="note" id="empty" hidden>Nobody matches. Try part of the last name.</p>
+      <button type="button" class="fold-btn" id="more" hidden></button>
+    </div>
+  </div>
+  <script type="application/json" id="board-data" set:html={JSON.stringify(board)}></script>
+  <script type="application/json" id="info-data" set:html={JSON.stringify(info)}></script>
+  <script type="application/json" id="who-data" set:html={JSON.stringify(who)}></script>
+</Base>
+
+<script is:inline define:vars={{ base, asOf }}>
+  (() => {
+    const board = JSON.parse(document.getElementById('board-data').textContent);
+    const info = JSON.parse(document.getElementById('info-data').textContent);
+    const who = new Map(JSON.parse(document.getElementById('who-data').textContent).map((p) => [p.id, p]));
+    const root = document.documentElement;
+    const grp = document.getElementById('grp'), rating = document.getElementById('rating'), team = document.getElementById('team'), q = document.getElementById('q');
+    const groupWord = { F: 'forwards', C: 'centers', W: 'wingers', D: 'defensemen' };
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const mode = () => (root.dataset.mode === 'season' ? 'season' : 'blend');
+    const raw = () => root.dataset.arena === 'raw';
+    const pname = (p) => `<a class="plink" href="${base}player/${p.id}/">${esc(p.n)}</a>`;
+    const tname = (abbr) => `<a class="tlink lteam" href="${base}team/${abbr}/">${abbr}</a>`;
+    const params = new URLSearchParams(location.search);
+    let focus = +params.get('p') || 0, showAll = false, cache = {};
+
+    const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+    const inGroup = (g, p) => (g === 'F' ? p.g === 'F' : g === 'D' ? p.g === 'D' : p.sub === g);
+    // Same rule as the build: a rating's own league rank when it compares exactly this group, else the order down the list.
+    const ordered = (rows, g) => {
+      let xs = rows.filter((r) => { const p = who.get(r.id); return p && inGroup(g, p); });
+      if (raw() && xs[0] && xs[0].rr !== undefined) return [...xs].sort((a, b) => b.rp - a.rp || b.rr - a.rr).map((r, i) => ({ ...r, n: i + 1, p: r.rp, lo: r.rp, hi: r.rp, s: r.rs, t: r.rt }));
+      if (xs.every((r) => r.vs === g)) return xs.map((r) => ({ ...r, n: r.r }));
+      const best = xs.reduce((a, b) => (b.p > a.p ? b : a), xs[0]), worst = xs.reduce((a, b) => (b.p < a.p ? b : a), xs[0]);
+      const up = !best || best.v >= worst.v ? 1 : -1;
+      return [...xs].sort((a, b) => up * (b.v - a.v) || b.p - a.p).map((r, i) => ({ ...r, n: i + 1 }));
+    };
+
+    const paintBoard = () => {
+      const g = grp.value, m = mode(), mine = window.lcPrefs?.get('team');
+      document.querySelectorAll('.lb-top').forEach((ol) => {
+        const xs = board[ol.dataset.key][g][m];
+        ol.innerHTML = xs.length ? xs.map((x) => { const p = who.get(x.id); return `<li class="${p.t === mine ? 'mine' : ''}" data-tip="${esc(p.n)}: ${esc(x.t)}"><span class="lb-rk">${x.n}</span><span class="lb-who">${esc(p.l)} <span class="lb-t">${p.t}</span></span><span class="lb-v">${esc(x.s)}</span></li>`; }).join('') : '<li class="n">Not rated for this group</li>';
+      });
+      document.querySelectorAll('.lb-card').forEach((a) => { a.href = `?t=${a.dataset.key}&g=${g}`; a.hidden = !board[a.dataset.key][g][m].length; });
+    };
+
+    const row = (x, mine) => {
+      const p = who.get(x.id);
+      const cls = [x.id === focus ? 'focus' : '', p.t === mine ? 'mine' : ''].join(' ');
+      return `<li class="${cls}" data-id="${x.id}" style="--v:${x.p};--lo:${x.lo};--hi:${x.hi}">
+        <span class="rk">${x.n}</span>
+        <span class="rname gwho">${pname(p)} ${tname(p.t)}</span>
+        <div class="lanes"><div class="lane"><span class="whisk"></span><span class="dot"></span></div></div>
+        <span class="say" data-tip="${esc(x.t)} Better than ${x.p}% of ${groupWord[x.vs] || 'his position'}." tabindex="0">${esc(x.s)}</span></li>`;
+    };
+    const gapRow = (n) => `<li class="gap"><span></span><span class="n">${n} more</span></li>`;
+
+    const paintList = async () => {
+      const key = rating.value, i = info[key], m = mode(), g = grp.value, mine = window.lcPrefs?.get('team');
+      if (!cache[key]) cache[key] = await (await fetch(`${base}data/rankings/${key}.json`)).json();
+      const all = ordered(cache[key][m], g);
+      document.getElementById('r-label').textContent = i.label;
+      document.getElementById('r-label').dataset.tip = i.tip;
+      document.getElementById('r-tip').textContent = i.tip;
+      document.getElementById('r-lo').textContent = i.lo;
+      document.getElementById('r-hi').textContent = i.hi;
+      const split = all.length && !all.every((r) => r.vs === g);
+      document.getElementById('r-who').textContent = all.length
+        ? `${all.length} ${groupWord[g]} rated ${m === 'blend' ? 'over this season and last' : 'this season'}, through ${asOf}.` + (split ? ' On this rating centers and wingers are compared with their own kind, so the dots show where each sits among his own group.' : '')
+        : `No ${groupWord[g]} are rated on this one.`;
+      const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
+      let xs = all.filter((x) => { const p = who.get(x.id); return (!team.value || p.t === team.value) && words.every((w) => fold(p.n).includes(w)); });
+      const list = document.getElementById('list'), more = document.getElementById('more');
+      const TOP = 25;
+      let html;
+      if (showAll || words.length || team.value || xs.length <= TOP + 5) html = xs.map((x) => row(x, mine)).join('');
+      else {
+        const at = xs.findIndex((x) => x.id === focus);
+        if (at >= TOP) {
+          const lo = Math.max(TOP, at - 3), hi = Math.min(xs.length, at + 4);
+          html = xs.slice(0, 10).map((x) => row(x, mine)).join('') + gapRow(lo - 10) + xs.slice(lo, hi).map((x) => row(x, mine)).join('');
+        } else html = xs.slice(0, TOP).map((x) => row(x, mine)).join('');
+      }
+      list.innerHTML = html;
+      document.getElementById('empty').hidden = xs.length > 0;
+      more.hidden = showAll || words.length > 0 || !!team.value || xs.length <= TOP + 5;
+      more.textContent = `Show all ${xs.length} ${groupWord[g]}`;
+    };
+
+    const show = (push) => {
+      const key = rating.value;
+      document.getElementById('board').hidden = !!key;
+      document.getElementById('one').hidden = !key;
+      document.querySelectorAll('.on-team').forEach((e) => { e.hidden = !key; });
+      if (push) {
+        const u = new URLSearchParams();
+        if (key) u.set('t', key);
+        if (grp.value !== 'F') u.set('g', grp.value);
+        if (focus) u.set('p', focus);
+        history.replaceState(null, '', `${location.pathname}${u.toString() ? '?' + u : ''}`);
+      }
+      if (key) paintList().then(() => { const f = document.querySelector('#list li.focus'); if (f && push === false) f.scrollIntoView({ block: 'center' }); });
+      else paintBoard();
+    };
+
+    // Arriving from a player page: ?t=rating&g=group&p=player.
+    if (params.get('t') && info[params.get('t')]) rating.value = params.get('t');
+    if (params.get('g') && groupWord[params.get('g')]) grp.value = params.get('g');
+    [grp, rating, team].forEach((s) => s.addEventListener('change', () => { showAll = false; if (s !== team) focus = 0; show(true); }));
+    q.addEventListener('input', () => paintList());
+    document.getElementById('more').addEventListener('click', () => { showAll = true; paintList(); });
+    document.addEventListener('prefs', () => show(true));
+    show(false);
+  })();
+</script>
+
+<style is:global>
+  .ptabs { display: flex; gap: 6px; margin: 14px 0 0; }
+  .ptabs a { font: 600 14px var(--ui); color: var(--ink-2); padding: 7px 14px; border-radius: 999px; background: var(--track); text-decoration: none; }
+  .ptabs a[aria-current] { background: var(--ink); color: var(--sheet); }
+  .on-team[hidden] { display: none; }
+  .lb-group { margin-top: 26px; }
+  .lb-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 10px; }
+  .lb-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
+  .lb-card { display: block; color: inherit; text-decoration: none; padding: 14px 16px; }
+  .lb-card[hidden] { display: none; }
+  .lb-card:hover { box-shadow: 0 0 0 2px var(--ink) inset; }
+  .lb-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 600 17px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
+  .lb-more { font: 500 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .lb-card:hover .lb-more { color: var(--ink); }
+  .lb-top { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1.4em 1fr auto; gap: 4px 8px; font: 400 14px var(--ui); }
+  .lb-top li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; padding: 2px 6px; margin-inline: -6px; }
+  .lb-top li.mine { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); border-radius: 8px; }
+  .lb-rk { color: var(--ink-3); font-weight: 600; font-size: 12px; text-align: right; }
+  .lb-who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-t { font: 500 11px var(--ui); color: var(--ink-3); }
+  .lb-v { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+  #one .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 2px 14px; margin-top: 10px; max-width: 420px; }
+  #one .search svg { width: 20px; height: 20px; fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; flex: none; }
+  #one .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--ui); padding: 10px 0; outline: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .rank-card { margin-top: 14px; }
+  .rank-tip { font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
+  .rank-tip .term { font-weight: 600; color: var(--ink); }
+  .key .you { display: inline-flex; }
+  .key .you::before { content: ''; width: 22px; height: 12px; border-radius: 4px; background: var(--track); display: inline-block; }
+  .ranks { display: flex; flex-direction: column; margin-top: 10px; list-style: none; padding: 0; }
+  .ranks li, .rank-ends { display: grid; grid-template-columns: 2.4em minmax(170px, 240px) minmax(120px, 1fr) minmax(170px, 240px); gap: 0 16px; align-items: center; }
+  .ranks li { padding: 7px 8px; margin-inline: -8px; border-top: 1px solid var(--rule); }
+  .ranks li.gap { color: var(--ink-3); font-size: 13px; padding-block: 10px; border-top-style: dashed; }
+  .ranks li.gap .n { grid-column: 2 / -1; }
+  .pranks .lane { --v: inherit; --lo: inherit; --hi: inherit; }
+  .rank-ends { margin-top: 14px; }
+  .rank-ends .ends { grid-column: 3; margin: 0; padding-inline: 7px; }
+  .rk { font: 600 13px var(--ui); color: var(--ink-3); text-align: right; }
+  .rname { font: 600 15px var(--ui); min-width: 0; }
+  .gwho { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .lteam { font: 500 12px var(--ui); color: var(--ink-3); }
+  .say { font: 400 14px/1.35 var(--ui); color: var(--ink-2); cursor: help; font-variant-numeric: tabular-nums; }
+  li.mine { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); border-radius: 10px; border-top-color: transparent; }
+  li.focus { background: var(--track); border-radius: 10px; border-top-color: transparent; box-shadow: inset 0 0 0 2px var(--ink); }
+  li.focus .rk, li.mine .rk { color: var(--ink); }
+  .fold-btn { display: block; width: 100%; margin-top: 14px; padding: 12px 16px; border: 0; border-radius: 14px; background: var(--track); font: 500 15px var(--ui); color: var(--ink); cursor: pointer; }
+  .fold-btn:hover { background: var(--rule); }
+  .fold-btn::after { content: ' +'; }
+  @media (max-width: 719px) {
+    .ranks li, .rank-ends { grid-template-columns: 2em minmax(0, 1fr) 34%; gap: 2px 12px; }
+    .ranks .gwho { gap: 2px 6px; }
+    .ranks .plink { font-size: 14px; }
+    .ranks .say { grid-column: 2 / -1; font-size: 13px; }
+    .rank-ends > span:nth-child(2) { display: none; }
+    .rank-ends .ends { grid-column: 3; }
+  }
+</style>
