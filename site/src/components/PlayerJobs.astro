@@ -4,6 +4,7 @@
 // written by pipeline/export/jobs.py from games before this one only, so a card never changes after the game.
 import Section from './Section.astro';
 import PLink from './PLink.astro';
+import Portrait from './Portrait.astro';
 
 type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
@@ -52,7 +53,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   const card = (c: Card) => (
     <li class:list={['card', 'pc', `t-${side(c.team)}`, !c.jobs.length && 'bare']}>
       <div class="pc-top">
-        <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
+        <span class="pc-name"><Portrait name={c.name} size={40} /><PLink id={c.id} name={c.name} /></span>
         <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>
       </div>
       {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
@@ -189,7 +190,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   @media (min-width: 760px) { .gcols { grid-template-columns: 1fr 1fr; } .gnote { grid-column: 1 / -1; } }
   .pc { display: grid; gap: 12px; align-content: start; }
   .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-  .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
+  .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 10px; }
   .pc-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
   .pc-sum { margin-left: auto; font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
   .pc-sum.did { background: var(--ink); color: var(--sheet); }

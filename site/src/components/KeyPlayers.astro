@@ -2,6 +2,8 @@
 // Key players: one compact card per player the team leans on most. Name and season line, his jobs as short tags (from
 // how he is used), and what he does better than most at his position as one row each. Detail lives in tooltips.
 import PLink from './PLink.astro';
+import Portrait from './Portrait.astro';
+import { teamColour } from '../lib/teams';
 import Pips from './Pips.astro';
 import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
 import { posWord, groupWord, ordinal, rankTag, rankTip, topShare, type Mode } from '../lib/players';
@@ -21,8 +23,9 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
       {list.map(({ p, jobs, strengths }) => {
         const st = p.stats.season;
         return (
-          <li class="card kpc">
+          <li class="card kpc" style={`--team:${teamColour(abbr)}`}>
             <div class="kp-top">
+              <Portrait name={p.name} number={p.number} size={56} />
               <p class="kp-name"><PLink id={p.id} name={p.name} /></p>
               {st && <p class="kp-toi" data-tip="Ice time a game this season, all situations." tabindex="0"><strong>{clock(st.toi)}</strong> a game</p>}
             </div>
@@ -63,7 +66,8 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
 <style>
   .kp { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
   .kpc { display: flex; flex-direction: column; gap: 8px; }
-  .kp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .kp-top { display: flex; align-items: center; gap: 12px; }
+  .kp-toi { margin-left: auto; }
   .kp-name { font: 600 21px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
   .kp-toi { font: 400 13px var(--ui); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; cursor: help; }
   .kp-toi strong { font-size: 15px; color: var(--ink); }

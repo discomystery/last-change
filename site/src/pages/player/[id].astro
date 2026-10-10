@@ -3,6 +3,7 @@
 // his shots, and NHL EDGE tracking. Goalies: role, the goalie card and where the shots he faces come from.
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
+import Portrait from '../../components/Portrait.astro';
 import AreaMap from '../../components/AreaMap.astro';
 import AreaShapes from '../../components/AreaShapes.astro';
 import SectionNav from '../../components/SectionNav.astro';
@@ -95,11 +96,16 @@ const statRow = (x: any) => (isG ? null : x);
 <Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
   <div class="player" style={`--team:${teamColour(p.team)}`}>
-    <header class="team-top">
-      <h1>{p.name}</h1>
-      <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
-    </header>
-    <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
+    <div class="phead">
+      <Portrait name={p.name} number={p.number} size={112} />
+      <div>
+        <header class="team-top">
+          <h1>{p.name}</h1>
+          <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
+        </header>
+        <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
+      </div>
+    </div>
     <SectionNav items={nav as [string, string][]} />
     {!isG && (
       <table class="pstats">
@@ -386,6 +392,9 @@ const statRow = (x: any) => (isG ? null : x);
 </script>
 
 <style>
+  .phead { display: flex; align-items: center; gap: 20px; margin-top: 22px; }
+  .phead .team-top { margin-top: 0; }
+  @media (max-width: 520px) { .phead { gap: 14px; } .phead :global(.pt) { --s: 76px !important; } }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
   .rec a { color: inherit; }
   .pstats { margin-top: 18px; border-collapse: collapse; font: 400 14px var(--ui); background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px; overflow: hidden; }
