@@ -6,8 +6,9 @@ import teams from '../../public/data/teams.json';
 import recapIndex from '../../public/data/recaps/index.json';
 import previewIndex from '../../public/data/previews/index.json';
 
-interface Props { id: number }
-const { id } = Astro.props;
+// `part` picks the trail back to the day's games (above the rink) or each team's previous and next game (below it).
+interface Props { id: number; part: 'crumbs' | 'around' }
+const { id, part } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const games = [...schedule.games].sort((a, b) => a.start.localeCompare(b.start));
 const g = games.find((x) => x.id === id)!;
@@ -31,31 +32,47 @@ const around = [g.away, g.home].map((me) => {
   return { me, prev: mine[i - 1], next: mine[i + 1] };
 });
 ---
-{g && (
-  <nav class="trail" aria-label="Where this game sits">
-    <p class="crumbs"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></p>
-    <ul class="around">
-      {around.map(({ me, prev, next }) => (
-        <li>
-          <a class="who tlink" href={`${base}team/${me}/`}>{place[me] ?? me}</a>
-          {prev ? <a class="step" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="step n">First game</span>}
-          {next ? <a class="step" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="step n">Last game</span>}
-        </li>
-      ))}
-    </ul>
-  </nav>
+{g && part === 'crumbs' && (
+  <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav>
+)}
+{g && part === 'around' && (
+  <div class="under">
+    <div class="when"><slot /></div>
+    {around.map(({ me, prev, next }, i) => (
+      <nav class:list={['around', i ? 'home' : 'away']} aria-label={`${place[me] ?? me}: previous and next game`}>
+        <a class="who tlink" href={`${base}team/${me}/`}>{me}</a>
+        <span class="pills">
+          {prev ? <a class="pill" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="pill none">First game</span>}
+          {next ? <a class="pill" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="pill none">Last game</span>}
+        </span>
+      </nav>
+    ))}
+  </div>
 )}
 
 <style>
-  .trail { margin-top: 14px; display: grid; gap: 10px; font: 400 13px var(--ui); }
-  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--ink-2); }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
   .crumbs a { color: inherit; }
   .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
-  .around { display: grid; gap: 6px; }
-  @media (min-width: 760px) { .around { grid-template-columns: 1fr 1fr; gap: 6px 24px; } }
-  .around li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
-  .who { font-weight: 700; color: var(--ink); min-width: 90px; }
-  .step { color: var(--ink-2); text-decoration: none; white-space: nowrap; }
-  a.step:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-  .tlink { text-decoration: none; }
+  /* Under the rink: when the game is in the middle, and each team's previous and next game under its own end of the rink. */
+  .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; padding-inline: 5.5%; }
+  /* The side padding lines the buttons up with the rink's goal lines, not its rounded ends. */
+  .when { grid-area: when; text-align: center; font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .around { display: grid; gap: 6px; justify-items: start; }
+  .around.away { grid-area: away; }
+  .around.home { grid-area: home; justify-items: end; }
+  /* On wide screens each team's games sit under its own end of the rink, so the name is only needed on phones. */
+  .who { display: none; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .who:hover { color: var(--ink); }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .home .pills { justify-content: flex-end; }
+  .pill { font: 500 13px var(--ui); text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
+  a.pill:hover { border-color: var(--ink); }
+  .pill.none { background: none; color: var(--ink-3); }
+  @media (max-width: 719px) {
+    .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; }
+    .who { display: block; }
+    .pills { flex-direction: column; align-items: flex-start; }
+    .home .pills { align-items: flex-end; }
+  }
 </style>

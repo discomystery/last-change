@@ -5,7 +5,6 @@
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
   .next { margin-top: 18px; }
-  .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
   .cols { display: grid; gap: 0 28px; }
   @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
   .cols .sub { margin-top: 22px; }
