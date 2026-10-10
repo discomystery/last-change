@@ -14,10 +14,11 @@ from pipeline.config import TABLES
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
 ATTEMPTS = UNBLOCKED | {"blocked-shot"}
 TURNOVER_WINDOW = 5  # seconds from a turnover to a shot for it to count as off-turnover
-POINT_DISTANCE = 50  # feet
+POINT_DISTANCE = 50  # feet; only for the retired "point" trait, kept so calls frozen under it still grade
+CLOSE_DISTANCE = 20  # feet from the middle of the goal line: "in close"
 BREAKDOWN_XG = 0.15  # an off-turnover shot at least this dangerous counts as a breakdown chance
 FACEOFF_WINDOW = 5  # seconds from an offensive-zone faceoff win to a goal for it to count as off the draw
-COUNTS = ["cf", "ff", "sf", "gf", "xgf", "reb_xgf", "to_xgf", "point_cf", "hits", "gives", "takes", "blocks"]
+COUNTS = ["cf", "ff", "sf", "gf", "xgf", "reb_xgf", "to_xgf", "point_cf", "d_cf", "close_ff", "hits", "gives", "takes", "blocks"]
 
 
 def _state(diff: int) -> int:
@@ -86,7 +87,9 @@ def build(season: int) -> dict:
         if typ in ATTEMPTS:
             xg = e["xGoal"] or 0.0
             far = e["x_norm"] is not None and math.hypot(89 - e["x_norm"], e["y_norm"]) > POINT_DISTANCE
-            point = pos.get((gid, e["p1"])) == "D" or far
+            by_d = pos.get((gid, e["p1"])) == "D"
+            point = by_d or far
+            close = e["x_norm"] is not None and math.hypot(89 - e["x_norm"], e["y_norm"]) <= CLOSE_DISTANCE
             off_turnover = home in last_turnover and e["sec"] - last_turnover[home] <= TURNOVER_WINDOW
             # No rush flag: shots within seconds of an event outside the offensive zone (the public sites' rule) score
             # less often than ordinary shots in this data, so the rule does not find rushes. Tested 2026-10-09.
@@ -94,8 +97,12 @@ def build(season: int) -> dict:
                 bump(side, "c" + sfx)
                 if point:
                     bump(side, "point_c" + sfx)
+                if by_d:
+                    bump(side, "d_c" + sfx)
                 if typ in UNBLOCKED:
                     bump(side, "f" + sfx)
+                    if close:
+                        bump(side, "close_f" + sfx)
                     bump(side, "xg" + sfx, xg)
                     if e["shotRebound"]:
                         bump(side, "reb_xg" + sfx, xg)
@@ -133,7 +140,7 @@ def build(season: int) -> dict:
                 bump(home, "oz_takes")
 
     cols = ["sec", "cf", "ca", "ff", "fa", "sf", "sa", "gf", "ga", "xgf", "xga", "reb_xgf", "reb_xga",
-            "to_xgf", "to_xga", "point_cf", "point_ca", "hits", "gives", "takes", "blocks", "bd_f", "bd_a", "oz_hits", "oz_takes", "forced_gives"]
+            "to_xgf", "to_xga", "point_cf", "point_ca", "d_cf", "d_ca", "close_ff", "close_fa", "hits", "gives", "takes", "blocks", "bd_f", "bd_a", "oz_hits", "oz_takes", "forced_gives"]
     table = pl.DataFrame(
         [{"game_id": k[0], "team_id": k[1], "is_home": k[2], "strength": k[3], "score_state": k[4], **{c: float(v.get(c, 0.0)) for c in cols}} for k, v in rows.items()]
     )

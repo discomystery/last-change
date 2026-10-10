@@ -44,9 +44,9 @@ const gamesRange = (() => { const g = Object.values(fp).map((t) => t.games); ret
 const f1 = (v: number) => v.toFixed(1), f2 = (v: number) => v.toFixed(2);
 const signed = (v: number, d: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
 const numFmt: Record<string, [(v: number) => string, string]> = {
-  volume: [f1, 'attempts per 60'], quality: [(v) => f1(1 / v), 'shots per expected goal'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
-  turnover: [(v) => `${f1(v)}%`, 'of chances'], point: [(v) => `${f1(v)}%`, 'of attempts'], suppression: [f1, 'allowed per 60'],
-  qualityAllowed: [(v) => f1(1 / v), 'shots per expected goal'], breakdowns: [f2, 'per 60'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
+  volume: [f1, 'attempts per 60'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
+  turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], suppression: [f1, 'allowed per 60'],
+  qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
   pace: [f1, 'shots per 60, both teams'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
   depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
   discipline: [(v) => signed(v, 2), 'drawn minus taken per 60'],
@@ -89,7 +89,7 @@ const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
   busy: (g) => `${g.sa60} shots faced per 60`,
-  danger: (g) => (g.danger ? `one expected goal for every ${(1 / g.danger).toFixed(1)} shots he faces` : '–'),
+  danger: (g) => (g.danger ? `the average shot he faces has a ${(100 * g.danger).toFixed(1)}% chance of going in` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
@@ -285,7 +285,7 @@ const _ = ordinal;
     ))}
   </Section>
 
-  <Section id="goalies" title="Goalies" placeholder={false} takeaway="Who is stopping more than he should, and what each team asks its goalie to face.">
+  <Section id="goalies" title="Goalies" placeholder={false} takeaway="Who is stopping more than he should, and what each team asks their goalie to face.">
     {modes.map((m) => {
       const q = quad(m);
       return (

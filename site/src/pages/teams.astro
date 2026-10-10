@@ -12,7 +12,7 @@ const confs = ['Eastern', 'Western'];
 const divs = (c: string) => [...new Set(all.filter((t) => t.conference === c).map((t) => t.division))].sort();
 const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, start: g.start, home: g.home, away: g.away }));
 ---
-<Base section="teams" title="Teams" mock={false} description="All 32 NHL teams: how each one plays, its lines, special teams and goalies.">
+<Base section="teams" title="Teams" mock={false} description="All 32 NHL teams: how each one plays, their lines, special teams and goalies.">
   <header class="page-top"><h1>Teams</h1></header>
   <div class="pick">
     <span>Show teams</span>

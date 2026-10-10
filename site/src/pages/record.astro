@@ -22,10 +22,13 @@ const day = (iso: string, opts: Intl.DateTimeFormatOptions = { month: 'short', d
 const n = total(calls.tally);
 
 const kindInfo: Record<string, { label: string; rule: string }> = {
-  clash: { label: 'Strength meets weakness', rule: 'Held up if the team reached its usual level' },
-  edge: { label: 'One team comes out ahead', rule: 'Held up if it won by half its usual margin' },
-  contrast: { label: 'One team comes out ahead', rule: 'Held up if it won by half its usual margin' },
-  pace: { label: 'Pace of the game', rule: 'Held up if the game ran at the teams’ usual pace' },
+  clash: { label: 'Strength meets weakness', rule: 'Held up if the team reached their usual level' },
+  edge: { label: 'One team comes out ahead', rule: 'Held up if they won by half their usual margin' },
+  contrast: { label: 'One team comes out ahead', rule: 'Held up if they won by half their usual margin' },
+  duel: { label: 'Strength against strength', rule: 'Held up if the side we picked won out, judged against the league average' },
+  changed: { label: 'Not the team you remember', rule: 'Held up if the team played more like this season than their two-season level' },
+  history: { label: 'A goalie record that’s a coincidence', rule: 'Held up if his night was closer to his usual than to that record' },
+  pace: { label: 'Pace of the game', rule: 'Held up if the game ran at the teams’ usual pace (newer previews: faster or slower than either team’s usual)' },
   physical: { label: 'A physical game', rule: 'Held up if the hit score reached the teams’ usual' },
   matchup: { label: 'Line matching', rule: 'Held up if the coach matched lines as usual at home' },
 };

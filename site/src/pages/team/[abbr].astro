@@ -71,7 +71,7 @@ const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
   busy: (g) => `${g.sa60} shots faced per 60`,
-  danger: (g) => (g.danger ? `one expected goal for every ${(1 / g.danger).toFixed(1)} shots he faces` : '–'),
+  danger: (g) => (g.danger ? `the average shot he faces has a ${(100 * g.danger).toFixed(1)}% chance of going in` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots; ${g.long_wait}% come after three quiet minutes`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
