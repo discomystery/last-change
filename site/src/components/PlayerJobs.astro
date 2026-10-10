@@ -6,7 +6,8 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 
 type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
-type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'big' | 'rough' | null; night_why: string | null };
+type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
+type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
@@ -18,7 +19,8 @@ const order = d ? [d.away, d.home] : [];
 const SHOWN = 6; // cards visible before the fold, per team (most ice time first)
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
 const verdictWord = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
-const summaryWord = { did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night' } as const;
+const pillWord = { huge: 'Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
+const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
 const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centres', W: 'wingers' };
 const whyTag = (j: Job) => (j.why === 'role' ? 'Relied on' : 'Better than most');
 const whyTip = (j: Job) => {
@@ -30,8 +32,12 @@ const whyTip = (j: Job) => {
 };
 // When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.
 const nightNote = (c: Card) => {
-  if (c.night === 'big' && (c.summary === 'mixed' || c.summary === 'didnt')) return '. A strong game, even though his usual jobs were quieter.';
-  if (c.night === 'rough' && c.summary === 'did') return '. A hard night on the scoresheet, though he still did his usual jobs.';
+  const quiet = c.summary === 'mixed' || c.summary === 'didnt';
+  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but his usual jobs went quiet.';
+  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but his usual jobs went quiet.';
+  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even though his usual jobs were quieter.';
+  if (c.night === 'good') return c.pill === 'big' ? ', on top of doing his usual jobs.' : ', so it counts for more.';
+  if (c.night === 'rough' && c.summary === 'did') return ', though he still did his usual jobs.';
   return '.';
 };
 const posWord: Record<string, string> = { C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defense' };
@@ -48,18 +54,18 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
     {order.map((t, i) => {
       const mine = d.players.filter((c) => c.team === t);
       const card = (c: Card) => (
-        <li class:list={['card', 'pc', `t-${side(t)}`]}>
+        <li class:list={['card', 'pc', `t-${side(t)}`, !c.jobs.length && 'bare']}>
           <div class="pc-top">
             <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
-            {c.night ? <span class:list={['pc-sum', c.night === 'big' ? 'did' : 'didnt']}>{c.night === 'big' ? 'Big night' : 'Rough night'}</span>
-              : c.summary && <span class:list={['pc-sum', c.summary]}>{summaryWord[c.summary]}</span>}
+            <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>
           </div>
-          {c.night && <p class="pc-night">{c.night_why}{nightNote(c)}</p>}
+          {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
           <dl class="pc-box">
             <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={`All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
             <div><dt>G</dt><dd>{c.box.g}</dd></div>
             <div><dt>A</dt><dd>{c.box.a}</dd></div>
             <div><dt><span class="term" tabindex="0" data-tip="Plus-minus, as the NHL counts it: goals for minus goals against while he was on the ice, leaving out power-play goals.">+/−</span></dt><dd>{c.box.pm > 0 ? `+${c.box.pm}` : c.box.pm < 0 ? `−${-c.box.pm}` : '0'}</dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip={`Expected goals at 5-on-5 with him on the ice: ${c.box.xgf.toFixed(2)} for his team, ${c.box.xga.toFixed(2)} against, adjusted for score and venue. It counts the chances, not just the goals.`}>xGF–xGA</span></dt><dd>{c.box.xgf.toFixed(1)}–{c.box.xga.toFixed(1)}</dd></div>
             <div><dt>Shots</dt><dd>{c.box.sog}</dd></div>
             <div><dt>Hits</dt><dd>{c.box.hits}</dd></div>
             <div><dt>Blocks</dt><dd>{c.box.blocks}</dd></div>
@@ -87,11 +93,14 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
         </div>
       );
     })}
-    <p class="note">
-      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary.
-      Listed by ice time, most first. Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
-    </p>
-    <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>
+    <details class="fold how">
+      <summary><span class="show">How the cards are graded</span><span class="hide">Hide how the cards are graded</span></summary>
+      <div class="how-body">
+        <p class="note"><strong>✓</strong> a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
+        <p class="note"><strong>Huge night</strong>: a hat trick or four or more points. <strong>Big night</strong>: two or more points, or a goal from a player who scores in fewer than one game in five on top of doing his jobs. <strong>Rough night</strong>: no points while the other team had 70% or more of the 5-on-5 chances with him on (xGF–xGA). Plus-minus never sets the level. A shorthanded goal counts as two points. Points never fully cover for jobs that went badly: with his jobs off, a huge night reads big and a big night reads mixed.</p>
+        <p class="note">Judged only from games before this one; 5-on-5 rates adjusted for score and venue. One game is a small sample: even a strong player misses a typical night about half the time. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.</p>
+      </div>
+    </details>
 
     {d.stood_out.length > 0 && (
       <>
@@ -160,6 +169,10 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
   .pc-sum { margin-left: auto; font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
   .pc-sum.did { background: var(--ink); color: var(--sheet); }
+  .how { margin-top: 16px; }
+  .how-body { display: grid; gap: 8px; padding-top: 12px; }
+  .pc-sum.rough { background: var(--ink-3); border-color: var(--ink-3); color: var(--sheet); }
+  .pc-sum.huge { background: var(--team); border-color: var(--team); color: var(--sheet); }
   .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
   .pc-night { font: 500 14px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
   .pc-box { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
@@ -167,6 +180,8 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-box dt { font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .pc-box dd { font: 700 17px/1.3 var(--ui); }
   .pc-jobs { display: grid; gap: 10px; }
+  .pc.bare .pc-jobs { display: none; }
+  .pc.bare .pc-box { border-bottom: 0; padding-bottom: 0; }
   .job { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; cursor: help; }
   .job-l { font: 600 15px/1.3 var(--ui); }
   .job-u { display: block; font: 400 12px/1.35 var(--ui); color: var(--ink-3); }
@@ -177,8 +192,8 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .job.missed .job-v, .job.na .job-v { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
   .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; }
   .job.na .job-l { color: var(--ink-2); }
-  .more-cards .hide, .more-cards[open] .show { display: none; }
-  .more-cards[open] .hide { display: inline; }
+  .more-cards .hide, .more-cards[open] .show, .how .hide, .how[open] .show { display: none; }
+  .more-cards[open] .hide, .how[open] .hide { display: inline; }
   .sub-take { color: var(--ink-2); margin-top: -4px; }
   .news { margin-top: 14px; }
   .news-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; }

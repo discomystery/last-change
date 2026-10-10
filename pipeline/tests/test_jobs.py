@@ -6,7 +6,7 @@ import pytest
 
 from pipeline.config import SITE_DATA
 from pipeline.config import RAW, TABLES
-from pipeline.export.jobs import binom_tail, grade, night, plus_minus, poisson_median, poisson_tail, summary
+from pipeline.export.jobs import GRID, RARE_GOAL, binom_tail, box_extras, grade, poisson_median, poisson_tail, scoresheet, scoring_odds, summary
 
 
 def test_typical_night_is_the_median_count():
@@ -35,10 +35,21 @@ def test_grades_like_preview_calls():
 
 def test_summary():
     assert summary([]) is None
-    assert summary(["held", "held", "partly"]) == "did"
-    assert summary(["held", "missed"]) == "mixed"
-    assert summary(["held", "missed", "missed"]) == "didnt"
-    assert summary(["partly", "partly"]) == "mixed"
+    assert summary([("hits", "held"), ("shooting", "held"), ("blocks", "partly")]) == "did"
+    assert summary([("hits", "held"), ("shooting", "missed")]) == "mixed"
+    assert summary([("hits", "held"), ("shooting", "missed"), ("blocks", "missed")]) == "didnt"
+    assert summary([("hits", "partly"), ("shooting", "na")]) == "mixed"
+    # power play and penalty kill results are shared by the unit, so they count half
+    assert summary([("pp", "missed"), ("pk", "missed"), ("shooting", "held")]) == "mixed"
+    assert summary([("pp", "held"), ("pk", "held"), ("shooting", "missed")]) == "mixed"
+
+
+def test_scoring_odds():
+    # a defenseman with 3 goals in 80 games rarely scores; a 40-goal pace forward does
+    assert scoring_odds(3, 80, 0.08) < RARE_GOAL
+    assert scoring_odds(40, 80, 0.25) > RARE_GOAL
+    # two goals in two games is mostly the position average, not a sniper
+    assert scoring_odds(2, 2, 0.08) < RARE_GOAL
 
 
 @pytest.mark.skipif(not (SITE_DATA / "jobs").exists(), reason="needs exported report cards")
@@ -47,24 +58,43 @@ def test_exported_cards_are_well_formed():
         d = json.loads(p.read_text())
         assert {c["team"] for c in d["players"]} <= {d["away"], d["home"]}
         for c in d["players"]:
-            assert len(c["jobs"]) <= 3 and (c["jobs"] or c["night"])
+            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt", "rough")
             for j in c["jobs"]:
                 assert j["verdict"] in ("held", "partly", "missed", "na") and j["text"]
                 assert "deserve" not in j["text"].lower()
         assert len(d["stood_out"]) <= 5
 
 
-def test_night_overrides_quiet_jobs():
-    box = {"g": 0, "a": 2, "pm": 1}
-    assert night(box, None)[0] == "big" and night(box, None)[1] == "2 assists, +1"
-    assert night({"g": 0, "a": 0, "pm": -3}, 0.4)[0] == "rough"
-    assert night({"g": 0, "a": 1, "pm": 0}, 0.5) == (None, None)
+def test_scoresheet_levels():
+    box = lambda g=0, a=0, pm=0, sh=0, pp=0: {"g": g, "a": a, "pm": pm, "sh": sh, "pp": pp, "ev": g - sh - pp}
+    assert scoresheet(box(a=2, pm=1), None) == ("big", "2 assists")
+    assert scoresheet(box(g=3, pm=2, sh=1, pp=1), 1.0)[0] == "huge"
+    assert "one shorthanded, one on the power play, one at even strength" in scoresheet(box(g=3, pm=2, sh=1, pp=1), 1.0)[1]
+    assert scoresheet(box(a=4), None)[0] == "huge"
+    # a shorthanded goal counts as two points
+    assert scoresheet(box(g=1, sh=1), None)[0] == "big"
+    # a goal matters more from someone who rarely scores
+    assert scoresheet(box(g=1), None, scoring_odds=0.09)[0] == "good"
+    assert scoresheet(box(g=1), None, scoring_odds=0.35) == (None, None)
+    # plus-minus never sets the level
+    assert scoresheet(box(pm=4), 0.9) == (None, None) and scoresheet(box(pm=-4), 0.5) == (None, None)
+    # a rough night is being badly out-chanced with no points
+    assert scoresheet({**box(), "xga": 1.2}, 0.2)[0] == "rough"
+    assert scoresheet({**box(), "xga": 0.4}, 0.2) == (None, None)  # too few chances either way to call it
+    assert scoresheet({**box(a=1), "xga": 1.2}, 0.2) == (None, None)
+    assert scoresheet(box(a=1, pm=2), 0.9) == (None, None)
+
+
+def test_grid_never_fully_bails_out_missed_jobs():
+    assert GRID["huge"]["didnt"] == "big" and GRID["big"]["didnt"] == "mixed" and GRID["good"]["didnt"] == "mixed"
+    assert GRID["huge"]["mixed"] == "huge" and GRID["good"]["did"] == "big" and GRID["rough"]["did"] == "mixed"
+    assert all(GRID[None][s] == (s if s else None) for s in ("did", "mixed", "didnt", None))
 
 
 @pytest.mark.skipif(not (RAW / "2026" / "box").exists() or not (TABLES / "2026" / "events.parquet").exists(), reason="needs 2026 raw boxscores")
 def test_plus_minus_comes_from_the_nhl_boxscore():
     import gzip
-    pm = plus_minus(2026)
+    pm = {k: v["pm"] for k, v in box_extras(2026).items()}
     checked = 0
     for f in sorted((RAW / "2026" / "box").glob("*.json.gz")):
         d = json.loads(gzip.decompress(f.read_bytes()))
