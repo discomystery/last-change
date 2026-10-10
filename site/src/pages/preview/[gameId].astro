@@ -176,7 +176,7 @@ const _ = ordinal;
     {notes.length > 0 && (
       <div class="card worth">
         <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> <NoteText text={n.text} names={n.names} /></li>)}</ul>
+        <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
@@ -453,6 +453,8 @@ const _ = ordinal;
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
   .watch + .worth { margin-top: 16px; }
+  .tpill { display: inline-block; background: color-mix(in oklab, var(--team) 16%, transparent); color: var(--ink); padding: 1px 9px; border-radius: 999px; font: 700 13px/1.6 var(--ui); text-decoration: none; margin-right: 2px; }
+  .tpill:hover { background: color-mix(in oklab, var(--team) 28%, transparent); }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
