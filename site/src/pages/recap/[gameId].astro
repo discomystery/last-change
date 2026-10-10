@@ -88,7 +88,10 @@ const replayBody = !dw ? '' : pct(loser) >= 60
   : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
-const hasJobs = Object.keys(import.meta.glob('../../../public/data/jobs/2*.json')).some((k) => k.endsWith(`/${r.game_id}.json`));
+const jobFiles = import.meta.glob<{ default: { game_id: number; players: { pos: string }[] } }>('../../../public/data/jobs/2*.json', { eager: true });
+const jobs = Object.values(jobFiles).find((f) => f.default.game_id === r.game_id)?.default;
+const hasJobs = !!jobs?.players.some((c) => c.pos !== 'G');
+const hasGoalieCards = !!jobs?.players.some((c) => c.pos === 'G');
 const nav = [
   ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
   ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
@@ -214,7 +217,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
   <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
-  <Section id="goalies" title="In net" placeholder={false} takeaway="How many goals each goalie stopped beyond what the shots he faced were worth.">
+  <Section id="goalies" title="In net" placeholder={false} takeaway={hasGoalieCards ? "Each goalie’s night: the goals he stopped beyond what the shots were worth, and the dangerous and routine saves." : "How many goals each goalie stopped beyond what the shots he faced were worth."}>
+    {hasGoalieCards ? <PlayerJobs gameId={r.game_id} place={place} side={side} goalies /> : (
     <ul class="two gl">
       {r.goalies.map((g) => (
         <li class:list={['card', `t-${side(g.team)}`]}>
@@ -223,6 +227,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
         </li>
       ))}
     </ul>
+    )}
     <p class="note">Empty-net shots are left out. Expected-goal models can’t see passes before a shot, so a goalie beaten by cross-ice passes looks worse here than he really was.</p>
   </Section>
 
