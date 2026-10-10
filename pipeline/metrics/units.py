@@ -11,6 +11,7 @@ from pipeline.config import REGULAR, TABLES
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
 WINDOW_GAMES = 10
 SHRINK_MINUTES = 120  # early-season line results are pulled toward the average for that line number
+DECAY = 0.5  # weight of each older game when choosing lines; tested on 2024-25 and 2025-26 (0.35-0.5 best, 1.0 = even)
 
 
 def game_units(season: int) -> pl.DataFrame:
@@ -60,10 +61,10 @@ def game_units(season: int) -> pl.DataFrame:
     return out
 
 
-def _pick(units: pl.DataFrame, count: int) -> list[dict]:
+def _pick(units: pl.DataFrame, count: int, by: str = "sec") -> list[dict]:
     """Most ice time first, skipping any group that shares a player with one already chosen."""
     chosen, used = [], set()
-    for row in units.sort("sec", descending=True).iter_rows(named=True):
+    for row in units.sort(by, descending=True).iter_rows(named=True):
         players = set(row["unit"].split("-"))
         if players & used:
             continue
@@ -82,12 +83,32 @@ def usual(season: int) -> dict[int, dict]:
         dates = t.select("game_id", "date").unique().sort("date", "game_id")
         window = dates.tail(WINDOW_GAMES)["game_id"].to_list()
         last = dates["game_id"][-1]
-        recent = t.filter(pl.col("game_id").is_in(window)).group_by("kind", "unit").agg(pl.exclude("game_id", "date", "team_id").sum())
+        sub = t.filter(pl.col("game_id").is_in(window))
+        age = {g: len(window) - 1 - k for k, g in enumerate(window)}
+        sub = sub.with_columns(wsec=pl.col("sec") * DECAY ** pl.col("game_id").replace_strict(age))
+        # A group's "proper" games: the games where it was one of that night's lines or pairs (picked the same way as
+        # the listed ones, from that game alone). Its ice time a game is averaged over those games only.
+        proper = []
+        for (gid, kind), g in sub.group_by("game_id", "kind"):
+            proper += [{"game_id": gid, "kind": kind, "unit": u["unit"]} for u in _pick(g, 4 if kind == "F" else 3)]
+        proper = pl.DataFrame(proper, schema={"game_id": pl.Int64, "kind": pl.String, "unit": pl.String}).with_columns(proper=pl.lit(True))
+        sub = sub.join(proper, on=["game_id", "kind", "unit"], how="left").with_columns(pl.col("proper").fill_null(False))
+        recent = sub.group_by("kind", "unit").agg(
+            pl.exclude("game_id", "date", "team_id", "proper").sum(), gp=pl.col("proper").sum(), sec_gp=pl.col("sec").filter(pl.col("proper")).sum(),
+            in_last=(pl.col("proper") & (pl.col("game_id") == last)).any())
         in_last = t.filter(pl.col("game_id") == last)
-        entry = {"games": len(window), "last_game": last, "units": [], "last": []}
+        entry = {"games": len(window), "last_game": last, "units": [], "last": [], "settled": {}}
         for kind, count, tag in (("F", 4, "L"), ("D", 3, "P")):
-            for i, u in enumerate(_pick(recent.filter(pl.col("kind") == kind), count)):
+            pool = recent.filter(pl.col("kind") == kind)
+            # Lines are chosen and numbered by recent ice time together, each older game counting half as much as the
+            # one after it: coaches change lines, and the latest combinations are the best guess for the next game.
+            for i, u in enumerate(_pick(pool, count, by="wsec")):
+                u["sec_pg"] = u["sec_gp"] / u["gp"] if u["gp"] else None
+                u["new"] = len(window) > 1 and u["gp"] == 1 and u["in_last"]  # a line for the first time last game
                 entry["units"].append({"label": f"{tag}{i + 1}", **u})
+            # How settled the lineup is: the four most-used groups' share of all the team's 5v5 time in trios (or pairs).
+            total = pool["sec"].sum()
+            entry["settled"][kind] = sum(u["sec"] for u in _pick(pool, count)) / total if total else None
             entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"]} for i, u in enumerate(_pick(in_last.filter(pl.col("kind") == kind), count))]
         teams[tid] = entry
 
@@ -108,8 +129,6 @@ def usual(season: int) -> dict[int, dict]:
             fo = u["oz_fo"] + u["dz_fo"]
             u["oz"] = 100 * u["oz_fo"] / fo if fo else None
         for stat, higher in (("xgf60", True), ("xga60", False), ("share", True), ("sec_pg", True), ("oz", True)):
-            for u in group:
-                u["sec_pg"] = u["sec"] / teams_games(teams, u)
             vals = [u[stat] for u in group if u[stat] is not None]
             for u in group:
                 if u[stat] is None:
@@ -117,11 +136,13 @@ def usual(season: int) -> dict[int, dict]:
                     continue
                 below = sum(v < u[stat] for v in vals) if higher else sum(v > u[stat] for v in vals)
                 u[f"{stat}_pct"] = round(100 * (below + 0.5) / len(vals))
+    for kind in ("F", "D"):
+        vals = [e["settled"][kind] for e in teams.values() if e["settled"][kind] is not None]
+        for e in teams.values():
+            v = e["settled"][kind]
+            e["settled"][f"{kind}_rank"] = None if v is None else 1 + sum(x > v for x in vals)
+            e["settled"][f"{kind}_median"] = sorted(vals)[len(vals) // 2] if vals else None
     return teams
-
-
-def teams_games(teams: dict, unit: dict) -> int:
-    return next(e["games"] for e in teams.values() if unit in e["units"])
 
 
 def special_usage(season: int) -> pl.DataFrame:
