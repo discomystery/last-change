@@ -215,7 +215,7 @@ const _ = ordinal;
         <select id="tb-rest" aria-label="What happens to the other teams" hidden><option value="dim">and fade the rest</option><option value="hide">and hide the rest</option></select>
       </div>
     </div>
-    <div class="key tkey"><span class="ramp"><i></i></span><span>Shading runs toward the right-hand word on each trait’s scale</span><span class="you">Your team is outlined</span></div>
+    <div class="key tkey"><span class="ramp"><i></i></span><span>Darker is better, or simply more of it where neither end is better</span><span class="you">Your team is outlined</span></div>
     <p class="note">Tap any column heading to sort by it; tap again to flip the order. Point at a box for the number in words.</p>
     <div class="tb-wrap" id="tb-wrap">
       <table class="tb" id="tb">
@@ -228,9 +228,8 @@ const _ = ordinal;
           <tr>
             {gTraits.map((t, i) => (
               <th class:list={['tb-h', { first: i === 0 || gTraits[i - 1].group !== t.group }]} data-k={t.key}>
-                <button type="button" data-sort={t.key} data-tip={`${t.label}. ${t.tip} Rank 1 is the most ${t.hi.toLowerCase()}, 32 the most ${t.lo.toLowerCase()}.`}>
+                <button type="button" data-sort={t.key} data-tip={`${t.label}. ${t.tip} Darker boxes are more ${t.hi.toLowerCase()}; paler ones more ${t.lo.toLowerCase()}.`}>
                   <span class="tb-l">{t.label}</span>
-                  <span class="tb-u v-rank">1 = {t.hi}</span>
                   <span class="tb-u v-num">{rawUnit[t.key] ? <><span class="a-adj">{numFmt[t.key][1]}</span><span class="a-raw">{rawUnit[t.key]}</span></> : numFmt[t.key][1]}</span>
                   <i></i>
                 </button>
@@ -583,7 +582,6 @@ const _ = ordinal;
   .tb-u { font: italic 400 11px/1.2 var(--body); color: var(--ink-3); text-transform: none; }
   .tb-u.v-num { display: none; }
   .tb.nums .tb-u.v-num { display: inline; }
-  .tb.nums .tb-u.v-rank { display: none; }
   .tb [data-sort] i { height: 8px; font-style: normal; }
   .tb th.sorted [data-sort] { color: var(--ink); }
   .tb th.sorted [data-sort] i::after { content: '▼'; font-size: 8px; }
