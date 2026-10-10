@@ -113,7 +113,7 @@ def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool
             "game_id": gid, "date": g["date"], "home": g["home"], "away": g["away"],
             "home_score": g["home_score"], "away_score": g["away_score"], "last_period": g["last_period"],
             # Expected goals after flurries are collapsed (a flurry counts once, at its combined chance).
-            "home_xg": float(hp.sum()), "away_xg": float(ap.sum()),
+            "home_xg": float(hp.sum()), "away_xg": float(ap.sum()), "home_chances": int(hp.size), "away_chances": int(ap.size),
             "home_reg_win": win, "reg_tie": tie, "away_reg_win": loss,
             "home_deserve": win + tie / 2, "away_deserve": loss + tie / 2,
             "home_won": g["home_score"] > g["away_score"],

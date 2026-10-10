@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
-from pipeline.metrics import adjust, goalies, team_style
+from pipeline.metrics import adjust, deserve, goalies, team_style
 
 PP_STRENGTHS = {"5v4", "5v3", "4v3"}
 MIN_PP_SEC = 60  # less power-play time than this and a power-play call can't be judged
@@ -217,6 +217,14 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
     return out[:4]
 
 
+def deserve_block(row: dict, away: str, home: str) -> dict:
+    """Deserve-to-win shares for the post-game meter: replays of regulation chances, level replays split evenly."""
+    return {"share": {away: round(row["away_deserve"], 3), home: round(row["home_deserve"], 3)},
+            "regulation": {away: round(row["away_reg_win"], 3), "tie": round(row["reg_tie"], 3), home: round(row["home_reg_win"], 3)},
+            "xg": {away: round(row["away_xg"], 2), home: round(row["home_xg"], 2)},
+            "chances": {away: row["away_chances"], home: row["home_chances"]}}
+
+
 def run(season: int = CURRENT_SEASON) -> dict:
     teams = json.loads((SITE_DATA / "teams.json").read_text())
     places = {t["abbr"]: t["place"] for t in teams}
@@ -224,6 +232,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     usual_lines = {t: [u["ids"] for u in v["units"] if u["label"][0] == "L"] for t, v in lines.items()}
     S = Season(season)
+    meter = {r["game_id"]: r for r in deserve.season_table(season).iter_rows(named=True)}
     out_dir = SITE_DATA / "recaps"
     out_dir.mkdir(parents=True, exist_ok=True)
     snaps = {}
@@ -250,7 +259,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
-               "numbers": nums, "goalies": glines, "surprises": surprises(S, gid, nums, places, fp, usual_lines, glines)}
+               "numbers": nums, "goalies": glines, "surprises": surprises(S, gid, nums, places, fp, usual_lines, glines),
+               "deserve": deserve_block(meter[gid], g["away"], g["home"]) if gid in meter else None}
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
         index.append({"id": gid, "date": g["date"], "away": g["away"], "home": g["home"], "score": rec["score"], "end": g["last_period"],
