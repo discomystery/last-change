@@ -87,6 +87,14 @@ const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot qu
     </div>
   </Section>
 
+  <Section id="sources" title="Where the data comes from" placeholder={false} takeaway="Everything is built from the NHL’s own public data.">
+    <div class="card explain">
+      <p><strong>Games.</strong> Play-by-play, shifts, boxscores, rosters, standings and the schedule come from the NHL’s public game data, updated twice a day. When the shift feed is missing a game, the NHL’s official time-on-ice reports fill the gap.</p>
+      <p><strong>Skating and shot speed.</strong> Player pages use NHL EDGE, the league’s puck and player tracking.</p>
+      <p><strong>Expected goals.</strong> Every expected-goal number on the site comes from our own model (above). We also download <a href="https://moneypuck.com">MoneyPuck.com</a>’s shot data as an outside check on ours; it appears only on the <a href={`${import.meta.env.BASE_URL}xg-check/`}>Chance check</a> page, beside our rating.</p>
+    </div>
+  </Section>
+
   <Section id="per60" title="What “per 60” means" placeholder={false} takeaway="Most rates on the site are per 60 minutes of ice time.">
     <div class="card explain">
       <p>A top line plays far more than a fourth line, and a team with a lot of power plays gets far more power-play shots than one with few. To compare them fairly, almost every rate on the site is scaled to 60 minutes of ice time in that situation: “2.9 expected goals per 60” means what the group would produce in a full hour at its current pace. Ice time itself is written as minutes and seconds, like 9:15.</p>

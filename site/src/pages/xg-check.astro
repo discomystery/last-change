@@ -7,7 +7,7 @@ const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%
 ---
 <Base title="Expected goals check" mock={false}>
   <h1 class="page-top">How dangerous was that chance?</h1>
-  <p class="lede">Our own expected-goals model rates every shot by how often shots like it go in. Here is every goal and the eight best chances that didn’t go in, from each team’s most recent game. Pick a game you watched and see whether the ratings match your memory.</p>
+  <p class="lede">Our own expected-goals model rates every shot by how often shots like it go in. Here is every goal and the eight best chances that didn’t go in, from each team’s most recent game. Pick a game you watched and see whether the ratings match your memory. MoneyPuck.com’s rating of the same shot is shown beside ours for comparison; nothing else on the site uses it.</p>
   <div class="pick"><span>Show</span>
     <select id="xg-game" aria-label="Game">{data.games.map((g) => <option value={String(g.id)} data-teams={`${g.home} ${g.away}`}>{g.away} at {g.home}, {day(g.date)}</option>)}</select>
   </div>
