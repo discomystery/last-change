@@ -111,54 +111,93 @@ def grade(v: float, usual: float, bench: float, higher: bool = True) -> str:
     return "missed"
 
 
-def plus_minus(season: int) -> dict[tuple[int, int], int]:
-    """Plus-minus per player-game, straight from the NHL boxscore (rebuilding it from play-by-play disagrees with the
-    league in a few games where the recorded manpower at a goal is off)."""
+def box_extras(season: int) -> dict[tuple[int, int], dict]:
+    """Plus-minus per player-game straight from the NHL boxscore (rebuilding it from play-by-play disagrees with the
+    league in a few games where the recorded manpower at a goal is off), plus his goals by strength from the
+    play-by-play: even strength, power play, shorthanded (shootouts left out)."""
     import gzip
-    out = {}
+    out: dict[tuple[int, int], dict] = defaultdict(lambda: {"pm": 0, "ev": 0, "pp": 0, "sh": 0})
     for f in (RAW / str(season) / "box").glob("*.json.gz"):
         d = json.loads(gzip.decompress(f.read_bytes()))
         for side in ("awayTeam", "homeTeam"):
             for grp in ("forwards", "defense"):
                 for p in (d.get("playerByGameStats") or {}).get(side, {}).get(grp, []):
-                    out[(d["id"], p["playerId"])] = p.get("plusMinus") or 0
-    return out
+                    out[(d["id"], p["playerId"])]["pm"] = p.get("plusMinus") or 0
+    for f in (RAW / str(season) / "pbp").glob("*.json.gz"):
+        d = json.loads(gzip.decompress(f.read_bytes()))
+        home = d["homeTeam"]["id"]
+        for ev in d.get("plays", []):
+            if ev.get("typeDescKey") != "goal" or ev["periodDescriptor"].get("periodType") == "SO":
+                continue
+            det, code = ev.get("details", {}), ev.get("situationCode") or "1551"
+            if not det.get("scoringPlayerId") or len(code) != 4:
+                continue
+            ag, ask, hsk, hg = (int(c) for c in code)
+            mine, theirs, my_g, their_g = (hsk, ask, hg, ag) if det.get("eventOwnerTeamId") == home else (ask, hsk, ag, hg)
+            kind = "sh" if mine < theirs and my_g else "pp" if mine > theirs and my_g and their_g else "ev"
+            out[(d["id"], det["scoringPlayerId"])][kind] += 1
+    return dict(out)
 
 
-def night(box: dict, xg_share: float | None) -> tuple[str | None, str | None]:
-    """The whole game, apart from his usual jobs: a big night (2+ points, +2 or better, or his team owning the chances
-    with him on) or a rough one (-3 or worse with no points). Shown first on the card, so a player who had a great
-    game in other ways never reads as "mixed" just because his usual jobs went quiet."""
-    pts, pm = box["g"] + box["a"], box["pm"]
+RARE_GOAL = 0.2  # a goal counts as a good night only for a player who scores in fewer than one game in five
+
+
+def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> tuple[str | None, str | None]:
+    """The whole game, apart from his usual jobs, in one of five levels. A shorthanded goal counts as two points.
+    huge: a hat trick or 4+ points. big: 2+ points, +2 or better, or a point at +1 with his team owning the chances
+    with him on. good: a goal from a player who rarely scores. rough: -3 or worse with no points."""
+    goals, pm = box["g"], box["pm"]
+    pts = goals + box["a"] + box.get("sh", 0)
     bits = []
-    if box["g"]:
-        bits.append(f"{box['g']} {'goal' if box['g'] == 1 else 'goals'}")
+    if goals:
+        kinds = [(box.get("sh", 0), "shorthanded"), (box.get("pp", 0), "on the power play"), (box.get("ev", 0), "at even strength")]
+        split = [("both" if n == 2 else "all") + f" {w}" if n == goals else f"{n} {w}" if n > 1 else f"one {w}" for n, w in kinds if n]
+        if goals == 1:
+            bits.append("a shorthanded goal" if box.get("sh") else "a power-play goal" if box.get("pp") else "a goal")
+        else:
+            bits.append({3: "a hat trick"}.get(goals, f"{goals} goals") + (f" ({', '.join(split)})" if len(split) > 1 or box.get("sh") else ""))
     if box["a"]:
         bits.append(f"{box['a']} {'assist' if box['a'] == 1 else 'assists'}")
     if pm:
         bits.append(f"{'+' if pm > 0 else '−'}{abs(pm)}")
     owned = xg_share is not None and xg_share >= 0.7
+    if owned and (pts or pm > 0):
+        bits.append(f"{round(100 * xg_share)}% of the 5-on-5 chances with him on")
+    why = ", ".join(bits)
+    if goals >= 3 or pts >= 4:
+        return "huge", why
     if pts >= 2 or pm >= 2 or (pts >= 1 and pm >= 1 and owned):
-        if owned:
-            bits.append(f"{round(100 * xg_share)}% of the 5-on-5 chances with him on")
-        return "big", ", ".join(bits)
+        return "big", why
+    if goals and scoring_odds < RARE_GOAL:
+        return "good", f"{why}, from a player who scores in about 1 game in {round(1 / scoring_odds)}"
     if pm <= -3 and pts == 0:
-        return "rough", ", ".join(bits)
+        return "rough", why
     return None, None
 
 
-RARE_GOAL = 0.2  # a goal lifts the summary only for a player who scores in fewer than one game in five
+# What the card says, from the scoresheet (rows) and his usual jobs (columns). A big scoresheet carries a card, but
+# never all the way when his jobs went badly: a hat trick with his jobs off is a big night, not a huge one, and two
+# points with his jobs off is mixed.
+GRID = {
+    "huge":  {"did": "huge", "mixed": "huge", "didnt": "big", None: "huge"},
+    "big":   {"did": "big", "mixed": "big", "didnt": "mixed", None: "big"},
+    "good":  {"did": "did", "mixed": "did", "didnt": "mixed", None: None},
+    None:    {"did": "did", "mixed": "mixed", "didnt": "didnt", None: None},
+    "rough": {"did": "mixed", "mixed": "rough", "didnt": "rough", None: "rough"},
+}
+
+UNIT_WEIGHT = 0.5  # power play and penalty kill results belong to five players, so they count half
 
 
-def summary(verdicts: list[str], rare_goal: bool = False) -> str | None:
+def summary(jobs: list[tuple[str, str]]) -> str | None:
     """did: two thirds of the way or better (held counts 1, partly a half); didnt: a third or less; else mixed.
-    A goal from a player who rarely scores lifts the summary one step (off night to mixed, mixed to did); for a
-    regular scorer a goal is part of an ordinary night, so it changes nothing."""
-    if not verdicts:
+    Jobs are (key, verdict); power play and penalty kill count half, his own strengths in full."""
+    jobs = [(k, v) for k, v in jobs if v != "na"]
+    if not jobs:
         return None
-    score = sum({"held": 1.0, "partly": 0.5}.get(v, 0.0) for v in verdicts) / len(verdicts)
-    out = "did" if score >= 2 / 3 - 1e-9 else "didnt" if score <= 1 / 3 + 1e-9 else "mixed"
-    return {"didnt": "mixed", "mixed": "did"}.get(out, out) if rare_goal else out
+    w = [UNIT_WEIGHT if k in ("pp", "pk") else 1.0 for k, _ in jobs]
+    score = sum(wi * {"held": 1.0, "partly": 0.5}.get(v, 0.0) for wi, (_, v) in zip(w, jobs)) / sum(w)
+    return "did" if score >= 2 / 3 - 1e-9 else "didnt" if score <= 1 / 3 + 1e-9 else "mixed"
 
 
 def scoring_odds(goals_before: float, games_before: int, group_avg: float) -> float:
@@ -270,7 +309,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     grp = {**ref.grp, **P._groups(now)}
     sub = {**ref.sub, **P._groups(now, P.SUB)}
 
-    pm = plus_minus(season)
+    extras = box_extras(season)
     cards = defaultdict(list)
     for (pid,), rows in now.group_by("player_id", maintain_order=True):
         m = rows.select(P.COLS).to_numpy()
@@ -288,10 +327,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
                                ref, impact.get(pid, {}), fac, hr, league, typical)
             if card:
                 card["id"] = pid
-                card["box"]["pm"] = pm.get((e["game_id"], pid), 0)
+                card["box"] |= extras.get((e["game_id"], pid), {"pm": 0, "ev": 0, "pp": 0, "sh": 0})
                 f, a = float(m[i][P.C["on_xgf_adj"]]), float(m[i][P.C["on_xga_adj"]])
                 share = f / (f + a) if m[i][P.C["sec5"]] >= 600 and f + a > 0 else None
-                card["night"], card["night_why"] = night(card["box"], share)
+                card["night"], card["night_why"] = scoresheet(card["box"], share, card.pop("odds"))
+                card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -305,7 +345,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         out = {"game_id": gid, "away": g["away"], "home": g["home"], "players": [], "stood_out": []}
         for t in (g["away"], g["home"]):
             mine = sorted((c for c in cs if c["team"] == t), key=lambda c: -c["toi_sec"])
-            out["players"] += [c for c in mine if c["jobs"] or c["night"]]
+            out["players"] += [c for c in mine if c["pill"]]
         # The most unlikely nights first, at most two of any one kind so hits can't crowd out everything else.
         notes, per_kind = [], defaultdict(int)
         for s in sorted(({**s, "id": c["id"], "name": c["name"], "team": c["team"]} for c in cs for s in c["standouts"]), key=lambda s: s["p"]):
@@ -433,14 +473,11 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
     jobs = jobs[:MAX_JOBS]
     for j in jobs:
         j["unit"] = UNIT[j["key"]]
-    verdicts = [j["verdict"] for j in jobs if j["verdict"] != "na"]
     odds = scoring_odds(before_sp["g"], n_before, league["g_D" if g == "D" else "g_F"])
-    rare = int(e["g"]) >= 1 and odds < RARE_GOAL
-    lifted = summary(verdicts) != summary(verdicts, rare)
     return {"team_id": e["team_id"], "pos": e["pos"], "toi_sec": round(sec), "toi": clock(sec), "toi5": clock(sec5), "toi_pp": clock(T("sec_pp")), "toi_pk": clock(T("sec_pk")),
             "box": {"g": int(e["g"]), "a": int(e["a1"] + e["a2"]), "sog": int(e["sog"]), "hits": int(e["hits"]), "blocks": int(e["blocks"])},
-            "jobs": jobs, "summary": summary(verdicts, rare),
-            "lifted": f"about 1 game in {round(1 / odds)}" if lifted else None, "standouts": outs}
+            "jobs": jobs, "summary": summary([(j["key"], j["verdict"]) for j in jobs]),
+            "odds": odds, "standouts": outs}
 
 
 def special_job(key: str, e: dict, sec: float, xg: float, sec_before: float, xg_before: float, league: float, per_game: float, ratio: float) -> dict:
