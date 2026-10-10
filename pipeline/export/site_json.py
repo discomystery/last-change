@@ -245,6 +245,12 @@ def export_lines(season: int) -> int:
                 "text": f'The forward lines keep changing. Even their four most-used trios over the last {e["games"]} games cover only {round(100 * share)}% of their forwards\u2019 '
                         f'5-on-5 time, {lowest} (a typical team: {round(100 * typical)}%). The lines listed lean on their latest games, but expect new combinations tonight.'}
 
+    every_name = sorted(set(names.values()), key=len, reverse=True)
+
+    def named(text: str) -> list[str]:
+        """Player names in a note, longest first, so the site can set them in bold."""
+        return [x for x in every_name if x in text]
+
     out = {}
     for tid, e in usual.items():
         place = abbr[tid]
@@ -283,7 +289,7 @@ def export_lines(season: int) -> int:
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
-            "notes": sorted(notes, key=lambda n: (n["kind"] != "shuffle", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"]))),
+            "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] != "shuffle", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
     for tid, m in units.matchups(season, usual).items():
         if abbr[tid] in out:
@@ -299,7 +305,7 @@ def export_lines(season: int) -> int:
         if shown:
             who = names.get(fo["player"], "?")
             heir = names.get(fo["replaced_by"][0][0], "?")
-            faceoff = {"player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
+            faceoff = {"names": [who, heir], "player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
                        "text": f'{who} is sent out to take power-play faceoffs, then changes. He has taken {fo["draw_pct"]}% of the team\u2019s power-play draws but stays on for about {fo["avg_stay"]} seconds at a time, against {fo["usual_stay"]} for the regulars, and is most often replaced by {heir} ({fo["replaced_by"][0][1]} of {fo["exits"]} changes).'}
         for kind in ("pp", "pk"):
             for u in sp[kind]:

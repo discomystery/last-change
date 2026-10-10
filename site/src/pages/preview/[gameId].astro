@@ -1,4 +1,5 @@
 ---
+import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
@@ -83,7 +84,7 @@ const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === labe
 const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
 const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const homeMu = LN[home]?.matchups?.home;
-const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text }] : [])]);
+const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
 
 // Special teams
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
@@ -175,7 +176,7 @@ const _ = ordinal;
     {notes.length > 0 && (
       <div class="card worth">
         <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
+        <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
@@ -290,7 +291,7 @@ const _ = ordinal;
               <p class="tile-v"><strong>{pkE.v.toFixed(1)}</strong> <span class="n">expected goals allowed per 60 · {ordinal(pkE.rank)} of 32</span></p>
             </li>
           </ul>
-          {P?.faceoff && <div class="card worth"><p class="mini-h">Worth knowing</p><ul><li>{P.faceoff.text}</li></ul></div>}
+          {P?.faceoff && <div class="card worth"><p class="mini-h">Worth knowing</p><ul><li><NoteText text={P.faceoff.text} names={(P.faceoff as any).names} /></li></ul></div>}
           <div class="st3">
             <div class:list={['card', `t-${side(pp)}`]}>
               <h4 class="st-h"><i></i>{place(pp)} power play</h4>

@@ -1,4 +1,5 @@
 ---
+import NoteText from '../../components/NoteText.astro';
 // Team page. Real: next game, results, schedule, last-game lines. Placeholder for now: the fingerprint.
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
@@ -184,7 +185,7 @@ const _ = ordinal;
         {ln.notes.length > 0 && (
           <div class="card worth">
             <p class="mini-h">Worth knowing</p>
-            <ul>{ln.notes.map((n) => <li>{n.text}</li>)}</ul>
+            <ul>{ln.notes.map((n) => <li><NoteText text={n.text} names={(n as any).names} /></li>)}</ul>
           </div>
         )}
         <div class="two units2">
@@ -272,7 +273,7 @@ const _ = ordinal;
         {sp.faceoff && (
           <div class="card worth">
             <p class="mini-h">Worth knowing</p>
-            <ul><li>{sp.faceoff.text}</li></ul>
+            <ul><li><NoteText text={sp.faceoff.text} names={(sp.faceoff as any).names} /></li></ul>
           </div>
         )}
         <div class="st3">
