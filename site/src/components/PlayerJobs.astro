@@ -5,7 +5,7 @@
 import Section from './Section.astro';
 import PLink from './PLink.astro';
 
-type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string; shots?: number; saves?: number; typ?: number };
+type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
 type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
@@ -81,14 +81,6 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
             <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
             <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
             {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
-            {j.verdict !== 'na' && j.shots != null && (
-              <span class="shots" aria-hidden="true">
-                {Array.from({ length: j.shots }, (_, k) => (
-                  <Fragment>{k === j.typ && <i class="typ"></i>}<b class:list={[k < j.saves! ? 'sv' : 'ga']}></b></Fragment>
-                ))}
-                {j.typ === j.shots && <i class="typ"></i>}
-              </span>
-            )}
           </li>
         ))}
       </ul>
@@ -97,7 +89,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   if (goalies) return gcards.length > 0 && (
     <div class="gcols">
       {order.map((t) => <ul class="gcol">{gcards.filter((c) => c.team === t).map(card)}</ul>)}
-      <p class="note gnote">Every goalie has the same three jobs, judged against his own earlier starts (✓) and an average goalie (≈). The dots are the shots he faced: filled for a save, open for a goal; the coloured line marks how many of those same shots he saves on a typical night. <strong>Huge night</strong>: a shutout on 25 or more shots, or 3+ goals saved above expected. <strong>Big night</strong>: any other shutout, or 1.5+. <strong>Rough night</strong>: 2+ goals worse than expected, or pulled early after three or more.</p>
+      <p class="note gnote">Every goalie has the same three jobs, judged against his own earlier starts (✓) and an average goalie (≈). <strong>Huge night</strong>: a shutout on 25 or more shots, or 3+ goals saved above expected. <strong>Big night</strong>: any other shutout, or 1.5+. <strong>Rough night</strong>: 2+ goals worse than expected, or pulled early after three or more.</p>
     </div>
   );
   return skaters.length > 0 && (
@@ -214,10 +206,6 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-jobs { display: grid; gap: 10px; }
   .pc.bare .pc-jobs { display: none; }
   .pc.bare .pc-box { border-bottom: 0; padding-bottom: 0; }
-  .shots { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: -4px; }
-  .shots b { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
-  .shots b.ga { background: none; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
-  .shots .typ { width: 2px; height: 14px; border-radius: 1px; background: var(--team); margin: 0 2px; }
   .job { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; cursor: help; }
   .job-l { font: 600 15px/1.3 var(--ui); }
   .job-u { display: block; font: 400 12px/1.35 var(--ui); color: var(--ink-3); }
