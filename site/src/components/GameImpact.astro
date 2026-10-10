@@ -1,0 +1,159 @@
+---
+// Post-game Impact: one number per player for the night, split into its parts, both teams. Data: scores/{game_id}.json,
+// written by pipeline/export/game_scores.py from finished games only.
+import Section from './Section.astro';
+import PLink from './PLink.astro';
+
+type Part = 'sheet' | 'play' | 'special' | 'usage' | 'net';
+type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: Partial<Record<Part, number>> };
+type Scores = { game_id: number; away: string; home: string; players: Row[] };
+interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
+const { gameId, place, side } = Astro.props;
+
+const files = import.meta.glob<{ default: Scores }>('../../public/data/scores/2*.json', { eager: true });
+const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const order = d ? [d.away, d.home] : [];
+const PARTS: [Part, string, string][] = [
+  ['sheet', 'Scoresheet', 'Goals and assists, the chances from his own shots, penalties drawn and taken, faceoffs.'],
+  ['play', '5-on-5 play', 'Chances for and against with him on the ice at 5-on-5, against league average and against his own team with him off the ice.'],
+  ['special', 'Special teams', 'Power-play chances above a league-average power play, and penalty-kill chances against below a league-average kill.'],
+  ['usage', 'Linemates and opponents', 'A little given back for strong linemates and weak opponents, or added for the reverse.'],
+  ['net', 'In net', 'Goals saved above expected: what the shots he faced were worth, minus the goals he allowed.'],
+];
+const label = Object.fromEntries(PARTS.map(([k, l]) => [k, l]));
+const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
+const fmt = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
+const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+// One scale for the whole game, so bars compare across both teams: the most any skater had below zero and above it.
+// A goalie's night can be far bigger either way; his bar stops at the edge rather than shrinking everyone else's.
+const neg = (r: Row) => Object.values(r.parts).reduce((s, v) => s + Math.min(0, v ?? 0), 0);
+const pos = (r: Row) => Object.values(r.parts).reduce((s, v) => s + Math.max(0, v ?? 0), 0);
+const sk = d ? d.players.filter((r) => r.pos !== 'G') : [];
+const lo = Math.min(-0.25, ...sk.map(neg));
+const hi = Math.max(0.25, ...sk.map(pos));
+const at = (v: number) => Math.max(0, Math.min(100, (100 * (v - lo)) / (hi - lo)));
+const zero = at(0);
+// Each part a segment: positive parts stack rightwards from zero, negative parts leftwards.
+const segs = (r: Row) => {
+  let up = 0, down = 0;
+  return PARTS.filter(([k]) => r.parts[k]).map(([k]) => {
+    const v = r.parts[k]!;
+    const [a, b] = v > 0 ? [up, (up += v)] : [(down += v), down - v];
+    return { k, left: at(a).toFixed(1), width: (at(b) - at(a)).toFixed(1) };
+  });
+};
+const tip = (r: Row) => {
+  const bits = PARTS.filter(([k]) => r.parts[k] !== undefined).map(([k]) => `${label[k]} ${fmt(r.parts[k]!)}`);
+  const where = r.pct == null ? '' : ` Better than ${r.pct}% of ${peer[r.pos] ?? 'forwards'}’ nights last season.`;
+  return `${bits.join(' · ')}.${where}`;
+};
+const top = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
+---
+{d && d.players.length > 0 && (
+  <Section id="impact" title="Impact" placeholder={false}
+    takeaway="One number for each player’s night: scoring, 5-on-5 play, special teams and the company he kept.">
+    <ol class="imp-top">
+      {top.map((r, i) => (
+        <li class:list={['card', `t-${side(r.team)}`]}>
+          <span class="imp-rank">{i + 1}</span>
+          <span class="imp-who"><span class="pc-name"><i></i><PLink id={r.id} name={r.name} /></span><span class="imp-team">{place(r.team)}</span></span>
+          <span class="imp-n"><strong>{fmt(r.score)}</strong>{r.pct != null && <span>{ord(r.pct)} pct</span>}</span>
+        </li>
+      ))}
+    </ol>
+    <div class="jpick imp-pick">
+      <span>Show</span>
+      <select id="imp-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+    </div>
+    <div class="imp-cols">
+      {order.map((t) => (
+        <section class:list={['imp-col', 'card', `t-${side(t)}`]} data-team={t} aria-label={place(t)}>
+          <h3 class="imp-h"><i></i>{place(t)}</h3>
+          <ul class="imp-list">
+            {d.players.filter((r) => r.team === t).map((r) => (
+              <li class="imp-row" tabindex="0" data-tip={tip(r)}>
+                <span class="imp-name"><PLink id={r.id} name={r.name} /><span class="imp-pos">{r.pos}</span></span>
+                <span class="imp-bar" aria-hidden="true">
+                  <span class="imp-zero" style={`left:${zero.toFixed(1)}%`}></span>
+                  {segs(r).map((s) => <span class={`imp-seg p-${s.k}`} style={`left:${s.left}%;width:${s.width}%`}></span>)}
+                </span>
+                <span class="imp-score"><strong>{fmt(r.score)}</strong>{r.pct != null && <span>{ord(r.pct)}</span>}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+    <ul class="imp-key">
+      {PARTS.map(([k, l, t]) => <li><i class={`p-${k}`}></i><span class="term" tabindex="0" data-tip={t}>{l}</span></li>)}
+    </ul>
+    <details class="fold how imp-how">
+      <summary><span class="show">How Impact is worked out</span><span class="hide">Hide how Impact is worked out</span></summary>
+      <div class="how-body">
+        <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and a penalty taken costs 0.16, what a power play is worth on average. Each faceoff won or lost moves it by 0.006.</p>
+        <p class="note"><strong>5-on-5 play</strong> counts most: the expected goals for minus against with him on the ice, half compared with league average (adjusted for score and venue) and half compared with his own team when he was off the ice, plus a smaller amount for actual goals for and against. A player can lose a game and still score well here if his line held its own.</p>
+        <p class="note"><strong>Special teams</strong>: power-play chances above what a league-average power play makes in the same time, and penalty-kill chances against below a league-average kill. <strong>Linemates and opponents</strong>: from each player’s 5-on-5 impact over the two seasons before, a player with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected.</p>
+        <p class="note">The small number is the percentile: how this night compares with every night last season at his position (forwards, defensemen, goalies), scored the same way. Empty-net shots and shootouts are left out of the chances. One game is a small sample; this says who moved this result, not who is better.</p>
+      </div>
+    </details>
+  </Section>
+)}
+
+<script is:inline>
+  // "Show [team]" on phones: opens on the visitor's own team when it played, otherwise the away team.
+  (() => {
+    const pick = document.getElementById('imp-team');
+    if (!pick) return;
+    const mine = [...pick.options].find((o) => o.value === window.lcPrefs?.get('team'));
+    if (mine) pick.value = mine.value;
+    const show = () => document.querySelectorAll('.imp-col').forEach((c) => c.classList.toggle('imp-off', c.dataset.team !== pick.value));
+    pick.addEventListener('change', show);
+    show();
+  })();
+</script>
+
+<style>
+  .imp-top, .imp-cols, .imp-key { --p-sheet: var(--ink); --p-play: #4f7cac; --p-special: #c08a3e; --p-usage: #a3b0bd; --p-net: #6e8f6a; }
+  @media (prefers-color-scheme: dark) {
+    .imp-top, .imp-cols, .imp-key { --p-play: #8fb3e8; --p-special: #d9a65a; --p-usage: #5d6d7c; --p-net: #9cc196; }
+  }
+  .imp-top { display: grid; gap: 12px; margin-top: 18px; counter-reset: none; }
+  @media (min-width: 760px) { .imp-top { grid-template-columns: repeat(3, 1fr); } }
+  .imp-top li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+  .imp-rank { font: 700 28px/1 var(--display); color: var(--ink-3); }
+  .imp-who { display: grid; gap: 2px; min-width: 0; }
+  .imp-team { font: 400 13px var(--ui); color: var(--ink-3); }
+  .pc-name { font: 700 19px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
+  .pc-name i, .imp-h i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
+  .imp-n { display: grid; justify-items: end; font: 400 12px var(--ui); color: var(--ink-3); }
+  .imp-n strong { font: 700 22px/1.1 var(--ui); color: var(--ink); }
+  .imp-pick { display: none; }
+  .jpick { flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .imp-cols { display: grid; gap: 16px; margin-top: 18px; }
+  @media (min-width: 760px) { .imp-cols { grid-template-columns: 1fr 1fr; align-items: start; } }
+  @media (max-width: 759px) { .imp-pick { display: flex; } .imp-col.imp-off { display: none; } }
+  .imp-h { display: flex; align-items: center; gap: 8px; font: 700 13px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); margin: 0 0 8px; }
+  .imp-list { display: grid; gap: 2px; }
+  .imp-row { display: grid; grid-template-columns: minmax(0, 9.5em) 1fr 4.2em; align-items: center; gap: 10px; padding: 3px 0; cursor: help; border-radius: 4px; }
+  .imp-row:hover, .imp-row:focus-visible { background: var(--track); }
+  @media (max-width: 759px) {
+    .imp-row { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 5px 0; }
+    .imp-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
+  }
+  .imp-name { display: flex; align-items: baseline; gap: 6px; font: 600 14px/1.3 var(--ui); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .imp-pos { font: 400 11px var(--ui); color: var(--ink-3); }
+  .imp-bar { position: relative; height: 14px; }
+  .imp-zero { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+  .imp-seg { position: absolute; top: 0; bottom: 0; background: var(--p); }
+  .imp-score { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; font: 400 11px var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .imp-score strong { font: 700 15px var(--ui); color: var(--ink); }
+  .p-sheet { --p: var(--p-sheet); } .p-play { --p: var(--p-play); } .p-special { --p: var(--p-special); } .p-usage { --p: var(--p-usage); } .p-net { --p: var(--p-net); }
+  .imp-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 14px; font: 400 13px var(--ui); color: var(--ink-2); }
+  .imp-key li { display: inline-flex; align-items: center; gap: 6px; }
+  .imp-key i { width: 12px; height: 12px; border-radius: 3px; background: var(--p); }
+  .imp-how { margin-top: 16px; }
+  .how-body { display: grid; gap: 8px; padding-top: 12px; }
+  .imp-how .hide, .imp-how[open] .show { display: none; }
+  .imp-how[open] .hide { display: inline; }
+</style>
