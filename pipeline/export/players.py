@@ -21,31 +21,35 @@ MISS_GROUPS = {"wide-left": "wide", "wide-right": "wide", "above-crossbar": "hig
                "hit-left-post": "post", "hit-right-post": "post", "hit-crossbar": "post", "short": "short"}
 
 
+# Shot areas are rings and wedges around the middle of the net (x 89, y 0), so their edges follow the
+# distance and angle that decide how dangerous a shot is. The site's map draws the same shapes from these
+# numbers (site/src/components/AreaMap.astro); keep the two in step.
+RINGS = (6, 22, 46, 60)  # crease, low slot and net sides, high slot and circles, the band below the points
+WEDGES = (28, 15, 72)  # degrees off straight out: low slot, high slot and middle point, start of the corners
+
+
 def area(x: float, y: float) -> str:
-    """Rink area of a shot, seen from the shooter (positive y is his left). Same rectangles as the site's map."""
-    side = "L" if y > 0 else "R"
-    a = abs(y)
+    """Rink area of a shot, seen from the shooter (positive y is his left)."""
     if x < 25:
         return "outside"
-    if x > 89:
-        return "behind" if a <= 22 else f"corner{side}"
-    if x >= 69:
-        if a <= 4 and x >= 83:
+    side = "L" if y > 0 else "R"
+    d = math.hypot(89 - x, y)
+    a = math.degrees(math.atan2(abs(y), 89 - x))  # 0 straight out from the net, 90 along the goal line, 180 behind
+    crease, inner, middle, outer = RINGS
+    low, slot, corner = WEDGES
+    if d <= inner:
+        if a > 90:
+            return "behind"
+        if d <= crease:
             return "crease"
-        if a <= 9:
-            return "lowSlot"
-        if a <= 22:
-            return f"netSide{side}"
-        if a <= 37:
-            return f"circle{side}"
+        return "lowSlot" if a <= low else f"netSide{side}"
+    if a > corner:
         return f"corner{side}"
-    if x >= 54:
-        if a <= 9:
-            return "highSlot"
-        return f"circle{side}" if a <= 37 else f"outer{side}"
-    if x >= 45:
-        return "highSlot" if a <= 9 else f"outer{side}"
-    return "point" if a <= 14 else f"point{side}"
+    if a <= slot:
+        return "highSlot" if d <= middle else "point"
+    if d <= middle:
+        return f"circle{side}"
+    return f"outer{side}" if d <= outer else f"point{side}"
 
 
 AREAS = ["crease", "lowSlot", "netSideL", "netSideR", "highSlot", "circleL", "circleR", "behind", "cornerL", "cornerR", "outerL", "outerR", "point", "pointL", "pointR", "outside"]
