@@ -1,0 +1,48 @@
+# Puts the site built by the calling workflow live, from the "github-pages" artifact it uploaded.
+# Uses GitHub's direct Pages upload (Settings > Pages > Source: GitHub Actions), so the built site is no longer
+# committed to the repository on every run. If Pages is still set to serve the gh-pages branch, the upload is
+# refused and the fallback job publishes the same build to gh-pages the old way, so the site never misses an update.
+name: Deploy site
+
+on:
+  workflow_call:
+    inputs:
+      message:
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  fallback:
+    needs: deploy
+    if: always() && needs.deploy.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: pages
+      - name: Publish the same build to the gh-pages branch
+        run: |
+          mkdir -p site/dist
+          tar -xf pages/artifact.tar -C site/dist
+          pipeline/deploy_site.sh "${{ inputs.message }}"

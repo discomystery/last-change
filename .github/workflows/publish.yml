@@ -63,6 +63,17 @@ jobs:
         run: |
           pipeline/save_data.sh "Data cache, published changes $(date -u +%Y-%m-%dT%H:%MZ)"
 
-      - name: Publish the site
-        run: |
-          pipeline/deploy_site.sh "Publish changes $(date -u +%Y-%m-%dT%H:%MZ)"
+      - name: Hand the built site to the deploy job
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: publish
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-pages.yml
+    with:
+      message: "Publish changes ${{ github.run_id }}"

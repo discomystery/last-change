@@ -34,7 +34,7 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
             <circle class="rk-dot blue" cx="42.5" cy="100" r="1" />
           </>
         )}
-        {shots.map((s) => <circle class="shot" data-p={s.p} cx={sx(s.y)} cy={sy(s.x)} r={0.9 + Math.sqrt(s.xg) * 4.2} data-tip={`${s.who ? s.who + ': ' : 'Shot: '}${Math.round(s.xg * 100)}% chance`} />)}
+        {shots.map((s) => <circle class="shot" data-p={s.p} cx={sx(s.y)} cy={sy(s.x)} r={+(0.9 + Math.sqrt(s.xg) * 4.2).toFixed(2)} data-tip={`${s.who ? s.who + ': ' : 'Shot: '}${Math.round(s.xg * 100)}% chance`} />)}
       </g>
     </svg>
   ))}
