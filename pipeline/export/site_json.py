@@ -60,6 +60,8 @@ def run(season: int) -> dict:
     pregame.run(season)  # finished games that never got a preview: rebuild one from the data before each game
     from pipeline.export import recaps
     recaps.run(season)  # grades the frozen preview calls of finished games
+    from pipeline.export import jobs
+    jobs.run(season)  # post-game report cards: did each player do his jobs
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games, "players": n_players}
 
 

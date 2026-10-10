@@ -7,6 +7,7 @@ import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
 import PLink from '../../components/PLink.astro';
+import PlayerJobs from '../../components/PlayerJobs.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import '../../styles/blocks.css';
 import { matchupColours } from '../../lib/teams';
@@ -86,9 +87,11 @@ const replayBody = !dw ? '' : pct(loser) >= 60
   : pct(winner) >= 60 ? `Replaying this game’s chances, ${place(winner)} comes out ahead ${pct(winner)} times in 100.`
   : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
+// Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
+const hasJobs = Object.keys(import.meta.glob('../../../public/data/jobs/2*.json')).some((k) => k.endsWith(`/${r.game_id}.json`));
 const nav = [
   ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
-  ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ['goalies', 'In net'],
+  ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
@@ -209,6 +212,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     </div>
     {r.end === 'SO' && <p class="note">The shootout decides the result but is left out of every other number on this site.</p>}
   </Section>
+
+  <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
   <Section id="goalies" title="In net" placeholder={false} takeaway="How many goals each goalie stopped beyond what the shots he faced were worth.">
     <ul class="two gl">

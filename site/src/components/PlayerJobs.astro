@@ -1,0 +1,186 @@
+---
+// Post-game report cards: for each player, the jobs his team relies on him for and the things he does better than
+// most at his position, each graded from this game; then who stood out somewhere new. Data: jobs/{game_id}.json,
+// written by pipeline/export/jobs.py from games before this one only, so a card never changes after the game.
+import Section from './Section.astro';
+import PLink from './PLink.astro';
+
+type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
+type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'big' | 'rough' | null; night_why: string | null };
+type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
+type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
+interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
+const { gameId, place, side } = Astro.props;
+
+const files = import.meta.glob<{ default: Jobs }>('../../public/data/jobs/2*.json', { eager: true });
+const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const order = d ? [d.away, d.home] : [];
+const SHOWN = 6; // cards visible before the fold, per team (most ice time first)
+const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
+const verdictWord = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
+const summaryWord = { did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night' } as const;
+const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centres', W: 'wingers' };
+const whyTag = (j: Job) => (j.why === 'role' ? 'Relied on' : 'Better than most');
+const whyTip = (j: Job) => {
+  if (j.key === 'pp') return `He has averaged ${j.per_game} a game on the power play coming into this game.`;
+  if (j.key === 'pk') return `He has averaged ${j.per_game} a game killing penalties coming into this game.`;
+  if (j.why === 'role') return 'He takes plenty of faceoffs for his team.';
+  const base = j.key === 'offImpact' || j.key === 'defImpact' ? 'over the two seasons before this one, after allowing for linemates and opponents' : 'going into this game, this season blended with last';
+  return `Better than ${j.pct}% of ${peer[j.vs ?? 'F']} ${base}.`;
+};
+// When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.
+const nightNote = (c: Card) => {
+  if (c.night === 'big' && (c.summary === 'mixed' || c.summary === 'didnt')) return '. A strong game, even though his usual jobs were quieter.';
+  if (c.night === 'rough' && c.summary === 'did') return '. A hard night on the scoresheet, though he still did his usual jobs.';
+  return '.';
+};
+const posWord: Record<string, string> = { C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defense' };
+const graded = d ? d.players.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];
+const share = (v: string) => graded.filter((j) => j.verdict === v).length;
+---
+{d && d.players.length > 0 && (
+  <Section id="jobs" title="Did they do their job?" placeholder={false}
+    takeaway="What each player is relied on for or better than most at, and whether he delivered.">
+    <div class="jpick">
+      <span>Show</span>
+      <select id="jobs-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+    </div>
+    {order.map((t, i) => {
+      const mine = d.players.filter((c) => c.team === t);
+      const card = (c: Card) => (
+        <li class:list={['card', 'pc', `t-${side(t)}`]}>
+          <div class="pc-top">
+            <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
+            {c.night ? <span class:list={['pc-sum', c.night === 'big' ? 'did' : 'didnt']}>{c.night === 'big' ? 'Big night' : 'Rough night'}</span>
+              : c.summary && <span class:list={['pc-sum', c.summary]}>{summaryWord[c.summary]}</span>}
+          </div>
+          {c.night && <p class="pc-night">{c.night_why}{nightNote(c)}</p>}
+          <dl class="pc-box">
+            <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={`All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
+            <div><dt>G</dt><dd>{c.box.g}</dd></div>
+            <div><dt>A</dt><dd>{c.box.a}</dd></div>
+            <div><dt><span class="term" tabindex="0" data-tip="Plus-minus, as the NHL counts it: goals for minus goals against while he was on the ice, leaving out power-play goals.">+/−</span></dt><dd>{c.box.pm > 0 ? `+${c.box.pm}` : c.box.pm < 0 ? `−${-c.box.pm}` : '0'}</dd></div>
+            <div><dt>Shots</dt><dd>{c.box.sog}</dd></div>
+            <div><dt>Hits</dt><dd>{c.box.hits}</dd></div>
+            <div><dt>Blocks</dt><dd>{c.box.blocks}</dd></div>
+          </dl>
+          <ul class="pc-jobs">
+            {c.jobs.map((j) => (
+              <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
+                <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
+                <span class="job-l">{j.label} <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span><span class="job-u">{j.verdict === 'na' ? 'Too little time to judge' : j.unit}</span></span>
+                {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
+              </li>
+            ))}
+          </ul>
+        </li>
+      );
+      return (
+        <div class="jblock" data-team={t} hidden={i !== 0}>
+          <ul class="pcs">{mine.slice(0, SHOWN).map(card)}</ul>
+          {mine.length > SHOWN && (
+            <details class="fold more-cards">
+              <summary><span class="show">Show {mine.length - SHOWN} more {place(t)} players</span><span class="hide">Hide the other {place(t)} players</span></summary>
+              <ul class="pcs">{mine.slice(SHOWN).map(card)}</ul>
+            </details>
+          )}
+        </div>
+      );
+    })}
+    <p class="note">
+      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. <strong>Big night</strong> (two or more points, +2 or better, or his team owning the chances with him on) and <strong>Rough night</strong> (−3 or worse with no points) cover the whole game, so they take the place of the job summary.
+      Listed by ice time, most first. Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
+    </p>
+    <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>
+
+    {d.stood_out.length > 0 && (
+      <>
+        <h3 class="sub">Somewhere new</h3>
+        <p class="sub-take">Things they aren’t known for, far beyond their usual pace.</p>
+        <ul class="two news">
+          {d.stood_out.map((s) => (
+            <li class:list={['card', `t-${side(s.team)}`]}>
+              <p class="news-h"><span class="pc-name"><i></i><PLink id={s.id} name={s.name} /></span><span class="news-l">{s.label}</span></p>
+              <p>{s.text}</p>
+            </li>
+          ))}
+        </ul>
+        <p class="note">A night this big would happen less than one game in fifty at his usual pace, and is at least twice what an average player at his position would manage.</p>
+      </>
+    )}
+  </Section>
+)}
+
+<script is:inline>
+  // "Show [team]": opens on the visitor's own team when it played, otherwise the away team.
+  (() => {
+    const pick = document.getElementById('jobs-team');
+    if (!pick) return;
+    const mine = [...pick.options].find((o) => o.value === window.lcPrefs?.get('team'));
+    if (mine) pick.value = mine.value;
+    // Masonry: lay the cards of each visible list into two columns, each card going to the shorter column.
+    const wide = window.matchMedia('(min-width: 760px)');
+    const lay = (list) => {
+      if (!list.offsetParent) return; // hidden (other team, or a closed fold): laid out when it is shown
+      if (!list.cards) list.cards = [...list.children];
+      list.replaceChildren();
+      list.classList.toggle('mason', wide.matches);
+      if (!wide.matches) { list.append(...list.cards); return; }
+      const cols = [0, 1].map(() => { const c = document.createElement('li'); c.className = 'pcol'; list.append(c); return c; });
+      for (const card of list.cards) {
+        const [a, b] = cols;
+        (b.offsetHeight < a.offsetHeight ? b : a).append(card);
+      }
+    };
+    const layAll = () => document.querySelectorAll('.jblock:not([hidden]) .pcs').forEach(lay);
+    const show = () => { document.querySelectorAll('.jblock').forEach((b) => { b.hidden = b.dataset.team !== pick.value; }); layAll(); };
+    pick.addEventListener('change', show);
+    document.querySelectorAll('.more-cards').forEach((d) => d.addEventListener('toggle', layAll));
+    wide.addEventListener('change', layAll);
+    document.fonts?.ready.then(layAll); // card heights change once the real fonts arrive
+    show();
+  })();
+</script>
+
+<style>
+  .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .pcs { display: grid; gap: 16px; margin-top: 18px; }
+  /* Masonry on wide screens: two columns that pack cards of different heights, read down the left column first. */
+  /* Masonry on wide screens: the script below puts each card, in ice-time order, into whichever of two columns is
+     shorter, so the columns end as close to level as the cards allow. Without the script it stays a plain grid. */
+  @media (min-width: 760px) {
+    .pcs { grid-template-columns: 1fr 1fr; align-items: start; }
+    .pcs.mason { display: flex; align-items: flex-start; gap: 16px; }
+    .pcs.mason > :global(.pcol) { flex: 1; min-width: 0; display: grid; gap: 16px; }
+  }
+  .pc { display: grid; gap: 12px; align-content: start; }
+  .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
+  .pc-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
+  .pc-sum { margin-left: auto; font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+  .pc-sum.did { background: var(--ink); color: var(--sheet); }
+  .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .pc-night { font: 500 14px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
+  .pc-box { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .pc-box div { display: grid; gap: 0; }
+  .pc-box dt { font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .pc-box dd { font: 700 17px/1.3 var(--ui); }
+  .pc-jobs { display: grid; gap: 10px; }
+  .job { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; cursor: help; }
+  .job-l { font: 600 15px/1.3 var(--ui); }
+  .job-u { display: block; font: 400 12px/1.35 var(--ui); color: var(--ink-3); }
+  .job-n { display: grid; justify-items: end; font: 400 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .job-n strong { font: 700 20px/1.1 var(--ui); color: var(--ink); }
+  .job-v { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font: 700 12px var(--ui); }
+  .job.held .job-v { background: var(--ink); color: var(--sheet); }
+  .job.missed .job-v, .job.na .job-v { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; }
+  .job.na .job-l { color: var(--ink-2); }
+  .more-cards .hide, .more-cards[open] .show { display: none; }
+  .more-cards[open] .hide { display: inline; }
+  .sub-take { color: var(--ink-2); margin-top: -4px; }
+  .news { margin-top: 14px; }
+  .news-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; }
+  .news-l { font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+</style>

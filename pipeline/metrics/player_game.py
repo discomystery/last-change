@@ -79,6 +79,9 @@ def build(season: int) -> pl.DataFrame:
     sh_against = shots.filter(shorthanded & (pl.col("n_own") > pl.col("n_opp"))).select("game_id", opp_on.alias("player_id"), "xg").explode("player_id")
     sh = sh_for.group_by("game_id", "player_id").agg(pl.col("xg").sum().alias("sh_xgf")).join(
         sh_against.group_by("game_id", "player_id").agg(pl.col("xg").sum().alias("sh_xga")), on=["game_id", "player_id"], how="full", coalesce=True)
+    # On the power play: chances his team creates with him on (for post-game report cards).
+    pp_for = shots.filter(shorthanded & (pl.col("n_own") > pl.col("n_opp"))).select("game_id", own_on.alias("player_id"), "xg").explode("player_id")
+    sh = sh.join(pp_for.group_by("game_id", "player_id").agg(pl.col("xg").sum().alias("pp_xgf")), on=["game_id", "player_id"], how="full", coalesce=True)
     team = on.group_by("game_id", "home").agg(agg("t_")).join(team_sec5, on=["game_id", "home"], how="full", coalesce=True)
 
     # His own shots, goals and assists.
