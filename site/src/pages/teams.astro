@@ -1,0 +1,92 @@
+---
+// Every team, by division (in standings order) or A to Z. The visitor's own team is pinned first either way.
+import Base from '../layouts/Base.astro';
+import teams from '../../public/data/teams.json';
+import schedule from '../../public/data/schedule.json';
+import TeamCard from '../components/TeamCard.astro';
+
+type T = { abbr: string; name: string; place: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string; div_rank: number };
+const all = teams as T[];
+const base = import.meta.env.BASE_URL;
+const confs = ['Eastern', 'Western'];
+const divs = (c: string) => [...new Set(all.filter((t) => t.conference === c).map((t) => t.division))].sort();
+const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, start: g.start, home: g.home, away: g.away }));
+---
+<Base section="teams" title="Teams" mock={false} description="All 32 NHL teams: how each one plays, its lines, special teams and goalies.">
+  <header class="page-top"><h1>Teams</h1></header>
+  <div class="pick">
+    <span>Show teams</span>
+    <select id="teams-view" aria-label="How to list the teams"><option value="division">by division</option><option value="az">A to Z</option></select>
+  </div>
+  <section id="mine" class="mine" hidden>
+    <p class="mini-h">Your team</p>
+    <ul class="tgrid"></ul>
+  </section>
+  <div data-view="division">
+    {confs.map((c) => (
+      <section class="conf">
+        <h2 class="conf-h">{c} Conference</h2>
+        <div class="divs">
+          {divs(c).map((d) => (
+            <section>
+              <h3 class="mini-h">{d}</h3>
+              <ol class="tgrid">{all.filter((t) => t.division === d).sort((a, b) => a.div_rank - b.div_rank).map((t) => <TeamCard t={t} />)}</ol>
+            </section>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+  <div data-view="az" hidden>
+    <ul class="tgrid az">{[...all].sort((a, b) => a.name.localeCompare(b.name)).map((t) => <TeamCard t={t} />)}</ul>
+  </div>
+  <p class="note">Within each division, teams are in standings order. Records are wins, losses and overtime losses.</p>
+  <script type="application/json" id="upcoming" set:html={JSON.stringify(upcoming)}></script>
+</Base>
+
+<script is:inline>
+  (() => {
+    const sel = document.getElementById('teams-view');
+    const views = document.querySelectorAll('[data-view]');
+    let saved = 'division';
+    try { saved = localStorage.getItem('lc-teams-view') || 'division'; } catch {}
+    const apply = (v) => { sel.value = v; views.forEach((el) => { el.hidden = el.dataset.view !== v; }); };
+    apply(saved);
+    sel.addEventListener('change', () => { apply(sel.value); try { localStorage.setItem('lc-teams-view', sel.value); } catch {} });
+
+    // Next game for every card, in the visitor's own time zone.
+    const games = JSON.parse(document.getElementById('upcoming').textContent).map((g) => ({ ...g, t: new Date(g.start) }));
+    const now = Date.now() - 4 * 3600e3;
+    const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    document.querySelectorAll('.tcard').forEach((card) => {
+      const me = card.dataset.team;
+      const next = games.filter((g) => (g.home === me || g.away === me) && g.t > now).sort((a, b) => a.t - b.t)[0];
+      card.querySelector('.tnext').textContent = next ? `Next: ${next.home === me ? 'vs' : 'at'} ${next.home === me ? next.away : next.home}, ${day.format(next.t)}` : 'No games scheduled';
+    });
+
+    // Pin the visitor's team.
+    const mine = window.lcPrefs?.get('team');
+    if (mine) {
+      const card = document.querySelector(`[data-view="division"] .tcard[data-team="${mine}"]`);
+      if (card) {
+        const box = document.getElementById('mine');
+        box.querySelector('.tgrid').append(card.cloneNode(true));
+        box.hidden = false;
+      }
+    }
+  })();
+</script>
+
+<style>
+  .page-top h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 22px; }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0 6px; font: 600 20px var(--display); }
+  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer; }
+  .mine { margin-top: 20px; }
+  .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 6px; }
+  .conf { margin-top: 30px; }
+  .conf-h { font: 600 23px/1.15 var(--display); margin-bottom: 14px; }
+  .divs { display: grid; gap: 22px 24px; }
+  @media (min-width: 820px) { .divs { grid-template-columns: 1fr 1fr; } }
+  .tgrid { display: grid; gap: 8px; margin-top: 8px; }
+  .tgrid.az { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); margin-top: 24px; }
+</style>

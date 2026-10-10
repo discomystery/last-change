@@ -1,42 +1,91 @@
 ---
-// Every player who has dressed this season, by team.
+// Find a player: type part of a name, or narrow by position and team. Opens on the visitor's own team's roster.
 import Base from '../layouts/Base.astro';
 import teams from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
-import '../styles/blocks.css';
 
 type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
+const players = [...(index as P[])].sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
+const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 const base = import.meta.env.BASE_URL;
-const groups: [string, string[]][] = [['Forwards', ['C', 'L', 'R']], ['Defensemen', ['D']], ['Goalies', ['G']]];
-const byTeam = teams.map((t) => ({ t, players: (index as P[]).filter((p) => p.team === t.abbr) })).filter((x) => x.players.length);
 ---
-<Base title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
-  <header class="team-top"><h1>Players</h1></header>
-  <p class="takeaway">Everyone who has dressed this season, by team. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
-  <nav class="jump" aria-label="Teams">{byTeam.map(({ t }) => <a href={`#${t.abbr}`}>{t.abbr}</a>)}</nav>
-  <div class="roster-grid">
-    {byTeam.map(({ t, players }) => (
-      <section class="card roster" id={t.abbr}>
-        <h2><a href={`${base}team/${t.abbr}/`}>{t.name}</a></h2>
-        {groups.map(([label, pos]) => {
-          const list = players.filter((p) => pos.includes(p.pos)).sort((a, b) => a.last.localeCompare(b.last));
-          return list.length > 0 && (
-            <>
-              <p class="mini-h">{label}</p>
-              <ul>{list.map((p) => <li><a class="plink" href={`${base}player/${p.id}/`}>{p.name}</a>{p.number !== null && <span class="n"> #{p.number}</span>}</li>)}</ul>
-            </>
-          );
-        })}
-      </section>
-    ))}
+<Base section="players" title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
+  <header class="page-top"><h1>Players</h1></header>
+  <p class="takeaway">Everyone who has dressed this season. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
+  <div class="find">
+    <label class="search">
+      <span class="sr">Find a player by name</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+      <input id="q" type="search" placeholder="Type a name, e.g. Aho" autocomplete="off" spellcheck="false" />
+    </label>
+    <div class="pick">
+      <span>Show</span>
+      <select id="pos" aria-label="Position">
+        <option value="">all players</option><option value="F">forwards</option><option value="D">defensemen</option><option value="G">goalies</option>
+      </select>
+      <span>on</span>
+      <select id="team" aria-label="Team">
+        <option value="">every team</option>
+        {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
+      </select>
+    </div>
   </div>
+  <p class="count n" id="count" aria-live="polite"></p>
+  <ul class="plist" id="plist">
+    {players.map((p) => (
+      <li class="card prow" data-name={`${p.name} ${p.number ?? ''}`.toLowerCase()} data-team={p.team} data-pos={p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F'}>
+        <a class="pname" href={`${base}player/${p.id}/`}>{p.name}</a>
+        <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a></span>
+      </li>
+    ))}
+  </ul>
+  <p class="note" id="empty" hidden>No player matches. Try part of the last name, or set the menus back to “all players” on “every team”.</p>
 </Base>
 
+<script is:inline>
+  (() => {
+    const q = document.getElementById('q'), pos = document.getElementById('pos'), team = document.getElementById('team');
+    const rows = [...document.querySelectorAll('.prow')];
+    const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    rows.forEach((r) => { r.dataset.key = fold(r.dataset.name); });
+    const mine = window.lcPrefs?.get('team');
+    if (mine) team.value = mine;
+    const show = () => {
+      const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
+      let n = 0;
+      rows.forEach((r) => {
+        const ok = (!pos.value || r.dataset.pos === pos.value) && (!team.value || r.dataset.team === team.value) && words.every((w) => r.dataset.key.includes(w));
+        r.hidden = !ok;
+        n += ok;
+      });
+      document.getElementById('count').textContent = `${n} ${n === 1 ? 'player' : 'players'}`;
+      document.getElementById('empty').hidden = n > 0;
+    };
+    // Typing a name searches the whole league, whatever team the menu was on.
+    q.addEventListener('input', () => { if (q.value.trim() && team.value && team.value === mine) team.value = ''; show(); });
+    pos.addEventListener('change', show);
+    team.addEventListener('change', show);
+    show();
+  })();
+</script>
+
 <style>
-  .roster-grid { display: grid; gap: 14px; margin-top: 24px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
-  .roster { scroll-margin-top: 24px; }
-  .roster h2 { font: 700 22px/1.15 var(--display); margin-bottom: 12px; }
-  .roster h2 a { text-decoration: none; }
-  .roster .mini-h { margin-top: 12px; }
-  .roster ul { display: grid; gap: 6px; font: 400 15px var(--ui); }
+  .page-top h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; margin-top: 22px; }
+  .find { display: grid; gap: 14px; margin-top: 18px; }
+  .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 4px 14px; }
+  .search:focus-within { border-color: var(--ink); }
+  .search svg { width: 22px; height: 22px; fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; flex: none; }
+  .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 18px var(--ui); padding: 12px 0; outline: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font: 600 20px var(--display); }
+  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .count { margin-top: 14px; }
+  .plist { display: grid; gap: 8px; margin-top: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .prow { display: grid; gap: 2px; padding: 11px 16px; border-radius: 14px; }
+  .prow[hidden] { display: none; }
+  .pname { font: 600 17px var(--ui); text-decoration: none; }
+  .pname:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .pmeta { font-size: 13px; }
+  .tlink { color: inherit; text-decoration: none; }
+  .tlink:hover { text-decoration: underline; }
 </style>

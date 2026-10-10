@@ -1,0 +1,61 @@
+---
+// Where a game sits: a trail back to the day's games, and each team's previous and next game, linking to the
+// post-game page or preview when one exists (otherwise to that day on the Games page).
+import schedule from '../../public/data/schedule.json';
+import teams from '../../public/data/teams.json';
+import recapIndex from '../../public/data/recaps/index.json';
+import previewIndex from '../../public/data/previews/index.json';
+
+interface Props { id: number }
+const { id } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const games = [...schedule.games].sort((a, b) => a.start.localeCompare(b.start));
+const g = games.find((x) => x.id === id)!;
+const recaps = new Set(recapIndex.games.map((x) => x.id));
+const previews = new Set(previewIndex.map((x) => x.id));
+const place = Object.fromEntries(teams.map((t) => [t.abbr, t.place]));
+const day = (d: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
+const href = (x: (typeof games)[number]) => (x.final && recaps.has(x.id) ? `${base}recap/${x.id}/` : !x.final && previews.has(x.id) ? `${base}preview/${x.id}/` : `${base}games/#${x.date}`);
+const label = (x: (typeof games)[number], me: string) => {
+  const opp = x.home === me ? x.away : x.home;
+  const where = x.home === me ? 'vs' : 'at';
+  if (x.final) {
+    const [mine, theirs] = x.home === me ? [x.hs, x.as] : [x.as, x.hs];
+    return `${where} ${opp}, ${mine! > theirs! ? 'W' : 'L'} ${mine}–${theirs}${x.end && x.end !== 'REG' ? ` (${x.end})` : ''}`;
+  }
+  return `${where} ${opp}, ${day(x.date, { month: 'short', day: 'numeric' })}`;
+};
+const around = [g.away, g.home].map((me) => {
+  const mine = games.filter((x) => x.home === me || x.away === me);
+  const i = mine.findIndex((x) => x.id === id);
+  return { me, prev: mine[i - 1], next: mine[i + 1] };
+});
+---
+{g && (
+  <nav class="trail" aria-label="Where this game sits">
+    <p class="crumbs"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></p>
+    <ul class="around">
+      {around.map(({ me, prev, next }) => (
+        <li>
+          <a class="who tlink" href={`${base}team/${me}/`}>{place[me] ?? me}</a>
+          {prev ? <a class="step" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="step n">First game</span>}
+          {next ? <a class="step" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="step n">Last game</span>}
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style>
+  .trail { margin-top: 14px; display: grid; gap: 10px; font: 400 13px var(--ui); }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--ink-2); }
+  .crumbs a { color: inherit; }
+  .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
+  .around { display: grid; gap: 6px; }
+  @media (min-width: 760px) { .around { grid-template-columns: 1fr 1fr; gap: 6px 24px; } }
+  .around li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .who { font-weight: 700; color: var(--ink); min-width: 90px; }
+  .step { color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+  a.step:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .tlink { text-decoration: none; }
+</style>

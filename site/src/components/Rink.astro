@@ -2,7 +2,7 @@
 // The matchup drawn as a rink seen from above: visitors on the left, home team on the right.
 // Real pages pass `sides`; the mock recap still falls back to the mock teams.
 import { order, home, teams, type Abbr } from '../data/mock';
-type Side = { abbr: string; cls: string; full: string; rec?: string; score?: number; home: boolean };
+type Side = { abbr: string; cls: string; full: string; rec?: string; score?: number; home: boolean; href?: string };
 interface Props { score?: Record<Abbr, number>; centre?: string; sides?: Side[] }
 const { score, centre = 'at', sides } = Astro.props;
 const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].record.otl}`;
@@ -14,8 +14,8 @@ const scored = list.some((s) => s.score !== undefined);
   <span class="dot-circle"><span>{centre}</span></span>
   {list.map((s) => (
     <div class:list={['side', s.cls, s.home ? 'is-home' : 'is-away']}>
-      <p class="abbr">{s.abbr}{s.score !== undefined && <span class="score">{s.score}</span>}</p>
-      <p class="fullname">{s.full}</p>
+      <p class="abbr">{s.href ? <a class="rlink" href={s.href}>{s.abbr}</a> : s.abbr}{s.score !== undefined && <span class="score">{s.score}</span>}</p>
+      <p class="fullname">{s.href ? <a class="rlink" href={s.href}>{s.full}</a> : s.full}</p>
       {!scored && s.rec && <p class="rec">{s.rec}</p>}
       {s.home && !scored && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
     </div>
@@ -40,6 +40,8 @@ const scored = list.some((s) => s.score !== undefined);
     .abbr:has(.score) { flex-direction: column; align-items: inherit; gap: 6px; }
     .is-home .abbr:has(.score) { flex-direction: column; align-items: flex-end; }
   }
+  .rlink { color: inherit; text-decoration: none; }
+  .rlink:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
   .fullname { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
   .rec { color: var(--ink-2); font: 400 14px var(--ui); }
   .lc { font: 600 13px var(--ui); margin-top: 4px; }

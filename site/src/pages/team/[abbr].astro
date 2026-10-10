@@ -111,7 +111,7 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 ---
-<Base title={team.name} mock={false}>
+<Base section="teams" title={team.name} mock={false}>
   <header class="team-top">
     <h1>{team.name}</h1>
     <p class="rec">{team.w}-{team.l}-{team.otl}</p>
@@ -427,7 +427,9 @@ const _ = ordinal;
       rink.append(el('span', 'circle', 'at'));
       [next.away, next.home].forEach((a, i) => {
         const side = el('div', 'side' + (i ? ' home' : ''));
-        side.append(el('p', 'abbr' + (a === me ? ' me' : ''), a), el('p', 'full', names[a] ?? a));
+        const ab = el('p', 'abbr' + (a === me ? ' me' : ''));
+        if (a === me) ab.textContent = a; else { const l = el('a', 'tlink', a); l.href = `${base}team/${a}/`; ab.append(l); }
+        side.append(ab, el('p', 'full', names[a] ?? a));
         if (i) side.append(el('p', 'lc', 'Has last change'));
         rink.append(side);
       });
@@ -441,7 +443,9 @@ const _ = ordinal;
     const row = (g) => {
       const li = el('li', 'card game');
       const opp = g.home === me ? g.away : g.home;
-      li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), el('span', 'g-title', `${g.home === me ? 'vs' : 'at'} ${names[opp] ?? opp}`));
+      const title = el('span', 'g-title', `${g.home === me ? 'vs' : 'at'} `);
+      const ol = el('a', 'tlink', names[opp] ?? opp); ol.href = `${base}team/${opp}/`; title.append(ol);
+      li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), title);
       if (g.final) {
         const s = g.home === me ? [g.hs, g.as] : [g.as, g.hs];
         const sc = el(RECAPS.has(g.id) ? 'a' : 'span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`);

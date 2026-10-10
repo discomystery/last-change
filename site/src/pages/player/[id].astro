@@ -82,7 +82,7 @@ const shadeBy = (areas: Record<string, Area>) => {
 const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : [['role', 'Role'], ['standout', 'Stands out'], ['ratings', 'All ratings'], ['shots', 'Shots'], ['edge', 'Skating and shot']];
 const statRow = (x: any) => (isG ? null : x);
 ---
-<Base title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
+<Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     <header class="team-top">
       <h1>{p.name}</h1>
