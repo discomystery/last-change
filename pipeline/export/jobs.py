@@ -256,6 +256,7 @@ def goalie_cards(season: int, game_ids: set[int]):
             else:
                 saves, typ_u, typ_a = n - a, binom_median(n, p_usual), binom_median(n, league[key])
                 job |= {"verdict": grade(saves, typ_u, typ_a), "tonight": f"{saves} of {n}", "usual": str(typ_u), "bench": str(typ_a), "bench_is": "Average",
+                        "shots": n, "saves": saves, "typ": typ_u,  # for the one-dot-per-shot row on the card
                         "text": f"Saved {saves} of {n} {'dangerous' if key == 'high' else 'routine'} shots. Typical for him: {typ_u}. "
                                 f"Average goalie: {typ_a}. He usually stops {100 * p_usual:.0f}% of these."}
             jobs.append(job)
