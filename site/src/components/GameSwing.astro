@@ -1,0 +1,156 @@
+---
+// Post-game Swing: each player's night as one number, as a bar in his team's colour, with tonight's lines and pairs
+// highlighted on request. Data: scores/{game_id}.json, written by pipeline/export/game_scores.py from finished games.
+import Section from './Section.astro';
+import PLink from './PLink.astro';
+import Pips from './Pips.astro';
+
+type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number } };
+type Unit = { kind: 'F' | 'D'; n: number; ids: number[]; sec: number; xgf: number; xga: number };
+type Scores = { game_id: number; away: string; home: string; players: Row[]; units?: Record<string, Unit[]> };
+interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
+const { gameId, place, side } = Astro.props;
+
+const files = import.meta.glob<{ default: Scores }>('../../public/data/scores/2*.json', { eager: true });
+const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const order = d ? [d.away, d.home] : [];
+const one = (v: number) => (Math.round(v * 10) === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
+const two = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const last = (r?: Row) => r?.name.replace(/^.\. /, '') ?? '?';
+const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
+const tip = (r: Row) => {
+  const where = r.pct == null ? '' : ` Better than ${r.pct}% of ${peer[r.pos] ?? 'forwards'}’ nights last season.`;
+  if (r.pos === 'G') return `${two(r.score)} goals saved above expected.${where}`;
+  const p = r.parts;
+  return `Scoresheet ${two(p.sheet ?? 0)}. At 5-on-5 ${two(p.play ?? 0)}. Special teams ${two(p.special ?? 0)}. Company kept ${two(p.usage ?? 0)}.${where}`;
+};
+// One scale for the whole game so bars compare across both teams. A goalie's night can be far bigger either way;
+// his bar stops at the edge rather than shrinking everyone else's.
+const sk = d ? d.players.filter((r) => r.pos !== 'G').map((r) => r.score) : [];
+const lo = Math.min(-0.5, ...sk), hi = Math.max(0.5, ...sk);
+const at = (v: number) => Math.max(0, Math.min(100, (100 * (v - lo)) / (hi - lo)));
+const zero = at(0);
+const byId = new Map(d?.players.map((r) => [r.id, r]) ?? []);
+const units = (t: string) => (d?.units?.[t] ?? []).map((u) => ({ ...u, key: `${u.kind === 'F' ? 'L' : 'P'}${u.n}` }));
+const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
+---
+{d && d.players.length > 0 && (
+  <Section id="swing" title="Swing" placeholder={false}
+    takeaway="How far each player swung tonight’s result, for his team or against it.">
+    <p class="sw-lead">
+      The biggest swings: {best.map((r, i) => <Fragment>{i > 0 && (i === best.length - 1 ? ' and ' : ', ')}<span class={`sw-who t-${side(r.team)}`}><i></i><PLink id={r.id} name={r.name} /> <span class="sw-lead-n">{one(r.score)}</span></span></Fragment>)}.
+    </p>
+    <div class="jpick">
+      <span>Show</span>
+      <select id="sw-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+      <span>highlighting</span>
+      {order.map((t) => (
+        <select class="sw-line" data-team={t} aria-label="Line or pair to highlight">
+          <option value="">no line</option>
+          {units(t).map((u) => <option value={u.key}>{u.key} {u.ids.map((i) => last(byId.get(i))).join('–')}</option>)}
+        </select>
+      ))}
+    </div>
+    {order.map((t) => {
+      const mine = d.players.filter((r) => r.team === t);
+      const us = units(t);
+      const of = new Map(us.flatMap((u) => u.ids.map((i) => [i, u.key] as const)));
+      return (
+        <div class={`sw-team card t-${side(t)}`} data-team={t}>
+          {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
+          <ol class="sw-rows">
+            {mine.map((r) => (
+              <li class="sw-row" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} tabindex="0" data-tip={tip(r)}>
+                <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag">{of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}</span></span>
+                <span class="sw-bar" aria-hidden="true">
+                  <span class="sw-zero" style={`left:${zero.toFixed(1)}%`}></span>
+                  <span class:list={['sw-fill', { neg: r.score < 0 }]} style={`left:${Math.min(at(r.score), zero).toFixed(1)}%;width:${Math.abs(at(r.score) - zero).toFixed(1)}%`}></span>
+                </span>
+                <strong class="sw-n">{one(r.score)}</strong>
+                {r.pct != null ? <Pips pct={r.pct} tip={tip(r)} /> : <span></span>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      );
+    })}
+    <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The pucks compare it with every night last season at his position. Lines and pairs are tonight’s, numbered by 5-on-5 time together. Tap a player for the parts.</p>
+    <details class="fold how sw-how">
+      <summary><span class="show">How Swing is worked out</span><span class="hide">Hide how Swing is worked out</span></summary>
+      <div class="how-body">
+        <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
+        <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus a smaller amount for actual goals. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: power-play and penalty-kill time compared with a league-average unit.</p>
+        <p class="note"><strong>Company kept</strong>: from every player’s 5-on-5 impact over the two seasons before, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who swung this result, not who is better.</p>
+      </div>
+    </details>
+  </Section>
+)}
+
+<script is:inline>
+  // "Show [team] highlighting [line]": opens on the visitor's own team when it played. Picking a line or pair fades
+  // everyone else and names how long the group played together; pointing at a line tag does the same.
+  (() => {
+    const team = document.getElementById('sw-team');
+    if (!team) return;
+    const mine = [...team.options].find((o) => o.value === window.lcPrefs?.get('team'));
+    if (mine) team.value = mine.value;
+    const lineFor = (t) => document.querySelector(`.sw-line[data-team="${t}"]`);
+    const mark = (box, key) => {
+      box.classList.toggle('lit', !!key);
+      box.querySelectorAll('.sw-row').forEach((r) => r.classList.toggle('on', !!key && r.dataset.unit === key));
+      box.querySelectorAll('.sw-unit').forEach((p) => { p.hidden = p.dataset.unit !== key; });
+    };
+    const show = () => {
+      document.querySelectorAll('.sw-team').forEach((b) => { b.hidden = b.dataset.team !== team.value; });
+      document.querySelectorAll('.sw-line').forEach((s) => { s.hidden = s.dataset.team !== team.value; });
+      const box = document.querySelector(`.sw-team[data-team="${team.value}"]`);
+      if (box) mark(box, lineFor(team.value)?.value);
+    };
+    team.addEventListener('change', show);
+    document.querySelectorAll('.sw-line').forEach((s) => s.addEventListener('change', show));
+    document.querySelectorAll('.sw-team').forEach((box) => {
+      box.querySelectorAll('.sw-tag').forEach((tag) => {
+        const key = tag.textContent;
+        if (!key || key === 'G') return;
+        tag.addEventListener('mouseenter', () => mark(box, key));
+        tag.addEventListener('mouseleave', () => mark(box, lineFor(box.dataset.team)?.value));
+        tag.addEventListener('click', (e) => { e.stopPropagation(); const s = lineFor(box.dataset.team); s.value = s.value === key ? '' : key; show(); });
+      });
+    });
+    show();
+  })();
+</script>
+
+<style>
+  .sw-lead { margin-top: 18px; font: 400 18px/1.6 var(--body); }
+  .sw-who { white-space: nowrap; }
+  .sw-who i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; vertical-align: 1px; }
+  .sw-lead-n { font: 700 15px var(--ui); color: var(--ink-2); }
+  .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 600 20px var(--display); }
+  .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
+  .sw-team { margin-top: 18px; max-width: 760px; }
+  .sw-unit { font: 400 14px var(--ui); color: var(--ink-2); margin-bottom: 8px; }
+  .sw-unit strong { font: 700 17px var(--display); color: var(--ink); margin-right: 4px; }
+  .sw-rows { display: grid; gap: 1px; }
+  .sw-row { display: grid; grid-template-columns: minmax(0, 12em) 1fr 3.2em auto; align-items: center; gap: 14px; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; cursor: help; transition: opacity 0.2s; }
+  .sw-row:hover, .sw-row:focus-visible { background: var(--track); }
+  .lit .sw-row:not(.on) { opacity: 0.28; }
+  .sw-name { display: flex; align-items: baseline; gap: 8px; font: 600 15px/1.3 var(--ui); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sw-tag { font: 600 11px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); cursor: pointer; }
+  .sw-bar { position: relative; height: 16px; }
+  .sw-zero { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); }
+  .sw-fill { position: absolute; top: 0; bottom: 0; background: var(--team); border-radius: 0 4px 4px 0; }
+  .sw-fill.neg { border-radius: 4px 0 0 4px; opacity: 0.55; }
+  .sw-n { font: 700 16px var(--ui); text-align: right; }
+  @media (max-width: 600px) {
+    .sw-row { grid-template-columns: minmax(0, 1fr) 3em; gap: 2px 10px; padding: 6px 8px; }
+    .sw-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
+    .sw-row :global(.pips) { display: none; }
+  }
+  .sw-how { margin-top: 16px; }
+  .how-body { display: grid; gap: 8px; padding-top: 12px; }
+  .sw-how .hide, .sw-how[open] .show { display: none; }
+  .sw-how[open] .hide { display: inline; }
+</style>

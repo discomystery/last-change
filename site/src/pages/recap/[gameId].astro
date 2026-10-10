@@ -8,7 +8,7 @@ import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
 import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
-import GameImpact from '../../components/GameImpact.astro';
+import GameSwing from '../../components/GameSwing.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import '../../styles/blocks.css';
 import { matchupColours } from '../../lib/teams';
@@ -97,7 +97,7 @@ const scoreFiles = import.meta.glob<{ default: { game_id: number; players: unkno
 const hasImpact = !!Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default.players.length;
 const nav = [
   ...(rv ? [['chance', 'Our read']] : []), ['scorecard', 'The calls'], ...(dw ? [['replays', 'Run it back']] : []),
-  ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasImpact ? [['impact', 'Impact']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
+  ...(r.surprises.length ? [['surprises', 'Surprises']] : []), ['numbers', 'Numbers'], ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
@@ -218,7 +218,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     {r.end === 'SO' && <p class="note">The shootout decides the result but is left out of every other number on this site.</p>}
   </Section>
 
-  <GameImpact gameId={r.game_id} place={place} side={side} />
+  <GameSwing gameId={r.game_id} place={place} side={side} />
 
   <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
