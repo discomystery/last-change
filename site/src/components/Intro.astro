@@ -1,26 +1,62 @@
 ---
 // Plain-English intro at the top of team and player pages (pipeline/export/intros.py): who this is, are they good,
-// have they been good; for players, storylines for the next game under a small heading.
-interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null }
-const { text, next = [], nextLabel, nextHref } = Astro.props;
+// have they been good; for players, storylines for the next game.
+// MOCK-UP: three layouts switchable with ?intro=a|b|c while the user picks one.
+interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null; colour?: string }
+const { text, next = [], nextLabel, nextHref, colour = 'var(--ink-3)' } = Astro.props;
+const [lead, ...rest] = text;
 ---
 {text.length > 0 && (
-  <div class="intro">
-    <p class="intro-text">{text.join(' ')}</p>
+  <div class="intro" data-v="a" style={`--tc:${colour}`}>
+    <div class="intro-main">
+      <p class="intro-lead">{lead}</p>
+      {rest.length > 0 && <p class="intro-text">{rest.join(' ')}</p>}
+    </div>
     {next.length > 0 && (
-      <div class="intro-next">
+      <aside class="intro-next">
         <p class="intro-eyebrow">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
         <p class="intro-story">{next.join(' ')}</p>
-      </div>
+      </aside>
     )}
   </div>
 )}
+<script is:inline>
+  (function () { var v = new URLSearchParams(location.search).get('intro'); if (v) document.querySelectorAll('.intro').forEach(function (e) { e.dataset.v = v; }); })();
+</script>
 <style>
-  .intro { margin: 18px 0 8px; max-width: 760px; }
-  .intro-text { margin: 0; font: 400 19px/1.65 var(--body); color: var(--ink); }
-  .intro-next { margin-top: 16px; padding: 12px 16px; background: var(--sheet); border-radius: 14px; }
-  .intro-eyebrow { margin: 0 0 4px; font: 700 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .intro { margin: 20px 0 8px; }
+  .intro p { margin: 0; }
+  .intro-eyebrow { margin-bottom: 4px !important; font: 700 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
   .intro-eyebrow a { color: inherit; }
-  .intro-story { margin: 0; font: 400 17px/1.6 var(--body); }
-  @media (max-width: 719px) { .intro-text { font-size: 18px; } }
+  .intro-story { font: 400 17px/1.6 var(--body); }
+
+  /* A: headline lead, then the rest quieter; next game in a card below. */
+  .intro[data-v='a'] { max-width: 780px; }
+  .intro[data-v='a'] .intro-lead { font: 600 25px/1.35 var(--display); font-variation-settings: 'SOFT' 100; }
+  .intro[data-v='a'] .intro-text { margin-top: 10px; font: 400 18px/1.65 var(--body); color: var(--ink-2); }
+  .intro[data-v='a'] .intro-next { margin-top: 18px; padding: 12px 16px; background: var(--sheet); border-radius: 14px; }
+
+  /* B: side by side on wide screens: the intro on the left, next game as a narrow card on the right. */
+  .intro[data-v='b'] { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .intro[data-v='b'] .intro-main { font: 400 19px/1.65 var(--body); }
+  .intro[data-v='b'] .intro-lead, .intro[data-v='b'] .intro-text { display: inline; }
+  .intro[data-v='b'] .intro-lead { font-weight: 600; }
+  .intro[data-v='b'] .intro-lead::after { content: ' '; }
+  .intro[data-v='b'] .intro-next { padding: 14px 16px; background: var(--sheet); border-radius: 14px; border-top: 4px solid var(--tc); }
+  .intro[data-v='b'] .intro-story { font-size: 16px; }
+  .intro[data-v='b']:not(:has(.intro-next)) { grid-template-columns: minmax(0, 780px); }
+
+  /* C: one white card with a team-colour edge; next game under a hairline inside it. */
+  .intro[data-v='c'] { max-width: 860px; background: var(--sheet); border-radius: 16px; border-left: 5px solid var(--tc); padding: 18px 22px; }
+  .intro[data-v='c'] .intro-main { font: 400 18px/1.65 var(--body); }
+  .intro[data-v='c'] .intro-lead, .intro[data-v='c'] .intro-text { display: inline; }
+  .intro[data-v='c'] .intro-lead { font-weight: 600; }
+  .intro[data-v='c'] .intro-lead::after { content: ' '; }
+  .intro[data-v='c'] .intro-next { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+
+  @media (max-width: 719px) {
+    .intro[data-v='b'] { grid-template-columns: 1fr; gap: 16px; }
+    .intro[data-v='a'] .intro-lead { font-size: 22px; }
+    .intro[data-v='c'] { padding: 16px; }
+  }
 </style>

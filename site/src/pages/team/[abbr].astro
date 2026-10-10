@@ -20,6 +20,7 @@ import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
 import Intro from '../../components/Intro.astro';
 import { teamIntro } from '../../lib/intros';
+import { teamColour } from '../../lib/teams';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
@@ -125,7 +126,7 @@ const _ = ordinal;
     <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
   </header>
   <SectionNav items={nav as [string, string][]} />
-  <Intro text={teamIntro(abbr)?.text ?? []} />
+  <Intro text={teamIntro(abbr)?.text ?? []} colour={teamColour(abbr)} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div id="next-card"></div>

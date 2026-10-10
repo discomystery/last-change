@@ -105,7 +105,7 @@ const statRow = (x: any) => (isG ? null : x);
     </header>
     <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
     <SectionNav items={nav as [string, string][]} />
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} />
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} />
     {!isG && (
       <table class="pstats">
         <thead><tr><th></th>{cols.map(([full, short, tip]) => <th>{tip ? <span class="term" tabindex="0" data-tip={tip}><span class="full">{full}</span><span class="short">{short}</span></span> : <><span class="full">{full}</span><abbr class="short" title={full}>{short}</abbr></>}</th>)}</tr></thead>
