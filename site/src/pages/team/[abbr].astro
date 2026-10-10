@@ -14,6 +14,7 @@ import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import linesData from '../../../public/data/lines.json';
 import Pips from '../../components/Pips.astro';
+import Portrait from '../../components/Portrait.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
@@ -319,8 +320,13 @@ const _ = ordinal;
                 <div class={`gmode m-${mode}`}>
                   <div class="g2">
                     <div class="card gcard">
-                      <p class="gname"><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
-                      <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                      <div class="ghead">
+                        <div class="ghead-text">
+                          <p class="gname"><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
+                          <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                        </div>
+                        <Portrait id={g.id} size={96} class="g-photo" />
+                      </div>
                       <dl class="gkv">
                         {(['low', 'medium', 'high'] as const).map((t) => <div><dt>{t[0].toUpperCase() + t.slice(1)}-danger save %</dt><dd>{svp(x.tiers[t].sv)} <span class="n">{x.tiers[t].shots} shots</span></dd></div>)}
                         <div><dt><span class="term" tabindex="0" data-tip="Shots on goal he faces per 60.">Shots faced per 60</span></dt><dd>{x.sa60} {!few && <Marker pct={x.pct.busy!} tip={`${compared(x.pct.busy!, 'busier than', 'quieter than', 'goalies')}.`} />}</dd></div>
