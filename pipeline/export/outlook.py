@@ -67,6 +67,12 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
     ids = team_ids(season)
     played = win_model.team_games(FULL_SEASONS + [season])
     m, out = model(), {}
+    try:  # who each team has been dressing: a finished game's own previous lineup, otherwise the latest one
+        done = win_model.lineups([season]).select("game_id", "team_id", pl.col("roster").alias("r"))
+        upcoming = win_model.next_rosters([season])
+    except Exception as e:  # no player ratings yet: chances without lineups
+        print(f"lineups unavailable for the morning figure: {e!r}")
+        done, upcoming = None, None
     for day in sorted({g["date"] for g in games}):
         today = [g for g in games if g["date"] == day and g["home"] in ids and g["away"] in ids]
         if not today:
@@ -75,9 +81,20 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
                               "home_score": 0, "away_score": 0, "h_xgd": 0.0, "a_xgd": 0.0} for g in today], schema=played.schema)
         df = win_model.pregame(pl.concat([played.filter(pl.col("date") < day), rows]))
         df = df.filter(pl.col("game_id").is_in([g["id"] for g in today]))
+        if upcoming is not None:
+            df = _with_rosters(df, done, upcoming)
         for r, p in zip(df.iter_rows(named=True), win_model.predict(m, df)):
             out[r["game_id"]] = {"p_home": float(p), "steps": win_model.explain(m, r)}
     return out
+
+
+def _with_rosters(df: pl.DataFrame, done: pl.DataFrame, upcoming: dict[int, float]) -> pl.DataFrame:
+    """Adds the `roster` term (home minus away): from the games table for games already played, so the figure is
+    the same as it was that morning, and from each team's latest lineup for games still to come."""
+    known = {(g, t): r for g, t, r in done.iter_rows()}
+    side = lambda g, t: known.get((g, t), upcoming.get(t, 0.0))
+    return df.with_columns(roster=pl.Series([side(g, h) - side(g, a) for g, h, a in df.select("game_id", "home_id", "away_id").iter_rows()],
+                                            dtype=pl.Float64))
 
 
 def _pick(pool: list[str], *key) -> str:
