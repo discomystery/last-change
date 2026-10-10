@@ -33,3 +33,10 @@ def test_with_without_never_leans_mostly_on_the_gap(season_2025):
     ww = relevancy.with_without(2025, season_2025)
     assert ww.height > 100
     assert ww["weight_on_gap"].max() < 0.5
+
+
+def test_goalies_have_one_franchise_group_of_five():
+    g = relevancy.goalies(2025)
+    assert g["player_id"].n_unique() == g.height
+    assert g.filter(pl.col("tier") == "franchise").height == 5
+    assert g.filter(pl.col("tier") == "franchise")["share"].min() > 0.4  # all regular starters

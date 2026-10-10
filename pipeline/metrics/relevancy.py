@@ -1,6 +1,9 @@
 """How much a team leans on each skater: one number for "who are this team's stars", used to pick the players
 previews, post-game pages, team pages and Worth knowing notes talk about.
 
+HIDDEN (user decision 2026-10-10): this is a build-time steer only. It is never shown on a page or written to the
+public site data, so nobody argues over rankings; pages may only use it to choose whom to talk about.
+
 Two parts, equal weight, each as a z-score against last full season's regulars (all skaters together):
   * Scoring reliance: his share of the team's goals (goals plus assists) in the games he plays, so a star on a
     low-scoring team counts as much as one on a high-scoring team.
@@ -218,6 +221,43 @@ def with_without(season: int, rel: pl.DataFrame, before: str | None = None) -> p
     est = prior + k * (d["gap"].to_numpy() - prior)
     z = d["gap"].to_numpy() / np.sqrt(se2)
     return d.with_columns(likely_him=pl.Series(np.round(est, 3)), weight_on_gap=pl.Series(np.round(k, 2)), gap_z=pl.Series(np.round(z, 2)))
+
+
+GOALIE_SEASON_WEIGHT = (1.0, 0.8, 0.6)  # this season, last, the one before
+GOALIE_SHRINK_SHOTS = 1500  # unblocked shots of average goaltending added to each goalie's own record
+GOALIE_TIERS = ((5, "franchise"), (15, "star"), (32, "core"), (64, "regular"))  # by league rank: the top five are the difference makers
+
+
+def goalies(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame:
+    """Goalie relevancy: half how much his club relies on him (his share of its starts this season and last), half
+    goals saved above expected per game over three seasons (older seasons count less), pulled toward average with
+    1,500 shots of an ordinary goalie because a season of goaltending is mostly bounces. Tiers go by league rank."""
+    from pipeline.metrics import goalies as G
+    parts = []
+    for i, s in enumerate(range(season, max(season - 3, FULL_SEASONS[0] - 1), -1)):
+        g = G.per_game(s)
+        g = g.filter(pl.col("date") < before) if before and s == season else g
+        parts.append(g.with_columns(w=pl.lit(GOALIE_SEASON_WEIGHT[i])))
+    g = pl.concat(parts, how="diagonal_relaxed")
+    latest = g.sort("date").group_by("goalie_id").agg(pl.col("team_id").last())
+    rec = g.group_by("goalie_id").agg(
+        (pl.col("started").cast(pl.Float64) * pl.col("w")).sum().alias("starts_w"),
+        ((pl.col("xga") - pl.col("ga")) * pl.col("w")).sum().alias("gsax_w"), (pl.col("fa") * pl.col("w")).sum().alias("fa_w"),
+        (pl.col("fa").sum() / pl.len()).alias("fa_game"))
+    st = g.filter((pl.col("season") >= season - 1) & pl.col("started"))
+    mine = st.group_by("goalie_id", "team_id").agg(pl.len().alias("starts"))
+    d = rec.join(latest, on="goalie_id").join(mine, on=["goalie_id", "team_id"], how="left").join(
+        st.group_by("team_id").agg(pl.len().alias("team_starts")), on="team_id", how="left")
+    d = d.with_columns(share=pl.col("starts").fill_null(0) / pl.col("team_starts"),
+                       saved=pl.col("gsax_w") / (pl.col("fa_w") + GOALIE_SHRINK_SHOTS) * pl.col("fa_game"))  # goals saved a game
+    reg = d.filter(pl.col("starts_w") >= 10)
+    z = lambda c: (pl.col(c) - reg[c].mean()) / reg[c].std()
+    d = d.with_columns(score=0.5 * z("share").fill_null(-2) + 0.5 * z("saved")).sort("score", descending=True)
+    d = d.with_columns(rank=pl.int_range(1, d.height + 1), team_rank=pl.col("score").rank("ordinal", descending=True).over("team_id"))
+    tier = pl.lit("depth")
+    for cut, name in reversed(GOALIE_TIERS):
+        tier = pl.when(pl.col("rank") <= cut).then(pl.lit(name)).otherwise(tier)
+    return d.with_columns(tier=tier).select(pl.col("goalie_id").alias("player_id"), "team_id", "starts", "share", "saved", "score", "rank", "tier", "team_rank")
 
 
 if __name__ == "__main__":  # python -m pipeline.metrics.relevancy: the league's top 60 and each club's top four
