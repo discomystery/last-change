@@ -1,159 +1,153 @@
 ---
-// Post-game Impact: one number per player for the night, split into its parts, both teams. Data: scores/{game_id}.json,
-// written by pipeline/export/game_scores.py from finished games only.
+// Post-game Impact, line by line: each player's night as one number, grouped the way his coach used him tonight.
+// Data: scores/{game_id}.json, written by pipeline/export/game_scores.py from finished games only.
 import Section from './Section.astro';
 import PLink from './PLink.astro';
+import Pips from './Pips.astro';
+import '../styles/blocks.css';
 
-type Part = 'sheet' | 'play' | 'special' | 'usage' | 'net';
-type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: Partial<Record<Part, number>> };
-type Scores = { game_id: number; away: string; home: string; players: Row[] };
+type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number } };
+type Unit = { kind: 'F' | 'D'; n: number; ids: number[]; sec: number; xgf: number; xga: number };
+type Scores = { game_id: number; away: string; home: string; players: Row[]; units?: Record<string, Unit[]> };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
 const { gameId, place, side } = Astro.props;
 
 const files = import.meta.glob<{ default: Scores }>('../../public/data/scores/2*.json', { eager: true });
 const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
 const order = d ? [d.away, d.home] : [];
-const PARTS: [Part, string, string][] = [
-  ['sheet', 'Scoresheet', 'Goals and assists, the chances from his own shots, penalties drawn and taken, faceoffs.'],
-  ['play', '5-on-5 play', 'Chances for and against with him on the ice at 5-on-5, against league average and against his own team with him off the ice.'],
-  ['special', 'Special teams', 'Power-play chances above a league-average power play, and penalty-kill chances against below a league-average kill.'],
-  ['usage', 'Linemates and opponents', 'A little given back for strong linemates and weak opponents, or added for the reverse.'],
-  ['net', 'In net', 'Goals saved above expected: what the shots he faced were worth, minus the goals he allowed.'],
-];
-const label = Object.fromEntries(PARTS.map(([k, l]) => [k, l]));
+const one = (v: number) => (Math.round(v * 10) / 10 === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
+const two = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
-const fmt = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
-const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
-// One scale for the whole game, so bars compare across both teams: the most any skater had below zero and above it.
-// A goalie's night can be far bigger either way; his bar stops at the edge rather than shrinking everyone else's.
-const neg = (r: Row) => Object.values(r.parts).reduce((s, v) => s + Math.min(0, v ?? 0), 0);
-const pos = (r: Row) => Object.values(r.parts).reduce((s, v) => s + Math.max(0, v ?? 0), 0);
-const sk = d ? d.players.filter((r) => r.pos !== 'G') : [];
-const lo = Math.min(-0.25, ...sk.map(neg));
-const hi = Math.max(0.25, ...sk.map(pos));
-const at = (v: number) => Math.max(0, Math.min(100, (100 * (v - lo)) / (hi - lo)));
-const zero = at(0);
-// Each part a segment: positive parts stack rightwards from zero, negative parts leftwards.
-const segs = (r: Row) => {
-  let up = 0, down = 0;
-  return PARTS.filter(([k]) => r.parts[k]).map(([k]) => {
-    const v = r.parts[k]!;
-    const [a, b] = v > 0 ? [up, (up += v)] : [(down += v), down - v];
-    return { k, left: at(a).toFixed(1), width: (at(b) - at(a)).toFixed(1) };
-  });
+// Three plain sources instead of a legend: what he put on the scoresheet, what happened with him on the ice
+// (5-on-5 and special teams), and the company he kept.
+const sources = (r: Row) => r.pos === 'G' ? [] : [
+  { k: 'scoring', v: r.parts.sheet ?? 0 },
+  { k: 'ice', v: (r.parts.play ?? 0) + (r.parts.special ?? 0) },
+  { k: 'company', v: r.parts.usage ?? 0 },
+];
+const mostly = (r: Row) => {
+  if (r.pos === 'G') return r.score >= 0 ? 'saves' : 'goals allowed';
+  const top = sources(r).sort((a, b) => Math.abs(b.v) - Math.abs(a.v))[0];
+  if (Math.abs(r.score) < 0.15) return 'quiet';
+  if (top.k === 'company') return top.v > 0 ? 'easy company' : 'tough company';
+  if (top.k === 'scoring') return top.v > 0 ? 'scoring' : 'penalties';
+  return top.v > 0 ? 'on the ice' : 'on the ice';
 };
 const tip = (r: Row) => {
-  const bits = PARTS.filter(([k]) => r.parts[k] !== undefined).map(([k]) => `${label[k]} ${fmt(r.parts[k]!)}`);
   const where = r.pct == null ? '' : ` Better than ${r.pct}% of ${peer[r.pos] ?? 'forwards'}’ nights last season.`;
-  return `${bits.join(' · ')}.${where}`;
+  if (r.pos === 'G') return `${two(r.score)} goals saved above expected.${where}`;
+  const p = r.parts;
+  return `Scoresheet ${two(p.sheet ?? 0)}. At 5-on-5 ${two(p.play ?? 0)}. Special teams ${two(p.special ?? 0)}. Company kept ${two(p.usage ?? 0)}.${where}`;
 };
-const top = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
+const byId = new Map(d?.players.map((r) => [r.id, r]) ?? []);
+// Tonight's groups for a team: forward lines, then pairs, then the goalies and anyone not in a regular group.
+const groups = (t: string) => {
+  const units = (d?.units?.[t] ?? []).map((u) => ({ ...u, rows: u.ids.map((i) => byId.get(i)).filter(Boolean) as Row[] }));
+  const placed = new Set(units.flatMap((u) => u.ids));
+  const mine = d?.players.filter((r) => r.team === t) ?? [];
+  return { units, goalies: mine.filter((r) => r.pos === 'G'), rest: mine.filter((r) => r.pos !== 'G' && !placed.has(r.id)), all: mine };
+};
+const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
 ---
-{d && d.players.length > 0 && (
+{d && d.players.length > 0 && (() => {
+  const row = (r: Row) => (
+    <li class="im-row" tabindex="0" data-tip={tip(r)}>
+      <span class="im-name"><PLink id={r.id} name={r.name} /></span>
+      <span class="im-from">{mostly(r)}</span>
+      {r.pct != null ? <Pips pct={r.pct} tip={tip(r)} /> : <span></span>}
+      <strong class="im-n">{one(r.score)}</strong>
+    </li>
+  );
+  return (
   <Section id="impact" title="Impact" placeholder={false}
-    takeaway="One number for each player’s night: scoring, 5-on-5 play, special teams and the company he kept.">
-    <ol class="imp-top">
-      {top.map((r, i) => (
-        <li class:list={['card', `t-${side(r.team)}`]}>
-          <span class="imp-rank">{i + 1}</span>
-          <span class="imp-who"><span class="pc-name"><i></i><PLink id={r.id} name={r.name} /></span><span class="imp-team">{place(r.team)}</span></span>
-          <span class="imp-n"><strong>{fmt(r.score)}</strong>{r.pct != null && <span>{ord(r.pct)} pct</span>}</span>
-        </li>
-      ))}
-    </ol>
-    <div class="jpick imp-pick">
+    takeaway="How much each player moved tonight’s result, set out the way his coach used him.">
+    <p class="im-lead">
+      The biggest nights: {best.map((r, i) => <Fragment>{i > 0 && (i === best.length - 1 ? ' and ' : ', ')}<span class={`im-who t-${side(r.team)}`}><i></i><PLink id={r.id} name={r.name} /> <span class="im-lead-n">{one(r.score)}</span></span></Fragment>)}.
+    </p>
+    <div class="jpick">
       <span>Show</span>
-      <select id="imp-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+      <select id="im-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+      <select id="im-view" aria-label="Order"><option value="lines">line by line</option><option value="rank">from best to worst</option></select>
     </div>
-    <div class="imp-cols">
-      {order.map((t) => (
-        <section class:list={['imp-col', 'card', `t-${side(t)}`]} data-team={t} aria-label={place(t)}>
-          <h3 class="imp-h"><i></i>{place(t)}</h3>
-          <ul class="imp-list">
-            {d.players.filter((r) => r.team === t).map((r) => (
-              <li class="imp-row" tabindex="0" data-tip={tip(r)}>
-                <span class="imp-name"><PLink id={r.id} name={r.name} /><span class="imp-pos">{r.pos}</span></span>
-                <span class="imp-bar" aria-hidden="true">
-                  <span class="imp-zero" style={`left:${zero.toFixed(1)}%`}></span>
-                  {segs(r).map((s) => <span class={`imp-seg p-${s.k}`} style={`left:${s.left}%;width:${s.width}%`}></span>)}
-                </span>
-                <span class="imp-score"><strong>{fmt(r.score)}</strong>{r.pct != null && <span>{ord(r.pct)}</span>}</span>
-              </li>
+    {order.map((t) => {
+      const g = groups(t);
+      return (
+        <div class={`im-team t-${side(t)}`} data-team={t}>
+          <div class="im-view two" data-view="lines">
+            {g.units.map((u) => (
+              <div class="card im-unit">
+                <div class="unit-top">
+                  <span class="unit-label">{u.kind === 'F' ? `L${u.n}` : `P${u.n}`}</span>
+                  <span class="unit-toi"><span class="term" tabindex="0" data-tip={`5-on-5 time these ${u.kind === 'F' ? 'three' : 'two'} spent on the ice together tonight. Groups are numbered by that time, most first.`}><strong>{clock(u.sec)}</strong> together</span> · <span class="term" tabindex="0" data-tip={`Expected goals at 5-on-5 while they were on together: ${u.xgf.toFixed(2)} for, ${u.xga.toFixed(2)} against.`}>chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)}</span></span>
+                </div>
+                <ul class="im-rows">{u.rows.map(row)}</ul>
+              </div>
             ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-    <ul class="imp-key">
-      {PARTS.map(([k, l, t]) => <li><i class={`p-${k}`}></i><span class="term" tabindex="0" data-tip={t}>{l}</span></li>)}
-    </ul>
-    <details class="fold how imp-how">
+            {(g.goalies.length > 0 || g.rest.length > 0) && (
+              <div class="card im-unit">
+                <div class="unit-top"><span class="unit-label">{g.rest.length ? 'In net and the rest' : 'In net'}</span></div>
+                <ul class="im-rows">{[...g.goalies, ...g.rest].map(row)}</ul>
+              </div>
+            )}
+          </div>
+          <div class="im-view card" data-view="rank" hidden>
+            <ol class="im-rows im-ranked">{g.all.map(row)}</ol>
+          </div>
+        </div>
+      );
+    })}
+    <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The pucks compare it with every night last season at his position. The small word says where most of it came from. Tap a player for the parts.</p>
+    <details class="fold how im-how">
       <summary><span class="show">How Impact is worked out</span><span class="hide">Hide how Impact is worked out</span></summary>
       <div class="how-body">
-        <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and a penalty taken costs 0.16, what a power play is worth on average. Each faceoff won or lost moves it by 0.006.</p>
-        <p class="note"><strong>5-on-5 play</strong> counts most: the expected goals for minus against with him on the ice, half compared with league average (adjusted for score and venue) and half compared with his own team when he was off the ice, plus a smaller amount for actual goals for and against. A player can lose a game and still score well here if his line held its own.</p>
-        <p class="note"><strong>Special teams</strong>: power-play chances above what a league-average power play makes in the same time, and penalty-kill chances against below a league-average kill. <strong>Linemates and opponents</strong>: from each player’s 5-on-5 impact over the two seasons before, a player with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected.</p>
-        <p class="note">The small number is the percentile: how this night compares with every night last season at his position (forwards, defensemen, goalies), scored the same way. Empty-net shots and shootouts are left out of the chances. One game is a small sample; this says who moved this result, not who is better.</p>
+        <p class="note"><strong>Scoring</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
+        <p class="note"><strong>On the ice</strong> counts most: expected goals for minus against with him on at 5-on-5, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus a smaller amount for actual goals. A player on a losing team can score well if his line held its own. Power-play and penalty-kill time is compared with a league-average unit.</p>
+        <p class="note"><strong>Company</strong>: from every player’s 5-on-5 impact over the two seasons before, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who moved this result, not who is better.</p>
       </div>
     </details>
   </Section>
-)}
+  );
+})()}
 
 <script is:inline>
-  // "Show [team]" on phones: opens on the visitor's own team when it played, otherwise the away team.
+  // "Show [team] [line by line / from best to worst]": opens on the visitor's own team when it played.
   (() => {
-    const pick = document.getElementById('imp-team');
-    if (!pick) return;
-    const mine = [...pick.options].find((o) => o.value === window.lcPrefs?.get('team'));
-    if (mine) pick.value = mine.value;
-    const show = () => document.querySelectorAll('.imp-col').forEach((c) => c.classList.toggle('imp-off', c.dataset.team !== pick.value));
-    pick.addEventListener('change', show);
+    const team = document.getElementById('im-team'), view = document.getElementById('im-view');
+    if (!team) return;
+    const mine = [...team.options].find((o) => o.value === window.lcPrefs?.get('team'));
+    if (mine) team.value = mine.value;
+    const show = () => document.querySelectorAll('.im-team').forEach((t) => {
+      t.hidden = t.dataset.team !== team.value;
+      t.querySelectorAll('.im-view').forEach((v) => { v.hidden = v.dataset.view !== view.value; });
+    });
+    team.addEventListener('change', show);
+    view.addEventListener('change', show);
     show();
   })();
 </script>
 
 <style>
-  .imp-top, .imp-cols, .imp-key { --p-sheet: var(--ink); --p-play: #4f7cac; --p-special: #c08a3e; --p-usage: #a3b0bd; --p-net: #6e8f6a; }
-  @media (prefers-color-scheme: dark) {
-    .imp-top, .imp-cols, .imp-key { --p-play: #8fb3e8; --p-special: #d9a65a; --p-usage: #5d6d7c; --p-net: #9cc196; }
-  }
-  .imp-top { display: grid; gap: 12px; margin-top: 18px; counter-reset: none; }
-  @media (min-width: 760px) { .imp-top { grid-template-columns: repeat(3, 1fr); } }
-  .imp-top li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
-  .imp-rank { font: 700 28px/1 var(--display); color: var(--ink-3); }
-  .imp-who { display: grid; gap: 2px; min-width: 0; }
-  .imp-team { font: 400 13px var(--ui); color: var(--ink-3); }
-  .pc-name { font: 700 19px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
-  .pc-name i, .imp-h i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
-  .imp-n { display: grid; justify-items: end; font: 400 12px var(--ui); color: var(--ink-3); }
-  .imp-n strong { font: 700 22px/1.1 var(--ui); color: var(--ink); }
-  .imp-pick { display: none; }
-  .jpick { flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .im-lead { margin-top: 18px; font: 400 18px/1.6 var(--body); }
+  .im-who { white-space: nowrap; }
+  .im-who i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; vertical-align: 1px; }
+  .im-lead-n { font: 700 15px var(--ui); color: var(--ink-2); }
+  .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 600 20px var(--display); }
   .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
-  .imp-cols { display: grid; gap: 16px; margin-top: 18px; }
-  @media (min-width: 760px) { .imp-cols { grid-template-columns: 1fr 1fr; align-items: start; } }
-  @media (max-width: 759px) { .imp-pick { display: flex; } .imp-col.imp-off { display: none; } }
-  .imp-h { display: flex; align-items: center; gap: 8px; font: 700 13px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); margin: 0 0 8px; }
-  .imp-list { display: grid; gap: 2px; }
-  .imp-row { display: grid; grid-template-columns: minmax(0, 9.5em) 1fr 4.2em; align-items: center; gap: 10px; padding: 3px 0; cursor: help; border-radius: 4px; }
-  .imp-row:hover, .imp-row:focus-visible { background: var(--track); }
-  @media (max-width: 759px) {
-    .imp-row { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 5px 0; }
-    .imp-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
-  }
-  .imp-name { display: flex; align-items: baseline; gap: 6px; font: 600 14px/1.3 var(--ui); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .imp-pos { font: 400 11px var(--ui); color: var(--ink-3); }
-  .imp-bar { position: relative; height: 14px; }
-  .imp-zero { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
-  .imp-seg { position: absolute; top: 0; bottom: 0; background: var(--p); }
-  .imp-score { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; font: 400 11px var(--ui); color: var(--ink-3); white-space: nowrap; }
-  .imp-score strong { font: 700 15px var(--ui); color: var(--ink); }
-  .p-sheet { --p: var(--p-sheet); } .p-play { --p: var(--p-play); } .p-special { --p: var(--p-special); } .p-usage { --p: var(--p-usage); } .p-net { --p: var(--p-net); }
-  .imp-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 14px; font: 400 13px var(--ui); color: var(--ink-2); }
-  .imp-key li { display: inline-flex; align-items: center; gap: 6px; }
-  .imp-key i { width: 12px; height: 12px; border-radius: 3px; background: var(--p); }
-  .imp-how { margin-top: 16px; }
+  .im-team[hidden], .im-view[hidden] { display: none; }
+  .im-view.two { margin-top: 18px; gap: 16px; align-items: start; }
+  .im-view.card { margin-top: 18px; }
+  .im-rows { display: grid; gap: 2px; margin-top: 10px; }
+  .im-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 3.2em; align-items: center; gap: 12px; padding: 5px 6px; margin: 0 -6px; border-radius: 6px; cursor: help; }
+  .im-row:hover, .im-row:focus-visible { background: var(--track); }
+  .im-name { font: 600 15px/1.3 var(--ui); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .im-from { font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); white-space: nowrap; }
+  .im-n { font: 700 17px var(--ui); text-align: right; }
+  .im-ranked { counter-reset: r; }
+  .im-ranked .im-name::before { counter-increment: r; content: counter(r); display: inline-block; width: 1.6em; font: 700 13px var(--ui); color: var(--ink-3); }
+  @media (max-width: 420px) { .im-row { gap: 8px; } .im-from { display: none; } }
+  .im-how { margin-top: 16px; }
   .how-body { display: grid; gap: 8px; padding-top: 12px; }
-  .imp-how .hide, .imp-how[open] .show { display: none; }
-  .imp-how[open] .hide { display: inline; }
+  .im-how .hide, .im-how[open] .show { display: none; }
+  .im-how[open] .hide { display: inline; }
 </style>

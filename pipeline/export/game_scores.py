@@ -26,6 +26,7 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.metrics import players as P
 from pipeline.metrics import rapm
+from pipeline.metrics import units as U
 
 OUT = SITE_DATA / "scores"
 PLAY = 0.6  # weight of an on-ice expected goal; 0.2 = scoresheet-led, 0.4 = even, 0.6 = play-led (user's choice)
@@ -137,6 +138,19 @@ def run(season: int = CURRENT_SEASON) -> dict:
     pools = {g: np.sort(ref.filter(pl.col("grp") == g)["score"].to_numpy()) for g in ("F", "D", "G")}
     pct = lambda g, v: int(max(1, min(99, round(100 * np.searchsorted(pools[g], v, side="right") / len(pools[g]))))) if len(pools[g]) else None
 
+    # Tonight's lines and pairs: the trios and pairs that played most together at 5-on-5 in this game.
+    gu = pl.read_parquet(d / "game_units.parquet") if (d / "game_units.parquet").exists() else None
+    def lines(gid: int, team_id: int) -> list[dict]:
+        if gu is None:
+            return []
+        mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
+        out = []
+        for kind, count in (("F", 4), ("D", 3)):
+            for i, u in enumerate(U._pick(mine.filter(pl.col("kind") == kind), count), 1):
+                out.append({"kind": kind, "n": i, "ids": [int(x) for x in u["unit"].split("-")], "sec": int(u["sec"]),
+                            "xgf": round(u["xgf"], 2), "xga": round(u["xga"], 2)})
+        return out
+
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
         old.unlink()
@@ -148,7 +162,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 "id": r["player_id"], "name": names.get(r["player_id"], "?"), "team": abbr.get(r["team_id"]), "pos": r["pos"],
                 "score": round(r["score"], 2), "pct": pct(r["grp"], r["score"]),
                 "parts": {k: round(r[k], 2) for k in (("net",) if r["pos"] == "G" else ("sheet", "play", "special", "usage"))}})
-        (OUT / f"{gid}.json").write_text(json.dumps({"game_id": gid, "away": g["away"], "home": g["home"], "players": players}, separators=(",", ":"), ensure_ascii=False))
+        units = {g["away"]: lines(gid, g["away_id"]), g["home"]: lines(gid, g["home_id"])}
+        (OUT / f"{gid}.json").write_text(json.dumps({"game_id": gid, "away": g["away"], "home": g["home"], "players": players, "units": units}, separators=(",", ":"), ensure_ascii=False))
     return {"games": now["game_id"].n_unique()}
 
 
