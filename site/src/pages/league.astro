@@ -18,7 +18,7 @@ import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../data/mock';
 import { clock } from '../lib/format';
 import '../styles/blocks.css';
 
-type T = { abbr: string; name: string; place: string; pts: number };
+type T = { abbr: string; name: string; place: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string };
 const teams = [...(teamsData as T[])].sort((a, b) => a.name.localeCompare(b.name));
 const modes = ['blend', 'season'] as const;
 type Mode = (typeof modes)[number];
@@ -38,6 +38,31 @@ const settle = (key: string) => {
   return k > 82 ? `${base} That is more than a season, so much of the spread between teams here is luck.` : base;
 };
 const gamesRange = (() => { const g = Object.values(fp).map((t) => t.games); return [Math.min(...g), Math.max(...g)]; })();
+
+// ---------- Every trait, every team (the big table) ----------
+// Each cell has four states (season mode x arena switch); the browser picks one and shows the rank or the number.
+const f1 = (v: number) => v.toFixed(1), f2 = (v: number) => v.toFixed(2);
+const signed = (v: number, d: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
+const numFmt: Record<string, [(v: number) => string, string]> = {
+  volume: [f1, 'attempts per 60'], quality: [(v) => f1(1 / v), 'shots per expected goal'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
+  turnover: [(v) => `${f1(v)}%`, 'of chances'], point: [(v) => `${f1(v)}%`, 'of attempts'], suppression: [f1, 'allowed per 60'],
+  qualityAllowed: [(v) => f1(1 / v), 'shots per expected goal'], breakdowns: [f2, 'per 60'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
+  pace: [f1, 'shots per 60, both teams'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
+  depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
+  discipline: [(v) => signed(v, 2), 'drawn minus taken per 60'],
+};
+const gTraits = fpGroups.flatMap((g) => traits.filter((t) => t.group === g));
+type Cell = { r: number; p: number; n: string; t: string };
+const cellData = Object.fromEntries(teams.map((tm) => [tm.abbr, Object.fromEntries(gTraits.flatMap((t) => {
+  const d = fp[tm.abbr]?.dims[t.key];
+  if (!d) return [];
+  const one = (m: Mode): Cell => ({ r: d[m].rank, p: d[m].pct, n: numFmt[t.key][0](d[m].raw === undefined ? d[m].v : d[m].index), t: `${tm.name}: ${t.say(d[m].raw === undefined ? d[m].v : d[m].index)}, ${ordinal(d[m].rank)} of 32` });
+  const raw = (m: Mode): Cell => ({ r: d[m].raw_rank!, p: rawPct(d[m].raw_rank!), n: f1(d[m].raw!), t: `${tm.name}: ${d[m].raw!.toFixed(1)} ${rawWords[t.key]}, ${ordinal(d[m].raw_rank!)} of 32` });
+  return [[t.key, d.blend.raw === undefined ? { b: one('blend'), s: one('season') } : { b: one('blend'), s: one('season'), br: raw('blend'), sr: raw('season') }]];
+}))]));
+const rawUnit: Record<string, string> = { physical: 'hits per 60 as recorded', forecheck: 'plays per 60 as recorded' };
+const confs = [...new Set(teams.map((t) => t.conference))].sort();
+const divsOf = (c: string) => [...new Set(teams.filter((t) => t.conference === c).map((t) => t.division))].sort();
 
 // ---------- Lines ----------
 type Unit = { label: string; players: string[]; ids?: number[]; toi_sec: number; xgf60: number; xga60: number; share: number; pct: Record<string, number | null> };
@@ -122,7 +147,7 @@ const srcRows = (side: 'for' | 'against', key: string) => {
 };
 const pc = (v: number, min: number, max: number) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)).toFixed(1);
 
-const nav: [string, string][] = [['style', 'Team styles'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav: [string, string][] = [['style', 'Team styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 ---
 <Base section="league" title="League" mock={false} description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
@@ -169,38 +194,65 @@ const _ = ordinal;
         <p class="note">{settle(t.key)}{rawWords[t.key] && <> This trait is an arena-adjusted score; switch “Hits and takeaways” to Raw in the settings to rank teams by the numbers as recorded.</>}</p>
       </div>
     ))}
+  </Section>
 
-    <details class="fold glance-fold">
-      <summary><span class="closed">Show every trait for every team</span><span class="opened">Hide the full table</span></summary>
-      <p class="note">Each box is the team’s rank of 32, more strongly shaded toward the right-hand word on that trait’s scale (1st is the most {traits[0].hi.toLowerCase()} on {traits[0].label.toLowerCase()}, for example). Tap a heading to sort by it.</p>
-      <div class="glance-wrap">
-        <table class="glance">
-          <thead>
-            <tr><th class="g-team"><button type="button" data-sort="name" aria-pressed="true">Team</button></th>
-              {traits.map((t) => <th><button type="button" data-sort={t.key} data-tip={`${t.label}: 1st is the most ${t.hi.toLowerCase()}, 32nd the most ${t.lo.toLowerCase()}.`}>{t.label}</button></th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map((tm) => (
-              <tr data-t={tm.abbr} data-name={tm.name}>
-                <th class="g-team"><TeamLink abbr={tm.abbr}>{tm.name}</TeamLink></th>
-                {traits.map((t) => {
-                  const d = fp[tm.abbr]?.dims[t.key];
-                  if (!d) return <td></td>;
-                  const raw = d.blend.raw !== undefined;
-                  return (
-                    <td data-k={t.key} data-b={d.blend.rank} data-s={d.season.rank} data-br={raw ? d.blend.raw_rank : undefined} data-sr={raw ? d.season.raw_rank : undefined}
-                      style={`--hb:${d.blend.pct};--hs:${d.season.pct}${raw ? `;--hbr:${rawPct(d.blend.raw_rank!)};--hsr:${rawPct(d.season.raw_rank!)}` : ''}`} class:list={{ hasraw: raw }}>
-                      {modes.map((m) => <span class={`c-${m}`}>{raw ? <><span class="a-adj">{d[m].rank}</span><span class="a-raw">{d[m].raw_rank}</span></> : d[m].rank}</span>)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  <Section id="table" title="Every trait, every team" placeholder={false} takeaway="The whole league at a glance: each team’s place on all 17 traits, side by side.">
+    <div class="tctl">
+      <div class="pick"><span>Show</span>
+        <select id="tb-view" aria-label="Ranks or numbers"><option value="rank">ranks</option><option value="num">the numbers</option></select>
       </div>
-    </details>
+      <div class="pick"><span>Highlight</span>
+        <select id="tb-hl" aria-label="Teams to highlight">
+          <option value="">no one</option>
+          <option value="mine">my team’s division</option>
+          {confs.map((c) => (
+            <optgroup label={`${c} Conference`}>
+              <option value={`c:${c}`}>the {c} Conference</option>
+              {divsOf(c).map((d) => <option value={`d:${d}`}>the {d} Division</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <select id="tb-rest" aria-label="What happens to the other teams" hidden><option value="dim">and fade the rest</option><option value="hide">and hide the rest</option></select>
+      </div>
+    </div>
+    <div class="key tkey"><span class="ramp"><i></i></span><span>Shading runs toward the right-hand word on each trait’s scale</span><span class="you">Your team is outlined</span></div>
+    <p class="note">Tap any column heading to sort by it; tap again to flip the order. Point at a box for the number in words.</p>
+    <div class="tb-wrap" id="tb-wrap">
+      <table class="tb" id="tb">
+        <thead>
+          <tr class="tb-groups">
+            <th class="tb-name" rowspan="2"><button type="button" data-sort="name">Team<i></i></button></th>
+            <th class="tb-pts" rowspan="2"><button type="button" data-sort="pts" data-tip="Standings points so far this season (games played in brackets).">Pts<i></i></button></th>
+            {fpGroups.map((g) => { const n = gTraits.filter((t) => t.group === g).length; return n ? <th class="tb-g" colspan={n}>{g}</th> : null; })}
+          </tr>
+          <tr>
+            {gTraits.map((t, i) => (
+              <th class:list={['tb-h', { first: i === 0 || gTraits[i - 1].group !== t.group }]} data-k={t.key}>
+                <button type="button" data-sort={t.key} data-tip={`${t.label}. ${t.tip} Rank 1 is the most ${t.hi.toLowerCase()}, 32 the most ${t.lo.toLowerCase()}.`}>
+                  <span class="tb-l">{t.label}</span>
+                  <span class="tb-u v-rank">1 = {t.hi}</span>
+                  <span class="tb-u v-num">{rawUnit[t.key] ? <><span class="a-adj">{numFmt[t.key][1]}</span><span class="a-raw">{rawUnit[t.key]}</span></> : numFmt[t.key][1]}</span>
+                  <i></i>
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {teams.map((tm) => (
+            <tr data-t={tm.abbr} data-name={tm.name} data-pts={tm.pts} data-gp={tm.gp} data-conf={tm.conference} data-div={tm.division}>
+              <th class="tb-name"><TeamLink abbr={tm.abbr}><span class="full">{tm.name}</span><span class="ab">{tm.abbr}</span></TeamLink></th>
+              <td class="tb-pts">{tm.pts} <span class="n">({tm.gp})</span></td>
+              {gTraits.map((t, i) => {
+                const c = cellData[tm.abbr][t.key];
+                return c ? <td class:list={['tb-c', { first: i === 0 || gTraits[i - 1].group !== t.group, hot: c.b.p >= 70 }]} data-k={t.key} data-tip={c.b.t} style={`--h:${c.b.p}`}>{c.b.r}</td> : <td class="tb-c" data-k={t.key}></td>;
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <script type="application/json" id="tb-data" set:html={JSON.stringify(cellData)}></script>
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway="Each team’s lines and pairs against the same-numbered group on every other team.">
@@ -344,25 +396,86 @@ const _ = ordinal;
     };
     mark();
 
-    // Sortable table of every trait. Sorting follows the season and arena switches.
-    const body = document.querySelector('.glance tbody');
-    const heads = document.querySelectorAll('.glance [data-sort]');
-    let by = 'name';
-    const sort = () => {
-      const season = document.documentElement.dataset.mode === 'season', raw = document.documentElement.dataset.arena === 'raw';
-      const rank = (tr) => {
-        const td = tr.querySelector(`td[data-k="${by}"]`);
-        if (!td) return 99;
-        const k = (season ? 's' : 'b') + (raw && td.dataset.br ? 'r' : '');
-        return +(td.dataset[k] ?? 99);
-      };
-      const rows = [...body.rows];
-      rows.sort((a, b) => (by === 'name' ? a.dataset.name.localeCompare(b.dataset.name) : rank(a) - rank(b)));
-      rows.forEach((r) => body.appendChild(r));
-      heads.forEach((h) => h.setAttribute('aria-pressed', String(h.dataset.sort === by)));
+    document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') mark(); });
+
+    // The big table: every trait for every team. Rank or number, sort by any column, highlight a division or conference.
+    const data = JSON.parse(document.getElementById('tb-data').textContent);
+    const root = document.documentElement;
+    const tbody = document.querySelector('#tb tbody');
+    const view = document.getElementById('tb-view'), hl = document.getElementById('tb-hl'), rest = document.getElementById('tb-rest');
+    let sortBy = 'pts', dir = 1;
+    const state = (cell) => { const m = root.dataset.mode === 'season' ? 's' : 'b'; return root.dataset.arena === 'raw' && cell[m + 'r'] ? cell[m + 'r'] : cell[m]; };
+    const paint = () => {
+      const num = view.value === 'num';
+      document.getElementById('tb').classList.toggle('nums', num);
+      tbody.querySelectorAll('tr').forEach((tr) => {
+        const row = data[tr.dataset.t] || {};
+        tr.querySelectorAll('td[data-k]').forEach((td) => {
+          const c = row[td.dataset.k];
+          if (!c) return;
+          const x = state(c);
+          td.textContent = num ? x.n : x.r;
+          td.style.setProperty('--h', x.p);
+          td.dataset.tip = x.t;
+          td.dataset.r = x.r;
+          td.classList.toggle('hot', x.p >= 70);
+        });
+      });
     };
-    heads.forEach((h) => h.addEventListener('click', () => { by = h.dataset.sort; sort(); }));
-    document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') mark(); else sort(); });
+    const sort = () => {
+      const rows = [...tbody.rows];
+      const key = (tr) => {
+        if (sortBy === 'name') return tr.dataset.name;
+        if (sortBy === 'pts') return -(+tr.dataset.pts) + (+tr.dataset.gp) / 1000;
+        const td = tr.querySelector(`td[data-k="${sortBy}"]`);
+        return td && td.dataset.r ? +td.dataset.r : 99;
+      };
+      rows.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir || a.dataset.name.localeCompare(b.dataset.name); });
+      rows.forEach((r) => tbody.appendChild(r));
+      document.querySelectorAll('#tb [data-sort]').forEach((h) => {
+        const on = h.dataset.sort === sortBy;
+        h.classList.toggle('flip', on && dir === -1);
+        h.closest('th').setAttribute('aria-sort', on ? ((h.dataset.sort === 'pts') === (dir === 1) ? 'descending' : 'ascending') : 'none');
+        h.closest('th').classList.toggle('sorted', on);
+      });
+      document.querySelectorAll('#tb td[data-k], #tb th[data-k]').forEach((c) => c.classList.toggle('sorted', c.dataset.k === sortBy));
+    };
+    const highlight = () => {
+      let v = hl.value;
+      const team = window.lcPrefs ? window.lcPrefs.get('team') : '';
+      if (v === 'mine') { const tr = team && tbody.querySelector(`tr[data-t="${team}"]`); v = tr ? 'd:' + tr.dataset.div : ''; }
+      rest.hidden = !v;
+      const t = document.getElementById('tb');
+      t.classList.toggle('hl', !!v);
+      t.classList.toggle('hide-rest', !!v && rest.value === 'hide');
+      tbody.querySelectorAll('tr').forEach((tr) => tr.classList.toggle('in', !!v && (v === 'c:' + tr.dataset.conf || v === 'd:' + tr.dataset.div)));
+    };
+    const save = () => { remember('tb-view', view.value); remember('tb-hl', hl.value); remember('tb-rest', rest.value); };
+    [['tb-view', view], ['tb-hl', hl], ['tb-rest', rest]].forEach(([k, s]) => { const v = recall(k); if (v !== null && [...s.options].some((o) => o.value === v)) s.value = v; });
+    // My team's division only makes sense once a team is chosen.
+    const mineOpt = hl.querySelector('option[value="mine"]');
+    const syncMine = () => { const team = window.lcPrefs ? window.lcPrefs.get('team') : ''; mineOpt.hidden = mineOpt.disabled = !team; if (!team && hl.value === 'mine') hl.value = ''; };
+    syncMine();
+    view.addEventListener('change', () => { paint(); save(); });
+    hl.addEventListener('change', () => { highlight(); save(); });
+    rest.addEventListener('change', () => { highlight(); save(); });
+    document.querySelectorAll('#tb [data-sort]').forEach((h) => h.addEventListener('click', () => {
+      if (sortBy === h.dataset.sort) dir = -dir; else { sortBy = h.dataset.sort; dir = 1; }
+      sort();
+    }));
+    document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') { syncMine(); highlight(); } else { paint(); sort(); } });
+    // Crosshair: the column under the pointer lights up along with its row.
+    const tb = document.getElementById('tb');
+    tb.addEventListener('mouseover', (e) => {
+      const c = e.target instanceof Element && e.target.closest('[data-k]');
+      const k = c ? c.dataset.k : null;
+      if (tb.dataset.col === k) return;
+      tb.querySelectorAll('.col').forEach((x) => x.classList.remove('col'));
+      if (k) tb.querySelectorAll(`[data-k="${k}"]`).forEach((x) => x.classList.add('col'));
+      tb.dataset.col = k || '';
+    });
+    tb.addEventListener('mouseleave', () => { tb.querySelectorAll('.col').forEach((x) => x.classList.remove('col')); tb.dataset.col = ''; });
+    paint(); sort(); highlight();
   })();
 </script>
 
@@ -443,24 +556,61 @@ const _ = ordinal;
   html[data-mode='season'] .sranks .slg { left: calc(var(--sa) * 1%); }
   .beyond { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 7px; cursor: help; }
 
-  /* Every trait for every team. The box darkens toward the trait's right-hand word. */
-  .glance-fold { margin-top: 26px; }
-  .glance-wrap { overflow-x: auto; margin-top: 12px; border-radius: 14px; background: var(--sheet); border: 1px solid var(--rule); }
-  .glance { border-collapse: separate; border-spacing: 2px; font: 600 13px var(--ui); padding: 6px; }
-  .glance th button { font: 600 10px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); background: none; border: 0; padding: 4px 2px; cursor: pointer; width: 62px; text-align: center; }
-  .glance th.g-team button { width: auto; text-align: left; }
-  .glance th button[aria-pressed='true'] { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-  .glance thead th { vertical-align: bottom; }
-  .glance tbody th { text-align: left; font: 600 14px var(--ui); white-space: nowrap; padding-right: 10px; }
-  .g-team { position: sticky; left: 0; background: var(--sheet); z-index: 1; }
-  .glance td { width: 62px; height: 28px; text-align: center; border-radius: 4px; --h: var(--hb); background: color-mix(in oklab, var(--heat) calc(var(--h) * 0.6%), var(--sheet)); }
-  html[data-mode='season'] .glance td { --h: var(--hs); }
-  html[data-arena='raw'] .glance td.hasraw { --h: var(--hbr); }
-  html[data-arena='raw'][data-mode='season'] .glance td.hasraw { --h: var(--hsr); }
-  .glance td .c-season { display: none; }
-  html[data-mode='season'] .glance td .c-season { display: inline; }
-  html[data-mode='season'] .glance td .c-blend { display: none; }
-  .glance tr.mine th, .glance tr.mine td { box-shadow: inset 0 0 0 2px var(--ink); }
+  /* The big table. Sticky heading rows and team column inside its own scroll box; shading follows the trait's scale. */
+  .tctl { display: flex; flex-wrap: wrap; gap: 0 28px; align-items: center; }
+  .tctl .pick { margin-bottom: 0; }
+  .tkey .ramp i { display: inline-block; width: 64px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, var(--sheet), color-mix(in oklab, var(--heat) 62%, var(--sheet))); border: 1px solid var(--rule); }
+  .tkey .you::before { content: ''; width: 18px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--ink); display: inline-block; }
+  /* Wider than the text column on big screens, so all 17 traits fit without scrolling sideways. */
+  .tb-wrap { margin-inline: calc(50% - min(50vw - 16px, 720px)); overflow: auto; max-height: min(78vh, 1180px); margin-top: 14px; border-radius: 14px; background: var(--sheet); border: 1px solid var(--rule); overscroll-behavior-x: contain; }
+  .tb { border-collapse: separate; border-spacing: 0; font: 600 13px var(--ui); width: 100%; }
+  .tb th, .tb td { padding: 0; }
+  .tb thead th { position: sticky; background: var(--sheet); z-index: 2; }
+  .tb-groups th { top: 0; height: 30px; }
+  .tb thead tr:nth-child(2) th { top: 30px; border-bottom: 1px solid var(--rule); }
+  .tb thead th[rowspan] { top: 0; border-bottom: 1px solid var(--rule); vertical-align: bottom; }
+  .tb-g { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); text-align: left; padding: 10px 0 0 10px !important; border-left: 2px solid var(--rule); white-space: nowrap; }
+  .tb .tb-name { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; min-width: 170px; border-right: 1px solid var(--rule); }
+  .tb thead .tb-name { z-index: 3; }
+  .tb tbody .tb-name { font: 600 14px var(--ui); white-space: nowrap; padding: 0 12px; }
+  .tb .ab { display: none; }
+  .tb-pts { text-align: right; padding: 0 10px !important; white-space: nowrap; font-weight: 600; }
+  .tb [data-sort] { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; width: 100%; min-height: 64px; padding: 8px 4px; font: 600 11px/1.15 var(--ui); color: var(--ink-2); background: none; border: 0; cursor: pointer; text-align: center; }
+  .tb .tb-name [data-sort] { align-items: flex-start; padding-left: 12px; font-size: 12px; }
+  .tb .tb-pts [data-sort] { align-items: flex-end; }
+  .tb-h { width: 66px; min-width: 66px; }
+  .tb-l { text-wrap: balance; }
+  .tb-u { font: italic 400 11px/1.2 var(--body); color: var(--ink-3); text-transform: none; }
+  .tb-u.v-num { display: none; }
+  .tb.nums .tb-u.v-num { display: inline; }
+  .tb.nums .tb-u.v-rank { display: none; }
+  .tb [data-sort] i { height: 8px; font-style: normal; }
+  .tb th.sorted [data-sort] { color: var(--ink); }
+  .tb th.sorted [data-sort] i::after { content: '▼'; font-size: 8px; }
+  .tb th.sorted [data-sort].flip i::after { content: '▲'; }
+  .tb th:not(.sorted) [data-sort]:hover i::after { content: '▼'; font-size: 8px; opacity: 0.35; }
+  .tb .first { border-left: 2px solid var(--rule); }
+  .tb tbody td, .tb tbody th { height: 34px; border-bottom: 1px solid color-mix(in oklab, var(--rule) 55%, var(--sheet)); }
+  .tb-c { text-align: center; font-variant-numeric: tabular-nums; cursor: default; background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 0.62%), var(--sheet)); color: var(--ink); }
+  .tb-c.hot { color: var(--heat-on-hot); }
+  .tb.nums .tb-c { font-size: 12px; }
+  .tb-c.sorted { box-shadow: inset 2px 0 0 var(--ink), inset -2px 0 0 var(--ink); }
+  .tb tbody tr:hover th, .tb tbody tr:hover .tb-pts { background: var(--track); }
+  .tb tbody tr:hover .tb-c, .tb .tb-c.col { filter: brightness(0.93); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .tb tbody tr:hover .tb-c, :root:not([data-theme='light']) .tb .tb-c.col { filter: brightness(1.25); } }
+  .tb th.col [data-sort] { color: var(--ink); }
+  .tb tr.mine th, .tb tr.mine td { box-shadow: inset 0 2px 0 var(--ink), inset 0 -2px 0 var(--ink); }
+  .tb tr.mine th { box-shadow: inset 0 2px 0 var(--ink), inset 0 -2px 0 var(--ink), inset 2px 0 0 var(--ink); }
+  .tb.hl tbody tr:not(.in) { opacity: 0.28; }
+  .tb.hl tbody tr:not(.in):hover { opacity: 0.7; }
+  .tb.hide-rest tbody tr:not(.in) { display: none; }
+  @media (max-width: 719px) {
+    .tb .tb-name { min-width: 64px; }
+    .tb .full { display: none; }
+    .tb .ab { display: inline; }
+    .tb-h { width: 62px; min-width: 62px; }
+    .tctl { gap: 0 16px; }
+  }
 
   @media (max-width: 719px) {
     .ranks li, .rank-ends { grid-template-columns: 2em minmax(0, 1fr) minmax(0, 1.3fr); gap: 2px 12px; }
