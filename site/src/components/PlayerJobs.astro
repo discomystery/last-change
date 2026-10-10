@@ -10,8 +10,9 @@ type Card = { id: number; name: string; team: string; pos: string; toi: string; 
 type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
-interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
-const { gameId, place, side } = Astro.props;
+// `goalies` renders only the goalies' cards (for the In net section); otherwise the skaters' section.
+interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string; goalies?: boolean }
+const { gameId, place, side, goalies = false } = Astro.props;
 
 const files = import.meta.glob<{ default: Jobs }>('../../public/data/jobs/2*.json', { eager: true });
 const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
@@ -43,10 +44,56 @@ const nightNote = (c: Card) => {
 };
 const posWord: Record<string, string> = { C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
 const signed = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${(-v).toFixed(1)}` : '0.0');
-const graded = d ? d.players.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];
+const skaters = d ? d.players.filter((c) => c.pos !== 'G') : [];
+const gcards = d ? d.players.filter((c) => c.pos === 'G') : [];
+const graded = d ? skaters.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];
 const share = (v: string) => graded.filter((j) => j.verdict === v).length;
 ---
-{d && d.players.length > 0 && (
+{d && (() => {
+  const card = (c: Card) => (
+    <li class:list={['card', 'pc', `t-${side(c.team)}`, !c.jobs.length && 'bare']}>
+      <div class="pc-top">
+        <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
+        <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>
+      </div>
+      {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
+      <dl class="pc-box">
+        <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={c.pos === 'G' ? 'Time in net.' : `All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
+        {c.pos === 'G' ? <Fragment>
+        <div><dt>Shots</dt><dd>{c.box.sa}</dd></div>
+        <div><dt>Saves</dt><dd>{c.box.sa - c.box.ga}</dd></div>
+        <div><dt>Sv%</dt><dd>{c.box.sv == null ? '–' : c.box.sv.toFixed(3).replace(/^0/, '')}</dd></div>
+        <div><dt><span class="term" tabindex="0" data-tip={`The shots he faced were worth ${c.box.xga.toFixed(2)} expected goals: what an average goalie would have allowed on them.`}>xGA</span></dt><dd>{c.box.xga.toFixed(1)}</dd></div>
+        <div><dt><span class="term" tabindex="0" data-tip="Goals saved above expected: the expected goals he faced minus the goals he allowed. Above zero is better than an average goalie.">GSAx</span></dt><dd>{signed(c.box.gsax)}</dd></div>
+        <div><dt><span class="term" tabindex="0" data-tip="Saves on dangerous shots (a 15% or better chance of scoring), out of how many he faced.">Dangerous</span></dt><dd>{c.box.high}</dd></div>
+        </Fragment> : <Fragment>
+        <div><dt>G</dt><dd>{c.box.g}</dd></div>
+        <div><dt>A</dt><dd>{c.box.a}</dd></div>
+        <div><dt><span class="term" tabindex="0" data-tip="Plus-minus, as the NHL counts it: goals for minus goals against while he was on the ice, leaving out power-play goals.">+/−</span></dt><dd>{c.box.pm > 0 ? `+${c.box.pm}` : c.box.pm < 0 ? `−${-c.box.pm}` : '0'}</dd></div>
+        <div><dt><span class="term" tabindex="0" data-tip={`Expected goals at 5-on-5 with him on the ice: ${c.box.xgf.toFixed(2)} for his team, ${c.box.xga.toFixed(2)} against, adjusted for score and venue. It counts the chances, not just the goals.`}>xGF–xGA</span></dt><dd>{c.box.xgf.toFixed(1)}–{c.box.xga.toFixed(1)}</dd></div>
+        <div><dt>Shots</dt><dd>{c.box.sog}</dd></div>
+        <div><dt>Hits</dt><dd>{c.box.hits}</dd></div>
+        <div><dt>Blocks</dt><dd>{c.box.blocks}</dd></div>
+        </Fragment>}
+      </dl>
+      <ul class="pc-jobs">
+        {c.jobs.map((j) => (
+          <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
+            <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
+            <span class="job-l">{j.label} <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span><span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
+            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+  if (goalies) return gcards.length > 0 && (
+    <div class="gcols">
+      {order.map((t) => <ul class="gcol">{gcards.filter((c) => c.team === t).map(card)}</ul>)}
+      <p class="note gnote">Every goalie has the same three jobs, judged against his own earlier starts (✓) and an average goalie (≈). <strong>Huge night</strong>: a shutout on 25 or more shots, or 3+ goals saved above expected. <strong>Big night</strong>: any other shutout, or 1.5+. <strong>Rough night</strong>: 2+ goals worse than expected, or pulled early after three or more.</p>
+    </div>
+  );
+  return skaters.length > 0 && (
   <Section id="jobs" title="Did they do their job?" placeholder={false}
     takeaway="What each player is relied on for or better than most at, and whether he delivered.">
     <div class="jpick">
@@ -54,44 +101,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       <select id="jobs-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
     </div>
     {order.map((t, i) => {
-      const mine = d.players.filter((c) => c.team === t);
-      const card = (c: Card) => (
-        <li class:list={['card', 'pc', `t-${side(t)}`, !c.jobs.length && 'bare']}>
-          <div class="pc-top">
-            <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
-            <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>
-          </div>
-          {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
-          <dl class="pc-box">
-            <div><dt>{posWord[c.pos] ?? c.pos}</dt><dd><span class="term" tabindex="0" data-tip={c.pos === 'G' ? 'Time in net.' : `All situations. At 5-on-5: ${c.toi5}. Power play: ${c.toi_pp}. Penalty kill: ${c.toi_pk}.`}>{c.toi}</span></dd></div>
-            {c.pos === 'G' ? <Fragment>
-            <div><dt>Shots</dt><dd>{c.box.sa}</dd></div>
-            <div><dt>Saves</dt><dd>{c.box.sa - c.box.ga}</dd></div>
-            <div><dt>Sv%</dt><dd>{c.box.sv == null ? '–' : c.box.sv.toFixed(3).replace(/^0/, '')}</dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip={`The shots he faced were worth ${c.box.xga.toFixed(2)} expected goals: what an average goalie would have allowed on them.`}>xGA</span></dt><dd>{c.box.xga.toFixed(1)}</dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip="Goals saved above expected: the expected goals he faced minus the goals he allowed. Above zero is better than an average goalie.">GSAx</span></dt><dd>{signed(c.box.gsax)}</dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip="Saves on dangerous shots (a 15% or better chance of scoring), out of how many he faced.">Dangerous</span></dt><dd>{c.box.high}</dd></div>
-            </Fragment> : <Fragment>
-            <div><dt>G</dt><dd>{c.box.g}</dd></div>
-            <div><dt>A</dt><dd>{c.box.a}</dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip="Plus-minus, as the NHL counts it: goals for minus goals against while he was on the ice, leaving out power-play goals.">+/−</span></dt><dd>{c.box.pm > 0 ? `+${c.box.pm}` : c.box.pm < 0 ? `−${-c.box.pm}` : '0'}</dd></div>
-            <div><dt><span class="term" tabindex="0" data-tip={`Expected goals at 5-on-5 with him on the ice: ${c.box.xgf.toFixed(2)} for his team, ${c.box.xga.toFixed(2)} against, adjusted for score and venue. It counts the chances, not just the goals.`}>xGF–xGA</span></dt><dd>{c.box.xgf.toFixed(1)}–{c.box.xga.toFixed(1)}</dd></div>
-            <div><dt>Shots</dt><dd>{c.box.sog}</dd></div>
-            <div><dt>Hits</dt><dd>{c.box.hits}</dd></div>
-            <div><dt>Blocks</dt><dd>{c.box.blocks}</dd></div>
-            </Fragment>}
-          </dl>
-          <ul class="pc-jobs">
-            {c.jobs.map((j) => (
-              <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
-                <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
-                <span class="job-l">{j.label} <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span><span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
-                {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
-              </li>
-            ))}
-          </ul>
-        </li>
-      );
+      const mine = skaters.filter((c) => c.team === t);
       return (
         <div class="jblock" data-team={t} hidden={i !== 0}>
           <ul class="pcs">{mine.slice(0, SHOWN).map(card)}</ul>
@@ -109,7 +119,6 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       <div class="how-body">
         <p class="note"><strong>✓</strong> a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
         <p class="note"><strong>Huge night</strong>: a hat trick or four or more points. <strong>Big night</strong>: two or more points, or a goal from a player who scores in fewer than one game in five on top of doing his jobs. <strong>Rough night</strong>: no points while the other team had 70% or more of the 5-on-5 chances with him on (xGF–xGA). Plus-minus never sets the level. A shorthanded goal counts as two points. Points never fully cover for jobs that went badly: with his jobs off, a huge night reads big and a big night reads mixed.</p>
-        <p class="note"><strong>Goalies</strong> have the same three jobs every night: saving more than the shots were expected to score, stopping dangerous shots, and stopping routine ones. <strong>Huge night</strong>: a shutout on 25 or more shots or 3+ goals saved above expected. <strong>Big night</strong>: any other shutout or 1.5+. <strong>Rough night</strong>: 2+ goals worse than expected, or pulled early after three or more.</p>
         <p class="note">Judged only from games before this one; 5-on-5 rates adjusted for score and venue. One game is a small sample: even a strong player misses a typical night about half the time. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.</p>
       </div>
     </details>
@@ -130,9 +139,10 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       </>
     )}
   </Section>
-)}
+  );
+})()}
 
-<script is:inline>
+{!goalies && <script is:inline>
   // "Show [team]": opens on the visitor's own team when it played, otherwise the away team.
   (() => {
     const pick = document.getElementById('jobs-team');
@@ -161,7 +171,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
     document.fonts?.ready.then(layAll); // card heights change once the real fonts arrive
     show();
   })();
-</script>
+</script>}
 
 <style>
   .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
@@ -175,6 +185,9 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
     .pcs.mason { display: flex; align-items: flex-start; gap: 16px; }
     .pcs.mason > :global(.pcol) { flex: 1; min-width: 0; display: grid; gap: 16px; }
   }
+  .gcols { display: grid; gap: 16px; }
+  .gcol { display: grid; gap: 16px; align-content: start; }
+  @media (min-width: 760px) { .gcols { grid-template-columns: 1fr 1fr; } .gnote { grid-column: 1 / -1; } }
   .pc { display: grid; gap: 12px; align-content: start; }
   .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
