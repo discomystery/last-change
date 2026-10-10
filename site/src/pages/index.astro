@@ -129,7 +129,7 @@ const base = import.meta.env.BASE_URL;
           c.href = `${base}recap/${last.id}/`;
           c.append(el('span', 'l-eyebrow', `Latest post-game · ${day.format(last.t)}`),
                    el('span', 'l-score', `${ms > ts ? 'Won' : 'Lost'} ${ms}–${ts}${last.end && last.end !== 'REG' ? ` (${last.end})` : ''} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`),
-                   el('span', 'l-sub', info && info.calls ? `How the ${info.rebuilt ? 'rebuilt ' : ''}preview held up: ${info.held} of ${info.calls} calls held, ${info.partly} partly` : 'The numbers, the surprises and the goalies'));
+                   el('span', 'l-sub', info && info.calls ? `How the preview held up: ${info.held} of ${info.calls} calls held, ${info.partly} partly` : 'The numbers, the surprises and the goalies'));
           lbox.append(c);
         }
         document.getElementById('upcoming').replaceChildren(...mine.filter((g) => !g.final && g !== next).slice(0, 5).map((g) => row(g, me)));
