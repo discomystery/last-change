@@ -80,7 +80,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
           <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
             <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
             <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
-            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
+            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>{j.key === 'high' || j.key === 'routine' ? 'typically saves' : 'typical'} {j.usual}</span></span>}
           </li>
         ))}
       </ul>
