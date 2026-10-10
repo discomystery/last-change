@@ -83,9 +83,9 @@ const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
 const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
   : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
 const replayBody = !dw ? '' : pct(loser) >= 60
-  ? `Replaying this game’s chances, ${place(loser)} comes out ahead ${pct(loser)} times in 100. The goals went the other way.`
-  : pct(winner) >= 60 ? `Replaying this game’s chances, ${place(winner)} comes out ahead ${pct(winner)} times in 100.`
-  : `Replaying this game’s chances, ${place(away)} comes out ahead ${pct(away)} times in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
+  ? `Played out 100 times with these chances, ${place(loser)} wins ${pct(loser)}. The goals went the other way.`
+  : pct(winner) >= 60 ? `Played out 100 times with these chances, ${place(winner)} wins ${pct(winner)}.`
+  : `Played out 100 times with these chances, ${place(away)} wins ${pct(away)} and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
 const hasJobs = Object.keys(import.meta.glob('../../../public/data/jobs/2*.json')).some((k) => k.endsWith(`/${r.game_id}.json`));
@@ -122,7 +122,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
               ))}
             </tbody>
           </table>
-          <p class="note"><strong>Control of chances</strong> compares each team’s expected-goal difference over its recent games, with older games counting less. <strong>Back-to-back</strong> is a team playing for the second night in a row. <strong>Tonight’s lineup</strong> values the players who actually dressed against each team’s usual lineup. Only games played before this one went in, and the preview only hinted at the number in words.</p>
+          <p class="note"><strong>Recent chances</strong>: how much better each team’s chances have been than its opponents’ lately, with the latest games counting most. <strong>Back-to-back</strong>: playing for the second night in a row. <strong>Tonight’s lineup</strong>: whether the players who dressed were stronger or weaker than the team’s usual lineup. Only earlier games went into it, and the preview hinted at it in words without showing the number.</p>
         </div>
       ))}
     </Section>
@@ -165,7 +165,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     ) : (
       <p class="note">Previews are saved at puck drop, starting with games on October 10, so there were no calls to check for this one.</p>
     )}
-    <p class="note">Each call is checked by the rule written down before the game: <strong>held up</strong> means the team reached its usual level or better (or, when the call is that one team comes out ahead, it won that comparison by at least half its usual margin); <strong>partly</strong> means it beat the league average (or the share with no line matching, or came out ahead by less) but fell short of that. One game is a tiny sample, so a miss doesn’t mean the preview was wrong about the team.</p>
+    <p class="note">Each call is checked by a rule set before the game. <strong>Held up</strong>: the team reached its usual level. <strong>Partly</strong>: it fell short of its usual level but still beat the league average. When a call says one team will come out ahead, held up means it won by at least half its usual gap, and partly means it won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {r.preview_page && <p class="note"><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</p>}
     {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls. <a href={`${import.meta.env.BASE_URL}record/`}>See the track record</a>.</p>}
   </Section>
@@ -173,7 +173,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   {dw && replays && (
     <Section id="replays" title="Run it back" placeholder={false} takeaway="We replayed this game’s chances 100 times. Here is how often each team came out ahead.">
       <div class="card meter">
-        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are level after regulation.`}>
+        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
           {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
         </div>
         <div class="meter-text">
@@ -181,21 +181,21 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           <p>{replayBody}</p>
           <dl class="compare">
             {order.map((a) => (
-              <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: wins {replays[side(a)]} of 100, plus half of the {replays.tie} level ones</span></div>
+              <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: {replays[side(a)]} wins, plus half of the {replays.tie} ties</span></div>
             ))}
           </dl>
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
         </div>
       </div>
-      <p class="note">How it works: every regulation shot that reached the net or missed it is a chance that goes in as often as this site’s <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says. The game is replayed with those chances, and a replay that ends level after regulation counts as half a win for each team, because overtime and shootouts are close to coin flips. A rebound scramble counts once, since only one shot in it can go in. Empty-net shots are left out.</p>
-      <p class="note">It knows nothing about goalies or finishing skill, or about passes before a shot. It also leans toward the team that was chasing, because a team with a lead tends to sit back and give up chances. Over the last three seasons, teams it gave 80% or more won about two games in three.</p>
+      <p class="note">How it works: every shot in regulation that was on target or missed the net goes in as often as our <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says it should, and the game is played out 100 times that way. A rebound scramble counts as one chance, and empty-net shots are left out. A replay tied after regulation counts as half a win each, since overtime and shootouts are close to coin flips.</p>
+      <p class="note">It doesn’t know about goalies, finishing skill or passes before a shot. It also favours the team that was chasing, because a team with a lead tends to sit back. Over the last three seasons, teams it gave 80% or more won about two games in three.</p>
     </Section>
   )}
 
   {r.surprises.length > 0 && (
     <Section id="surprises" title="What the preview didn’t see coming" placeholder={false} takeaway="The parts of this game furthest from how these teams usually play, biggest first.">
       <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
-      <p class="note"><strong>Broke the pattern</strong>: the game went the other way from a team’s usual habit. <strong>Further than usual</strong>: the usual direction, much further. <strong>Closer than usual</strong>: the usual direction, much nearer even. <strong>Out of character</strong>: a team that is usually about average was far from it. Each one is measured against what the teams’ numbers said before the game, and shot counts have to stray further than anything else to make this list.</p>
+      <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of its usual habit. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: a usually average team, far from average. Each is measured against the teams’ numbers before the game.</p>
     </Section>
   )}
 

@@ -207,7 +207,7 @@ function goalie(a: Abbr, i: number) {
     ],
     workload: [
       { label: 'Shots faced per 60', tip: 'Shots on goal he faces per 60.', value: round(a === 'CAR' ? between(24, 26.5) : between(28, 31), 1) },
-      { label: 'Danger per shot', tip: 'Average expected-goal value of an unblocked shot against him.', value: round(a === 'CAR' ? between(0.078, 0.086) : between(0.066, 0.074), 3) },
+      { label: 'Danger per shot', tip: 'How dangerous the shots against him are, on average.', value: round(a === 'CAR' ? between(0.078, 0.086) : between(0.066, 0.074), 3) },
       { label: 'Defensive breakdowns per 60', tip: 'Dangerous chances he faces per 60 within seconds of his team losing the puck. A stand-in for chances faced alone; public data cannot see where defenders are.', value: round(between(2.2, 3.6), 1) },
       { label: 'Median gap between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', value: `${Math.round(a === 'CAR' ? between(62, 78) : between(44, 56))} s` },
       { label: 'Shots after 3+ quiet minutes', tip: 'Share of shots that arrive after he has gone at least three minutes without one.', value: `${Math.round(a === 'CAR' ? between(11, 16) : between(5, 9))}%` },
@@ -306,8 +306,8 @@ const fpMeta: Record<string, FpMeta> = {
   turnover: { group: 'Offense', lo: 'Patient', hi: 'Opportunist', at0: 5, at100: 14, say: (v) => `${f1(v)}% of chances come right after a turnover` },
   point: { group: 'Offense', lo: 'Down low', hi: 'Point-heavy', at0: 26, at100: 44, say: (v) => `${f1(v)}% of shot attempts come from the point` },
   suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per 60` },
-  qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `opponents need ${f1(1 / v)} shots per expected goal` },
-  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${v.toFixed(2)} breakdown chances allowed per 60` },
+  qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `one expected goal against for every ${f1(1 / v)} shots` },
+  breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${v.toFixed(2)} defensive breakdowns per 60` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per 60, both teams combined` },
   forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
@@ -445,7 +445,7 @@ type Goalie = (typeof goalies)['CAR'][number];
 export const goalieTraits = [
   { key: 'gsax', label: 'Stopping more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall', pct: (g: Goalie) => clamp(50 + g.gsax60 * 110), say: (g: Goalie) => `${gsign(g.gsax)} goals saved above expected in ${g.starts} starts` },
   { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per 60.', lo: 'Quiet', hi: 'Under siege', pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per 60` },
-  { key: 'danger', label: 'How dangerous the shots are', tip: 'Average expected-goal value of an unblocked shot against him.', lo: 'Sheltered', hi: 'Exposed', pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
+  { key: 'danger', label: 'How dangerous the shots are', tip: 'How dangerous the shots against him are, on average.', lo: 'Sheltered', hi: 'Exposed', pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
   { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous chances he faces per 60 within seconds of his team losing the puck. A stand-in for chances faced alone.', lo: 'Rare', hi: 'Constant', pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous chances off turnovers per 60` },
   { key: 'gaps', label: 'Waiting between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', lo: 'Steady work', hi: 'Long waits', pct: (g: Goalie) => clamp((gnum(g.workload[3].value) - 40) * 2.4), say: (g: Goalie) => `a typical wait of ${g.workload[3].value} between shots` },
   { key: 'steady', label: 'Night-to-night steadiness', tip: 'How often he gives his team a fair chance to win.', lo: 'Streaky', hi: 'Steady', pct: (g: Goalie) => clamp((g.consistency.qs - 40) * 3.6), say: (g: Goalie) => `a quality start ${g.consistency.qs}% of the time` },

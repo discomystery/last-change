@@ -104,8 +104,8 @@ def every(k: str, dev: float) -> int:
 
 def rarity(k: str, dev: float) -> str:
     n = every(k, dev)
-    return f"Over the last three seasons, a team strayed this far about once every {n} games." if n < 1000 else \
-        "Over the last three seasons, a team strayed this far in fewer than one game in a thousand."
+    return f"A team strays this far about once every {n} games." if n < 1000 else \
+        "A team strays this far less than once in a thousand games."
 
 
 def classify(usual: float, x: float, mid: float, sd: float) -> str:
@@ -158,7 +158,8 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
     up = x > usual
     if kind == "quality":
         head = f"{T} got to the dangerous areas" if up else f"{T} was kept to the outside"
-        body = f"{T} needed {1 / x:.1f} unblocked shots per expected goal at 5-on-5, against its usual {1 / usual:.1f} and a league average of {1 / league:.1f}."
+        body = (f"{T}’s shots at 5-on-5 were {'more' if up else 'less'} dangerous than usual: one expected goal every {1 / x:.1f} shots, "
+                f"against its usual {1 / usual:.1f} (league average {1 / league:.1f}).")
         cat = "chances"
     elif kind == "pp":
         head = f"{T}’s power play came alive" if up else f"{O} shut down {T}’s power play"
@@ -223,7 +224,7 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         p = replay["share"][l]
         if p >= 0.6:
             out.append(_item("result", 1.0 + (p - 0.6) * 7.5, "rare", f"{places[w]} won against the run of play",
-                             f"Replaying this game’s chances, {places[l]} comes out ahead {round(100 * p)} times in 100. {places[w]} won anyway."))
+                             f"Played out 100 times with these chances, {places[l]} wins {round(100 * p)}. {places[w]} won anyway."))
     return [c for c in out if c is not None]
 
 

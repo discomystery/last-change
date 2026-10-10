@@ -35,7 +35,8 @@ export const peerWord: Record<string, string> = { F: 'forwards', D: 'defensemen'
 export type Competition = Record<Mode, Record<'all' | 'home' | 'road', { v: number; pct: number } | null>>;
 const sign = (v: number, d = 2) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
 
-export type TraitInfo = { label: string; tip: string; lo: string; hi: string; say: (v: number) => string; group: string; raw?: (v: number) => string };
+/** `up` / `down`: how a comparison reads above and below the middle (EDGE measures are not better or worse, just more or less). */
+export type TraitInfo = { label: string; tip: string; lo: string; hi: string; say: (v: number) => string; group: string; raw?: (v: number) => string; up?: string; down?: string };
 export const TRAITS: Record<string, TraitInfo> = {
   shooting: { group: 'Scoring', label: 'Shooting volume', lo: 'Rarely shoots', hi: 'Fires away', say: (v) => `${v.toFixed(1)} shot attempts per 60 at 5-on-5`,
     tip: 'Shot attempts he takes himself per 60 minutes at 5-on-5, counting shots that are blocked or miss the net.' },
@@ -49,7 +50,7 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play will rate lower here than their value.' },
   offImpact: { group: 'Driving play at 5-on-5', label: 'Creating chances', lo: 'Along for the ride', hi: 'Drives play',
     say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances at 5-on-5`,
-    tip: 'How much he adds to his team’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces, where his shifts start and the score. Every player is rated at once from every shift of this season and last (the regularized plus-minus method public analysts use), and small samples are pulled toward average.' },
+    tip: 'How much better his team’s chances get at 5-on-5 when he is on the ice, in expected goals per 60. It separates him from his linemates and opponents by comparing every shift of this season and last, and allows for where shifts start and the score.' },
   defImpact: { group: 'Driving play at 5-on-5', label: 'Preventing chances', lo: 'Chances against rise', hi: 'Shuts it down',
     say: (v) => (Math.abs(v) < 0.01 ? 'about average: no measurable change in the opponent’s chances at 5-on-5' : v > 0 ? `takes ${v.toFixed(2)} expected goals per 60 off the opponent’s chances at 5-on-5` : `opponents get ${Math.abs(v).toFixed(2)} more expected goals per 60 at 5-on-5 with him out there`),
     tip: 'How much he cuts the opponent’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces (so facing top lines is not held against him), where his shifts start and the score. It sees chances, not the quality of defensive plays that public data does not record.' },
@@ -71,11 +72,11 @@ export const TRAITS: Record<string, TraitInfo> = {
 export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Special teams', 'Physical and puck', 'Penalties and faceoffs'];
 
 export const EDGE: Record<string, TraitInfo> = {
-  topSpeed: { group: 'EDGE', label: 'Top speed', lo: 'Slower', hi: 'Burner', say: (v) => `${v.toFixed(1)} mph at his fastest`, tip: 'His fastest skating speed, measured by the NHL’s puck and player tracking (NHL EDGE).' },
-  bursts: { group: 'EDGE', label: 'Fast bursts', lo: 'Rare', hi: 'Frequent', say: (v) => `${v.toFixed(1)} bursts over 20 mph per 60`, tip: 'How often he gets above 20 mph, per 60 minutes on the ice. Measured by NHL EDGE.' },
-  shotSpeed: { group: 'EDGE', label: 'Hardest shot', lo: 'Softer', hi: 'Cannon', say: (v) => `${v.toFixed(1)} mph on his hardest shot`, tip: 'The speed of his hardest shot, measured by NHL EDGE.' },
-  distance: { group: 'EDGE', label: 'Distance skated', lo: 'Shorter', hi: 'Covers ground', say: (v) => `${v.toFixed(2)} miles skated per 60`, tip: 'How far he skates per 60 minutes on the ice. Measured by NHL EDGE.' },
-  oz: { group: 'EDGE', label: 'Time in the offensive zone', lo: 'Defending', hi: 'Attacking', say: (v) => `${v.toFixed(1)}% of his even-strength time in the offensive zone`,
+  topSpeed: { group: 'EDGE', up: 'faster than', down: 'slower than', label: 'Top speed', lo: 'Slower', hi: 'Burner', say: (v) => `${v.toFixed(1)} mph at his fastest`, tip: 'His fastest skating speed, measured by the NHL’s puck and player tracking (NHL EDGE).' },
+  bursts: { group: 'EDGE', up: 'more often than', down: 'less often than', label: 'Fast bursts', lo: 'Rare', hi: 'Frequent', say: (v) => `${v.toFixed(1)} bursts over 20 mph per 60`, tip: 'How often he gets above 20 mph, per 60 minutes on the ice. Measured by NHL EDGE.' },
+  shotSpeed: { group: 'EDGE', up: 'harder than', down: 'softer than', label: 'Hardest shot', lo: 'Softer', hi: 'Cannon', say: (v) => `${v.toFixed(1)} mph on his hardest shot`, tip: 'The speed of his hardest shot, measured by NHL EDGE.' },
+  distance: { group: 'EDGE', up: 'farther than', down: 'less far than', label: 'Distance skated', lo: 'Shorter', hi: 'Covers ground', say: (v) => `${v.toFixed(2)} miles skated per 60`, tip: 'How far he skates per 60 minutes on the ice. Measured by NHL EDGE.' },
+  oz: { group: 'EDGE', up: 'more than', down: 'less than', label: 'Time in the offensive zone', lo: 'Defending', hi: 'Attacking', say: (v) => `${v.toFixed(1)}% of his even-strength time in the offensive zone`,
     tip: 'Share of his even-strength ice time the puck spends in the offensive zone. Measured by NHL EDGE. His linemates and his usage (who he plays against, where his shifts start) shape this a lot.' },
 };
 
@@ -104,10 +105,10 @@ export function standouts(p: Skater, mode: Mode) {
 }
 
 export const roleTip: Record<string, string> = {
-  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line. Each unit is built around its quarterback.',
-  Trigger: 'Trigger: the unit’s main shooter. He has produced the most shot danger on the power play over this season and last, counting only games with his current team.',
-  Distributor: 'Distributor: the main passer. He has the most primary assists on power-play goals over this season and last, counting only games with his current team.',
-  'Net-front': 'Net-front: at least 40% of his power-play shots with his current team come from within 15 feet of the net.',
+  Quarterback: 'Quarterback: the defenseman who runs the unit from the blue line.',
+  Trigger: 'Trigger: the unit’s main shooter, with the most dangerous power-play shots on the team over this season and last.',
+  Distributor: 'Distributor: the main passer, with the most first assists on the team’s power-play goals over this season and last.',
+  'Net-front': 'Net-front: parks in front of the net. At least 40% of his power-play shots come from within 15 feet.',
   Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
 };
 
