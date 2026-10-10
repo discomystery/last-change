@@ -4,7 +4,7 @@
 import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
-import { posWord, groupWord, ordinal, type Mode } from '../lib/players';
+import { posWord, groupWord, ordinal, rankTag, rankTip, type Mode } from '../lib/players';
 import { clock, compared } from '../lib/format';
 
 interface Props { abbr: string; place: string }
@@ -42,7 +42,7 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
                   <ul class="kp-rows">
                     {best.map((it) => (
                       <li tabindex="0" data-tip={`${it.info.label}: better than ${it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
-                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                        <span class="kp-lab">{it.info.label}{rankTag(it.rank) && <span class="rk" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span>}</span><Pips pct={it.pct} tip={`${compared(it.pct, 'better than', 'behind', it.vs)}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
                       </li>
                     ))}
                     {worst.map((it) => (
@@ -77,4 +77,5 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
   .kp-rows li.weak { color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 6px; }
   .kp-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 12px; }
   .kp-none { font-size: 13px; }
+  .rk { display: inline-block; margin-left: 7px; padding: 0 7px; border-radius: 999px; background: var(--ink); color: var(--sheet); font: 700 10px/1.6 var(--ui); letter-spacing: 0.03em; vertical-align: 1px; white-space: nowrap; }
 </style>

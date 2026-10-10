@@ -190,7 +190,8 @@ def run(season: int) -> int:
                     if v is None or not len(pool):
                         continue
                     edge_pct.setdefault(pid, {}).setdefault(mode, {})[k] = {"v": round(v, 2), "pct": round(rating._pct(v, pool, higher)), "ok": pid in regular,
-                                                                         "of": int(len(pool)), "avg": round(float(pool.mean()), 2), "vs": g}
+                                                                         "of": int(len(pool)), "avg": round(float(pool.mean()), 2), "vs": g,
+                                                                         "rank": int((pool > v).sum() + 1 if higher else (pool < v).sum() + 1)}
 
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
