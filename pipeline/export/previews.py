@@ -232,45 +232,104 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     return out
 
 
-def run(now: datetime | None = None) -> dict:
-    now = now or datetime.now(timezone.utc)
-    sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
-    teams = {t["abbr"]: t for t in json.loads((SITE_DATA / "teams.json").read_text())}
-    places = {k: t["place"] for k, t in teams.items()}
-    fp = json.loads((SITE_DATA / "fingerprints.json").read_text())
-    lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
-    out_dir = SITE_DATA / "previews"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    written = frozen = 0
+def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict) -> list[dict]:
+    """The two to four "What to watch" calls for one game, from fingerprints and lines as they stood before it."""
+    claims = clash_claims(gid, away, home, fp, places)
+    claims += tempo_claims(gid, away, home, fp, places)
+    mc = matchup_claim(gid, away, home, lines, places)
+    if mc:
+        claims.append(mc)
+    claims = claims[:4]
+    while len(claims) < 2:
+        claims.append(contrast_claim(gid, away, home, fp, places, {c["metric"] for c in claims}))
+    for i, c in enumerate(claims):
+        c.pop("gap", None)
+        c["id"] = f"{gid}-{i + 1}"
+    return claims
+
+
+def records(sched: list[dict], before: str) -> dict[str, str]:
+    """Each team's wins-losses-overtime losses from the games finished before a start time."""
+    rec = {}
     for g in sched:
-        start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
-        path = out_dir / f"{g['id']}.json"
-        if start <= now:
-            frozen += path.exists()
-            continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
-        if g["final"] or start > now + timedelta(days=DAYS_AHEAD):
+        if not g["final"] or g["start"] >= before:
             continue
-        away, home = g["away"], g["home"]
-        if away not in fp["teams"] or home not in fp["teams"]:
-            continue
-        claims = clash_claims(g["id"], away, home, fp["teams"], places)
-        claims += tempo_claims(g["id"], away, home, fp["teams"], places)
-        mc = matchup_claim(g["id"], away, home, lines, places)
-        if mc:
-            claims.append(mc)
-        claims = claims[:4]
-        while len(claims) < 2:
-            claims.append(contrast_claim(g["id"], away, home, fp["teams"], places, {c["metric"] for c in claims}))
-        for i, c in enumerate(claims):
-            c.pop("gap", None)
-            c["id"] = f"{g['id']}-{i + 1}"
-        snap = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
-                "snapshot_at": now.isoformat(timespec="seconds"), "data_as_of": fp["generated_at"], "claims": claims}
-        path.write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
-        written += 1
+        win, lose = (g["home"], g["away"]) if g["hs"] > g["as"] else (g["away"], g["home"])
+        rec.setdefault(win, [0, 0, 0])[0] += 1
+        rec.setdefault(lose, [0, 0, 0])[1 if g["end"] == "REG" else 2] += 1
+    return {t: "-".join(map(str, r)) for t, r in rec.items()}
+
+
+def bundle(away: str, home: str, site: dict, record: dict) -> dict:
+    """The slice of every data file the preview page reads, for these two teams, as it stood when the preview was made.
+    Saved inside the snapshot so the page can still be shown, unchanged, after the game."""
+    two = lambda d: {**{k: v for k, v in d.items() if k != "teams"}, "teams": {t: d["teams"][t] for t in (away, home) if t in d["teams"]}}
+    return {"fingerprints": two(site["fingerprints"]), "lines": two(site["lines"]), "goalies": two(site["goalies"]),
+            "goal_sources": two(site["goal_sources"]), "records": {t: record.get(t, "0-0-0") for t in (away, home)}}
+
+
+def site_files(folder) -> dict:
+    return {k: json.loads((folder / f"{k}.json").read_text()) for k in ("fingerprints", "lines", "goalies", "goal_sources")}
+
+
+def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None, **extra) -> dict:
+    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number."""
+    away, home = g["away"], g["home"]
+    fp = site["fingerprints"]["teams"]
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places)
+    out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
+           "snapshot_at": now.isoformat(timespec="seconds"), "data_as_of": site["fingerprints"]["generated_at"], **extra,
+           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}
+    if chance:
+        from pipeline.export import outlook
+        out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
+    return out
+
+
+def write_index(out_dir) -> int:
     index = []
     for p in sorted(q for q in out_dir.glob("*.json") if q.name != "index.json"):
         s = json.loads(p.read_text())
-        index.append({"id": s["game_id"], "start": s["start"], "away": s["away"], "home": s["home"], "claims": len(s["claims"])})
+        index.append({"id": s["game_id"], "start": s["start"], "away": s["away"], "home": s["home"], "claims": len(s["claims"]),
+                      "rebuilt": bool(s.get("rebuilt"))})
     (out_dir / "index.json").write_text(json.dumps(index, separators=(",", ":")))
-    return {"written": written, "frozen": frozen, "indexed": len(index)}
+    return len(index)
+
+
+def _chances(games: list[dict]) -> dict[int, dict]:
+    """Morning win chances for these games, used only to pick wording. Previews still work without them."""
+    if not games:
+        return {}
+    try:
+        from pipeline.config import CURRENT_SEASON
+        from pipeline.export import outlook
+        return outlook.morning(CURRENT_SEASON, games)
+    except Exception as e:  # e.g. tables missing in a test: no matchup note rather than no preview
+        print(f"win chances unavailable: {e!r}")
+        return {}
+
+
+def run(now: datetime | None = None) -> dict:
+    now = now or datetime.now(timezone.utc)
+    sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
+    places = {t["abbr"]: t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())}
+    site = site_files(SITE_DATA)
+    out_dir = SITE_DATA / "previews"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = frozen = 0
+    todo = []
+    for g in sched:
+        start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
+        if start <= now:
+            frozen += (out_dir / f"{g['id']}.json").exists()
+            continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
+        if g["final"] or start > now + timedelta(days=DAYS_AHEAD):
+            continue
+        if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
+            todo.append(g)
+    chances = _chances(todo)
+    for g in todo:
+        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]))
+        (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
+        written += 1
+    return {"written": written, "frozen": frozen, "indexed": write_index(out_dir)}

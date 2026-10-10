@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
+# Both can be pointed elsewhere, e.g. at a copy of the tables cut off at a past date (see export/pregame.py).
+DATA = Path(os.environ.get("LAST_CHANGE_DATA", ROOT / "data"))
 RAW = DATA / "raw"
 TABLES = DATA / "tables"
-SITE_DATA = ROOT / "site" / "public" / "data"
+SITE_DATA = Path(os.environ.get("LAST_CHANGE_SITE_DATA", ROOT / "site" / "public" / "data"))
 
 NHL_WEB = "https://api-web.nhle.com"
 NHL_STATS = "https://api.nhle.com/stats/rest/en"

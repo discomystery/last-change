@@ -19,22 +19,32 @@ import { clock as mmss } from '../../lib/format';
 import { matchupColours } from '../../lib/teams';
 import '../../styles/blocks.css';
 import teamsData from '../../../public/data/teams.json';
-import fpData from '../../../public/data/fingerprints.json';
-import linesData from '../../../public/data/lines.json';
-import goalieData from '../../../public/data/goalies.json';
-import srcData from '../../../public/data/goal_sources.json';
+import fpAll from '../../../public/data/fingerprints.json';
+import linesAll from '../../../public/data/lines.json';
+import goalieAll from '../../../public/data/goalies.json';
+import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
 
 type Claim = { id: string; kind: string; head: string; body: string; cite: string; check: object | null };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[] };
+// `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
+// still be shown unchanged after the game. `rebuilt` previews were made after the game from the data before it.
+type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }> };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
   const final = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
-  return Object.values(files).map((f) => f.default).filter((s) => !final.has(s.game_id)).map((s) => ({ params: { gameId: String(s.game_id) }, props: { snap: s } }));
+  return Object.values(files).map((f) => f.default).filter((s) => !final.has(s.game_id) || s.pregame).map((s) => ({ params: { gameId: String(s.game_id) }, props: { snap: s } }));
 }
 const { snap } = Astro.props as { snap: Snap };
+const pre = snap.pregame;
+const fpData = pre?.fingerprints ?? fpAll;
+const linesData = pre?.lines ?? linesAll;
+const goalieData = pre?.goalies ?? goalieAll;
+const srcData = pre?.goal_sources ?? srcAll;
+const played = schedule.games.find((g) => g.id === snap.game_id && g.final);
+const fmtDay = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
 const base = import.meta.env.BASE_URL;
 const { away, home } = snap;
 const order = [away, home] as const;
@@ -42,12 +52,14 @@ const side = (a: string) => (a === away ? 'away' : 'home');
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
 const full = (a: string) => T[a]?.name ?? a;
-const rec = (a: string) => (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
+const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
 const colours = matchupColours(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
-const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
+const asOf = snap.rebuilt
+  ? (snap.data_through ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${snap.data_through}T12:00:00Z`)) : 'Last season')
+  : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
@@ -118,11 +130,13 @@ const srcInfo: [string, string, string][] = [
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
 const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
+// The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
+const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
 const _ = ordinal;
 ---
 <Base section="games" title={`${away} at ${home} preview`} mock={false}>
-  <style is:inline set:html={colourCss}></style>
+  <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
     <dl class="meta">
@@ -131,10 +145,30 @@ const _ = ordinal;
       <div><dt>Numbers through</dt><dd>{asOf}</dd></div>
     </dl>
       <GameTrail id={snap.game_id} />
+    {played && (
+      <p class="card banner">
+        {snap.rebuilt
+          ? <>This preview was rebuilt after the game, using only games played before {fmtDay(played.date)}{snap.data_through ? '' : ' (none yet this season, so it leans on last season)'}. Nobody could read it beforehand, so its calls are checked on the post-game page but left out of the season count. </>
+          : <>This is the preview as it stood at puck drop. </>}
+        Final: {played.away} {played.as}, {played.home} {played.hs}{played.end && played.end !== 'REG' ? ` (${played.end})` : ''}. <a href={`${base}recap/${snap.game_id}/`}>See how it held up</a>.
+      </p>
+    )}
   </section>
   <SectionNav items={nav as [string, string][]} pinned />
 
   <Section id="watch" title="The short version" placeholder={false}>
+    {snap.outlook && (
+      <div class="card outlook">
+        {order.filter((a) => snap.outlook![a]).map((a) => (
+          <div class={`pov pov-${side(a)}`}>
+            <p class="mini-h">How it looks for {place(a)}</p>
+            <h3>{snap.outlook![a].head}</h3>
+            <p>{snap.outlook![a].body}</p>
+          </div>
+        ))}
+        <p class="cite">From this site’s win model, which rates each team on how well it has controlled the chances lately, home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
+      </div>
+    )}
     <ol class="watch">
       {snap.claims.map((c) => (
         <li class="card">
@@ -150,7 +184,9 @@ const _ = ordinal;
         <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
       </div>
     )}
-    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+    <p class="note">{snap.rebuilt
+      ? 'These calls are written by the same fixed rules as every preview, from the numbers below as they stood before the game.'
+      : 'These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.'}</p>
   </Section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
@@ -301,7 +337,7 @@ const _ = ordinal;
           {[away, null, home].map((a) => a === null ? (
             <div class="card gmid">
               <p class="chart-title"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are every goalie with at least ten starts over this season and last; point at one to see who it is.">Helping, or hung out to dry?</span></p>
-              <Quadrant tall league={lg} xDomain={xDom} yDomain={[-yMax, yMax]} xMid={xMid} highlights={order.flatMap((t) => goaliesOf(t).filter((o) => o.blend.xga60 !== null && o.blend.gsax60 !== null).map((o) => ({ team: side(t), name: o.name, probable: o.blend.starts >= goalieData.min_starts.blend, x: o.blend.xga60!, y: o.blend.gsax60! })))} />
+              {lg.length === 0 ? <p class="note">No goalie has played yet this season.</p> : <Quadrant tall league={lg} xDomain={xDom} yDomain={[-yMax, yMax]} xMid={xMid} highlights={order.flatMap((t) => goaliesOf(t).filter((o) => o.blend.xga60 !== null && o.blend.gsax60 !== null).map((o) => ({ team: side(t), name: o.name, probable: o.blend.starts >= goalieData.min_starts.blend, x: o.blend.xga60!, y: o.blend.gsax60! })))} />}
             </div>
           ) : goaliesOf(a).map((g, gi) => {
             const x = g[mode];
@@ -412,6 +448,9 @@ const _ = ordinal;
 
 <style>
   .hero { margin-top: 10px; }
+  .banner { margin-top: 16px; padding: 12px 16px; }
+  .outlook { margin-bottom: 16px; }
+  .outlook h3 { margin: 4px 0 6px; }
   .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin-top: 16px; }
   .meta dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .meta dd { font-weight: 500; }

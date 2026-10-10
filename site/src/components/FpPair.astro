@@ -12,7 +12,9 @@ const rawWords: Record<string, string> = { physical: 'hits recorded per 60', for
   <div class="lanes">
     {sides.map((s) => {
       const b = c[s.abbr].blend, n = c[s.abbr].season;
-      return <div class:list={['lane', s.cls]} style={`--b:${b.pct};--blo:${b.lo};--bhi:${b.hi};--c:${n.pct};--clo:${n.lo};--chi:${n.hi}`}><span class="whisk"></span><span class="dot"></span></div>;
+      // A team with no games yet this season (only in previews rebuilt from early in the season) has no season-only dot.
+      const none = n.pct === null || n.pct === undefined;
+      return <div class:list={['lane', s.cls, { 'no-season': none }]} style={none ? `--b:${b.pct};--blo:${b.lo};--bhi:${b.hi}` : `--b:${b.pct};--blo:${b.lo};--bhi:${b.hi};--c:${n.pct};--clo:${n.lo};--chi:${n.hi}`}><span class="whisk"></span><span class="dot"></span></div>;
     })}
   </div>
   <ul class="fpp-stats">
@@ -23,7 +25,9 @@ const rawWords: Record<string, string> = { physical: 'hits recorded per 60', for
           const e = c[s.abbr][mode];
           return (
             <p class={`fpc-line m-${mode}`}>
-              {e.raw === undefined
+              {e.v === null || (e.raw !== undefined && e.index === null)
+                ? <span><b>{s.place}:</b> nothing to show yet this season</span>
+                : e.raw === undefined
                 ? <><span><b>{s.place}:</b> {c.say(e.v)}</span><em>{ordinal(e.rank)} of 32</em></>
                 : <>
                     <span class="a-adj"><b>{s.place}:</b> {c.say(e.index)}</span><em class="a-adj">{ordinal(e.rank)} of 32</em>
@@ -42,4 +46,5 @@ const rawWords: Record<string, string> = { physical: 'hits recorded per 60', for
   .fpp-stats li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; align-items: baseline; }
   .fpp-stats i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   .fpp .lanes { gap: 6px; }
+  :global(html[data-mode='season']) .no-season .dot, :global(html[data-mode='season']) .no-season .whisk { visibility: hidden; }
 </style>

@@ -56,6 +56,8 @@ def run(season: int) -> dict:
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import previews
     previews.run()  # last: reads the JSON written above
+    from pipeline.export import pregame
+    pregame.run(season)  # finished games that never got a preview: rebuild one from the data before each game
     from pipeline.export import recaps
     recaps.run(season)  # grades the frozen preview calls of finished games
     return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games, "players": n_players}
@@ -83,12 +85,15 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
 READY = ["volume", "quality", "rebounds", "turnover", "point", "suppression", "qualityAllowed", "breakdowns", "goalie", "pace", "forecheck", "physical", "depth", "pp", "pk", "powerKill", "discipline"]
 
 
-def export_fingerprints(season: int) -> int:
+def export_fingerprints(season: int, idle: bool = False) -> int:
+    """`idle` adds teams that have not played yet this season (see team_style.run)."""
     from pipeline.metrics import team_style
 
-    out = team_style.run(season)
-    g = pl.read_parquet(TABLES / str(season) / "games.parquet")
-    abbr = {**dict(zip(g["home_id"], g["home"])), **dict(zip(g["away_id"], g["away"]))}
+    out = team_style.run(season, idle=idle)
+    abbr = {}
+    for s_ in (season - 1, season):  # a team that has not played yet is named from last season's games
+        g = pl.read_parquet(TABLES / str(s_) / "games.parquet")
+        abbr |= {**dict(zip(g["home_id"], g["home"])), **dict(zip(g["away_id"], g["away"]))}
     from pipeline.metrics.team_style import INDEXED
 
     def dim(t, d):
