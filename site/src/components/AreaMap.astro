@@ -111,6 +111,10 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
     <g class="am-shots">
       {shots.filter((s) => s[0] >= 25).map(([x, y, xg, goal, cur]) => <circle class:list={['ps', { goal: goal === 1, old: cur === 0 }]} cx={sx(y)} cy={sy(x)} r={0.7 + Math.sqrt(xg / 1000) * 3.6} />)}
     </g>
+    {/* SVG has no z-index, so the hover outline is a copy of each area drawn above everything else. */}
+    <g class="am-rings" clip-path={`url(#${id}-clip)`}>
+      {Object.keys(paths).map((k) => <path d={paths[k]} />)}
+    </g>
   </svg>
 </figure>
 
@@ -118,7 +122,24 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
   .areamap svg { width: 100%; height: auto; display: block; }
   .am-area path { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.7; stroke-linejoin: round; }
   .am-area { cursor: help; outline: none; }
-  .am-area:hover path, .am-area:focus path { stroke: var(--ink); stroke-width: 0.6; }
+  .am-rings path { fill: none; stroke: var(--ink); stroke-width: 0.6; stroke-linejoin: round; pointer-events: none; display: none; }
+  .areamap.dots .am-rings { display: none; }
+  /* One rule per area, in SHAPES order (15 areas). */
+  .areamap svg:has(.am-area:nth-child(1):is(:hover, :focus)) .am-rings path:nth-child(1) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(2):is(:hover, :focus)) .am-rings path:nth-child(2) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(3):is(:hover, :focus)) .am-rings path:nth-child(3) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(4):is(:hover, :focus)) .am-rings path:nth-child(4) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(5):is(:hover, :focus)) .am-rings path:nth-child(5) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(6):is(:hover, :focus)) .am-rings path:nth-child(6) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(7):is(:hover, :focus)) .am-rings path:nth-child(7) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(8):is(:hover, :focus)) .am-rings path:nth-child(8) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(9):is(:hover, :focus)) .am-rings path:nth-child(9) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(10):is(:hover, :focus)) .am-rings path:nth-child(10) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(11):is(:hover, :focus)) .am-rings path:nth-child(11) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(12):is(:hover, :focus)) .am-rings path:nth-child(12) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(13):is(:hover, :focus)) .am-rings path:nth-child(13) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(14):is(:hover, :focus)) .am-rings path:nth-child(14) { display: inline; }
+  .areamap svg:has(.am-area:nth-child(15):is(:hover, :focus)) .am-rings path:nth-child(15) { display: inline; }
   .am-labels text { font: 600 3.4px var(--ui); fill: var(--ink); text-anchor: middle; pointer-events: none; }
   .am-labels text.dark { fill: var(--sheet); }
   .am-shots { display: none; }
