@@ -26,6 +26,8 @@ const { p } = Astro.props as { p: any };
 const base = import.meta.env.BASE_URL;
 const index = Object.values(import.meta.glob('../../../public/data/players/index.json', { eager: true, import: 'default' }))[0] as { id: number }[];
 const known = new Set(index.map((x) => x.id));
+// Every percentile opens the skater rankings for that rating, with this player picked out.
+const rankHref = (key: string, vs?: string) => `${base}players/rankings/?t=${key}&g=${vs ?? p.group}&p=${p.id}`;
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
@@ -228,9 +230,9 @@ const statRow = (x: any) => (isG ? null : x);
                       {modes.map(([m]) => (
                         <p class={`fpc-line m-${m}`}>
                           {e[m].raw === undefined
-                            ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} /></>
-                            : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} class='a-adj' />
-                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerWord[e[m].vs ?? s.group])} class='a-raw' /></>}
+                            ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} /></>
+                            : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} class='a-adj' />
+                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerWord[e[m].vs ?? s.group])} class='a-raw' /></>}
                         </p>
                       ))}
                     </li>
@@ -297,7 +299,7 @@ const statRow = (x: any) => (isG ? null : x);
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
-                        <p class={`fpc-line m-${m}`}>{e ? <><span tabindex="0" data-tip={`${cap(t.say(e.v))}.`}>{t.short(e.v)}</span><Rank ok={e.ok} pct={e.pct} words={compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', peerWord[e.vs ?? s.group])} /></> : <span class="n">No tracking data yet.</span>}</p>
+                        <p class={`fpc-line m-${m}`}>{e ? <><span tabindex="0" data-tip={`${cap(t.say(e.v))}.`}>{t.short(e.v)}</span><Rank href={rankHref(k, e.vs)} ok={e.ok} pct={e.pct} words={compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', peerWord[e.vs ?? s.group])} /></> : <span class="n">No tracking data yet.</span>}</p>
                       ); })}
                     </li>
                   );

@@ -36,7 +36,9 @@
   .fpc-line.m-season { display: none; }
   html[data-mode='season'] .fpc-line.m-season { display: flex; }
   html[data-mode='season'] .fpc-line.m-blend { display: none; }
-  .fpc-line em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .fpc-line em, .fpc-line .rank-link { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .fpc-line .rank-link { text-decoration: underline 1px var(--rule); text-underline-offset: 4px; }
+  .fpc-line .rank-link:hover { color: var(--ink); text-decoration-color: var(--ink); }
   .units2 { align-items: start; }
   .gmode.m-season { display: none; }
   html[data-mode='season'] .gmode.m-season { display: block; }
