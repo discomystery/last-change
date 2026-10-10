@@ -222,7 +222,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .sw-row { display: grid; grid-template-columns: minmax(0, 13em) 1fr 3.2em 7em; align-items: center; gap: 16px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; cursor: pointer; }
   .sw-item { transition: opacity 0.2s; }
   .sw-row[aria-expanded="true"] { background: var(--track); border-radius: 6px 6px 0 0; }
-  .sw-det { background: var(--track); margin: 0 -8px 6px; padding: 4px 8px 12px; border-radius: 0 0 6px 6px; display: grid; gap: 6px; }
+  .sw-det { background: var(--track); margin: 0 -8px 6px; padding: 8px 40px 16px; border-radius: 0 0 6px 6px; display: grid; gap: 8px; }
   .sw-det[hidden] { display: none; }
   .sw-dr { display: grid; grid-template-columns: 9em minmax(6em, 14em) 3em 1fr; gap: 12px; align-items: center; }
   .sw-dl { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--ui); color: var(--ink-2); }
@@ -245,6 +245,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   @media (max-width: 600px) {
     .sw-row { grid-template-columns: minmax(0, 1fr) auto 3em; gap: 4px 10px; padding: 7px 8px; }
     .sw-dr { grid-template-columns: 1fr 3em; gap: 2px 10px; }
+    .sw-det { padding: 8px 20px 14px; }
     .sw-mini { display: none; }
     .sw-dw { grid-column: 1 / -1; font-size: 14px; }
     .sw-n { grid-column: 3; grid-row: 1; }
