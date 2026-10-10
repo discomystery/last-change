@@ -231,8 +231,8 @@ def export_lines(season: int) -> int:
         from_bottom = len(usual) - rank + 1
         lowest = "the lowest share in the league" if from_bottom == 1 else f"the {ORDINAL_WORDS.get(from_bottom, ordinal(from_bottom))}-lowest in the league"
         return {"player": None, "kind": "shuffle", "change": "shuffled", "now": round(100 * share), "before": round(100 * typical), "games": e["games"],
-                "text": f'The forward lines keep changing. Even its four most-used trios over the last {e["games"]} games cover only {round(100 * share)}% of its forwards\u2019 '
-                        f'5-on-5 time, {lowest} (a typical team: {round(100 * typical)}%). The lines listed lean on its latest games, but expect new combinations tonight.'}
+                "text": f'The forward lines keep changing. Even their four most-used trios over the last {e["games"]} games cover only {round(100 * share)}% of their forwards\u2019 '
+                        f'5-on-5 time, {lowest} (a typical team: {round(100 * typical)}%). The lines listed lean on their latest games, but expect new combinations tonight.'}
 
     out = {}
     for tid, e in usual.items():

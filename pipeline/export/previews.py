@@ -18,12 +18,14 @@ Reads the site JSON the other exports have just written (fingerprints, lines), s
 """
 import json
 import zlib
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 2  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast)
+RULES_VERSION = 3  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+# 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -40,84 +42,144 @@ MEASURE = {
     "pp": "expected goals per 60 on the power play",
 }
 # The prediction itself, in plain words, for the team named first: the recap checks exactly this.
-CLASH_CALL = {
-    "volume": lambda X, v: f"{X} takes at least its usual {v:.1f} shot attempts per 60 at 5-on-5.",
-    "quality": lambda X, v: f"{X} gets one expected goal from its usual {1 / v:.1f} shots or fewer.",
-    "turnover": lambda X, v: f"At least its usual {v:.1f}% of {X}’s 5-on-5 chances come right after winning the puck.",
-    "pp": lambda X, v: f"{X}’s power play creates at least its usual {v:.1f} expected goals per 60.",
+CLASH_CALL = {  # w: the attacking team's words (see `team_words`)
+    "volume": lambda w, v: f"{w['X']} take at least their usual {v:.1f} shot attempts per 60 at 5-on-5.",
+    "quality": lambda w, v: f"{w['X']} get one expected goal from their usual {1 / v:.1f} shots or fewer.",
+    "turnover": lambda w, v: f"{w['X']} get at least their usual {v:.1f}% of their 5-on-5 chances right after winning the puck.",
+    "pp": lambda w, v: f"{w['Xp']} power play creates at least their usual {v:.1f} expected goals per 60.",
 }
-# How each trait's value reads in a sentence, and whether its name takes a plural verb.
+# How each trait's value reads in a sentence.
 SAY = {
     "volume": lambda v: f"{v:.1f} shot attempts per 60 at 5-on-5",
     "quality": lambda v: f"one expected goal for every {1 / v:.1f} shots",
-    "turnover": lambda v: f"{v:.1f}% of its chances come right after winning the puck",
+    "turnover": lambda v: f"{v:.1f}% of their chances come right after winning the puck",
     "pp": lambda v: f"{v:.1f} expected goals per 60",
 }
-# Several ways to say each call, so a week of previews doesn't read like one sentence on repeat. The wording is picked
-# from the game and the call (not at random), so it stays put between runs. {X} is the attacking team, {Y} the one
-# defending; {xr}/{yr} their league ranks, {xv} the attacking team's figure in words. A leading * marks wording that
-# claims the attacking team is among the league's best, used only when it ranks in the top five.
+
+# Voice (user, 2026-10-10): casual, the way a fan talks. Team nicknames lean ("the Blues"), with the place name mixed in;
+# teams are "they"; no numbers in headlines; the body says why in a sentence, then what we expect. Ranks read
+# "6th in the league", never "6th of 32".
+# Placeholders: {X} / {Y} the nickname with "the" ("the Blues", plural verbs), {Xp} / {Yp} its possessive ("the Blues’"),
+# {Xc} / {Yc} the place ("St. Louis", singular verbs; a nickname for the two New York clubs). Each pool is picked from
+# the game and the call (not at random), so the wording stays put between runs. A leading * marks wording that claims
+# the team is among the league's best, used only for a top-five rank.
 CLASH_WORDS = {
     "volume": (
-        ["{X} should get plenty of shots away", "Expect {X} to fire from everywhere", "{Y} gives up shots, and {X} takes them",
-         "{X}’s shot volume meets a soft spot"],
-        ["{X} ranks {xr} of 32 for shot volume ({xv}); {Y} ranks {yr} for shot suppression.",
-         "*Few teams shoot as often as {X}: {xv}, {xr} in the league. {Y} sits {yr} of 32 at keeping shots down.",
-         "*{Y} is {yr} of 32 at shot suppression, and {X} is one of the league’s busiest shooting teams ({xr}: {xv})."],
+        ["{X} should pile up the shots", "Expect {X} to fire from everywhere", "{Y} give up shots, and {X} take them",
+         "{X} are going to test {Yp} goalie early and often"],
+        ["{X} shoot a lot ({xv}, {xr} in the league), and {Y} are {yr} at keeping shots down. Look for a big shot total.",
+         "*Few teams shoot like {X} ({xr}: {xv}), and {Y} sit {yr} at keeping shots away. It could be a long night in {Yp} end.",
+         "{Yc} has been giving up shots all season ({yr} at keeping them down), and {X} rarely pass one up ({xr}: {xv})."],
     ),
     "quality": (
-        ["{X} gets to the dangerous areas", "{Y} lets teams in close, and {X} goes there", "Look for {X} to find the slot",
+        ["{X} are going to live in {Yp} slot", "{Y} let teams in close, and {X} go there", "Look for {X} to find the slot",
          "Quality over quantity for {X}"],
-        ["{X} ranks {xr} of 32 for shot quality ({xv}); {Y} ranks {yr} for keeping shots to the outside.",
-         "*{X}’s shots are among the league’s most dangerous ({xr} of 32: {xv}). {Y} ranks {yr} at keeping opponents to the outside.",
-         "{Y} has struggled to keep shots to the perimeter ({yr} of 32), and {X} makes its shots count: {xv}, {xr} in the league."],
+        ["{X} make their shots count ({xr} in the league: {xv}), and {Y} are {yr} at keeping teams to the outside. Expect {X} to get their looks from in tight.",
+         "*{Xp} shots are some of the most dangerous in the league ({xr}: {xv}), and {Y} are {yr} at keeping teams outside. Look for plenty of chances from the slot.",
+         "{Y} have struggled to keep shots to the perimeter ({yr} in the league), and {X} don’t waste many: {xv}, {xr} in the league."],
     ),
     "turnover": (
-        ["{X} pounces on mistakes, and {Y} makes them", "Watch {Y}’s puck management", "Turnovers could swing this one",
-         "{X} feeds on loose pucks"],
-        ["{X} ranks {xr} of 32 for chances off turnovers ({xv}); {Y} ranks {yr} for avoiding breakdowns.",
-         "*{X} turns takeaways into chances as well as almost anyone ({xr} of 32: {xv}). {Y} ranks {yr} at avoiding breakdowns.",
-         "{Y} gives up more dangerous chances after losing the puck than most ({yr} of 32 at avoiding breakdowns). {X} ranks {xr} for chances off turnovers."],
+        ["{Y} can’t afford to cough it up", "{X} feed on mistakes, and {Y} make them", "Watch {Yp} puck management",
+         "Turnovers could swing this one"],
+        ["{X} turn stolen pucks into chances ({xr} in the league: {xv}), and {Y} are {yr} at avoiding breakdowns. A sloppy pass or two could cost {Y}.",
+         "*Almost nobody punishes turnovers like {X} ({xr}: {xv}), and {Y} give the puck away in bad spots ({yr} at avoiding breakdowns).",
+         "{Y} give up more dangerous chances after losing the puck than most ({yr} at avoiding breakdowns), and {X} pounce: {xr} for chances off turnovers."],
     ),
     "pp": (
-        ["{X}’s power play has a target", "Penalties could cost {Y}", "Special teams tilt toward {X}", "{Y} can’t afford to take penalties"],
-        ["{X} ranks {xr} of 32 on the power play ({xv}); {Y} ranks {yr} on the penalty kill.",
-         "{X}’s power play creates {xv}, {xr} in the league. {Y}’s penalty kill ranks {yr}.",
-         "{Y}’s penalty kill sits {yr} of 32, and {X}’s power play is {xr} ({xv})."],
+        ["{Xp} power play has a target", "Penalties could cost {Y}", "Special teams lean toward {X}", "{Y} can’t afford to take penalties"],
+        ["{Xp} power play is {xr} in the league ({xv}), and {Yp} kill is {yr}. Every trip to the box hurts {Y} more than most.",
+         "{Yp} penalty kill sits {yr} in the league, and {Xp} power play is {xr} ({xv}). Discipline matters more than usual for {Y} tonight.",
+         "*{Xp} power play is one of the league’s best ({xr}: {xv}), and {Yp} kill ranks {yr}. {Y} need to stay out of the box."],
     ),
 }
-MATCHUP_HEADS = ["{H} will try to get {mine} out against {theirs}", "Watch for {mine} against {theirs}",
-                 "Last change: {mine} against {theirs}", "{H} likes this matchup at home"]
-CONTRAST_HEADS = {  # {top} is the team at the high end of the scale, {bot} the low end
-    "volume": ["{top} shoots far more than {bot}", "Volume against patience"],
-    "quality": ["{top} hunts better looks than {bot}", "Point-blank against perimeter"],
-    "suppression": ["{top} locks it down; {bot} doesn’t", "One stingy defense, one porous one"],
-    "qualityAllowed": ["{top} keeps shots outside; {bot} lets them in", "Sheltered against exposed"],
-    "pace": ["Different speeds", "{top} plays fast; {bot} slows it down"],
-    "point": ["{top} shoots from the point; {bot} works down low", "Different shooting spots"],
-    "forecheck": ["{top} hounds the puck; {bot} sits back", "Forecheck against patience"],
-    "physical": ["Bruisers against finesse", "{top} hits; {bot} mostly doesn’t"],
-    "depth": ["{top} rolls four lines; {bot} leans on its top six", "Depth against star power"],
-    "pp": ["One power play bites, one doesn’t", "{top}’s power play outclasses {bot}’s"],
-    "pk": ["{top} kills penalties far better than {bot}", "Airtight against leaky on the kill"],
-}
-CONTRAST_BODIES = ["{top} ranks {rt} of 32 for {name}, toward the {hi} end; {bot} ranks {rb}, toward the {lo} end.",
-                   "On {name}, {top} sits {rt} of 32, at the {hi} end of the scale. {bot} is {rb}, at the {lo} end."]
 PACE_WORDS = {
-    "fast": (["Expect a track meet", "Shots should fly both ways", "Two of the league’s busiest games meet"],
-             "{A}’s games average {av} ({ar} of 32 for pace); {H}’s average {hv} ({hr})."),
-    "slow": (["Expect a grind", "Don’t expect many shots", "A low-event night is likely"],
-             "{A}’s games average only {av} ({ar} of 32 for pace); {H}’s average {hv} ({hr})."),
+    "fast": (["Expect a track meet", "Shots should fly both ways", "Nobody’s sitting back in this one"],
+             "{Ac} plays some of the league’s fastest games ({ar} for pace: {av}), and so does {Hc} ({hr}). We think this one runs hotter than either team’s usual."),
+    "slow": (["Expect a grind", "Bring a pillow", "Don’t blink and you still might miss the shots"],
+             "{Ac} plays some of the league’s slowest games ({ar} for pace: {av}), and so does {Hc} ({hr}). We think this one is even quieter than either team’s usual."),
 }
-PHYSICAL_HEADS = ["A physical night ahead", "Bodies will fly", "Two of the league’s heaviest-hitting teams"]
+PHYSICAL_HEADS = ["Bodies will fly", "This one’s going to leave marks", "Two of the league’s heaviest-hitting teams"]
 TOP = 5  # "among the best" wording needs a top-five rank
 BOTH = 70  # both teams at or above this percentile (or both at or below 100 - BOTH) for a pace or physical call
+
+# Strength against strength (the "duel"): one team's best habit meets the other team's best defence of it. Which side
+# wins is close to a coin flip, so these are the hottest calls; the lean comes from a regression of each game's figure
+# on the attacking team's level and the defending team's level (each from that season's other games, 2023-24 to
+# 2025-26, about 7,800 team-games): (weight on the offense, weight on the defense). In games where both sides ranked
+# in the top quarter, the attack beat the league average 51% of the time for shot volume, 52% for chance quality and
+# 55% on the power play, so power plays win these more often than kills do.
+DUELS = {  # offense trait: (defense trait, weights, what the offense does, what the defense does)
+    "volume": ("suppression", (0.891, 0.855), "shot volume", "keeping shots away"),
+    "quality": ("qualityAllowed", (0.683, 0.611), "chance quality", "keeping teams to the outside"),
+    "pp": ("pk", (0.897, 0.589), "the power play", "the penalty kill"),
+}
+DUEL_BAR = 75  # both teams at or above this percentile
+DUEL_HEADS = ["Something has to give", "Strength against strength", "The matchup inside the matchup", "Best against best"]
+DUEL_LEAN = {  # who we side with
+    "offense": ["We think {X} still get theirs.", "Our lean: {Xp} {oname} wins out.", "We’ll side with {X}."],
+    "defense": ["Our lean: {Y} hold the line.", "We’ll side with {Yp} defense.", "We think {Y} win this one."],
+}
+DUEL_LEAN_PP = {"offense": ["Our lean: {Xp} power play wins out. Power plays usually beat kills in these spots."],
+                "defense": ["Our lean: {Yp} kill holds up, even though power plays usually win these."]}
+
+# "Not the team you remember": this season a team is clearly not what their two-season blend says. Only once the
+# season has as many games as the trait needs to be half signal, and only when the season's 80% range sits wholly on
+# one side of the blend. The call: tonight lands on this season's side of the blend.
+CHANGED = {  # trait: (ranked for, the team's ..., better, worse); every trait here is measured for one team in one game
+    "volume": ("shot volume", "shot volume", "shooting more", "shooting less"),
+    "suppression": ("keeping shots away", "shot suppression", "tighter defensively", "giving up more shots"),
+    "quality": ("chance quality", "chance quality", "getting better looks", "settling for worse looks"),
+    "qualityAllowed": ("keeping teams to the outside", "slot defense", "keeping teams outside better", "letting teams in close"),
+    "physical": ("hitting", "hitting", "hitting more", "hitting less"),
+    "pp": ("the power play", "power play", "a sharper power play", "a quieter power play"),
+    "pk": ("the penalty kill", "penalty kill", "a tighter kill", "a leakier kill"),
+}
+CHANGED_GAP = 25  # season and blend percentiles at least this far apart
+CHANGED_MOVE = 0.05  # and the figures themselves at least 5% apart
+CHANGED_HEADS = {"better": ["{Xp} {thing} is better than you remember", "Don’t judge {X} by last season", "{X} have changed"],
+                 "worse": ["{Xp} {thing} isn’t what it was", "Not the {Xn} you remember", "{X} have slipped"]}
+CHANGED_HEADS_PHYSICAL = {"better": ["{X} are hitting more than you remember", "{X} have toughened up"],
+                          "worse": ["{X} aren’t hitting like they used to", "Not the {Xn} you remember"]}
+
+# Home matchups, told as what the coach is doing: hunting a mismatch for his scorers, sending a checking line at the
+# other team's stars, or going power against power.
+MATCHUP_WORDS = {
+    "hunt": (["{H} will hunt a mismatch", "{Hstar}’s line gets the soft minutes", "{H} want {Hstar} away from the big guns"],
+             "That’s a coach chasing an easier matchup for his scorers."),
+    "shadow": (["A shadow job for {mine}", "{H} will send their checkers at {Ostar}", "{Ostar} gets company tonight"],
+               "That’s a checking assignment: the coach wants this group on {theirline}."),
+    "best": (["Best on best: {Hstar} against {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power against power"],
+             "Strength on strength, and the coach is choosing it."),
+    "even": (["{H} like {Hstar}’s line against {Ostar}’s", "Like for like: {Hstar} against {Ostar}"],
+             "Line for line, and the coach keeps choosing it."),
+    "pair": (["{mine} get the {Ostar} assignment", "{H} will send {mine} at {Ostar}", "A tough night ahead for {Ostar}"],
+             "That’s the coach picking a defense pair for {theirline}."),
+}
+
+# Goalie records against one team: tested over 2023-24 to 2026-27 (911 goalie-opponent pairs with four or more
+# starts), a goalie's saves above expected against one team in half his meetings predicts the other half not at all
+# (r = -0.02). So a striking record against tonight's opponent is a coincidence, and the call says so.
+HISTORY_MIN_STARTS, HISTORY_MIN_SHOTS, HISTORY_GAP = 5, 120, 0.03  # save-percentage gap from his usual
+HISTORY_HEADS = {"good": ["Does {G} own {O}? Probably not", "{Gp} record against {O} is a coincidence", "Don’t count on {G} to stand on his head again"],
+                 "bad": ["{O} aren’t {Gp} kryptonite", "{Gp} rough record against {O} is a coincidence", "{G} isn’t cursed against {O}"]}
+
+HISTORY_BODIES = [
+    "{G} has a {sv_vs} save percentage in {n} starts against {O} since 2023-24, and {sv_all} against everyone else. It looks like a pattern, "
+    "but across three seasons a goalie’s record against one team told us nothing about the next meeting. Expect the usual {G}.",
+    "{n} starts against {O} since 2023-24, a {sv_vs} save percentage. Against everyone else, {sv_all}. Fans love a pattern like this, "
+    "but we checked three seasons of them and they predicted nothing. Expect the usual {G}.",
+]
+PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
+MAX_CALLS, MIN_CALLS, MAX_PER_KIND = 4, 2, 2
 
 
 def _pick(pool: list[str], *key) -> str:
     return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
+
+
 MIN_HOME_GAMES, MIN_MINUTES = 3, 30  # before a home matching habit becomes a call
 ORD = ["first", "second", "third", "fourth"]
+NICKS: dict[str, str] = {}  # team -> nickname, from teams.json (filled by `names`)
 
 
 def _ordinal(n: int) -> str:
@@ -128,19 +190,57 @@ def _last(name: str) -> str:
     return name.split(" ", 1)[-1]
 
 
+def _and(xs: list[str]) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def _cap(t: str) -> str:
+    return t[0].upper() + t[1:]
+
+
+def _poss(name: str) -> str:
+    return name + ("’" if name.endswith("s") else "’s")
+
+
+def names(places: dict) -> dict[str, str]:
+    if not NICKS:
+        try:
+            NICKS.update({t["abbr"]: t.get("nick") or t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())})
+        except (OSError, KeyError, ValueError):
+            pass
+    return {t: NICKS.get(t, p) for t, p in places.items()}
+
+
+def team_words(t: str, places: dict, prefix: str) -> dict[str, str]:
+    """How a sentence names a team: "the Blues" (plural verbs), "the Blues’", and "St. Louis" (singular verbs)."""
+    nick = names(places).get(t, places.get(t, t))
+    the = f"the {nick}"
+    place = places.get(t, t)
+    city = the if place.startswith("NY ") else place  # "NY Rangers" reads badly as a place
+    return {prefix: the, f"{prefix}p": _poss(the), f"{prefix}c": city, f"{prefix}n": nick}
+
+
+def _fmt(text: str, **w) -> str:
+    """Fill a template and capitalise each sentence's first letter ("the Blues ..." at the start becomes "The Blues")."""
+    out = text.format(**w)
+    out = _cap(out)
+    return ". ".join(_cap(s) if s else s for s in out.split(". "))
+
+
 def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[dict]:
     out = []
     for off, dfn, _, _ in CLASHES:
         for x, y in ((away, home), (home, away)):
             o, d = fp[x]["dims"][off]["blend"], fp[y]["dims"][dfn]["blend"]
             if o["pct"] >= STRONG and d["pct"] <= WEAK:
-                words = {"X": places[x], "Y": places[y], "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"])}
+                words = {**team_words(x, places, "X"), **team_words(y, places, "Y"),
+                         "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"])}
                 league = o["v"] * 100 / o["index"] if o.get("index") else None
                 out.append({
                     "kind": "clash", "gap": o["pct"] - d["pct"], "metric": off, "team": x, "opp": y,
-                    "head": _pick(CLASH_WORDS[off][0], gid, off, x).format(**words),
-                    "call": CLASH_CALL[off](places[x], o["v"]),
-                    "body": _pick([b.lstrip("*") for b in CLASH_WORDS[off][1] if o["rank"] <= TOP or not b.startswith("*")], gid, off, x, "body").format(**words),
+                    "head": _fmt(_pick(CLASH_WORDS[off][0], gid, off, x), **words),
+                    "call": _cap(CLASH_CALL[off](words, o["v"])),
+                    "body": _fmt(_pick([b.lstrip("*") for b in CLASH_WORDS[off][1] if o["rank"] <= TOP or not b.startswith("*")], gid, off, x, "body"), **words),
                     "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
                     "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(o["v"], 4),
                               "league": round(league, 4) if league else None, "direction": "above",
@@ -155,7 +255,125 @@ def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     return picked[:3]
 
 
-def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict) -> dict | None:
+def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[dict]:
+    """Strength against strength: pick the side the regression leans to, against the league average."""
+    out = []
+    for off, (dfn, (wo, wd), oname, dname) in DUELS.items():
+        for x, y in ((away, home), (home, away)):
+            o, d = fp[x]["dims"][off]["blend"], fp[y]["dims"][dfn]["blend"]
+            if o["pct"] < DUEL_BAR or d["pct"] < DUEL_BAR or not o.get("index") or not d.get("index"):
+                continue
+            lo, ld = o["v"] * 100 / o["index"], d["v"] * 100 / d["index"]
+            lean = lo + wo * (o["v"] - lo) + wd * (d["v"] - ld)  # what tonight's figure for x is expected to be
+            side = "offense" if lean >= lo else "defense"
+            words = {**team_words(x, places, "X"), **team_words(y, places, "Y"), "oname": oname, "dname": dname,
+                     "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"])}
+            lean_txt = _pick((DUEL_LEAN_PP if off == "pp" else DUEL_LEAN)[side], gid, off, x, "lean")
+            body = "{X} are {xr} in the league for " + oname + " ({xv}); {Y} are " + _ordinal(d["rank"]) + " at " + dname + ". " + lean_txt
+            call = _cap(DUEL_CALL[off][side](words, lo))
+            out.append({
+                "kind": "duel", "gap": min(o["pct"], d["pct"]), "metric": off, "team": x, "opp": y, "lean": side,
+                "head": _fmt(_pick(DUEL_HEADS, gid, off, x), **words),
+                "body": _fmt(body, **words), "call": call,
+                "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(lo, 4), "usual": round(o["v"], 4),
+                          "league": round(lo, 4), "direction": "above" if side == "offense" else "below",
+                          "rule": "held if tonight's figure lands on the predicted side of the league average; otherwise didn't happen"},
+            })
+    out.sort(key=lambda c: -c["gap"])
+    return out
+
+
+DUEL_CALL = {  # trait: {side: the call in words}, w the attacking (X) and defending (Y) teams, lg the league average
+    "volume": {"offense": lambda w, lg: f"{w['X']} take more than the league-average {lg:.1f} shot attempts per 60 at 5-on-5 against {w['Y']}.",
+               "defense": lambda w, lg: f"{w['Y']} keep {w['X']} under the league-average {lg:.1f} shot attempts per 60 at 5-on-5."},
+    "quality": {"offense": lambda w, lg: f"{w['Xp']} chances are more dangerous than the league average (one expected goal per {1 / lg:.1f} shots) against {w['Y']}.",
+                "defense": lambda w, lg: f"{w['Y']} keep {w['Xp']} chances less dangerous than the league average (one expected goal per {1 / lg:.1f} shots)."},
+    "pp": {"offense": lambda w, lg: f"{w['Xp']} power play creates more than the league-average {lg:.1f} expected goals per 60 against {w['Y']}.",
+           "defense": lambda w, lg: f"{w['Yp']} kill holds {w['Xp']} power play under the league-average {lg:.1f} expected goals per 60."},
+}
+
+
+def changed_claims(gid: int, away: str, home: str, fp: dict, places: dict, stab: dict) -> list[dict]:
+    """Teams playing clearly unlike their two-season selves, once the season has enough games to say so."""
+    from pipeline.metrics.team_style import DIMS
+    out = []
+    for t, o in ((away, home), (home, away)):
+        games = fp[t].get("games", 0)
+        for k, (name, thing, better, worse) in CHANGED.items():
+            dim = fp[t]["dims"].get(k, {})
+            b, s = dim.get("blend"), dim.get("season")
+            if not b or not s or s.get("lo") is None or games < (stab.get(k, {}).get("k_games") or 999):
+                continue
+            if abs(s["pct"] - b["pct"]) < CHANGED_GAP or s["lo"] <= b["pct"] <= s["hi"] or abs(s["v"] - b["v"]) < CHANGED_MOVE * abs(b["v"]):
+                continue
+            up = s["pct"] > b["pct"]  # better than the blend (percentiles are oriented so higher is better)
+            higher = DIMS[k][3]
+            words = {**team_words(t, places, "X"), "name": name, "thing": thing}
+            show = EDGE[k][4] if k in EDGE else (lambda v: f"{v:.1f}")
+            sv, bv = (s["index"], b["index"]) if k in INDEX_TRAITS else (s["v"], b["v"])
+            body = (f"Over this season and last, {words['X']} rank {_ordinal(b['rank'])} for {name}. This season alone they’re "
+                    f"{_ordinal(s['rank'])} ({show(sv)}, against {show(bv)} blended), {better if up else worse}. "
+                    f"We think tonight looks more like this season than the old {words['Xn']}.")
+            # "above" the blend means a bigger figure; for traits where lower is better, better means below
+            direction = "above" if up == higher else "below"
+            out.append({
+                "kind": "changed", "gap": abs(s["pct"] - b["pct"]), "metric": k, "team": t, "opp": o,
+                "head": _fmt(_pick((CHANGED_HEADS_PHYSICAL if k == "physical" else CHANGED_HEADS)["better" if up else "worse"], gid, k, t), **words),
+                "body": _cap(body),
+                "call": (f"{_cap(words['X'])} hit {'more' if up else 'less'} than their blended level ({show(bv)})." if k == "physical" else
+                         f"{_cap(words['Xp'])} {thing} is {'better' if up else 'worse'} than their blended level of {show(bv)}."),
+                "cite": f"Style fingerprint · blended and this season only · {games} games this season",
+                "check": {"metric": k, "team": t, "baseline": round(b["v"], 4), "season": round(s["v"], 4), "index_traits": k in INDEX_TRAITS,
+                          "league": round(b["v"] * 100 / b["index"], 4) if b.get("index") else None, "direction": direction,
+                          "rule": "held if tonight's figure lands on this season's side of the blended level; otherwise didn't happen"},
+            })
+    out.sort(key=lambda c: -c["gap"])
+    return out
+
+
+@lru_cache(maxsize=1)
+def _player_points():
+    """Every skater-game over this season and last (points and date), from the tables as they stand."""
+    import polars as pl
+
+    from pipeline.config import CURRENT_SEASON, TABLES
+    fr = []
+    for s in (CURRENT_SEASON - 1, CURRENT_SEASON):
+        d = TABLES / str(s)
+        if (d / "player_game.parquet").exists():
+            dates = pl.read_parquet(d / "games.parquet", columns=["game_id", "date"])
+            fr.append(pl.read_parquet(d / "player_game.parquet", columns=["game_id", "player_id", "g", "a1", "a2"]).join(dates, on="game_id"))
+    return pl.concat(fr) if fr else None
+
+
+def _points(before: str | None = None) -> dict[int, float]:
+    """Points per game for every skater over this season and last, from games before `before` (a date) if given.
+    Used only to name a line's best-known player."""
+    try:
+        import polars as pl
+        d = _player_points()
+        if d is None:
+            return {}
+        if before:
+            d = d.filter(pl.col("date") < before[:10])
+        d = d.group_by("player_id").agg(p=(pl.col("g") + pl.col("a1") + pl.col("a2")).sum() / pl.len())
+        return dict(zip(d["player_id"], d["p"]))
+    except Exception as e:
+        print(f"points unavailable: {e!r}")
+        return {}
+
+
+def _star(unit: dict, pts: dict) -> str:
+    """The unit's best-known player: most points per game, else the last one listed (usually the centre)."""
+    ids, players = unit.get("ids", []), unit.get("players", [])
+    if pts and ids:
+        i = max(range(len(ids)), key=lambda j: pts.get(ids[j], 0.0))
+        return _last(players[i])
+    return _last(players[-1]) if players else ""
+
+
+def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts: dict | None = None) -> dict | None:
     h, a = lines.get(home), lines.get(away)
     if not h or not a or not h.get("matchups"):
         return None
@@ -171,14 +389,23 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict) -> 
     opp = next((u for u in a["units"] if u["label"] == f"L{j + 1}"), None)
     if not opp:
         return None
-    mine = ", ".join(_last(n) for n in unit["players"])
-    theirs = ", ".join(_last(n) for n in opp["players"])
+    pts = pts if pts is not None else {}
+    mine = _and([_last(n) for n in unit["players"]])
+    theirs = _and([_last(n) for n in opp["players"]])
+    lab, n = r["label"][0], int(r["label"][1:])
+    style = ("pair" if lab == "P" else "best" if n == 1 and j == 0 else "hunt" if n < j + 1 else "shadow" if n > j + 1 else "even")
+    heads, why = MATCHUP_WORDS[style]
+    w = {**team_words(home, places, "H"), **team_words(away, places, "O"), "mine": mine, "theirs": theirs,
+         "Hstar": _star(unit, pts), "Ostar": _star(opp, pts)}
+    theirline = "the other team’s top line" if j == 0 else f"opponents’ {ORD[j]} lines"
+    group = f"{mine}" if lab == "P" else f"{w['Hstar']}’s line ({mine})"
+    body = (f"At home, {w['H']} have sent {group} out against opponents’ {ORD[j]} lines {v}% of the time, when no line matching "
+            f"would give about {r['expected'][j]}%. {why.format(theirline=theirline)} Tonight {w['Op']} {ORD[j]} line is {theirs}.")
     return {
-        "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away,
-        "head": _pick(MATCHUP_HEADS, gid, "matchup").format(H=places[home], mine=mine, theirs=theirs),
-        "call": f"{places[home]}’s {r['label']} spends at least {v}% of its 5-on-5 time against {places[away]}’s {ORD[j]} line.",
-        "body": f"At home, {places[home]}’s {r['label']} ({mine}) has spent {v}% of its 5-on-5 time against opponents’ {ORD[j]} lines. "
-                f"With no line matching it would be about {r['expected'][j]}%. Tonight {places[away]}’s usual {ORD[j]} line is {theirs}.",
+        "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away, "style": style,
+        "head": _fmt(_pick(heads, gid, "matchup"), **w),
+        "call": f"{_cap(w['Hp'])} {r['label']} ({mine}) spends at least {v}% of its 5-on-5 time against {w['Op']} {ORD[j]} line.",
+        "body": _cap(body),
         "cite": f"Who plays against whom · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
         "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
                   "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
@@ -186,6 +413,70 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict) -> 
                   "baseline": v, "threshold": r["expected"][j], "direction": "above",
                   "rule": "held if the share is at or above the home habit; partly if above the no-matching level; otherwise didn't happen"},
     }
+
+
+@lru_cache(maxsize=1)
+def _goalie_history() -> "object | None":
+    """Every start over 2023-24 to now: goalie, opponent, date, shots on goal, goals. None when the tables are missing."""
+    try:
+        import polars as pl
+
+        from pipeline.config import CURRENT_SEASON, FULL_SEASONS, TABLES
+        from pipeline.metrics import goalies
+        fr = []
+        for s in [*FULL_SEASONS, CURRENT_SEASON]:
+            if not (TABLES / str(s) / "events.parquet").exists():
+                continue
+            g = goalies.per_game(s).filter(pl.col("started"))
+            gm = pl.read_parquet(TABLES / str(s) / "games.parquet").select("game_id", "home_id", "away_id", "home", "away")
+            g = g.join(gm, on="game_id").with_columns(opp=pl.when(pl.col("team_id") == pl.col("home_id")).then(pl.col("away")).otherwise(pl.col("home")))
+            fr.append(g.select("goalie_id", "opp", "date", "sa", "ga"))
+        return pl.concat(fr) if fr else None
+    except Exception as e:
+        print(f"goalie history unavailable: {e!r}")
+        return None
+
+
+def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, places: dict) -> list[dict]:
+    """A goalie (his team's busiest this season) whose record against tonight's opponent is far from his usual.
+    `hist` holds only starts before the game (see `call_extras`)."""
+    if hist is None:
+        return []
+    import polars as pl
+    out = []
+    for t, o in ((away, home), (home, away)):
+        roster = goalies_site.get("teams", {}).get(t) or []
+        if not roster:
+            continue
+        g = max(roster, key=lambda x: ((x.get("season") or {}).get("starts", 0), (x.get("blend") or {}).get("starts", 0)))
+        mine = hist.filter(pl.col("goalie_id") == g["id"])
+        if mine.is_empty():
+            continue
+        vs = mine.filter(pl.col("opp") == o)
+        n, sa, ga = vs.height, int(vs["sa"].sum() or 0), int(vs["ga"].sum() or 0)
+        all_sa, all_ga = int(mine["sa"].sum()), int(mine["ga"].sum())
+        if n < HISTORY_MIN_STARTS or sa < HISTORY_MIN_SHOTS or all_sa - sa < 300:
+            continue
+        sv_vs, sv_all = 1 - ga / sa, 1 - (all_ga - ga) / (all_sa - sa)
+        if abs(sv_vs - sv_all) < HISTORY_GAP:
+            continue
+        good = sv_vs > sv_all
+        G = _last(g["name"])
+        w = {"G": G, "Gp": _poss(G), **team_words(o, places, "O")}
+        fmt = lambda s: f"{s:.3f}".lstrip("0")
+        body = _pick(HISTORY_BODIES, gid, g["id"], "body").format(n=n, sv_vs=fmt(sv_vs), sv_all=fmt(sv_all), **w)
+        out.append({
+            "kind": "history", "gap": abs(sv_vs - sv_all) * 1000, "metric": "goalie_sv", "team": t, "opp": o,
+            "head": _fmt(_pick(HISTORY_HEADS["good" if good else "bad"], gid, g["id"]), **w),
+            "body": _cap(body),
+            "call": f"If {G} starts, his save percentage lands closer to his usual {fmt(sv_all)} than to his {fmt(sv_vs)} against {w['O']}.",
+            "cite": f"Goalie starts since 2023-24 · {n} against {places.get(o, o)}, {all_sa - sa:,} shots against everyone else",
+            "check": {"metric": "goalie_sv", "team": t, "goalie_id": g["id"], "baseline": round(sv_all, 4), "record": round(sv_vs, 4),
+                      "starts": n, "direction": "closer",
+                      "rule": "held if he starts and his save percentage is closer to his usual than to his record against this team; can't judge if he doesn't start"},
+        })
+    out.sort(key=lambda c: -c["gap"])
+    return out[:1]  # one goalie myth a game is plenty
 
 
 # Edge calls: on a trait where the two teams sit far apart, the team at the better end comes out ahead tonight.
@@ -205,26 +496,27 @@ EDGE = {
 SAME = {"volume": "suppression", "suppression": "volume", "quality": "qualityAllowed", "qualityAllowed": "quality", "pp": "pk", "pk": "pp"}
 INDEX_TRAITS = {"forecheck", "physical"}  # compared as a score against league average, never as a count
 EDGE_CALL = {  # the prediction in plain words: {top} comes out ahead of {bot} on this tonight
-    "volume": "{top} takes more 5-on-5 shot attempts per 60 than {bot}.", "quality": "{top}’s shots are more dangerous on average than {bot}’s.",
-    "suppression": "{top} allows fewer 5-on-5 shot attempts per 60 than {bot}.", "qualityAllowed": "{top} keeps the shots it allows further from danger than {bot} does.",
-    "point": "{top} takes a bigger share of its shots from the point than {bot}.", "forecheck": "{top} puts more forecheck pressure on than {bot}.",
-    "physical": "{top} hits more than {bot} in the close stretches of the game.", "depth": "{top} spreads its forward ice time deeper down the lineup than {bot}.",
-    "pp": "{top}’s power play creates more per 60 than {bot}’s.", "pk": "{top}’s penalty kill allows less per 60 than {bot}’s.",
+    "volume": "{top} take more 5-on-5 shot attempts per 60 than {bot}.", "quality": "{topp} shots are more dangerous on average than {botp}.",
+    "suppression": "{top} allow fewer 5-on-5 shot attempts per 60 than {bot}.", "qualityAllowed": "{top} keep the shots they allow further from danger than {bot} do.",
+    "point": "{top} take a bigger share of their shots from the point than {bot}.", "forecheck": "{top} put more forecheck pressure on than {bot}.",
+    "physical": "{top} hit more than {bot} in the close stretches of the game.", "depth": "{top} spread their forward ice time deeper down the lineup than {bot}.",
+    "pp": "{topp} power play creates more per 60 than {botp}.", "pk": "{topp} penalty kill allows less per 60 than {botp}.",
 }
 EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, {bot} the other
-    "volume": ["{top} shoots far more than {bot}", "Volume against patience"],
-    "quality": ["{top} hunts better looks than {bot}", "Point-blank against perimeter"],
-    "suppression": ["{top} locks it down; {bot} doesn’t", "One stingy defense, one porous one"],
-    "qualityAllowed": ["{top} keeps shots outside; {bot} lets them in", "Sheltered against exposed"],
-    "point": ["{top} shoots from the point; {bot} works down low", "Different shooting spots"],
-    "forecheck": ["{top} hounds the puck; {bot} sits back", "Forecheck against patience"],
-    "physical": ["Bruisers against finesse", "{top} hits; {bot} mostly doesn’t"],
-    "depth": ["{top} rolls four lines; {bot} leans on its top six", "Depth against star power"],
-    "pp": ["One power play bites, one doesn’t", "{top}’s power play outclasses {bot}’s"],
-    "pk": ["{top} kills penalties far better than {bot}", "Airtight against leaky on the kill"],
+    "volume": ["{top} will outshoot {bot}", "Volume against patience"],
+    "quality": ["{top} hunt better looks than {bot}", "Point-blank against perimeter"],
+    "suppression": ["{top} lock it down; {bot} don’t", "One stingy defense, one leaky one"],
+    "qualityAllowed": ["{top} keep shots outside; {bot} let them in", "Sheltered against exposed"],
+    "point": ["{top} fire from the point; {bot} work down low", "Two different ideas of a good shot"],
+    "forecheck": ["{top} hound the puck; {bot} sit back", "Forecheck against patience"],
+    "physical": ["Bruisers against finesse", "{top} hit; {bot} mostly don’t"],
+    "depth": ["{top} roll four lines; {bot} lean on their top six", "Depth against star power"],
+    "pp": ["One power play bites, one doesn’t", "{topp} power play outclasses {botp}"],
+    "pk": ["{top} kill penalties far better than {bot}", "Airtight against leaky on the kill"],
 }
-EDGE_BODIES = ["{top} ranks {rt} of 32 for {name}, toward the {hi} end; {bot} ranks {rb}, toward the {lo} end.",
-               "On {name}, {top} sits {rt} of 32, at the {hi} end of the scale. {bot} is {rb}, at the {lo} end."]
+EDGE_BODIES = ["{top} are {rt} in the league for {name}, at the {hi} end; {bot} are {rb}, at the {lo} end. Expect that gap to show.",
+               "On {name}, {topc} ranks {rt} in the league and {botc} ranks {rb}. That’s about as far apart as two teams get."]
+EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
 
 
 def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
@@ -245,56 +537,64 @@ def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
             "rule": "held if the team comes out ahead by at least half its usual margin; partly if it comes out ahead by less; otherwise didn't happen"}
 
 
-def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set) -> dict:
-    """The trait where the two teams sit furthest apart, called as: the team at the better end comes out ahead tonight."""
-    k = max((k for k in EDGE if k not in skip), key=lambda k: abs(fp[away]["dims"][k]["blend"]["pct"] - fp[home]["dims"][k]["blend"]["pct"]))
+def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set, hot_only: bool = False) -> dict | None:
+    """The trait where the two teams sit furthest apart, called as: the team at the better end comes out ahead tonight.
+    With `hot_only`, only a gap wide enough to be worth a call (EDGE_GAP, EDGE_END); otherwise the widest one."""
+    gap = lambda k: abs(fp[away]["dims"][k]["blend"]["pct"] - fp[home]["dims"][k]["blend"]["pct"])
+    keys = [k for k in EDGE if k not in skip and k in fp[away]["dims"] and k in fp[home]["dims"]]
+    if hot_only:
+        keys = [k for k in keys if gap(k) >= EDGE_GAP and max(fp[t]["dims"][k]["blend"]["pct"] for t in (away, home)) >= 100 - EDGE_END
+                and min(fp[t]["dims"][k]["blend"]["pct"] for t in (away, home)) <= EDGE_END]
+    if not keys:
+        return None
+    k = max(keys, key=gap)
     name, lo, hi = EDGE[k][:3]
     a, h = fp[away]["dims"][k]["blend"], fp[home]["dims"][k]["blend"]
     top, bot = (away, home) if a["pct"] >= h["pct"] else (home, away)
     rt, rb = (a, h) if top == away else (h, a)
-    w = {"name": name, "top": places[top], "bot": places[bot], "rt": _ordinal(rt["rank"]), "rb": _ordinal(rb["rank"]), "hi": hi, "lo": lo}
+    tw, bw = team_words(top, places, "top"), team_words(bot, places, "bot")
+    w = {"name": name, **tw, **bw, "rt": _ordinal(rt["rank"]), "rb": _ordinal(rb["rank"]), "hi": hi, "lo": lo}
     return {
-        "kind": "edge", "metric": k, "team": top, "opp": bot,
-        "head": _cap(_pick(EDGE_HEADS[k], gid, k).format(**w)),
-        "body": _pick(EDGE_BODIES, gid, k, "body").format(**w),
-        "call": EDGE_CALL[k].format(**w),
+        "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
+        "head": _fmt(_pick(EDGE_HEADS[k], gid, k), **w),
+        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body"), **w),
+        "call": _fmt(EDGE_CALL[k], **w),
         "cite": f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season",
         "check": edge_check(k, top, bot, fp),
     }
 
 
-def _cap(t: str) -> str:
-    return t[0].upper() + t[1:]
-
-
 def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[dict]:
-    """Calls about the game as a whole: pace (both teams fast or both slow) and physicality (both heavy hitters)."""
+    """Calls about the game as a whole: pace (both teams fast or both slow) and physicality (both heavy hitters). The pace
+    bar is the faster (or slower) of the two teams' usual, not their average: two fast teams playing a fast game is the
+    obvious read, so the call says this one runs faster than either usually does."""
     out = []
     cite = f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season"
     a, h = fp[away]["dims"]["pace"]["blend"], fp[home]["dims"]["pace"]["blend"]
+    w = {**team_words(away, places, "A"), **team_words(home, places, "H")}
     for kind, both, direction in (("fast", a["pct"] >= BOTH and h["pct"] >= BOTH, "above"), ("slow", a["pct"] <= 100 - BOTH and h["pct"] <= 100 - BOTH, "below")):
         if both:
             heads, body = PACE_WORDS[kind]
             league = a["v"] * 100 / a["index"]
+            bar = max(a["v"], h["v"]) if kind == "fast" else min(a["v"], h["v"])
             out.append({
-                "kind": "pace", "metric": "pace", "team": away, "opp": home,
+                "kind": "pace", "gap": min(a["pct"], h["pct"]) if kind == "fast" else 100 - max(a["pct"], h["pct"]), "metric": "pace", "team": away, "opp": home,
                 "head": _pick(heads, gid, "pace"),
-                "call": f"The game runs at {'more' if kind == 'fast' else 'fewer'} than the two teams’ usual {(a['v'] + h['v']) / 2:.1f} unblocked shots per 60 at 5-on-5.",
-                "body": body.format(A=places[away], H=places[home], av=f"{a['v']:.1f} unblocked shots per 60 at 5-on-5, both teams combined",
-                                    hv=f"{h['v']:.1f}", ar=_ordinal(a["rank"]), hr=_ordinal(h["rank"])),
+                "call": f"The game runs at {'more' if kind == 'fast' else 'fewer'} than {bar:.1f} unblocked shots per 60 at 5-on-5, {'faster' if kind == 'fast' else 'slower'} than either team’s usual.",
+                "body": _fmt(body, **w, av=f"{a['v']:.1f} unblocked shots per 60 at 5-on-5, both teams combined", ar=_ordinal(a["rank"]), hr=_ordinal(h["rank"])),
                 "cite": cite,
                 "check": {"metric": "pace", "measure": "unblocked shot attempts per 60 at 5-on-5, both teams combined, adjusted for score and venue",
-                          "team": None, "baseline": round((a["v"] + h["v"]) / 2, 2), "league": round(league, 2), "direction": direction,
-                          "rule": f"held if tonight's pace is {direction} the two teams' average; partly if {direction} the league average; otherwise didn't happen"},
+                          "team": None, "baseline": round(bar, 2), "average": round((a["v"] + h["v"]) / 2, 2), "league": round(league, 2), "direction": direction,
+                          "rule": f"held if tonight's pace is {direction} the {'faster' if kind == 'fast' else 'slower'} team's usual; partly if {direction} the league average; otherwise didn't happen"},
             })
     a, h = fp[away]["dims"]["physical"]["blend"], fp[home]["dims"]["physical"]["blend"]
     if a["pct"] >= BOTH and h["pct"] >= BOTH:
         out.append({
-            "kind": "physical", "metric": "physical", "team": away, "opp": home,
+            "kind": "physical", "gap": min(a["pct"], h["pct"]), "metric": "physical", "team": away, "opp": home,
             "head": _pick(PHYSICAL_HEADS, gid, "physical"),
             "call": f"The two teams’ combined hit score reaches their usual {(a['index'] + h['index']) / 2:.0f}.",
-            "body": f"{places[away]}’s hit score is {a['index']} ({_ordinal(a['rank'])} of 32) and {places[home]}’s is {h['index']} ({_ordinal(h['rank'])}). "
-                    f"100 is league average, after adjusting for each arena’s scorer.",
+            "body": _fmt(f"{{A}} have a hit score of {a['index']} ({_ordinal(a['rank'])} in the league) and {{H}} {h['index']} ({_ordinal(h['rank'])}), "
+                         f"where 100 is league average after adjusting for each arena’s scorer. Keep your head up.", **w),
             "cite": cite,
             "check": {"metric": "physical", "measure": "hits per 60 in close games, both teams, as a score against league average (arena-adjusted)",
                       "team": None, "baseline": round((a["index"] + h["index"]) / 2, 1), "league": 100, "direction": "above",
@@ -303,18 +603,47 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     return out
 
 
-def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict) -> list[dict]:
-    """The two to four "What to watch" calls for one game, from fingerprints and lines as they stood before it."""
-    claims = clash_claims(gid, away, home, fp, places)
-    claims += tempo_claims(gid, away, home, fp, places)
-    mc = matchup_claim(gid, away, home, lines, places)
+def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, extra: dict | None = None) -> list[dict]:
+    """The two to four "What to watch" calls for one game, from fingerprints and lines as they stood before it.
+
+    Calls are chosen for how interesting they are, not how safe: strength against strength first (a real question),
+    then a team that has changed, a coach's matchup plan, a goalie record that is really a coincidence, a strength into
+    a weakness, a game-wide pace or hitting call, and last a wide gap between the two on one trait. At most two of one
+    kind; topped up with the widest gap when fewer than two qualify. `extra` holds what only a full run has (the
+    fingerprints' stabilization table, points per game, goalie history and goalies.json)."""
+    extra = extra or {}
+    cands = duel_claims(gid, away, home, fp, places)
+    cands += changed_claims(gid, away, home, fp, places, extra.get("stab") or {})
+    mc = matchup_claim(gid, away, home, lines, places, extra.get("pts"))
     if mc:
-        claims.append(mc)
-    claims = claims[:4]
-    while len(claims) < 2:
-        used = {c["metric"] for c in claims}
-        claims.append(edge_claim(gid, away, home, fp, places, used | {SAME[m] for m in used if m in SAME}))
+        cands.append(mc)
+    cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places)
+    cands += clash_claims(gid, away, home, fp, places)
+    cands += tempo_claims(gid, away, home, fp, places)
+    ec = edge_claim(gid, away, home, fp, places, set(), hot_only=True)
+    if ec:
+        cands.append(ec)
+    claims, per_kind, used = [], {}, set()
+    for c in sorted(cands, key=lambda c: (PRIORITY[c["kind"]], -c.get("gap", 0))):
+        # one call per trait pairing: a duel on shot volume and a clash on shot volume would say the same thing twice
+        key = SAME.get(c["metric"], c["metric"]) if c["kind"] in ("duel", "clash", "edge", "changed") else None
+        if per_kind.get(c["kind"], 0) >= MAX_PER_KIND or (key and (key in used or c["metric"] in used)) or len(claims) >= MAX_CALLS:
+            continue
+        if key:
+            used |= {key, c["metric"]}
+        per_kind[c["kind"]] = per_kind.get(c["kind"], 0) + 1
+        claims.append(c)
+    while len(claims) < MIN_CALLS:
+        ec = edge_claim(gid, away, home, fp, places, used | {SAME[m] for m in used if m in SAME})
+        if ec is None:
+            break
+        used |= {ec["metric"]}
+        claims.append(ec)
+    heads = set()
     for i, c in enumerate(claims):
+        if c["head"] in heads and c["kind"] == "duel":  # two duels in one game: don't open both the same way
+            c["head"] = next((h for h in DUEL_HEADS if h not in heads), c["head"])
+        heads.add(c["head"])
         c.pop("gap", None)
         c["id"] = f"{gid}-{i + 1}"
     return claims
@@ -344,11 +673,20 @@ def site_files(folder) -> dict:
     return {k: json.loads((folder / f"{k}.json").read_text()) for k in ("fingerprints", "lines", "goalies", "goal_sources")}
 
 
+def call_extras(site: dict, before: str) -> dict:
+    """What some calls need beyond the site files, from games before `before` (the game's start) only, so a rebuilt
+    preview sees what a live one would have."""
+    import polars as pl
+    hist = _goalie_history()
+    return {"stab": site["fingerprints"].get("stabilization") or {}, "goalies": site.get("goalies") or {},
+            "pts": _points(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
+
+
 def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None, **extra) -> dict:
     """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number."""
     away, home = g["away"], g["home"]
     fp = site["fingerprints"]["teams"]
-    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places)
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, call_extras(site, g["start"]))
     out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}

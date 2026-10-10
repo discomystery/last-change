@@ -14,11 +14,11 @@ import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
 
-type Call = { id: string; kind: string; head: string; body: string; call?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; usual?: string; tonight?: string; league?: string };
+type Call = { id: string; kind: string; head: string; body: string; call?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string }[]; replays?: Replays | null;
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }> } | null };
 
 export async function getStaticPaths() {
@@ -125,7 +125,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
               ))}
             </tbody>
           </table>
-          <p class="note"><strong>Recent chances</strong>: how much better each team’s chances have been than its opponents’ lately, with the latest games counting most. <strong>Back-to-back</strong>: playing for the second night in a row. <strong>Tonight’s lineup</strong>: whether the players who dressed were stronger or weaker than the team’s usual lineup. Only earlier games went into it, and the preview hinted at it in words without showing the number.</p>
+          <p class="note"><strong>Recent chances</strong>: how much better each team’s chances have been than their opponents’ lately, with the latest games counting most. <strong>Back-to-back</strong>: playing for the second night in a row. <strong>Tonight’s lineup</strong>: whether the players who dressed were stronger or weaker than the team’s usual lineup. Only earlier games went into it, and the preview hinted at it in words without showing the number.</p>
         </div>
       ))}
     </Section>
@@ -152,6 +152,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
                 <>
                   <p class:list={['verdict', c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span> {label[c.verdict]}</p>
                   <p>{c.happened}</p>
+                  {c.beyond && <p class="beyond"><strong>Called it, and then some.</strong> {c.beyond}</p>}
                   {c.tonight && c.tonight !== '–' && (
                     <dl class="compare">
                       <div><dd>{c.usual}</dd><span>Coming in</span></div>
@@ -168,7 +169,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     ) : (
       <p class="note">No preview was saved for this game, so there were no calls to check.</p>
     )}
-    <p class="note">Each call is checked by a rule set before the game. <strong>Held up</strong>: the team reached its usual level. <strong>Partly</strong>: it fell short of its usual level but still beat the league average. When a call says one team will come out ahead, held up means it won by at least half its usual gap, and partly means it won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
+    <p class="note">Each call is checked by a rule set before the game. <strong>Held up</strong>: the team reached their usual level. <strong>Partly</strong>: they fell short of their usual level but still beat the league average. When a call says one team will come out ahead, held up means they won by at least half their usual gap, and partly means they won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     {r.preview_page && <p class="note"><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</p>}
     {seasonTotal > 0 && <p class="note">This season so far: {sayCount(season.held, 'held up')}, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal} graded calls. <a href={`${import.meta.env.BASE_URL}record/`}>See the track record</a>.</p>}
   </Section>
@@ -197,8 +198,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
   {r.surprises.length > 0 && (
     <Section id="surprises" title="What the preview didn’t see coming" placeholder={false} takeaway="The parts of this game furthest from how these teams usually play, biggest first.">
-      <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3><p>{s.body}</p></li>)}</ul>
-      <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of its usual habit. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: a usually average team, far from average. Each is measured against the teams’ numbers before the game.</p>
+      <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.flipped ? 'Flipped a call' : s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3>{s.flipped && <p class="flipped">The preview said “{s.flipped}.”</p>}<p>{s.body}</p></li>)}</ul>
+      <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of their usual habit. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: a usually average team, far from average. Each is measured against the teams’ numbers before the game.</p>
     </Section>
   )}
 
@@ -248,6 +249,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .eyebrow { margin-bottom: 4px; }
   .claim h3, .h { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
   .detail { color: var(--ink-2); font-size: 15px; }
+  .beyond { margin-top: 10px; }
+  .flipped { font-style: italic; color: var(--ink-2); margin-bottom: 6px; }
   .verdict { display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; margin-bottom: 8px; }
   .verdict.held { background: var(--ink); color: var(--sheet); }
   .verdict.missed, .verdict.na, .verdict.note-only { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }

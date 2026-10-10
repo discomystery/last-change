@@ -19,8 +19,8 @@ from pipeline.metrics import win_model
 # (upper bound on the team's chance, headline, caveat). Bands are for wording only and are never published.
 # Over 2025-26 the model's chances ran from about 38% to 70% for nine games in ten.
 BANDS = [
-    (0.30, ["A steep climb for {T}", "{T} has its work cut out", "Everything points away from {T}"],
-     ["{T} could still pull it off {how}, but it might need a miracle.", "{T}’s best hope is {how_bare}, plus a big night in goal."]),
+    (0.30, ["A steep climb for {T}", "{T} has their work cut out", "Everything points away from {T}"],
+     ["{T} could still pull it off {how}, but they might need a miracle.", "{T}’s best hope is {how_bare}, plus a big night in goal."]),
     (0.42, ["A tough matchup for {T}", "{T} faces a real test", "Not an easy night for {T}"],
      ["{T} can pull it off {how}.", "{T}’s best way through is {how_bare}."]),
     (0.48, ["A slightly uphill night for {T}", "{T} starts a half-step behind", "Close, but {O} has the slight edge"],
@@ -29,21 +29,21 @@ BANDS = [
      ["{T} can tip it {how}.", "For {T}, the difference could be {how_bare}."]),
     (0.58, ["{T} has a slight edge", "Leaning {T}’s way", "{T} starts a half-step ahead"],
      ["Not by much, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
-    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} has a lot going for it"],
+    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} has a lot going for them"],
      ["{O} can make it interesting {how_o}.", "{O}’s way back in is {how_o_bare}."]),
-    (1.01, ["{T} has nearly everything going for it", "A big edge for {T}", "This one sets up well for {T}"],
+    (1.01, ["{T} has nearly everything going for them", "A big edge for {T}", "This one sets up well for {T}"],
      ["Anything short of a win would be a surprise, though {O} can make a game of it {how_o}.",
-      "{O}’s only real way in is {how_o_bare}, and it would need a near-perfect night."]),
+      "{O}’s only real way in is {how_o_bare}, and they would need a near-perfect night."]),
 ]
 # A team's way to win, from its strongest trait against the matching trait of the other team.
 ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare phrase)
-    "volume": ("suppression", "if it keeps the shots coming", "piling up shots"),
-    "quality": ("qualityAllowed", "if it gets to the dangerous areas", "getting to the dangerous areas"),
-    "pp": ("pk", "if its power play gets going", "a power play that gets going"),
-    "pk": ("pp", "if its penalty kill holds up", "a penalty kill that holds up"),
-    "turnover": ("breakdowns", "if it pounces on loose pucks", "pouncing on loose pucks"),
-    "suppression": ("volume", "if it keeps shots to a minimum", "keeping shots to a minimum"),
-    "qualityAllowed": ("quality", "if it keeps the shots to the outside", "keeping the shots to the outside"),
+    "volume": ("suppression", "if they keep the shots coming", "piling up shots"),
+    "quality": ("qualityAllowed", "if they get to the dangerous areas", "getting to the dangerous areas"),
+    "pp": ("pk", "if their power play gets going", "a power play that gets going"),
+    "pk": ("pp", "if their penalty kill holds up", "a penalty kill that holds up"),
+    "turnover": ("breakdowns", "if they pounce on loose pucks", "pouncing on loose pucks"),
+    "suppression": ("volume", "if they keep shots to a minimum", "keeping shots to a minimum"),
+    "qualityAllowed": ("quality", "if they keep the shots to the outside", "keeping the shots to the outside"),
 }
 
 

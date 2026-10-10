@@ -158,7 +158,7 @@ const _ = ordinal;
             <p>{snap.outlook![a].body}</p>
           </div>
         ))}
-        <p class="cite">From this site’s win model, which rates each team on how well it has controlled the chances lately, home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
+        <p class="cite">From this site’s win model, which rates each team on how well they have controlled the chances lately, home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
       </div>
     )}
     <ol class="watch">
@@ -202,7 +202,7 @@ const _ = ordinal;
     <p class="note">Forecheck pressure and physicality are arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
-  <Section id="lines" title="Lines and deployment" placeholder={false} takeaway={`${place(home)} is at home, so its coach changes last and chooses who plays against whom.`}>
+  <Section id="lines" title="Lines and deployment" placeholder={false} takeaway={`${place(home)} is at home, so their coach changes last and chooses who plays against whom.`}>
     <div class="key">
       <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
       <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
@@ -237,7 +237,7 @@ const _ = ordinal;
     {homeMu && homeMu.games > 0 ? (
       <>
         <p class="takeaway">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
-        {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing its forward lines, so the four named here (from its latest games) may not be the ones it sends out tonight.</p>}
+        {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing their forward lines, so the four named here (from their latest games) may not be the ones they send out tonight.</p>}
         <div class="card stripcard">
           <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
           {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (

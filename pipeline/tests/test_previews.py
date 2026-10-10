@@ -81,3 +81,46 @@ def test_edge_call_graded_on_the_usual_margin():
     old = {**claim, "kind": "contrast", "check": None}
     assert recaps.measure_edge(S, 1, old, places, fp)["verdict"] == "missed"
     assert recaps.measure_edge(S, 1, {**old, "metric": "pace"}, places, fp)["verdict"] == "na"
+
+
+def _dims(**over):
+    d = {k: {"blend": {"v": 60.0, "pct": 50, "rank": 16, "index": 100}} for k in
+         ["volume", "suppression", "quality", "qualityAllowed", "turnover", "breakdowns", "pp", "pk", "pace", "point", "forecheck", "physical", "depth"]}
+    for k, b in over.items():
+        d[k] = {"blend": {"rank": 3, **b}}
+    return d
+
+
+def test_strength_against_strength_picks_a_side_from_the_regression():
+    places = {"AAA": "Aville", "BBB": "Btown"}
+    # A power play at 9.0 (league 7.5) against a kill allowing 6.0: 0.897 * 1.5 - 0.589 * 1.5 > 0, so the power play.
+    fp = {"AAA": {"games": 5, "dims": _dims(pp={"v": 9.0, "pct": 90, "index": 120})},
+          "BBB": {"games": 5, "dims": _dims(pk={"v": 6.0, "pct": 90, "index": 80})}}
+    duel = previews.duel_claims(1, "AAA", "BBB", fp, places)[0]
+    assert duel["kind"] == "duel" and duel["lean"] == "offense" and duel["check"]["direction"] == "above"
+    assert duel["check"]["baseline"] == 7.5
+    # Shot volume 62 (league 60) against a defense allowing 54: the defense wins the lean.
+    fp = {"AAA": {"games": 5, "dims": _dims(volume={"v": 62.0, "pct": 80, "index": 103.33})},
+          "BBB": {"games": 5, "dims": _dims(suppression={"v": 54.0, "pct": 90, "index": 90})}}
+    duel = previews.duel_claims(1, "AAA", "BBB", fp, places)[0]
+    assert duel["lean"] == "defense" and duel["check"]["direction"] == "below"
+
+
+def test_team_words_use_the_nickname_and_they():
+    previews.NICKS.clear()
+    previews.NICKS.update({"STL": "Blues", "NYR": "Rangers", "MIN": "Wild"})
+    w = previews.team_words("STL", {"STL": "St. Louis"}, "X")
+    assert w == {"X": "the Blues", "Xp": "the Blues’", "Xc": "St. Louis", "Xn": "Blues"}
+    assert previews.team_words("NYR", {"NYR": "NY Rangers"}, "X")["Xc"] == "the Rangers"
+    assert previews.team_words("MIN", {"MIN": "Minnesota"}, "X")["Xp"] == "the Wild’s"
+    assert previews._fmt("{X} shoot. {Xp} kill holds.", **w) == "The Blues shoot. The Blues’ kill holds."
+    previews.NICKS.clear()
+
+
+def test_goalie_record_call_graded_on_his_usual():
+    from pipeline.export import recaps
+    claim = {"kind": "history", "check": {"goalie_id": 7, "baseline": 0.905, "record": 0.945}}
+    line = lambda saves, shots, started=True: [{"id": 7, "name": "A. Goalie", "started": started, "shots": shots, "saves": saves}]
+    assert recaps.measure_history(claim, line(27, 30))["verdict"] == "held"  # .900
+    assert recaps.measure_history(claim, line(29, 30))["verdict"] == "missed"  # .967
+    assert recaps.measure_history(claim, line(29, 30, started=False))["verdict"] == "na"

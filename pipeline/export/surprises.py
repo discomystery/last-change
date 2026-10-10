@@ -118,8 +118,11 @@ def classify(usual: float, x: float, mid: float, sd: float) -> str:
     return "further" if abs(x - mid) > abs(usual - mid) else "muted"
 
 
-def _item(kind: str, score: float, cls: str, head: str, body: str) -> dict:
-    return {"kind": kind, "score": round(score, 2), "tag": TAGS[cls], "head": head, "body": body}
+def _item(kind: str, score: float, cls: str, head: str, body: str, sig: tuple | None = None) -> dict:
+    out = {"kind": kind, "score": round(score, 2), "tag": TAGS[cls], "head": head, "body": body}
+    if sig:
+        out["sig"] = sig  # (figure, team, went up): lets a surprise be matched against the preview's calls
+    return out
 
 
 def shot_share(rows: dict, a: str, h: str, fp: dict, places: dict) -> dict | None:
@@ -142,11 +145,11 @@ def shot_share(rows: dict, a: str, h: str, fp: dict, places: dict) -> dict | Non
     cls = classify(e[t], x[t], 50, sd("share"))
     T, O = places[t], places[o]
     head = {"break": f"{T} flipped the shot count", "further": f"{T} buried {O} in shots",
-            "muted": f"{T} held its own on shots", "unusual": f"{T} dominated the shot count"}[cls]
+            "muted": f"{T} held their own on shots", "unusual": f"{T} dominated the shot count"}[cls]
     expect = (f"From how these two usually play, {T} would expect about {e[t]:.0f}%." if cls != "unusual"
               else "These two usually split the shots about evenly.")
     body = f"{T} took {x[t]:.0f}% of the 5-on-5 shot attempts (adjusted for score and venue). {expect} {rarity('share', dev)}"
-    return _item("shots", z * SHOT_WEIGHT, cls, head, body)
+    return _item("shots", z * SHOT_WEIGHT, cls, head, body, ("shots", t, True))
 
 
 def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, league: float | None, places: dict) -> dict | None:
@@ -159,22 +162,22 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
     if kind == "quality":
         head = f"{T} got to the dangerous areas" if up else f"{T} was kept to the outside"
         body = (f"{T}’s shots at 5-on-5 were {'more' if up else 'less'} dangerous than usual: one expected goal every {1 / x:.1f} shots, "
-                f"against its usual {1 / usual:.1f} (league average {1 / league:.1f}).")
+                f"against their usual {1 / usual:.1f} (league average {1 / league:.1f}).")
         cat = "chances"
     elif kind == "pp":
         head = f"{T}’s power play came alive" if up else f"{O} shut down {T}’s power play"
-        body = f"{T}’s power play created {x:.1f} expected goals per 60, against its usual {usual:.1f} and a league average of {league:.1f}."
+        body = f"{T}’s power play created {x:.1f} expected goals per 60, against their usual {usual:.1f} and a league average of {league:.1f}."
         cat = "special"
     elif kind == "hits":
         xi, ui = 100 * x / league, 100 * usual / league
         head = f"{T} brought the hits" if up else f"{T} hardly hit anyone"
-        body = f"{T}’s hit score in the close stretches of the game was {xi:.0f}, against its usual {ui:.0f} (100 is league average, adjusted for the arena’s scorer)."
+        body = f"{T}’s hit score in the close stretches of the game was {xi:.0f}, against their usual {ui:.0f} (100 is league average, adjusted for the arena’s scorer)."
         cat = "physical"
     else:  # depth
-        head = f"{T} leaned on its bottom six" if up else f"{T} shortened its bench"
-        body = f"{T}’s bottom-six forwards played {x:.0f}% of the forwards’ 5-on-5 time, against its usual {usual:.0f}% and a league average of {league:.0f}%."
+        head = f"{T} leaned on their bottom six" if up else f"{T} shortened their bench"
+        body = f"{T}’s bottom-six forwards played {x:.0f}% of the forwards’ 5-on-5 time, against their usual {usual:.0f}% and a league average of {league:.0f}%."
         cat = "lineup"
-    return _item(cat, abs(z), cls, head, f"{body} {rarity(kind, x - usual)}")
+    return _item(cat, abs(z), cls, head, f"{body} {rarity(kind, x - usual)}", (kind, t, up))
 
 
 def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, glines: list, new_trio: list, replay: dict | None) -> list[dict]:
@@ -198,7 +201,7 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         g = score["pp_goals"][t]
         if g >= 2:
             out.append(_item("special", 1.5 + 0.5 * (g - 2), "rare", f"{places[t]}’s power play did damage",
-                             f"{g} power-play goals on {score['pp_opps'][t]} chances."))
+                             f"{g} power-play goals on {score['pp_opps'][t]} chances.", ("pp", t, True)))
     won = {a: score[a] > score[h], h: score[h] > score[a]}
     for gl in glines:
         if not gl["started"] or gl["shots"] < 15:
@@ -228,6 +231,68 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
     return [c for c in out if c is not None]
 
 
+# What each kind of preview call predicted, in the surprises' own terms: (figure, team, went up). The shot share is
+# told from the side of the team that beat expectations, so it is matched both ways round.
+def call_sigs(claim: dict) -> list[tuple]:
+    k, m, chk = claim.get("kind"), claim.get("metric"), claim.get("check") or {}
+    t, o = claim.get("team"), claim.get("opp")
+    if k == "clash":
+        f = {"volume": "shots", "quality": "quality", "pp": "pp"}.get(m)
+        return [(f, t, True)] if f else []
+    if k in ("edge", "contrast"):
+        top, bot = chk.get("team", t), chk.get("opp", o)
+        # the team at the better end goes up, the other goes down: a stingy defense or a strong kill means the
+        # opponent's figure goes down, which is the same as this team's going up
+        f = {"volume": "shots", "suppression": "shots", "quality": "quality", "qualityAllowed": "quality",
+             "pp": "pp", "pk": "pp", "physical": "hits", "depth": "depth"}.get(m)
+        if not f:
+            return []
+        return [(f, top, True), (f, bot, False)]
+    if k == "physical":
+        return [("hits", t, True), ("hits", o, True)]
+    return []
+
+
+def _matches(sig: tuple, call_sig: tuple) -> bool | None:
+    """True if the call predicted the same thing the surprise reports, False if the opposite, None if unrelated."""
+    f, t, up = sig
+    cf, ct, cup = call_sig
+    if f != cf:
+        return None
+    if f == "shots" and ct != t:  # a share: the other team going down is this team going up
+        ct, cup = t, not cup
+    if ct != t:
+        return None
+    return up == cup
+
+
+def against_calls(cands: list[dict], calls: list[dict]) -> tuple[list[dict], dict[str, dict]]:
+    """Square the surprises with the preview's calls. A call that held and went much further than expected is not a
+    surprise: it leaves the list and the call gets an "and then some" note instead. A call that went the other way stays
+    a surprise but names the call it flipped. `calls` are the snapshot's claims, each with its graded `verdict`."""
+    kept, beyond = [], {}
+    for c in cands:
+        sig = c.get("sig")
+        hit = None
+        for call in calls if sig else []:
+            for cs in call_sigs(call):
+                same = _matches(sig, cs)
+                if same is True and call.get("verdict") == "held":
+                    hit = ("beyond", call)
+                elif same is False and call.get("verdict") == "missed" and hit is None:
+                    hit = ("flipped", call)
+            if hit and hit[0] == "beyond":
+                break
+        if hit and hit[0] == "beyond":
+            if c["score"] >= SMALL and (hit[1]["id"] not in beyond or beyond[hit[1]["id"]]["score"] < c["score"]):
+                beyond[hit[1]["id"]] = c
+            continue
+        if hit:
+            c = {**c, "flipped": hit[1]["head"]}
+        kept.append(c)
+    return kept, {k: {"head": v["head"], "body": v["body"], "score": v["score"]} for k, v in beyond.items()}
+
+
 def pick(cands: list[dict]) -> list[dict]:
     """At most one per kind, biggest first: up to four surprises, topped up to two with smaller twists."""
     best = {}
@@ -236,7 +301,7 @@ def pick(cands: list[dict]) -> list[dict]:
     ranked = sorted(best.values(), key=lambda c: -c["score"])
     big = [c for c in ranked if c["score"] >= BIG][:MAX_SHOWN]
     small = [{**c, "mild": True} for c in ranked if SMALL <= c["score"] < BIG][:max(0, MIN_SHOWN - len(big))]
-    shown = big + small
+    shown = [{k: v for k, v in c.items() if k != "sig"} for c in big + small]
     if not shown:
         return [{"kind": "form", "score": 0, "tag": "True to form", "mild": True, "head": "Both teams played to type",
                  "body": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, "

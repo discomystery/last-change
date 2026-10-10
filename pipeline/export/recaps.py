@@ -73,6 +73,8 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
     chk, m = claim["check"], claim["metric"]
     if claim["kind"] in ("edge", "contrast"):
         return measure_edge(S, gid, claim, places, fp)
+    if claim["kind"] == "changed":
+        return measure_changed(S, gid, claim, places)
     if chk is None:
         return {"verdict": None}
     tid = S.team_id.get((gid, chk["team"])) if chk.get("team") else None
@@ -84,15 +86,15 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             return {"verdict": "na", "happened": "The numbers for this game aren’t available."}
         if m == "volume":
             v = r["cf_adj"] / r["sec5"] * 3600
-            txt = f"{team} took {v:.1f} shot attempts per 60 at 5-on-5 (adjusted for score and venue), against its usual {base:.1f}."
+            txt = f"{team} took {v:.1f} shot attempts per 60 at 5-on-5 (adjusted for score and venue), against their usual {base:.1f}."
             fmt = lambda x: f"{x:.1f} per 60"
         elif m == "quality":
             v = r["xgf_adj"] / r["ff_adj"] if r["ff_adj"] else 0.0
-            txt = f"{team} got one expected goal every {1 / v:.1f} shots, against its usual {1 / base:.1f}." if v else f"{team} barely got a shot away at 5-on-5."
+            txt = f"{team} got one expected goal every {1 / v:.1f} shots, against their usual {1 / base:.1f}." if v else f"{team} barely got a shot away at 5-on-5."
             fmt = lambda x: f"1 expected goal per {1 / x:.1f} shots" if x else "–"
         elif m == "turnover":
             v = 100 * r["to_xgf"] / r["xgf5"] if r["xgf5"] else 0.0
-            txt = f"{v:.1f}% of {team}’s 5-on-5 chances came right after winning the puck, against its usual {base:.1f}%."
+            txt = f"{v:.1f}% of {team}’s 5-on-5 chances came right after winning the puck, against their usual {base:.1f}%."
             fmt = lambda x: f"{x:.1f}%"
         else:
             if r["pp_sec"] < MIN_PP_SEC:
@@ -100,9 +102,14 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
                         "usual": f"{base:.1f} per 60", "tonight": "–"}
             v = r["pp_xgf"] / r["pp_sec"] * 3600
             g = S.pp_goals(gid, tid)
-            txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r['pp_sec'])} of 5-on-4 time, against its usual {base:.1f}, "
+            txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r['pp_sec'])} of 5-on-4 time, against their usual {base:.1f}, "
                    f"and scored {g} {'goal' if g == 1 else 'goals'}.")
             fmt = lambda x: f"{x:.1f} per 60"
+        if claim["kind"] == "duel":  # graded against the league average alone: which side of it the attack landed on
+            usual = chk.get("usual", base)
+            what = {"volume": "5-on-5 shot attempts", "quality": "chance quality", "pp": "the power play", "turnover": "chances off turnovers"}[m]
+            txt = f"On {what}, {team} had {fmt(v)}. The league average is {fmt(base)}, and they came in at {fmt(usual)}."
+            return {"verdict": grade(v, base, None, chk["direction"]), "happened": txt, "usual": fmt(usual), "tonight": fmt(v), "league": fmt(base)}
         out = {"verdict": grade(v, base, league, chk["direction"]), "happened": txt, "usual": fmt(base), "tonight": fmt(v)}
         if league is not None:
             out["league"] = fmt(league)
@@ -114,8 +121,10 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
     if m == "pace":
         r = rows[0]
         v = (r["ff_adj"] + r["fa_adj"]) / r["sec5"] * 3600
+        usual = (f"the {'faster' if chk['direction'] == 'above' else 'slower'} team’s usual {base:.1f}" if "average" in chk
+                 else f"the two teams’ usual {base:.1f}")  # rules 3 set the bar at the faster (or slower) team's usual
         return {"verdict": grade(v, base, league, chk["direction"]),
-                "happened": f"The game ran at {v:.1f} unblocked shots per 60 at 5-on-5, both teams combined, against the two teams’ usual {base:.1f} and a league average of {league:.1f}.",
+                "happened": f"The game ran at {v:.1f} unblocked shots per 60 at 5-on-5, both teams combined, against {usual} and a league average of {league:.1f}.",
                 "usual": f"{base:.1f} per 60", "tonight": f"{v:.1f} per 60", "league": f"{league:.1f} per 60"}
     if m == "physical":
         if min(r["close_sec"] for r in rows) < MIN_CLOSE_SEC:
@@ -180,6 +189,44 @@ def measure_edge(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> di
             "usual": f"{top} {fmt(ut)} · {bot} {fmt(ub)}", "tonight": f"{top} {fmt(tv)} · {bot} {fmt(bv)}"}
 
 
+def measure_changed(S: Season, gid: int, claim: dict, places: dict) -> dict:
+    """A team playing unlike their two-season selves: did tonight land on this season's side of the blended level?"""
+    chk, k = claim["check"], claim["metric"]
+    r = S.rows.get((gid, S.team_id.get((gid, chk["team"]))))
+    T = places.get(chk["team"], chk["team"])
+    if r is None:
+        return {"verdict": "na", "happened": "The numbers for this game aren’t available."}
+    need = {"pp": ("pp_sec", MIN_PP_SEC, "power-play time"), "pk": ("pk_sec", MIN_PP_SEC, "penalty-kill time"),
+            "physical": ("close_sec", MIN_CLOSE_SEC, "close-game time")}.get(k, ("sec5", 600, "5-on-5 time"))
+    if r[need[0]] < need[1]:
+        return {"verdict": "na", "happened": f"{T} had only {clock(r[need[0]])} of {need[2]}, too little to judge."}
+    v = team_style._value(r, k)
+    if v != v:
+        return {"verdict": "na", "happened": "Too little of what this call counts happened to judge it."}
+    base, season = chk["baseline"], chk["season"]
+    fmt = previews.EDGE[k][4]
+    show = (lambda x: fmt(100 * x / chk["league"])) if k in previews.INDEX_TRAITS and chk.get("league") else fmt
+    beyond = (lambda a, b: a > b) if chk["direction"] == "above" else (lambda a, b: a < b)
+    verdict = "held" if beyond(v, base) else "missed"
+    return {"verdict": verdict,
+            "happened": f"On {previews.EDGE[k][3]}, {T} had {show(v)}, against {show(base)} over this season and last and {show(season)} this season alone.",
+            "usual": show(base), "tonight": show(v)}
+
+
+def measure_history(claim: dict, glines: list) -> dict:
+    """A goalie's record against one team, called a coincidence: was tonight closer to his usual than to that record?"""
+    chk = claim["check"]
+    g = next((x for x in glines if x["id"] == chk["goalie_id"]), None)
+    fmt = lambda x: f"{x:.3f}".lstrip("0")
+    if g is None or not g["started"] or not g["shots"]:
+        return {"verdict": "na", "happened": "He didn’t start, so this call can’t be judged.", "usual": fmt(chk["baseline"]), "tonight": "–"}
+    sv = g["saves"] / g["shots"]
+    verdict = "held" if abs(sv - chk["baseline"]) < abs(sv - chk["record"]) else "missed"
+    return {"verdict": verdict,
+            "happened": f"{g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
+            "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None}
+
+
 def matchup_seconds(S: Season, gid: int, chk: dict) -> dict[str, float]:
     """5v5 seconds the home group spent against each of the visitors' usual forward lines in this game."""
     g = S.games[gid]
@@ -219,13 +266,15 @@ def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     return out
 
 
-def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lines: dict, glines: list, replay: dict | None) -> list[dict]:
-    """See `surprises.py`. `fp` and `usual_lines` are the teams' numbers as the preview saw them."""
+def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lines: dict, glines: list, replay: dict | None,
+              calls: list[dict] = ()) -> tuple[list[dict], dict[str, dict]]:
+    """See `surprises.py`. `fp` and `usual_lines` are the teams' numbers as the preview saw them; `calls` are the
+    snapshot's claims with their verdicts. Returns the surprises and an "and then some" note per call id."""
     g = S.games[gid]
     a, h = g["away"], g["home"]
     rows = {t: S.rows.get((gid, S.team_id[(gid, t)])) for t in (a, h)}
     if any(r is None for r in rows.values()):
-        return []
+        return [], {}
     score = {a: g["away_score"], h: g["home_score"], "pp_goals": {t: nums[t]["pp_goals"] for t in (a, h)},
              "pp_opps": {t: nums[t]["pp_opps"] for t in (a, h)}}
     trios = []
@@ -239,7 +288,8 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
             if ids not in usual:
                 trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"])))
                 break
-    return surprise_rules.pick(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay))
+    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay), list(calls))
+    return surprise_rules.pick(cands), beyond
 
 
 def replay_block(row: dict, away: str, home: str) -> dict:
@@ -286,17 +336,22 @@ def run(season: int = CURRENT_SEASON) -> dict:
         fp_pre = {**fp, **pre.get("fingerprints", {}).get("teams", {})}
         lines_pre = {**usual_lines, **{t: [u["ids"] for u in v["units"] if u["label"][0] == "L"] for t, v in pre.get("lines", {}).get("teams", {}).items()}}
         rb = replay_block(meter[gid], g["away"], g["home"]) if gid in meter else None
-        calls = []
+        calls, graded_claims = [], []
         for c in (snap or {}).get("claims", []):
-            res = measure(S, gid, c, places, fp_pre)
+            res = measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre)
+            graded_claims.append({**c, "verdict": res.get("verdict")})
             calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "cite": c["cite"], **res})
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
+        surp, beyond = surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
+        for c in calls:
+            if c["id"] in beyond:
+                c["beyond"] = beyond[c["id"]]["body"]
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
-               "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb),
+               "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
                "replays": rb}
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
