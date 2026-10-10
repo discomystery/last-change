@@ -14,7 +14,7 @@ const hr = (data as any).home_road as Record<string, { home_rate: number; away_r
 const settle = Object.entries(fp.stabilization as Record<string, { r: number; k_games: number }>).sort((a, b) => a[1].k_games - b[1].k_games);
 const names: Record<string, string> = { volume: 'Shot volume', quality: 'Shot quality', turnover: 'Off-turnover offense', point: 'Point-shot reliance', suppression: 'Shot suppression', qualityAllowed: 'Quality allowed', breakdowns: 'Breakdowns avoided', goalie: 'Goaltending', pace: 'Pace', forecheck: 'Forecheck pressure', physical: 'Physicality', rebounds: 'Second chances', pp: 'Power play', pk: 'Penalty kill', powerKill: 'Power kill', discipline: 'Discipline' };
 ---
-<Base title="Methods" mock={false}>
+<Base section="methods" title="Methods" mock={false}>
   <h1 class="page-h">How the numbers are made</h1>
   <p class="lede">Plain-language explanations of the adjustments behind the site, with the real figures.</p>
 

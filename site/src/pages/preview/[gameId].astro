@@ -4,6 +4,7 @@
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
+import GameTrail from '../../components/GameTrail.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
@@ -124,15 +125,16 @@ const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'],
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
 const _ = ordinal;
 ---
-<Base title={`${away} at ${home} preview`} mock={false}>
+<Base section="games" title={`${away} at ${home} preview`} mock={false}>
   <style is:inline set:html={colourCss}></style>
   <section class="hero" aria-label="Matchup">
-    <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home }))} />
+    <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
     <dl class="meta">
       <div><dt>When</dt><dd>{dateStr}, {timeStr}</dd></div>
       <div><dt>Where</dt><dd>{snap.venue}</dd></div>
       <div><dt>Numbers through</dt><dd>{asOf}</dd></div>
     </dl>
+      <GameTrail id={snap.game_id} />
   </section>
   <nav class="jump sticky" id="jump" aria-label="Sections">{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
 
@@ -149,7 +151,7 @@ const _ = ordinal;
     {notes.length > 0 && (
       <div class="card worth">
         <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><strong>{place(n.a)}:</strong> {n.text}</li>)}</ul>
+        <ul>{notes.map((n) => <li><strong><a class="tlink" href={`${base}team/${n.a}/`}>{place(n.a)}</a>:</strong> {n.text}</li>)}</ul>
       </div>
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
@@ -186,7 +188,7 @@ const _ = ordinal;
     <div class="two">
       {order.map((a) => (
         <div class={`t-${side(a)}`}>
-          <h3 class="team-h">{full(a)}</h3>
+          <h3 class="team-h"><a class="tlink" href={`${base}team/${a}/`}>{full(a)}</a></h3>
           <ul class="units">
             {(LN[a]?.units ?? []).map((u) => (
               <li class="card unit">
@@ -456,6 +458,8 @@ const _ = ordinal;
   .two-n i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
   .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
   .team-h { margin-top: 8px; }
+  .tlink { color: inherit; text-decoration: none; }
+  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
   .units { display: grid; gap: 14px; }
   .opp-key { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; font: 400 14px var(--ui); margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
   .opp-key .mini-h { margin: 0; flex-basis: 100%; }

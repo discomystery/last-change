@@ -1,7 +1,17 @@
 ---
 import teams from '../../public/data/teams.json';
-interface Props { title: string; description?: string; mock?: boolean | 'mixed' }
-const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true } = Astro.props;
+type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
+interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
+// Main sections. League and Track record have their place in the menu before their pages exist.
+const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
+  { id: 'games', label: 'Games', href: 'games/' },
+  { id: 'teams', label: 'Teams', href: 'teams/' },
+  { id: 'players', label: 'Players', href: 'players/' },
+  { id: 'league', label: 'League', soon: 'Coming soon: all 32 teams on every scale, and every goalie on one chart.' },
+  { id: 'record', label: 'Track record', soon: 'Coming soon: how often the previews’ calls hold up, all season.' },
+];
+const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
 const teamList = teams as { abbr: string; name: string }[];
 ---
@@ -32,12 +42,11 @@ const teamList = teams as { abbr: string; name: string }[];
         <a class="wordmark" href={base}>Last Change</a>
         <span class="wordmark-note">working title</span>
         <nav class="site-nav" aria-label="Site">
-          <a href={base}>Home</a>
-          <a id="my-team-link" href={base} data-base={base} hidden>My team</a>
-          <a href={`${base}players/`}>Players</a>
-          <a href={`${base}check/`}>Real lines</a>
-          <a href={`${base}xg-check/`}>Chance check</a>
-          <a href={`${base}methods/`}>Methods</a>
+          <a id="my-team-link" class="my-team" href={base} data-base={base} hidden></a>
+          {tabs.map((t) => t.soon
+            ? <span class="soon" tabindex="0" data-tip={t.soon}>{t.label}</span>
+            : <a href={`${base}${t.href}`} aria-current={cur(t.id)}>{t.label}</a>)}
+          <a class="minor" href={`${base}methods/`} aria-current={cur('methods')}>Methods</a>
         </nav>
       </div>
       <button type="button" class="prefs-toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs">Settings</button>
@@ -66,9 +75,25 @@ const teamList = teams as { abbr: string; name: string }[];
       </div>
     </header>
     <main><slot /></main>
+    <nav class="tabbar" aria-label="Site">
+      <a href={base} aria-current={cur('home')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" /></svg>Home</a>
+      <a href={`${base}games/`} aria-current={cur('games')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>Games</a>
+      <a href={`${base}teams/`} aria-current={cur('teams')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z" /></svg>Teams</a>
+      <a href={`${base}players/`} aria-current={cur('players')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></svg>Players</a>
+      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
+    </nav>
+    <div class="more" id="more" hidden>
+      <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
+      <span class="soon">League <em>coming soon</em></span>
+      <span class="soon">Track record <em>coming soon</em></span>
+      <a href={`${base}methods/`}>Methods</a>
+      <a href={`${base}check/`}>Real lines check</a>
+      <a href={`${base}xg-check/`}>Chance check</a>
+    </div>
     <footer class="site-foot">
       <p>Expected goals data from <a href="https://moneypuck.com">MoneyPuck.com</a>. Game data: NHL.</p>
       <p>A fan project. Not affiliated with the NHL or any of its teams.</p>
+      <p class="checks">Behind the numbers: <a href={`${base}methods/`}>Methods</a> · <a href={`${base}check/`}>Real lines check</a> · <a href={`${base}xg-check/`}>Chance check</a></p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline>
@@ -81,7 +106,10 @@ const teamList = teams as { abbr: string; name: string }[];
           root.dataset[k] = v;
           document.querySelectorAll(`[data-pref="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
           if (k === 'team') document.getElementById('team-pick').value = v;
-          if (k === 'team') { const l = document.getElementById('my-team-link'); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; }
+          if (k === 'team') {
+            ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
+            if (v) document.getElementById('my-team-link').textContent = v;
+          }
         };
         const set = (k, v) => {
           try { localStorage.setItem('lc-' + k, v); } catch {}
@@ -92,6 +120,11 @@ const teamList = teams as { abbr: string; name: string }[];
         Object.keys(defaults).forEach((k) => apply(k, read(k)));
         document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
         document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
+        const more = document.getElementById('more'), moreBtn = document.getElementById('more-toggle');
+        const setMore = (open) => { more.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
+        moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(more.hidden); });
+        document.addEventListener('click', (e) => { if (!more.hidden && !more.contains(e.target)) setMore(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
         const toggle = document.getElementById('prefs-toggle');
         toggle.addEventListener('click', () => {
           const open = document.getElementById('prefs').classList.toggle('open');
@@ -192,7 +225,29 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 18px; font: 600 14px var(--ui); }
   .site-nav a { white-space: nowrap; }
   .site-nav a { text-decoration: none; }
-  .site-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .site-nav { align-items: center; }
+  .site-nav a, .site-nav .soon { padding: 6px 0; border-bottom: 2px solid transparent; }
+  .site-nav a:hover { border-bottom-color: var(--rule); }
+  .site-nav a[aria-current='page'] { border-bottom-color: var(--ink); }
+  .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
+  .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
+  .site-nav .my-team { border: 1px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
+  .tabbar, .more { display: none; }
+  .checks a { color: inherit; }
+  @media (max-width: 719px) {
+    .site-nav { display: none; }
+    body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--sheet); border-top: 1px solid var(--rule); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+    .tabbar a, .tabbar button { display: grid; justify-items: center; gap: 3px; font: 600 11px var(--ui); color: var(--ink-3); text-decoration: none; background: none; border: 0; padding: 4px 0; cursor: pointer; }
+    .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+    .tabbar [aria-current='page'], .tabbar button[aria-expanded='true'] { color: var(--ink); }
+    .tabbar [aria-current='page'] svg { stroke-width: 2.4; }
+    .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
+    .more a, .more .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
+    .more a:hover { background: var(--track); }
+    .more .soon { color: var(--ink-3); font-weight: 500; }
+    .more em { font-style: normal; font-size: 12px; margin-left: 6px; }
+  }
   .prefs { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; padding: 10px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; font: 400 13px var(--ui); color: var(--ink-2); }
   .prefs-toggle { display: none; justify-self: start; font: 600 13px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
   .prefs-toggle::after { content: ' ▾'; }

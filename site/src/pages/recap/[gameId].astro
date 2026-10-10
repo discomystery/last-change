@@ -4,6 +4,8 @@
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
+import GameTrail from '../../components/GameTrail.astro';
+import PLink from '../../components/PLink.astro';
 import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
@@ -45,11 +47,12 @@ const rows: [string, string, (n: Nums) => string][] = [
   ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
 ];
 ---
-<Base title={`${away} at ${home}, final`} mock={false}>
+<Base section="games" title={`${away} at ${home}, final`} mock={false}>
   <style is:inline set:html={colourCss}></style>
   <section class="hero" aria-label="Final score">
-    <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home }))} />
+    <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
     <p class="when">{endWord} · {dateStr} · {r.venue}</p>
+      <GameTrail id={r.game_id} />
   </section>
 
   <Section id="scorecard" title="What the preview said, and what happened" placeholder={false} takeaway={takeaway}>
@@ -95,7 +98,7 @@ const rows: [string, string, (n: Nums) => string][] = [
   <Section id="numbers" title="The numbers" placeholder={false} takeaway="How the game went, beyond the score.">
     <div class="card">
       <table class="numbers">
-        <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{place(a)}</th>)}</tr></thead>
+        <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i><a class="tlink" href={`${import.meta.env.BASE_URL}team/${a}/`}>{place(a)}</a></th>)}</tr></thead>
         <tbody>
           <tr><th scope="row">Goals</th>{order.map((a) => <td>{r.score[a]}</td>)}</tr>
           {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
@@ -115,7 +118,7 @@ const rows: [string, string, (n: Nums) => string][] = [
     <ul class="two gl">
       {r.goalies.map((g) => (
         <li class:list={['card', `t-${side(g.team)}`]}>
-          <div class="job-top"><span class="job-name"><i></i><span class="plink" tabindex="0" data-tip="Player pages are coming. This name will open his.">{g.name}</span></span><span class="gs"><strong>{sgn(g.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: the goals his shots were worth by this site’s model, minus the goals he let in. Positive is good.">goals saved above expected</span></span></div>
+          <div class="job-top"><span class="job-name"><i></i><PLink id={g.id} name={g.name} /></span><span class="gs"><strong>{sgn(g.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: the goals his shots were worth by this site’s model, minus the goals he let in. Positive is good.">goals saved above expected</span></span></div>
           <p>{g.saves} saves on {g.shots} shots{g.sv !== null ? ` (${g.sv.toFixed(3).replace(/^0/, '')})` : ''} in {g.toi}{g.started ? '' : ' in relief'}. The shots were worth {g.xga.toFixed(1)} expected goals; he allowed {g.ga}.{g.high.shots > 0 ? ` Stopped ${g.high.shots - g.high.goals} of ${g.high.shots} high-danger shots.` : ''}</p>
         </li>
       ))}
@@ -156,4 +159,6 @@ const rows: [string, string, (n: Nums) => string][] = [
   .gs { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); }
   .gs strong { font: 700 22px/1 var(--display); color: var(--ink); }
   .foot { margin-top: 36px; }
+  .tlink { color: inherit; text-decoration: none; }
+  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
 </style>

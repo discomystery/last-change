@@ -141,3 +141,7 @@
   .lt tr.gap > * { border-top: 3px solid var(--line-red); }
   .lt tbody tr:last-child > * { border-bottom: 0; }
   .todo { margin-top: 16px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
+
+  /* A team name that opens the team's page, in the surrounding text style. */
+  .tlink { color: inherit; text-decoration: none; }
+  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
