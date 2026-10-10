@@ -140,12 +140,14 @@ def box_extras(season: int) -> dict[tuple[int, int], dict]:
 
 
 RARE_GOAL = 0.2  # a goal counts as a good night only for a player who scores in fewer than one game in five
+ROUGH_SHARE, ROUGH_XGA = 0.3, 0.8  # no points while the other team had 70%+ of the 5-on-5 chances, and plenty of them
 
 
 def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> tuple[str | None, str | None]:
     """What he put on the scoresheet, apart from his usual jobs. A shorthanded goal counts as two points.
-    huge: a hat trick or 4+ points. big: 2+ points. good: a goal from a player who rarely scores. Plus-minus is
-    left out: it counts goals he was on the ice for, not what he did."""
+    huge: a hat trick or 4+ points. big: 2+ points. good: a goal from a player who rarely scores. rough: no points
+    while the other team had 70%+ of the 5-on-5 chances with him on (0.8+ expected goals against, 10+ minutes).
+    Plus-minus is left out: it counts goals he was on the ice for, however they happened; chances say more."""
     goals = box["g"]
     pts = goals + box["a"] + box.get("sh", 0)
     bits = []
@@ -170,6 +172,8 @@ def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> 
         return "big", why
     if rare:
         return "good", why
+    if pts == 0 and xg_share is not None and xg_share <= ROUGH_SHARE and box.get("xga", 0) >= ROUGH_XGA:
+        return "rough", f"No points, and {round(100 * (1 - xg_share))}% of the 5-on-5 chances went the other way with him on"
     return None, None
 
 
@@ -181,6 +185,7 @@ GRID = {
     "big":  {"did": "big", "mixed": "big", "didnt": "mixed", None: "big"},
     "good": {"did": "big", "mixed": "did", "didnt": "mixed", None: None},
     None:   {"did": "did", "mixed": "mixed", "didnt": "didnt", None: None},
+    "rough": {"did": "mixed", "mixed": "rough", "didnt": "rough", None: "rough"},
 }
 
 UNIT_WEIGHT = 0.5  # power play and penalty kill results belong to five players, so they count half
@@ -327,6 +332,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 card["box"] |= extras.get((e["game_id"], pid), {"pm": 0, "ev": 0, "pp": 0, "sh": 0})
                 f, a = float(m[i][P.C["on_xgf_adj"]]), float(m[i][P.C["on_xga_adj"]])
                 share = f / (f + a) if m[i][P.C["sec5"]] >= 600 and f + a > 0 else None
+                card["box"] |= {"xgf": round(f, 2), "xga": round(a, 2)}  # 5-on-5, with him on, score-and-venue adjusted
                 card["night"], card["night_why"] = scoresheet(card["box"], share, card.pop("odds"))
                 card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)

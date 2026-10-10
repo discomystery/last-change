@@ -58,7 +58,7 @@ def test_exported_cards_are_well_formed():
         d = json.loads(p.read_text())
         assert {c["team"] for c in d["players"]} <= {d["away"], d["home"]}
         for c in d["players"]:
-            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt")
+            assert len(c["jobs"]) <= 3 and c["pill"] in ("huge", "big", "did", "mixed", "didnt", "rough")
             for j in c["jobs"]:
                 assert j["verdict"] in ("held", "partly", "missed", "na") and j["text"]
                 assert "deserve" not in j["text"].lower()
@@ -77,13 +77,17 @@ def test_scoresheet_levels():
     assert scoresheet(box(g=1), None, scoring_odds=0.09)[0] == "good"
     assert scoresheet(box(g=1), None, scoring_odds=0.35) == (None, None)
     # plus-minus never sets the level
-    assert scoresheet(box(pm=4), 0.9) == (None, None) and scoresheet(box(pm=-4), 0.1) == (None, None)
+    assert scoresheet(box(pm=4), 0.9) == (None, None) and scoresheet(box(pm=-4), 0.5) == (None, None)
+    # a rough night is being badly out-chanced with no points
+    assert scoresheet({**box(), "xga": 1.2}, 0.2)[0] == "rough"
+    assert scoresheet({**box(), "xga": 0.4}, 0.2) == (None, None)  # too few chances either way to call it
+    assert scoresheet({**box(a=1), "xga": 1.2}, 0.2) == (None, None)
     assert scoresheet(box(a=1, pm=2), 0.9) == (None, None)
 
 
 def test_grid_never_fully_bails_out_missed_jobs():
     assert GRID["huge"]["didnt"] == "big" and GRID["big"]["didnt"] == "mixed" and GRID["good"]["didnt"] == "mixed"
-    assert GRID["huge"]["mixed"] == "huge" and GRID["good"]["did"] == "big"
+    assert GRID["huge"]["mixed"] == "huge" and GRID["good"]["did"] == "big" and GRID["rough"]["did"] == "mixed"
     assert all(GRID[None][s] == (s if s else None) for s in ("did", "mixed", "didnt", None))
 
 
