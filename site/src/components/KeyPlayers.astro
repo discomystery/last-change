@@ -1,0 +1,80 @@
+---
+// Key players: one compact card per player the team leans on most. Name and season line, his jobs as short tags (from
+// how he is used), and what he does better than most at his position as one row each. Detail lives in tooltips.
+import PLink from './PLink.astro';
+import Pips from './Pips.astro';
+import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
+import { posWord, groupWord, ordinal, type Mode } from '../lib/players';
+import { clock } from '../lib/format';
+
+interface Props { abbr: string; place: string }
+const { abbr, place } = Astro.props;
+const list = keyPlayers(abbr, place);
+const modes: Mode[] = ['blend', 'season'];
+const sayOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.info.raw(it.est.raw) : it.info.say(it.est?.raw !== undefined ? it.est.index ?? 100 : it.v));
+const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.est.raw_pct : it.pct);
+---
+{list.length === 0
+  ? <p class="note">Nobody has played enough games yet.</p>
+  : (
+    <ul class="kp">
+      {list.map(({ p, jobs, strengths }) => {
+        const st = p.stats.season;
+        return (
+          <li class="card kpc">
+            <div class="kp-top">
+              <p class="kp-name"><PLink id={p.id} name={p.name} /></p>
+              {st && <p class="kp-toi" data-tip="Ice time a game this season, all situations." tabindex="0"><strong>{clock(st.toi)}</strong> a game</p>}
+            </div>
+            <p class="kp-line">{p.number !== null && `#${p.number} · `}{posWord[p.pos] ?? p.pos}{st && <> · {st.p} P in {st.gp} GP <span class="kp-ga">({st.g} G, {st.a} A)</span></>}</p>
+            <ul class="kp-jobs">
+              {jobs.map((j) => <li class="chip tag" tabindex="0" data-tip={j.tip}>{j.text}</li>)}
+              {modes.map((m) => {
+                const t = toughMinutes(p, m);
+                return t !== null && <li class={`chip tag m-${m}`} tabindex="0" data-tip={`Faces tougher opponents at 5-on-5 than ${t}% of ${groupWord[p.group]}. Not good or bad in itself; his ratings already account for it.`}>Tough minutes</li>;
+              })}
+            </ul>
+            {modes.map((m) => {
+              const { best, worst } = strengths[m];
+              return (
+                <div class={`gmode m-${m}`}>
+                  {best.length === 0 && worst.length === 0 && <p class="n kp-none">No clear strengths or weak spots yet.</p>}
+                  <ul class="kp-rows">
+                    {best.map((it) => (
+                      <li tabindex="0" data-tip={`${it.info.label}: better than ${it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                      </li>
+                    ))}
+                    {worst.map((it) => (
+                      <li class="weak" tabindex="0" data-tip={`${it.info.label}: behind ${100 - it.pct}% of ${it.vs}. ${sayOf(it, false)[0].toUpperCase()}${sayOf(it, false).slice(1)}.`}>
+                        <span class="kp-lab">{it.info.label}</span><Pips pct={it.pct} tip={`Better than ${it.pct}% of ${it.vs}.`} /><span class="kp-pct">{ordinal(it.pct)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </li>
+        );
+      })}
+    </ul>
+  )}
+
+<style>
+  .kp { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .kpc { display: flex; flex-direction: column; gap: 8px; }
+  .kp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .kp-name { font: 600 21px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
+  .kp-toi { font: 400 13px var(--ui); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; cursor: help; }
+  .kp-toi strong { font-size: 15px; color: var(--ink); }
+  .kp-line { font: 400 13px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .kp-ga { color: var(--ink-3); }
+  .kp-jobs { list-style: none; padding: 0; margin: 2px 0 4px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .kp-jobs .chip { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; }
+  :global(html[data-mode='season']) .kp-jobs li.m-season { display: inline-block; }
+  .kp-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font: 400 14px var(--ui); }
+  .kp-rows li { display: grid; grid-template-columns: 1fr auto 3.2em; align-items: center; gap: 10px; cursor: help; }
+  .kp-rows li.weak { color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 6px; }
+  .kp-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 12px; }
+  .kp-none { font-size: 13px; }
+</style>

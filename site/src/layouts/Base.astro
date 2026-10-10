@@ -3,12 +3,12 @@ import teams from '../../public/data/teams.json';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
-// Main sections. League and Track record have their place in the menu before their pages exist.
+// Main sections. Track record has its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
   { id: 'teams', label: 'Teams', href: 'teams/' },
   { id: 'players', label: 'Players', href: 'players/' },
-  { id: 'league', label: 'League', soon: 'Coming soon: all 32 teams on every scale, and every goalie on one chart.' },
+  { id: 'league', label: 'League', href: 'league/' },
   { id: 'record', label: 'Track record', soon: 'Coming soon: how often the previews’ calls hold up, all season.' },
 ];
 const cur = (id: Section) => (section === id ? 'page' : undefined);
@@ -84,7 +84,7 @@ const teamList = teams as { abbr: string; name: string }[];
     </nav>
     <div class="more" id="more" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
-      <span class="soon">League <em>coming soon</em></span>
+      <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <span class="soon">Track record <em>coming soon</em></span>
       <a href={`${base}methods/`}>Methods</a>
       <a href={`${base}check/`}>Real lines check</a>
