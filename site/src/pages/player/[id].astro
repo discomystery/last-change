@@ -29,6 +29,9 @@ const known = new Set(index.map((x) => x.id));
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
+// A rank tag is glued to the label's last word so it never drops onto a line of its own.
+const headOf = (label: string) => label.slice(0, label.lastIndexOf(' ') + 1);
+const lastOf = (label: string) => label.slice(label.lastIndexOf(' ') + 1);
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 const tough = (p: number) => (p > 55 ? `tougher than ${p}%` : p < 45 ? `easier than ${100 - p}%` : 'about average');
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(p.generated_at));
@@ -190,7 +193,7 @@ const statRow = (x: any) => (isG ? null : x);
                 <div class="two sw">
                   <div class="card">
                     <p class="mini-h">Better than most at his position</p>
-                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span>{tagOf(it)}</span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
+                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{headOf(it.info.label)}<span class="nw">{lastOf(it.info.label)}{tagOf(it)}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is above most {groupWord[s.group]}.</p>}
                   </div>
                   <div class="card">
@@ -219,7 +222,7 @@ const statRow = (x: any) => (isG ? null : x);
                   const e = s.traits[k];
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season.ok }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span>{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</span>; })}</span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</span>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${e.season.pct};--clo:${e.season.lo};--chi:${e.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
@@ -290,7 +293,7 @@ const statRow = (x: any) => (isG ? null : x);
                   const bp = b?.pct ?? 50, cp = c?.pct ?? 50;
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !(b?.ok || c?.ok) }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span>{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</span>; })}</span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <span class={`rk rk-${m}`} tabindex="0" data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</span>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
@@ -415,6 +418,7 @@ const statRow = (x: any) => (isG ? null : x);
   .sw-l em { font-style: normal; color: var(--ink-3); }
   .mini .fpc-name { font-size: 18px; }
   .rk { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: var(--sheet); font: 700 11px/1.7 var(--ui); letter-spacing: 0.03em; vertical-align: 2px; white-space: nowrap; cursor: help; }
+  .nw { white-space: nowrap; }
   .rk.rk-season { display: none; }
   html[data-mode='season'] .rk.rk-season { display: inline-block; }
   html[data-mode='season'] .rk.rk-blend { display: none; }
