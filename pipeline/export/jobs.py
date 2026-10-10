@@ -54,6 +54,11 @@ COUNTS = {
     "blocks": ("blocks_adj", "sec", "blocked shots", "blocked shot", ""),
     "takeaways": ("takes_adj", "sec", "takeaways", "takeaway", ""),
 }
+# What the numbers on a card measure, in words (shown under each job's label).
+UNIT = {"shooting": "shot attempts at 5-on-5", "chances": "expected goals from his own shots at 5-on-5", "hits": "hits", "blocks": "blocked shots",
+        "takeaways": "takeaways", "faceoffs": "faceoffs won", "offImpact": "expected goals per 60 with him on at 5-on-5",
+        "defImpact": "expected goals per 60 allowed with him on at 5-on-5", "pp": "expected goals per 60 on the power play",
+        "pk": "expected goals per 60 allowed on the penalty kill"}
 RAW_COL = {"hits": "hits", "blocks": "blocks", "takeaways": "takes"}
 LABEL = {"shooting": "Shooting", "chances": "Getting to dangerous spots", "hits": "Hitting", "blocks": "Blocking shots",
          "takeaways": "Taking the puck away", "faceoffs": "Faceoffs", "offImpact": "Creating chances at 5-on-5",
@@ -370,6 +375,8 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
     order = {"pp": 0, "pk": 1}
     jobs.sort(key=lambda j: (j["verdict"] == "na", order.get(j["key"], 2), -(j.get("pct") or 0)))
     jobs = jobs[:MAX_JOBS]
+    for j in jobs:
+        j["unit"] = UNIT[j["key"]]
     return {"team_id": e["team_id"], "pos": e["pos"], "toi_sec": round(sec), "toi": clock(sec), "toi5": clock(sec5), "toi_pp": clock(T("sec_pp")), "toi_pk": clock(T("sec_pk")),
             "box": {"g": int(e["g"]), "a": int(e["a1"] + e["a2"]), "sog": int(e["sog"]), "hits": int(e["hits"]), "blocks": int(e["blocks"])},
             "jobs": jobs, "summary": summary([j["verdict"] for j in jobs if j["verdict"] != "na"]), "standouts": outs}

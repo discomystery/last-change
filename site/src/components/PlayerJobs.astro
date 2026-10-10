@@ -5,7 +5,7 @@
 import Section from './Section.astro';
 import PLink from './PLink.astro';
 
-type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string };
+type Job = { key: string; label: string; why: 'role' | 'strength'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; sog: number; hits: number; blocks: number }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null };
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
@@ -34,7 +34,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
 ---
 {d && d.players.length > 0 && (
   <Section id="jobs" title="Did they do their job?" placeholder={false}
-    takeaway="Each player’s card lists what his team relies on him for and what he does better than most, judged from the games before this one, and whether he delivered.">
+    takeaway="What each player is relied on for or better than most at, and whether he delivered.">
     <div class="jpick">
       <span>Show</span>
       <select id="jobs-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
@@ -57,13 +57,10 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
           </dl>
           <ul class="pc-jobs">
             {c.jobs.map((j) => (
-              <li class:list={['job', j.verdict]}>
-                <p class="job-h">
-                  <span class="job-v" role="img" aria-label={verdictWord[j.verdict]} title={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
-                  <span class="job-l">{j.label}</span>
-                  <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>
-                </p>
-                <p class="job-t">{j.text}</p>
+              <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
+                <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
+                <span class="job-l">{j.label} <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span><span class="job-u">{j.verdict === 'na' ? 'Too little time to judge' : j.unit}</span></span>
+                {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
               </li>
             ))}
           </ul>
@@ -82,16 +79,15 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       );
     })}
     <p class="note">
-      <strong>Did it</strong> means he reached a typical night for himself in the ice time he got; <strong>partly</strong> means he beat an average player at his position, a typical power play or penalty kill, or his own team with him off the ice; <strong>didn’t</strong> means neither.
-      A typical night is the level he reaches in about half his games, not his average, because a few big nights pull an average up.
-      Players are listed by ice time. Rates at 5-on-5 are adjusted for score and venue. Across both teams, {share('held')} jobs were done, {share('partly')} partly and {share('missed')} not.
+      <strong>✓</strong> reached a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither.
+      Point at a row for the full story. Judged only from games before this one; 5-on-5 rates adjusted for score and venue. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.
     </p>
-    <p class="note">One game is a small sample: a strong player misses a typical night about half the time. These cards say what happened in this game, not how good anyone is.</p>
+    <p class="note">One game is a small sample: even a strong player misses a typical night about half the time.</p>
 
     {d.stood_out.length > 0 && (
       <>
         <h3 class="sub">Somewhere new</h3>
-        <p class="sub-take">Players who did something they aren’t known for, far beyond their usual pace.</p>
+        <p class="sub-take">Things they aren’t known for, far beyond their usual pace.</p>
         <ul class="two news">
           {d.stood_out.map((s) => (
             <li class:list={['card', `t-${side(s.team)}`]}>
@@ -135,13 +131,16 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-box div { display: grid; gap: 0; }
   .pc-box dt { font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .pc-box dd { font: 700 17px/1.3 var(--ui); }
-  .pc-jobs { display: grid; gap: 12px; }
-  .job-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font: 600 15px var(--ui); }
-  .job-v { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font: 700 12px var(--ui); flex: none; align-self: center; }
+  .pc-jobs { display: grid; gap: 10px; }
+  .job { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; cursor: help; }
+  .job-l { font: 600 15px/1.3 var(--ui); }
+  .job-u { display: block; font: 400 12px/1.35 var(--ui); color: var(--ink-3); }
+  .job-n { display: grid; justify-items: end; font: 400 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .job-n strong { font: 700 20px/1.1 var(--ui); color: var(--ink); }
+  .job-v { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font: 700 12px var(--ui); }
   .job.held .job-v { background: var(--ink); color: var(--sheet); }
   .job.missed .job-v, .job.na .job-v { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
-  .job-why { font: 400 12px var(--ui); color: var(--ink-3); }
-  .job-t { font-size: 15px; line-height: 1.5; color: var(--ink-2); margin-top: 2px; padding-left: 30px; }
+  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; }
   .job.na .job-l { color: var(--ink-2); }
   .more-cards .hide, .more-cards[open] .show { display: none; }
   .more-cards[open] .hide { display: inline; }
