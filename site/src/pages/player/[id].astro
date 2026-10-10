@@ -115,7 +115,7 @@ const statRow = (x: any) => (isG ? null : x);
                   {role.line ? (
                     <>
                       <p>{posName} on the {lineWord[role.line.label[0]]} with {role.line.mates.map(nameLink).map((m, i) => <>{i > 0 && ' and '}{m.href ? <a class="plink" href={m.href}>{m.name}</a> : m.name}</>)}.</p>
-                      <p class="n">That {lineWord[role.line.label[0]]} has the {most(Number(role.line.label.slice(1)))} 5-on-5 time together on the team over the last {Math.min(role.team_games, 10)} games ({clock(role.line.toi_sec)} a game), so it is listed as {role.line.label}.</p>
+                      <p class="n">Listed as {role.line.label}: lines are numbered by recent 5-on-5 time together, with the latest games counting most{role.line.toi_sec != null && <> ({clock(role.line.toi_sec)} together a game when it is one of the team’s lines)</>}.</p>
                     </>
                   ) : (
                     <p>Not part of one of the team’s usual {s.group === 'D' ? 'pairs' : 'lines'} over the last {Math.min(role.team_games, 10)} games{role.gp !== undefined ? `; has played ${role.gp} of the team’s ${role.team_games} games this season` : ''}.</p>

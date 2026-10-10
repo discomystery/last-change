@@ -1,0 +1,25 @@
+---
+// A line's or pair's 5-on-5 time together per game, averaged only over the games it was one of that night's lines
+// (a "proper" line), so a coach who keeps shuffling does not make every line look like it barely plays.
+// A group that was a line for the first time in the last game is marked New and shows that game's time.
+import Marker from './Marker.astro';
+import { clock } from '../lib/format';
+interface Props { toi_sec: number | null; seconds: number; gp?: number; isNew?: boolean; games: number; pct: number | null; peers: string }
+const { toi_sec, seconds, gp, isNew, games, pct, peers } = Astro.props;
+const n = gp ?? games;
+const rank = pct === null ? '' : ` More 5-on-5 ice time together than ${pct}% of ${peers}.`;
+const tip = toi_sec === null || n === 0
+  ? `Not yet one of the team’s lines in any single game; listed because its players have played together lately (${clock(seconds)} in all).`
+  : isNew
+    ? `A new combination: a line for the first time in the last game, when it played ${clock(toi_sec)} together.${rank}`
+    : `One of the team’s lines in ${n} of the last ${games} games, averaging ${clock(toi_sec)} together in those.${rank} ${clock(seconds)} together in all.`;
+---
+<span class="unit-toi">
+  {isNew && <span class="unit-new" data-tip={tip} tabindex="0">New</span>}
+  {toi_sec === null || n === 0
+    ? <><strong>{clock(seconds)}</strong> in all</>
+    : isNew
+      ? <><strong>{clock(toi_sec)}</strong> last game</>
+      : <><strong>{clock(toi_sec)}</strong> a game{n < games && <span class="unit-gp">in {n} of {games}</span>}</>}
+  <Marker pct={pct ?? 50} tip={tip} />
+</span>

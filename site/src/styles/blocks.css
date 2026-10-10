@@ -120,6 +120,8 @@
   .unit-label { font: 700 19px/1 var(--display); }
   .unit-toi { margin-left: auto; font: 400 13px var(--ui); color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
   .unit-toi strong { font-size: 15px; color: var(--ink); }
+  .unit-gp { color: var(--ink-3); }
+  .unit-new { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); background: var(--track); border-radius: 999px; padding: 2px 7px; }
   .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   @media (min-width: 480px) { .stats { grid-template-columns: repeat(4, 1fr); } }
