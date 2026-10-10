@@ -23,9 +23,8 @@ const verdictWord = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 
 const pillWord = { huge: 'Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
 const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
 const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centres', W: 'wingers' };
-const whyTag = (j: Job) => (j.why === 'core' ? 'Every goalie' : j.why === 'role' ? 'Relied on' : 'Better than most');
+const whyTag = (j: Job) => (j.why === 'role' ? 'Relied on' : 'Better than most'); // goalies' jobs ('core') carry no tag: the In net note says every goalie has the same three
 const whyTip = (j: Job) => {
-  if (j.why === 'core') return 'Part of every goalie’s job, judged against his own earlier starts and an average goalie.';
   if (j.key === 'pp') return `He has averaged ${j.per_game} a game on the power play coming into this game.`;
   if (j.key === 'pk') return `He has averaged ${j.per_game} a game killing penalties coming into this game.`;
   if (j.why === 'role') return 'He takes plenty of faceoffs for his team.';
@@ -80,7 +79,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
         {c.jobs.map((j) => (
           <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
             <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
-            <span class="job-l">{j.label} <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span><span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
+            <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
             {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>typical {j.usual}</span></span>}
           </li>
         ))}
