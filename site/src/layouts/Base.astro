@@ -245,6 +245,8 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
   .site-nav .my-team { border: 1px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
+  /* The team pill fills in on hover (like the Preview buttons) instead of picking up the tabs' underline colour on its bottom edge. */
+  .site-nav .my-team:hover { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
   .tabbar, .more { display: none; }
   .checks a { color: inherit; }
   @media (max-width: 719px) {
