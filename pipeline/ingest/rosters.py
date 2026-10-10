@@ -5,7 +5,7 @@ on a past date (rebuilt previews, players who changed teams mid-season, call-ups
 (32 requests, about 16 seconds); a day already recorded is not fetched again, and offline runs skip it.
 
 Table: data/tables/{season}/rosters.parquet with date (Eastern), team, player_id, first, last, pos (C, L, R, D, G),
-shoots, number, birth_date.
+shoots, number, birth_date, headshot (the URL of the NHL's portrait photo; null in rows recorded before it was added).
 """
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -17,7 +17,7 @@ from pipeline.config import NHL_WEB, OFFLINE, PLAYOFFS, REGULAR, TABLES, season_
 from pipeline.ingest.client import get
 
 SCHEMA = {"date": pl.Utf8, "team": pl.Utf8, "player_id": pl.Int64, "first": pl.Utf8, "last": pl.Utf8, "pos": pl.Utf8,
-          "shoots": pl.Utf8, "number": pl.Int64, "birth_date": pl.Utf8}
+          "shoots": pl.Utf8, "number": pl.Int64, "birth_date": pl.Utf8, "headshot": pl.Utf8}
 
 
 def path(season: int):
@@ -36,7 +36,7 @@ def _rows(team: str, season: int, day: str) -> list[dict]:
         for p in data.get(group, []):
             out.append({"date": day, "team": team, "player_id": p["id"], "first": (p.get("firstName") or {}).get("default"),
                         "last": (p.get("lastName") or {}).get("default"), "pos": p.get("positionCode"), "shoots": p.get("shootsCatches"),
-                        "number": p.get("sweaterNumber"), "birth_date": p.get("birthDate")})
+                        "number": p.get("sweaterNumber"), "birth_date": p.get("birthDate"), "headshot": p.get("headshot")})
     return out
 
 
@@ -45,7 +45,7 @@ def snapshot(season: int, day: str | None = None) -> dict:
     day = day or today()
     if OFFLINE:
         return {"skipped": "offline"}
-    old = pl.read_parquet(path(season)) if path(season).exists() else pl.DataFrame(schema=SCHEMA)
+    old = _read(season) if path(season).exists() else pl.DataFrame(schema=SCHEMA)
     if day in set(old["date"].to_list()):
         return {"skipped": f"{day} already recorded"}
     games = pl.read_parquet(TABLES / str(season) / "games.parquet").filter(pl.col("game_type").is_in([REGULAR, PLAYOFFS]))
@@ -61,6 +61,20 @@ def snapshot(season: int, day: str | None = None) -> dict:
     new = pl.DataFrame(rows, schema=SCHEMA)
     pl.concat([old, new]).sort("date", "team", "player_id").write_parquet(path(season))
     return {"date": day, "players": new.height, "teams": len(teams) - len(missing), "missing": missing}
+
+
+def _read(season: int) -> pl.DataFrame:
+    """The saved table, with any column added since it was written filled with nulls."""
+    t = pl.read_parquet(path(season))
+    return t.with_columns(*[pl.lit(None, dtype=d).alias(c) for c, d in SCHEMA.items() if c not in t.columns]).select(list(SCHEMA))
+
+
+def headshots(season: int) -> dict[int, str]:
+    """Each player's portrait URL from the latest day a club listed him with one."""
+    if not path(season).exists():
+        return {}
+    t = _read(season).filter(pl.col("headshot").is_not_null()).sort("date").unique("player_id", keep="last")
+    return dict(zip(t["player_id"].to_list(), t["headshot"].to_list()))
 
 
 def team_on(season: int, player_id: int, day: str) -> str | None:
