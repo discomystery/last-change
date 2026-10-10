@@ -266,6 +266,8 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .sw-item.open .sw-name::before { content: ''; width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
   .sw-det { display: grid; gap: 10px; }
   .sw-det[hidden] { display: none; }
+  .sw-dp { order: -1; }
+  .sw-item.open .sw-foot { padding-left: 19px; }
   .sw-scs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   .sw-sc { background: var(--sheet); border-radius: 12px; padding: 14px 16px; }
   .sw-sch { display: flex; justify-content: space-between; align-items: baseline; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
@@ -298,7 +300,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
     .sw-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
     .sw-row > span:empty { display: none; }
     .sw-item.open { grid-template-columns: minmax(0, 1fr) auto 3em; column-gap: 10px; }
-    .sw-item.open .sw-foot { grid-column: 1; grid-row: 3; padding: 12px 0 4px; }
+    .sw-item.open .sw-foot { grid-column: 1; grid-row: 3; padding: 12px 0 4px 19px; }
     .sw-item.open .sw-row > :last-child { grid-column: 2; grid-row: 3; padding-top: 8px; }
     .sw-item.open .sw-n { grid-column: 3; grid-row: 3; padding-top: 8px; }
     .sw-item.open .sw-bar { grid-column: 1 / -1; grid-row: 4; margin-bottom: 14px; }
