@@ -58,7 +58,7 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
 ---
 <Base section="record" title="Track record" mock={false} description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
   <header class="team-top"><h1>Track record</h1></header>
-  <p class="takeaway lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
+  <p class="lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />
 
   <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Only calls saved before the game count. Bolder is better.">
@@ -260,8 +260,6 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
 </script>
 
 <style>
-  .lede { max-width: 46em; }
-  .eyebrow { font: 600 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
   .big { font: 700 40px / 1.1 var(--display); margin: 8px 0 12px; }
   .big span { font: 500 17px var(--ui); color: var(--ink-2); }
   .big.empty { font-size: 26px; color: var(--ink-2); }
@@ -283,7 +281,6 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
   .key span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: -8px; vertical-align: -1px; }
 
   .setpick { margin-top: 64px; }
-  .setview :global(.sec) { margin-top: 48px; }
 
   .rows { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 14px; }
   .rows li { display: grid; grid-template-columns: minmax(200px, 1.1fr) 2fr 92px; gap: 16px; align-items: center; }

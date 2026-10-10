@@ -1,6 +1,5 @@
 /* Shared by team and preview pages: fingerprint cards, line cards, matchup strips, special teams, goalies, goal sources. */
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
-  .team-top h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; }
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
   .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
@@ -11,7 +10,7 @@
   @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
   .cols .sub { margin-top: 22px; }
   .games { display: grid; gap: 8px; }
-  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 12px 16px; border-radius: 14px; }
+  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
   .g-when { grid-column: 1 / -1; font: 400 12px var(--ui); color: var(--ink-3); }
   .g-title { font-weight: 600; }
   .g-score { font: 700 16px var(--ui); white-space: nowrap; }
@@ -59,8 +58,6 @@
   .gh { margin-top: 14px; padding: 14px 16px 12px; background: var(--ice); border-radius: 12px; }
   .gh .histo { max-width: none; }
   .chart-title { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
-  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }
-  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stripcard { margin-top: 16px; }
   .strips { display: grid; gap: 8px; margin-bottom: 20px; }
   .strips:last-child { margin-bottom: 0; }
@@ -129,19 +126,16 @@
   .stats > div { display: grid; gap: 3px; justify-items: start; }
   .stats dt { font-size: 12px; color: var(--ink-2); }
   .stats dd { font-weight: 600; font-size: 15px; }
-  .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 8px; }
+  .mini-h { margin-bottom: 8px; }
   .worth { margin-top: 16px; }
   .worth ul { display: grid; gap: 8px; font: 400 15px/1.5 var(--ui); }
   .tablecard { overflow-x: auto; margin-top: 18px; }
   .lt { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
   .lt th, .lt td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-  .lt thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); white-space: normal; }
+  .lt thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); white-space: normal; }
   .lt th:first-child { text-align: left; }
   .lt tbody th { font-weight: 600; }
   .lt tr.gap > * { border-top: 3px solid var(--line-red); }
   .lt tbody tr:last-child > * { border-bottom: 0; }
   .todo { margin-top: 16px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 
-  /* A team name that opens the team's page, in the surrounding text style. */
-  .tlink { color: inherit; text-decoration: none; }
-  .tlink:hover { text-decoration: underline; text-underline-offset: 4px; }
