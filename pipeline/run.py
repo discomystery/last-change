@@ -48,6 +48,7 @@ def update(season: int) -> dict:
     out["build"] = games.build_season(season)
     if season == CURRENT_SEASON:
         out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
+        out["availability"] = availability_update(season)
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
@@ -58,6 +59,22 @@ def update(season: int) -> dict:
     player_game.build(season)
     out["edge"] = edge.update(season)  # tracking numbers for players who played since the last fetch
     out["export"] = site_json.run(season)
+    return out
+
+
+def availability_update(season: int) -> dict:
+    """Game-day rosters and scratches, NHL.com injury news, then who was available to each club each day. Last
+    season's game rosters and reports are filled in once, so absences can be studied over a full season."""
+    from pipeline.ingest import game_rosters, status_report
+    from pipeline.metrics import availability
+
+    out = {}
+    for s in (season - 1, season):
+        if s == season or not game_rosters.path(s).exists():
+            out[f"game_rosters_{s}"] = game_rosters.update(s)
+        if s == season or not status_report.path(s).exists():
+            out[f"status_{s}"] = status_report.update(s)
+    out["table"] = availability.build(season)
     return out
 
 
@@ -102,6 +119,11 @@ def publish(season: int) -> dict:
     units.game_units(season)
     units.depth_table(season)
     player_game.build(season)
+    if season == CURRENT_SEASON:
+        from pipeline.ingest import status_report
+        from pipeline.metrics import availability
+        status_report.build(season)  # re-read the saved reports with the current rules
+        out["availability"] = availability.build(season)
     out["export"] = site_json.run(season)
     return out
 
