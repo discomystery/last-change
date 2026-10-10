@@ -1,23 +1,22 @@
 ---
 // The full roster: who is out first (with NHL.com's status where it gave one), then everyone by position.
-// variant "fold": a one-line "who's out" under Key players, the roster behind a fold.
-// variant "section": its own section, out cards on top and the roster always open.
+// Sits under Key players: a one-line "who's out", the roster behind a fold. Each reason opens its details on hover/tap.
 import PLink from './PLink.astro';
 import { roster, asOf, day } from '../lib/roster';
 import { clock } from '../lib/format';
 
-interface Props { abbr: string; place: string; nick: string; variant?: 'fold' | 'section' }
-const { abbr, place, nick, variant = 'fold' } = Astro.props;
-const { rows, gone, moves } = roster(abbr);
+interface Props { abbr: string }
+const { abbr } = Astro.props;
+const { rows, gone } = roster(abbr);
 const out = rows.filter((r) => r.out);
 const groups = [['F', 'Forwards'], ['D', 'Defense'], ['G', 'Goalies']] as const;
 const posWord: Record<string, string> = { C: 'C', L: 'LW', R: 'RW', D: 'D', G: 'G' };
-const outLine = out.filter((r) => r.status !== 'not_listed');
+// Players off the NHL roster are often just in the minors; list them only if they were key here last season.
+const outLine = out.filter((r) => r.status !== 'not_listed' || r.key);
 ---
-{variant === 'fold' && (
-  <div class="ro-fold">
+<div class="ro-fold">
     {outLine.length > 0
-      ? <p class="ro-out"><span class="ro-lab">Out</span>{outLine.map((r, i) => <><span class="ro-o" tabindex="0" data-tip={r.tip}>{r.page ? <PLink id={r.id} name={r.name} /> : r.name} <em>{r.tag.toLowerCase()}</em></span>{i < outLine.length - 1 && <span class="ro-sep">·</span>}</>)}</p>
+      ? <p class="ro-out"><span class="ro-lab">Out</span>{outLine.map((r, i) => <><span class="ro-o">{r.page ? <PLink id={r.id} name={r.name} /> : r.name} <em tabindex="0" data-tip={r.tip}>{r.tag[0].toLowerCase() + r.tag.slice(1)}</em></span>{i < outLine.length - 1 && <span class="ro-sep">·</span>}</>)}</p>
       : <p class="ro-out"><span class="ro-lab">Out</span><span class="n">Nobody reported out.</span></p>}
     <details class="fold">
       <summary><span class="closed">Show the full roster · {rows.length} players</span><span class="opened">Hide the full roster</span></summary>
@@ -40,56 +39,13 @@ const outLine = out.filter((r) => r.status !== 'not_listed');
       {gone.length > 0 && <p class="note">Regulars here last season whom no NHL club lists now: {gone.map((r) => r.name).join(', ')}.</p>}
       <p class="note">As of {day(asOf)}. Injury details come from the NHL.com Status Report when it names a player; otherwise we only say what the rosters show.</p>
     </details>
-  </div>
-)}
-
-{variant === 'section' && (
-  <div class="ro-sec">
-    {out.length > 0 && (
-      <>
-        <h3 class="sub">Out right now</h3>
-        <ul class="ro-cards">
-          {out.map((r) => (
-            <li class="card ro-card">
-              <p class="ro-cn">{r.page ? <PLink id={r.id} name={r.name} /> : r.name}<span class="ro-pos">{posWord[r.pos ?? ''] ?? ''}</span></p>
-              <p class="ro-pill">{r.tag}</p>
-              <p class="ro-why">{r.report?.injury ? `${r.report.injury[0].toUpperCase()}${r.report.injury.slice(1)}` : r.status === 'scratched' ? 'No injury reported' : r.status === 'not_listed' ? 'Likely in the minors' : 'No reason given'}</p>
-              <p class="ro-meta">{r.missed > 0 ? `Missed ${r.missed} game${r.missed === 1 ? '' : 's'}` : 'Missed tonight'}{r.report && <> · <a href={r.report.url} rel="noopener">NHL.com, {day(r.report.date)}</a></>}</p>
-            </li>
-          ))}
-        </ul>
-      </>
-    )}
-    <h3 class="sub">Everyone</h3>
-    <table class="ro-table">
-      <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Season</th><th>TOI</th><th>Status</th></tr></thead>
-      {groups.map(([g, label]) => (
-        <tbody>
-          <tr class="ro-g"><th colspan="6">{label}</th></tr>
-          {rows.filter((r) => r.group === g).map((r) => (
-            <tr class={r.out ? 'is-out' : ''}>
-              <td class="ro-num">{r.number ?? ''}</td>
-              <td>{r.page ? <PLink id={r.id} name={r.name} /> : r.name}</td>
-              <td>{posWord[r.pos ?? ''] ?? ''}</td>
-              <td class="ro-stat">{r.line}</td>
-              <td class="ro-stat">{r.toi !== null ? clock(r.toi) : ''}</td>
-              <td>{r.tag && <span class="ro-tag" tabindex="0" data-tip={r.tip}>{r.tag}</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      ))}
-    </table>
-    {moves.length > 0 && <p class="note">Roster moves in the last 30 days: {moves.map((m) => `${m.name} (${m.from ? `from ${m.from}` : 'joined'}${m.to && m.to !== abbr ? ` to ${m.to}` : ''}, ${day(m.date)})`).join('; ')}.</p>}
-    {gone.length > 0 && <p class="note">Regulars here last season whom no NHL club lists now: {gone.map((r) => r.name).join(', ')}.</p>}
-    <p class="note">As of {day(asOf)}. Injury details come from the NHL.com Status Report when it names a player; otherwise we only say what the rosters show.</p>
-  </div>
-)}
+</div>
 
 <style>
   .ro-out { font: 400 15px/1.7 var(--ui); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 18px; }
   .ro-lab { font: 700 11px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
-  .ro-o { cursor: help; white-space: nowrap; }
-  .ro-o em { font-style: normal; color: var(--ink-3); font-size: 13px; }
+  .ro-o { white-space: nowrap; }
+  .ro-o em { font-style: normal; color: var(--ink-3); font-size: 13px; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
   .ro-sep { color: var(--ink-3); }
   .ro-cols { display: grid; gap: 8px 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; }
   .ro-list { list-style: none; padding: 0; margin: 0; font: 400 14px var(--ui); }
@@ -98,16 +54,5 @@ const outLine = out.filter((r) => r.status !== 'not_listed');
   .ro-pos { margin-left: 6px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
   .ro-stat { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ro-tag { font: 600 11px var(--ui); padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--ink); white-space: nowrap; cursor: help; }
-  .is-out .ro-name, tr.is-out td:nth-child(2) { color: var(--ink-2); }
-  .ro-cards { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
-  .ro-card { display: flex; flex-direction: column; gap: 4px; }
-  .ro-cn { font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
-  .ro-pill { font: 700 12px var(--ui); letter-spacing: 0.02em; }
-  .ro-why { font: 400 13px var(--ui); color: var(--ink-2); }
-  .ro-meta { font: 400 12px var(--ui); color: var(--ink-3); }
-  .ro-table { width: 100%; border-collapse: collapse; font: 400 14px var(--ui); }
-  .ro-table th, .ro-table td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--rule); }
-  .ro-table thead th { font: 700 11px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
-  .ro-g th { font: 700 11px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); padding-top: 16px; }
-  @media (max-width: 560px) { .ro-table thead th:nth-child(5), .ro-table td:nth-child(5), .ro-table thead th:nth-child(3), .ro-table td:nth-child(3) { display: none; } }
+  .is-out .ro-name { color: var(--ink-2); }
 </style>

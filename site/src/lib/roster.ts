@@ -6,7 +6,7 @@ const files = import.meta.glob('../../public/data/players/*.json', { eager: true
 const byId = new Map<number, any>(Object.values(files).filter((p: any) => p?.id).map((p: any) => [p.id, p]));
 
 export type Report = { status: string; injury: string | null; timeline: string | null; date: string; url: string };
-export type RosterPlayer = { id: number; name: string; pos: string | null; number: number | null; status: string; missed: number; last: string | null; report: Report | null };
+export type RosterPlayer = { id: number; name: string; pos: string | null; number: number | null; key?: boolean; status: string; missed: number; last: string | null; report: Report | null };
 export type Row = RosterPlayer & { group: 'F' | 'D' | 'G'; out: boolean; tag: string; tip: string; line: string; toi: number | null; page: boolean };
 
 export const asOf: string = (data as any).date;
@@ -23,12 +23,13 @@ const games = (n: number) => `${n} game${n === 1 ? '' : 's'}`;
 /** The short tag and its tooltip for one player's status. */
 export function describe(p: RosterPlayer): { tag: string; tip: string; out: boolean } {
   const r = p.report;
-  const missed = p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '';
+  const missed = (p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '') + (p.last ? ` Last played ${day(p.last)}.` : p.status !== 'no_club' ? ' Has not played this season.' : '');
   const said = r ? ` NHL.com Status Report, ${day(r.date)}.` : '';
   switch (p.status) {
     case 'injured': {
       const tag = r?.status === 'long' && r.timeline ? cap(r.timeline) : REPORT_TAG[r?.status ?? 'out'];
-      return { tag, out: true, tip: `${tag}${r?.injury ? `, ${r.injury}` : ''}.${missed}${said}` };
+      const t = r?.timeline && !tag.toLowerCase().includes(r.timeline) ? `, ${r.timeline}` : '';
+      return { tag, out: true, tip: `${tag}${r?.injury ? `: ${r.injury}` : ''}${t}.${missed}${said}` };
     }
     case 'suspended': return { tag: 'Suspended', out: true, tip: `Suspended.${missed}${said}` };
     case 'personal': return { tag: 'Personal leave', out: true, tip: `Away for personal or family reasons.${missed}${said}` };
