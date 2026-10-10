@@ -9,6 +9,7 @@ const base = import.meta.env.BASE_URL;
   <div class="pick" id="games-pick" data-base={base}>
     <span>Show</span>
     <select id="games-scope" aria-label="Which games"><option value="all">every game</option></select>
+    <span class="pick-pair"><span>in</span><select id="games-month" aria-label="Which month"></select></span>
   </div>
   <div id="day-view">
     <div class="strip-wrap">
@@ -77,9 +78,29 @@ const base = import.meta.env.BASE_URL;
       history.replaceState(null, '', '#' + d);
       strip.querySelectorAll('.day').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.date === d)));
       strip.querySelector(`[data-date="${d}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+      monthPick.value = d.slice(0, 7);
       document.getElementById('day-h').textContent = (d === today ? 'Today, ' : '') + dayLong.format(asDate(d));
       document.getElementById('day-games').replaceChildren(...games.filter((g) => g.date === d).map((g) => card(g)));
     };
+    // Fade whichever end of the strip has more days hidden past it, so the last visible day isn't sliced in half.
+    const edges = () => {
+      const max = strip.scrollWidth - strip.clientWidth;
+      strip.classList.toggle('more-l', strip.scrollLeft > 2);
+      strip.classList.toggle('more-r', strip.scrollLeft < max - 2);
+    };
+    strip.addEventListener('scroll', edges, { passive: true });
+    window.addEventListener('resize', edges);
+
+    // Month menu: jumps to the first day with games that month (today, if it falls in the month picked).
+    const monthPick = document.getElementById('games-month');
+    const monthName = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    [...new Set(dates.map((d) => d.slice(0, 7)))].forEach((m) => { const o = el('option', null, monthName.format(asDate(m + '-15'))); o.value = m; monthPick.append(o); });
+    monthPick.addEventListener('change', () => {
+      const m = monthPick.value;
+      if (scope.value !== 'all') { document.getElementById('m-' + m)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+      showDay(current.startsWith(m) ? current : (today.startsWith(m) && dates.find((d) => d >= today && d.startsWith(m))) || dates.find((d) => d.startsWith(m)));
+    });
+
     const step = (k) => { const i = dates.indexOf(current) + k; if (i >= 0 && i < dates.length) showDay(dates[i]); };
     document.getElementById('prev-day').addEventListener('click', () => step(-1));
     document.getElementById('next-day').addEventListener('click', () => step(1));
@@ -93,7 +114,7 @@ const base = import.meta.env.BASE_URL;
       let cur = null, list = null;
       games.filter((g) => g.home === me || g.away === me).forEach((g) => {
         const m = month.format(asDate(g.date));
-        if (m !== cur) { cur = m; box.append(el('h2', 'day-h', m)); list = el('ul', 'glist'); box.append(list); }
+        if (m !== cur) { cur = m; const h = el('h2', 'day-h', m); h.id = 'm-' + g.date.slice(0, 7); box.append(h); list = el('ul', 'glist'); box.append(list); }
         const c = card(g, me);
         if (!g.final && !box.querySelector('.next')) c.classList.add('next');
         list.append(c);
@@ -105,6 +126,7 @@ const base = import.meta.env.BASE_URL;
       document.getElementById('day-view').hidden = mine;
       document.getElementById('team-view').hidden = !mine;
       if (mine) showTeam(scope.value); else showDay(current);
+      edges();
     };
     const mine = window.lcPrefs?.get('team');
     if (mine && T[mine]) { const o = el('option', null, `${T[mine].place}’s games`); o.value = mine; scope.append(o); }
@@ -116,8 +138,12 @@ const base = import.meta.env.BASE_URL;
 <style is:global>
   /* Global: most of this page is built in the browser, which scoped styles don't reach. */
   .strip-wrap { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; margin-top: 16px; }
-  .days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
-  .step { font: 600 22px/1 var(--ui); width: 34px; height: 54px; border-radius: 10px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); cursor: pointer; }
+  .days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; --fl: 0px; --fr: 0px; -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); }
+  .days::-webkit-scrollbar { display: none; }
+  .days.more-l { --fl: 64px; }
+  .days.more-r { --fr: 64px; }
+  .pick-pair { display: inline-flex; align-items: center; gap: 10px; }
+  .step { font: 600 22px/1 var(--ui); width: 34px; align-self: stretch; margin-block: 2px; border-radius: 10px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); cursor: pointer; }
   .day { display: grid; justify-items: center; gap: 1px; min-width: 76px; padding: 7px 8px; border-radius: 12px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); cursor: pointer; font-family: var(--ui); }
   .day .d1 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .day .d2 { font-size: 15px; font-weight: 700; }
@@ -125,7 +151,7 @@ const base = import.meta.env.BASE_URL;
   .day.today { border-color: var(--ink-3); }
   .day[aria-pressed='true'] { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
   .day[aria-pressed='true'] span { color: var(--sheet); }
-  .day-h { font: 600 23px/1.15 var(--display); margin: 26px 0 10px; }
+  .day-h { font: 600 23px/1.15 var(--display); margin: 26px 0 10px; scroll-margin-top: 80px; }
   .glist { display: grid; gap: 8px; }
   @media (min-width: 820px) { .glist { grid-template-columns: 1fr 1fr; } }
   .gcard { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; }
