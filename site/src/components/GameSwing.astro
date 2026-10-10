@@ -13,6 +13,23 @@ const { gameId, place, side } = Astro.props;
 
 const files = import.meta.glob<{ default: Scores }>('../../public/data/scores/2*.json', { eager: true });
 const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+// The report card's verdict sits beside the pucks, in the same pill as "Did they do their job?" below.
+type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
+const jobFiles = import.meta.glob<{ default: { game_id: number; players: { id: number; pill: Pill }[] } }>('../../public/data/jobs/2*.json', { eager: true });
+const pills = new Map(Object.values(jobFiles).find((f) => f.default.game_id === gameId)?.default.players.map((c) => [c.id, c.pill]) ?? []);
+const pillWord = { huge: 'Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
+const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
+// The parts of a skater's number, each drawn as its own piece of the bar in a lighter shade of his team's colour.
+const PARTS = [
+  { key: 'sheet', label: 'Scoresheet', mix: 100 },
+  { key: 'play', label: '5-on-5', mix: 72 },
+  { key: 'special', label: 'Special teams', mix: 46 },
+  { key: 'usage', label: 'Company kept', mix: 26 },
+] as const;
+type Piece = { key: string; label: string; mix: number; v: number };
+const pieces = (r: Row): Piece[] => (r.pos === 'G'
+  ? [{ key: 'net', label: 'Goals saved above expected', mix: 100, v: r.score }]
+  : PARTS.map((p) => ({ ...p, v: r.parts[p.key] ?? 0 })));
 const order = d ? [d.away, d.home] : [];
 const one = (v: number) => (Math.round(v * 10) === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
 const two = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
@@ -25,12 +42,24 @@ const tip = (r: Row) => {
   const p = r.parts;
   return `Scoresheet ${two(p.sheet ?? 0)}. At 5-on-5 ${two(p.play ?? 0)}. Special teams ${two(p.special ?? 0)}. Company kept ${two(p.usage ?? 0)}.${where}`;
 };
-// One scale for the whole game so bars compare across both teams. A goalie's night can be far bigger either way;
-// his bar stops at the edge rather than shrinking everyone else's.
-const sk = d ? d.players.filter((r) => r.pos !== 'G').map((r) => r.score) : [];
-const lo = Math.min(-0.5, ...sk), hi = Math.max(0.5, ...sk);
+// One scale for the whole game so bars compare across both teams. Gains stack right of zero and losses left, so the
+// scale runs from the biggest stack of losses to the biggest stack of gains. A goalie's night can be far bigger either
+// way; his bar stops at the edge rather than shrinking everyone else's.
+const sk = d ? d.players.filter((r) => r.pos !== 'G').map(pieces) : [];
+const sum = (ps: Piece[], sign: number) => ps.reduce((a, p) => a + (Math.sign(p.v) === sign ? p.v : 0), 0);
+const lo = Math.min(-0.5, ...sk.map((ps) => sum(ps, -1))), hi = Math.max(0.5, ...sk.map((ps) => sum(ps, 1)));
 const at = (v: number) => Math.max(0, Math.min(100, (100 * (v - lo)) / (hi - lo)));
 const zero = at(0);
+// Lay the pieces out from zero outwards: gains to the right in part order, losses to the left.
+const layout = (r: Row) => {
+  let up = 0, down = 0;
+  return pieces(r).filter((p) => Math.abs(p.v) >= 0.005).map((p) => {
+    const from = p.v > 0 ? up : down + p.v;
+    if (p.v > 0) up += p.v; else down += p.v;
+    const l = at(from), w = at(from + Math.abs(p.v)) - l;
+    return { ...p, l, w };
+  }).filter((p) => p.w > 0.05);
+};
 const byId = new Map(d?.players.map((r) => [r.id, r]) ?? []);
 const units = (t: string) => (d?.units?.[t] ?? []).map((u) => ({ ...u, key: `${u.kind === 'F' ? 'L' : 'P'}${u.n}` }));
 const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
@@ -59,23 +88,26 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
       return (
         <div class={`sw-team card t-${side(t)}`} data-team={t}>
           {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
+          <p class="sw-key" aria-hidden="true">{PARTS.map((p) => <span><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}<span><i class="tick"></i>Net</span></p>
           <ol class="sw-rows">
             {mine.map((r) => (
               <li class="sw-row" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} tabindex="0" data-tip={tip(r)}>
                 <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag">{of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}</span></span>
                 <span class="sw-bar" aria-hidden="true">
                   <span class="sw-zero" style={`left:${zero.toFixed(1)}%`}></span>
-                  <span class:list={['sw-fill', { neg: r.score < 0 }]} style={`left:${Math.min(at(r.score), zero).toFixed(1)}%;width:${Math.abs(at(r.score) - zero).toFixed(1)}%`}></span>
+                  {layout(r).map((p) => <span class:list={['sw-piece', { neg: p.v < 0 }]} data-part={p.key} style={`left:${p.l.toFixed(1)}%;width:${p.w.toFixed(1)}%;--mix:${p.mix}%`}></span>)}
+                  <span class="sw-net" style={`left:${at(r.score).toFixed(1)}%`}></span>
                 </span>
                 <strong class="sw-n">{one(r.score)}</strong>
                 {r.pct != null ? <Pips pct={r.pct} tip={tip(r)} /> : <span></span>}
+                {pills.get(r.id) ? <span class={`sw-pill ${pillClass[pills.get(r.id)!]}`}>{pills.get(r.id) === 'huge' && '★ '}{pillWord[pills.get(r.id)!]}</span> : <span></span>}
               </li>
             ))}
           </ol>
         </div>
       );
     })}
-    <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The pucks compare it with every night last season at his position. Lines and pairs are tonight’s, numbered by 5-on-5 time together. Tap a player for the parts.</p>
+    <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The pucks compare it with every night last season at his position. Lines and pairs are tonight’s, numbered by 5-on-5 time together. Each bar is split into its parts: gains run right from the line, losses left, and the small tick marks where they net out. The label at the end is his report card from “Did they do their job?” below. Tap a player for the numbers.</p>
     <details class="fold how sw-how">
       <summary><span class="show">How Swing is worked out</span><span class="hide">Hide how Swing is worked out</span></summary>
       <div class="how-body">
@@ -130,24 +162,36 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 600 20px var(--display); }
   .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
-  .sw-team { margin-top: 18px; max-width: 760px; }
+  .sw-team { margin-top: 18px; }
+  .sw-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 600 12px var(--ui); color: var(--ink-2); margin-bottom: 10px; }
+  .sw-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw-key i { width: 14px; height: 10px; border-radius: 2px; background: color-mix(in oklab, var(--team) var(--mix), var(--sheet)); }
+  .sw-key i.tick { width: 2px; height: 14px; border-radius: 0; background: var(--ink); }
   .sw-unit { font: 400 14px var(--ui); color: var(--ink-2); margin-bottom: 8px; }
   .sw-unit strong { font: 700 17px var(--display); color: var(--ink); margin-right: 4px; }
   .sw-rows { display: grid; gap: 1px; }
-  .sw-row { display: grid; grid-template-columns: minmax(0, 12em) 1fr 3.2em auto; align-items: center; gap: 14px; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; cursor: help; transition: opacity 0.2s; }
+  .sw-row { display: grid; grid-template-columns: minmax(0, 13em) 1fr 3.2em auto 7.5em; align-items: center; gap: 14px; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; cursor: help; transition: opacity 0.2s; }
   .sw-row:hover, .sw-row:focus-visible { background: var(--track); }
   .lit .sw-row:not(.on) { opacity: 0.28; }
   .sw-name { display: flex; align-items: baseline; gap: 8px; font: 600 15px/1.3 var(--ui); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sw-tag { font: 600 11px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); cursor: pointer; }
   .sw-bar { position: relative; height: 16px; }
   .sw-zero { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); }
-  .sw-fill { position: absolute; top: 0; bottom: 0; background: var(--team); border-radius: 0 4px 4px 0; }
-  .sw-fill.neg { border-radius: 4px 0 0 4px; opacity: 0.55; }
+  .sw-piece { position: absolute; top: 0; bottom: 0; background: color-mix(in oklab, var(--team) var(--mix), var(--sheet)); border-radius: 3px; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--team) 35%, transparent); background-clip: padding-box; border: 1px solid transparent; }
+  .sw-piece.neg { background-image: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in oklab, var(--sheet) 55%, transparent) 3px 5px); }
+  .sw-net { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+  .sw-pill { justify-self: start; font: 700 11px var(--ui); padding: 2px 8px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+  .sw-pill.did { background: var(--ink); color: var(--sheet); }
+  .sw-pill.rough { background: var(--ink-3); border-color: var(--ink-3); color: var(--sheet); }
+  .sw-pill.huge { background: var(--team); border-color: var(--team); color: var(--sheet); }
+  .sw-pill.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
   .sw-n { font: 700 16px var(--ui); text-align: right; }
   @media (max-width: 600px) {
-    .sw-row { grid-template-columns: minmax(0, 1fr) 3em; gap: 2px 10px; padding: 6px 8px; }
+    .sw-row { grid-template-columns: minmax(0, 1fr) auto 3em; gap: 4px 10px; padding: 6px 8px; }
+    .sw-n { grid-column: 3; grid-row: 1; }
+    .sw-pill { grid-column: 2; grid-row: 1; justify-self: end; }
     .sw-bar { grid-column: 1 / -1; grid-row: 2; height: 10px; }
-    .sw-row :global(.pips) { display: none; }
+    .sw-row :global(.pips), .sw-row > span:empty { display: none; }
   }
   .sw-how { margin-top: 16px; }
   .how-body { display: grid; gap: 8px; padding-top: 12px; }
