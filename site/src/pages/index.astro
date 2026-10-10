@@ -37,7 +37,8 @@ const base = import.meta.env.BASE_URL;
   (async () => {
     const root = document.getElementById('home');
     const base = root.dataset.base;
-    const [teams, sched, pv] = await Promise.all(['teams', 'schedule', 'previews/index'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
+    const [teams, sched, pv, rc] = await Promise.all(['teams', 'schedule', 'previews/index', 'recaps/index'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
+    const RECAPS = new Set(rc.games.map((g) => g.id));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -55,7 +56,9 @@ const base = import.meta.env.BASE_URL;
         const mine = me ? (g.home === me ? [g.hs, g.as] : [g.as, g.hs]) : [g.as, g.hs];
         const extra = g.end && g.end !== 'REG' ? ` (${g.end})` : '';
         const res = me ? (mine[0] > mine[1] ? 'W ' : 'L ') : '';
-        li.append(el('span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`));
+        const sc = el(RECAPS.has(g.id) ? 'a' : 'span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`);
+        if (RECAPS.has(g.id)) { sc.href = `${base}recap/${g.id}/`; sc.title = 'How the game went, and how the preview held up'; }
+        li.append(sc);
       } else if (PREVIEWS[g.id]) {
         const a = el('a', 'g-link', PREVIEWS[g.id]);
         a.href = `${base}preview/${g.id}/`;
