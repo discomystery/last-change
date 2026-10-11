@@ -1,7 +1,7 @@
 ---
-// The post-game reveal of our hidden pre-game win chance, told as a scroll story: the gauge and one line of text stay
-// still on screen while scrolling fades each step's note in and out in place, and each step moves the needle by what
-// that input was worth. "Show every step at once" swaps
+// The post-game reveal of our hidden pre-game win chance, told as a short story in one compact card: when the card comes
+// into view it plays through the steps by itself, fading each step's note in and out in place while the needle moves
+// by what that input was worth. Dots jump to a step, and the card replays on request. "Show every step at once" swaps
 // the story for the full list with the longer explanations (also what shows without scripts or with reduced motion).
 export type Beat = { key: string; label: string; short: string; long?: string; pts: number; before: number; end: number; sum?: boolean };
 interface Props { team: string; teamCls: string; other: string; otherCls: string; chance: number; outcome: string; beats: Beat[] }
@@ -17,28 +17,28 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
     <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
   </div>
 
-  <div class="cs-story" hidden style={`--n:${beats.length}`}>
-    <div class="cs-stage">
-      <div class="cs-gauge">
-        <p class="cs-num"><span class="cs-val">50</span>%<small>for {team} to win</small></p>
-        <div class={`cs-track ${otherCls}`}>
-          <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
-          <i class="cs-mid"></i>
-          <i class="cs-ghost" style="left:50%"></i>
-          <i class="cs-needle" style="left:50%"></i>
-        </div>
-        <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
+  <div class="cs-story card" hidden>
+    <div class="cs-gauge">
+      <p class="cs-num"><span class="cs-val">50</span>%<small>for {team} to win</small></p>
+      <div class={`cs-track ${otherCls}`}>
+        <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
+        <i class="cs-mid"></i>
+        <i class="cs-ghost" style="left:50%"></i>
+        <i class="cs-needle" style="left:50%"></i>
       </div>
-      <ol class="cs-texts">
-        {beats.map((b, i) => (
-          <li class="cs-text" data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts} style={i ? 'opacity:0' : ''} aria-hidden={i ? 'true' : 'false'}>
-            <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts">{signed(b.pts)}</span>}</p>
-            <p class="cs-line">{b.short}</p>
-            {i === beats.length - 1 && <p class="cs-out">{outcome}</p>}
-          </li>
-        ))}
-      </ol>
-      <div class="cs-foot"><ol class="cs-pips" aria-hidden="true">{beats.map(() => <li></li>)}</ol><button type="button" class="cs-skip">Skip to every step</button></div>
+      <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
+    </div>
+    <ol class="cs-texts" aria-live="polite">
+      {beats.map((b, i) => (
+        <li class:list={['cs-text', { on: i === 0 }]} data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts}>
+          <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts">{signed(b.pts)}</span>}</p>
+          <p class="cs-line">{b.short}{i === beats.length - 1 && <> <span class="cs-out">{outcome}</span></>}</p>
+        </li>
+      ))}
+    </ol>
+    <div class="cs-foot">
+      <button type="button" class="cs-play" aria-label="Replay"><span class="i-pause" aria-hidden="true">❚❚</span><span class="i-play" aria-hidden="true">▶</span><span class="i-again" aria-hidden="true">↻</span></button>
+      <ol class="cs-pips">{beats.map((b, i) => <li><button type="button" data-i={i} aria-label={b.label}></button></li>)}</ol>
     </div>
   </div>
 
@@ -65,13 +65,13 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
 <script is:inline>
   (() => {
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const STEP = 2600;  // how long each note stays up while playing
     document.querySelectorAll('.cs:not([data-ready])').forEach((cs) => {
       cs.dataset.ready = '1';
       const story = cs.querySelector('.cs-story'), list = cs.querySelector('.cs-list'), btn = cs.querySelector('.cs-toggle');
-      const stage = cs.querySelector('.cs-stage'), val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill');
-      const needle = cs.querySelector('.cs-needle'), ghost = cs.querySelector('.cs-ghost');
-      const texts = [...cs.querySelectorAll('.cs-text')], pips = [...cs.querySelectorAll('.cs-pips li')], n = texts.length;
-      let shown = 50, raf = 0, current = -1, ticking = false;
+      const val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill'), needle = cs.querySelector('.cs-needle'), ghost = cs.querySelector('.cs-ghost');
+      const texts = [...cs.querySelectorAll('.cs-text')], pips = [...cs.querySelectorAll('.cs-pips button')], play = cs.querySelector('.cs-play'), n = texts.length;
+      let shown = 50, raf = 0, current = 0, timer = 0, state = 'idle';  // idle (not started), playing, paused, done
       const tween = (to) => {
         cancelAnimationFrame(raf);
         const from = shown, t0 = performance.now(), dur = 650;
@@ -83,49 +83,39 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
         };
         raf = requestAnimationFrame(step);
       };
-      // The needle moves once per step, when that step's note takes over.
       const setStep = (i) => {
-        if (i === current) return;
         current = i;
         const t = texts[i], end = +t.dataset.end, before = +t.dataset.before, pts = +t.dataset.pts;
         fill.style.width = `${end}%`;
         needle.style.left = `${end}%`;
         ghost.style.left = `${before}%`;
         ghost.classList.toggle('seen', pts !== 0);
-        pips.forEach((p, j) => p.classList.toggle('on', j <= i));
-        texts.forEach((x, j) => x.setAttribute('aria-hidden', j === i ? 'false' : 'true'));
+        texts.forEach((x, j) => x.classList.toggle('on', j === i));
+        pips.forEach((p, j) => { p.classList.toggle('on', j <= i); p.setAttribute('aria-current', j === i ? 'step' : 'false'); });
         tween(end);
       };
-      // Each step owns an equal slice of the scroll. Inside its slice a note fades and drifts in, holds, then fades and
-      // drifts out as the next one arrives (the first starts shown, the last stays).
-      const frame = () => {
-        ticking = false;
-        if (story.hidden) return;
-        // Progress runs from the moment the stage pins (story top reaches the stage's sticky top) to when it unpins.
-        const r = story.getBoundingClientRect(), run = r.height - stage.offsetHeight, pin = parseFloat(getComputedStyle(stage).top) || 0;
-        const p = Math.max(0, Math.min(1, (pin - r.top) / Math.max(1, run)));
-        const f = p * n, i = Math.min(n - 1, Math.floor(f)), local = f - i;
-        texts.forEach((t, j) => {
-          let o = 0, y = 0;
-          if (j === i) {
-            const fadeIn = j === 0 ? 1 : Math.min(1, local / 0.22);
-            const fadeOut = j === n - 1 ? 1 : Math.min(1, (1 - local) / 0.22);
-            o = Math.min(fadeIn, fadeOut);
-            y = j > 0 && local < 0.22 ? (1 - fadeIn) * 18 : j < n - 1 && local > 0.78 ? -(1 - fadeOut) * 18 : 0;
-          }
-          t.style.opacity = o.toFixed(3);
-          t.style.transform = `translateY(${y.toFixed(1)}px)`;
-        });
-        setStep(i);
+      const setState = (s) => { state = s; cs.dataset.state = s; play.setAttribute('aria-label', s === 'playing' ? 'Pause' : s === 'done' ? 'Play again' : 'Play'); };
+      const tick = () => {
+        if (current >= n - 1) { setState('done'); return; }
+        setStep(current + 1);
+        timer = setTimeout(tick, STEP);
       };
-      const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
-      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); if (asStory) frame(); };
+      const start = (from) => { clearTimeout(timer); setState('playing'); setStep(from); timer = setTimeout(tick, from === 0 ? 1400 : STEP); };
+      const pause = () => { clearTimeout(timer); setState('paused'); };
+      play.addEventListener('click', () => (state === 'playing' ? pause() : start(state === 'done' ? 0 : current)));
+      pips.forEach((p) => p.addEventListener('click', () => { pause(); setStep(+p.dataset.i); if (+p.dataset.i === n - 1) setState('done'); }));
+      // Plays once, the first time most of the card is on screen; pauses if it scrolls away mid-way.
+      const io = new IntersectionObserver((es) => es.forEach((e) => {
+        if (e.isIntersecting && state === 'idle') start(0);
+        else if (!e.isIntersecting && state === 'playing') pause();
+      }), { threshold: 0.6 });
+      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); };
       btn.hidden = false;
       btn.addEventListener('click', () => mode(story.hidden));
-      cs.querySelector('.cs-skip').addEventListener('click', () => { mode(false); cs.scrollIntoView({ block: 'start' }); scrollBy(0, -90); });
-      addEventListener('scroll', onScroll, { passive: true });
-      addEventListener('resize', onScroll);
+      setState('idle');
+      setStep(0);
       mode(!reduce);
+      io.observe(story);
     });
   })();
 </script>
@@ -135,16 +125,12 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
   .cs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
   .cs-toggle { font: 500 13px var(--ui); color: var(--ink-2); background: var(--track); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   .cs-toggle:hover { color: var(--ink); background: var(--rule); }
-  .cs .to-story, .cs.as-story .to-list { display: none; }
-  .cs.as-story .to-story { display: inline; }
+  .cs .to-list, .cs.as-story .to-story { display: none; }
+  .cs.as-story .to-list { display: inline; }
 
-  /* The story: one still frame (gauge, then the current note) pinned while the page scrolls under it. Each step gets
-     a slice of scroll; the container is tall enough to give every step one. */
-  .cs-story { position: relative; margin: 10px auto 0; max-width: 760px; height: calc(var(--n) * 48vh + 100vh); }
-  .cs-stage { position: sticky; top: calc(var(--bar-h, 34px) + 12px); height: calc(100vh - var(--bar-h, 34px) - 24px);
-    display: flex; flex-direction: column; }
-  .cs-gauge { background: var(--sheet); border-radius: 18px; padding: 18px 22px 16px; box-shadow: 0 0 0 1px var(--rule); }
-  .cs-num { display: flex; align-items: baseline; gap: 2px; margin: 0 0 14px; font: 700 64px/0.95 var(--display); font-variant-numeric: tabular-nums; }
+  /* The story: one compact card; the notes share one spot and cross-fade. */
+  .cs-story { margin-top: 12px; }
+  .cs-num { display: flex; align-items: baseline; gap: 2px; margin: 0 0 12px; font: 700 56px/0.95 var(--display); font-variant-numeric: tabular-nums; }
   .cs-num small { font: 600 15px var(--ui); color: var(--ink-2); margin-left: 12px; }
   .cs-track { position: relative; height: 14px; border-radius: 999px; background: color-mix(in oklab, var(--team) 35%, var(--track)); }
   .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); transition: width 0.65s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -156,20 +142,23 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
   .cs-ends { display: flex; justify-content: space-between; margin-top: 10px; font: 600 13px var(--ui); }
   .cs-ends i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin: 0 6px; }
 
-  /* Every note sits in the same spot; only the current one is visible. */
-  .cs-texts { list-style: none; padding: 0; margin: 0; position: relative; flex: 1; min-height: 220px; }
-  .cs-text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
-    padding: 0 12px; will-change: opacity, transform; }
-  .cs-title { font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
+  .cs-texts { list-style: none; padding: 0; margin: 18px 0 0; display: grid; }
+  .cs-text { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); transition: opacity 0.45s, transform 0.45s; pointer-events: none; }
+  .cs-text.on { opacity: 1; transform: none; transition-delay: 0.2s; pointer-events: auto; }
+  .cs-title { font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 6px; display: flex; gap: 10px; align-items: center; }
   .cs-pts { font: 700 12px var(--ui); color: var(--ink); background: var(--track); border-radius: 999px; padding: 2px 9px; letter-spacing: 0.02em; }
-  .cs-line { font: 600 30px/1.22 var(--display); max-width: 22ch; margin: 0; text-wrap: balance; }
-  .cs-out { font: 400 20px/1.4 var(--body); color: var(--ink-2); margin: 14px 0 0; }
-  .cs-foot { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .cs-skip { font: 500 12.5px var(--ui); color: var(--ink-3); background: none; border: 0; padding: 4px 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--rule); }
-  .cs-skip:hover { color: var(--ink); }
-  .cs-pips { list-style: none; padding: 0; margin: 0; display: flex; justify-content: center; gap: 7px; }
-  .cs-pips li { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); transition: background 0.3s; }
-  .cs-pips li.on { background: var(--ink-3); }
+  .cs-line { font: 600 22px/1.3 var(--display); margin: 0; text-wrap: pretty; }
+  .cs-out { color: var(--ink-2); }
+  .cs-foot { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+  .cs-play { width: 30px; height: 30px; flex: none; border-radius: 50%; border: 0; background: var(--track); color: var(--ink-2); font: 700 11px var(--ui); cursor: pointer; display: grid; place-items: center; }
+  .cs-play:hover { color: var(--ink); background: var(--rule); }
+  .cs-play span { display: none; }
+  .cs[data-state="playing"] .i-pause, .cs:is([data-state="paused"], [data-state="idle"]) .i-play, .cs[data-state="done"] .i-again { display: block; }
+  .cs-pips { list-style: none; padding: 0; margin: 0; display: flex; gap: 4px; }
+  .cs-pips button { width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+  .cs-pips button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--rule); transition: background 0.3s, transform 0.3s; }
+  .cs-pips button.on::before { background: var(--ink-3); }
+  .cs-pips button[aria-current="step"]::before { background: var(--ink); transform: scale(1.25); }
 
   /* Every step at once. */
   .cs-list { margin-top: 12px; }
@@ -192,13 +181,10 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
   .step.sum .st-l b, .step.sum .st-n b { font-weight: 700; }
 
   @media (max-width: 719px) {
-    .cs-story { height: calc(var(--n) * 55vh + 100vh); }
-    .cs-stage { top: calc(var(--bar-h, 34px) + 58px); height: calc(100vh - var(--bar-h, 34px) - 58px - 76px); }
-    .cs-gauge { padding: 14px 16px 12px; }
-    .cs-num { font-size: 48px; margin-bottom: 10px; }
-    .cs-line { font-size: 25px; }
-    .cs-out { font-size: 18px; }
+    .cs-num { font-size: 46px; }
+    .cs-line { font-size: 20px; }
+    .cs-pips { gap: 0; }
     .step { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'l n' 't t'; }
   }
-  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost, .cs-text { transition: none; } }
 </style>
