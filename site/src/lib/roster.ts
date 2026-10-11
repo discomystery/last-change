@@ -1,11 +1,13 @@
 // Full rosters and who is out, from roster.json (pipeline/export/roster.py). Words for each status live here so the
-// team page, previews and post-game pages say the same thing. We never say why a player is out unless NHL.com did.
+// team page, previews and post-game pages say the same thing. We never say why a player is out unless NHL.com or a
+// roster move did.
 import data from '../../public/data/roster.json';
 
 const files = import.meta.glob('../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
 const byId = new Map<number, any>(Object.values(files).filter((p: any) => p?.id).map((p: any) => [p.id, p]));
 
-export type Report = { status: string; injury: string | null; timeline: string | null; date: string; url: string };
+// A report with no url is a roster move from the league-wide transactions list (pipeline/ingest/transactions.py).
+export type Report = { status: string; injury: string | null; timeline: string | null; date: string; url: string | null };
 export type RosterPlayer = { id: number; name: string; pos: string | null; number: number | null; key?: boolean; status: string; missed: number; last: string | null; report: Report | null };
 export type Row = RosterPlayer & { group: 'F' | 'D' | 'G'; out: boolean; tag: string; tip: string; line: string; toi: number | null; page: boolean };
 
@@ -24,7 +26,9 @@ const games = (n: number) => `${n} game${n === 1 ? '' : 's'}`;
 export function describe(p: RosterPlayer): { tag: string; tip: string; out: boolean } {
   const r = p.report;
   const missed = (p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '') + (p.last ? ` Last played ${day(p.last)}.` : p.status !== 'no_club' ? ' Has not played this season.' : '');
-  const said = r ? ` NHL.com Status Report, ${day(r.date)}.` : '';
+  const said = r ? (r.url ? ` NHL.com Status Report, ${day(r.date)}.` : ` Roster move, ${day(r.date)}.`) : '';
+  // Sent to the minors (a roster move), for a player the club holds but does not list.
+  const minors = r?.status === 'assigned' && r.timeline ? r.timeline.replace(/^to /, '') : null;
   switch (p.status) {
     case 'injured': {
       const tag = r?.status === 'long' && r.timeline ? cap(r.timeline) : REPORT_TAG[r?.status ?? 'out'];
@@ -35,7 +39,8 @@ export function describe(p: RosterPlayer): { tag: string; tip: string; out: bool
     case 'personal': return { tag: 'Personal leave', out: true, tip: `Away for personal or family reasons.${missed}${said}` };
     case 'scratched': return { tag: 'Scratched', out: true, tip: `On the game-day roster but did not dress. The league does not say why, and no injury has been reported.${missed}` };
     case 'off_roster': return { tag: 'Not in the lineup', out: true, tip: `Listed by the club but left off the game-day roster, which usually means injured reserve. No injury has been reported.${missed}` };
-    case 'not_listed': return { tag: 'Off the NHL roster', out: true, tip: `The club holds his rights but its NHL roster does not list him: usually in the minors, sometimes a long-term injury. Nothing has been reported.${missed}` };
+    case 'not_listed': if (minors) return { tag: /\(AHL\)/.test(minors) ? 'In the AHL' : 'In the minors', out: true, tip: `Assigned to ${minors} on ${day(r!.date)}.${missed}` };
+      return { tag: 'Off the NHL roster', out: true, tip: `The club holds his rights but its NHL roster does not list him: usually in the minors, sometimes a long-term injury. Nothing has been reported.${missed}` };
     case 'no_club': return { tag: 'No NHL club', out: false, tip: 'A regular here last season. No NHL club lists him now, and he has not played this season. The data cannot say why (unsigned, retired or playing abroad).' };
     default: return { tag: '', out: false, tip: '' };
   }

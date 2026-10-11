@@ -126,7 +126,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     the next full update."""
     from pipeline.build import games, shot_features
     from pipeline.export import flow, game_scores, jobs, pending, previews, recaps, roster, site_json, stories, track
-    from pipeline.ingest import game_rosters, nhl, nhl_previews, rosters, status_report
+    from pipeline.ingest import game_rosters, nhl, nhl_previews, rosters, status_report, transactions
     from pipeline.metrics import availability, player_game, team_game, units, xg_model
     import polars as pl
 
@@ -144,6 +144,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     except Exception as e:
         print(f"status report unavailable: {e!r}")
     status_report.build(season)
+    out["transactions"] = transactions.update(season)  # today's roster moves (keeps the saved copy if unreachable)
     out["availability"] = availability.build(season)
     out["nhl_previews"] = nhl_previews.update(season)
     out["teams_and_schedule"] = site_json.export_teams_and_schedule(season)  # standings, and which games are final
@@ -168,7 +169,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
 def availability_update(season: int) -> dict:
     """Game-day rosters and scratches, NHL.com injury news, then who was available to each club each day. Last
     season's game rosters and reports are filled in once, so absences can be studied over a full season."""
-    from pipeline.ingest import game_rosters, status_report
+    from pipeline.ingest import game_rosters, status_report, transactions
     from pipeline.metrics import availability
 
     out = {}
@@ -177,6 +178,7 @@ def availability_update(season: int) -> dict:
             out[f"game_rosters_{s}"] = game_rosters.update(s)
         if s == season or not status_report.path(s).exists():
             out[f"status_{s}"] = status_report.update(s)
+    out["transactions"] = transactions.update(season)  # injured reserve, minors, suspensions: all 32 clubs
     out["table"] = availability.build(season)
     return out
 
@@ -249,9 +251,10 @@ def publish(season: int) -> dict:
     units.depth_table(season)
     player_game.build(season)
     if season == CURRENT_SEASON:
-        from pipeline.ingest import status_report
+        from pipeline.ingest import status_report, transactions
         from pipeline.metrics import availability
         status_report.build(season)  # re-read the saved reports with the current rules
+        transactions.build(season)  # and the saved roster moves
         out["availability"] = availability.build(season)
     out["export"] = site_json.run(season)
     return out
