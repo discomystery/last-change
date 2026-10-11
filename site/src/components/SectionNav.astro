@@ -1,6 +1,6 @@
 ---
 // Section menu for long pages (team, preview, player). Wide screens: a row of section links (pinned while
-// scrolling when `pinned`). Phones: a thin bar pinned under the top strip, "Jump to [section]", using the phone's
+// scrolling when `pinned`). Phones: a thin bar pinned to the top of the screen, "Jump to [section]", using the phone's
 // own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
 // pinned elements stick for the whole page, not just inside a short wrapper.
 // Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it:
@@ -18,11 +18,6 @@ const { items, pinned = false } = Astro.props;
 <script is:inline>
   // Runs once the page has loaded: the sections it tracks come after this menu in the page.
   const secnavStart = () => {
-    const strip = document.querySelector('.mockbar');
-    const root = document.documentElement;
-    const setBar = () => { if (strip) root.style.setProperty('--bar-h', strip.offsetHeight + 'px'); };
-    setBar();
-    addEventListener('resize', setBar);
     const pills = [...document.querySelectorAll('.secnav-pills a')];
     const bar = document.querySelector('.secnav-bar');
     const pick = document.getElementById('secnav-pick');
@@ -37,11 +32,11 @@ const { items, pinned = false } = Astro.props;
     let queued = false;
     const update = () => {
       queued = false;
-      const top = (strip ? strip.offsetHeight : 0) + (bar.offsetHeight || 0) + 40;
+      const top = (bar.offsetHeight || 0) + 40;
       let cur = ids[0];
       for (const s of secs) if (s.getBoundingClientRect().top <= top) cur = s.id;
       if (document.activeElement !== pick) pick.value = cur;
-      bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= (strip ? strip.offsetHeight : 0) + 1 && scrollY > 0);
+      bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= 1 && scrollY > 0);
       pills.forEach((a) => a.classList.toggle('here', a.getAttribute('href') === '#' + cur));
       const row = document.querySelector('.secnav-pills.pinned');
       const here = row && row.querySelector('a.here');
@@ -64,13 +59,13 @@ const { items, pinned = false } = Astro.props;
 </script>
 
 <style is:global>
-  .secnav-pills.pinned { position: sticky; top: var(--bar-h, 34px); z-index: 15; background: var(--ice); padding-block: 8px; }
+  .secnav-pills.pinned { position: sticky; top: 0; z-index: 15; background: var(--ice); padding-block: 8px; }
   .secnav-pills a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
   .secnav-bar { display: none; }
   @media (max-width: 719px) {
     .jump.secnav-pills { display: none; }  /* beats the shared .jump row style, whichever loads last */
     .secnav-bar {
-      display: flex; align-items: center; gap: 10px; position: sticky; top: var(--bar-h, 34px); z-index: 15;
+      display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 15;
       margin: 14px -16px 0; padding: 9px 16px; background: var(--ice); border-bottom: 1px solid transparent; transition: border-color 0.2s;
       font: 600 17px var(--display); font-variation-settings: 'SOFT' 100;
     }
@@ -80,7 +75,7 @@ const { items, pinned = false } = Astro.props;
       flex: 1; min-width: 0; font: 600 16px var(--ui); color: var(--ink); background: var(--sheet);
       border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer;
     }
-    main [id] { scroll-margin-top: calc(var(--bar-h, 34px) + 72px); }
+    main [id] { scroll-margin-top: 72px; }
   }
   .secnav-puck, .secnav-prog { display: none; }
   html.motion .secnav-pills.pinned { padding-bottom: 14px; }

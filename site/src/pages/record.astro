@@ -72,7 +72,7 @@ const LO = 30, HI = 100;
 const x = (p: number) => `${((100 * p - LO) / (HI - LO)) * 100}%`;
 const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
 ---
-<Base section="record" title="Track record" mock={false} description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
+<Base section="record" title="Track record" description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
   <header class="team-top"><h1>Track record</h1></header>
   <p class="lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />

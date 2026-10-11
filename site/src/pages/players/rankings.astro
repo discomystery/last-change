@@ -19,7 +19,7 @@ const board = Object.fromEntries(RATINGS.map((r) => {
 const info = Object.fromEntries(RATINGS.map((r) => [r.key, { label: r.info.label, tip: r.info.tip, lo: r.info.lo, hi: r.info.hi, edge: r.edge, raw: !!r.info.raw, who: Object.fromEntries(['F', 'C', 'W', 'D'].map((g) => [g, peerOf(r.key, g)])), rule: POOL_RULE[r.key] ?? null }]));
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(skaters[0]?.generated_at ?? Date.now()));
 ---
-<Base section="players" title="Skater rankings" mock={false} description="Every NHL skater ranked on every rating: who creates the most chances, shoots the most, kills penalties best, skates fastest.">
+<Base section="players" title="Skater rankings" description="Every NHL skater ranked on every rating: who creates the most chances, shoots the most, kills penalties best, skates fastest.">
   <header class="page-top"><h1>Skater rankings</h1></header>
   <p class="lede">Who leads the league on each rating. Pick a rating to see every regular ranked, or start from the leaders below.</p>
   <nav class="ptabs" aria-label="Players"><a class="ptab" href={`${base}players/`}>Find a player</a><a class="ptab" href={`${base}players/rankings/`} aria-current="page">Rankings</a></nav>
