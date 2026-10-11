@@ -7,6 +7,7 @@ on:
   schedule:
     - cron: "0 10 * * *"  # 10:00 UTC: after the last West Coast games are final
     - cron: "0 16 * * *"  # 16:00 UTC: refresh before the day's games, so previews freeze on fresh numbers
+    - cron: "30 20 * * *"  # 20:30 UTC: pick up NHL.com's projected starting goalies (its previews go up 16:00-19:00 UTC)
   workflow_dispatch: {}
 
 permissions:
