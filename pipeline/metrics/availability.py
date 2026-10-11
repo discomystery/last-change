@@ -283,3 +283,11 @@ def on(season: int, day: str, team: str | None = None) -> pl.DataFrame:
     """Everyone with a club on a date (all clubs, or one)."""
     t = load(season).filter(pl.col("date") == day)
     return t.filter(pl.col("team") == team) if team else t
+
+
+def held(season: int) -> set[int]:
+    """Everyone a club holds on the latest day in the table (listed or not, injured or not), not players with no club."""
+    t = load(season)
+    if not t.height:
+        return set()
+    return set(t.filter((pl.col("date") == t["date"].max()) & (pl.col("status") != "no_club"))["player_id"].to_list())

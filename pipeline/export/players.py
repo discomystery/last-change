@@ -1,4 +1,7 @@
-"""Player pages: one JSON file per player who has dressed this season, plus an index.
+"""Player pages: one JSON file per player who has dressed this season or is with a club now, plus an index.
+
+Players a club holds who have not dressed yet this season (injured, suspended, in the minors) get a page too, marked
+`unplayed`, rated from last season alone; the page says he has not played and why, in the roster's words.
 
 Skaters get their role (line, units, ice time), ratings against their position, NHL EDGE tracking numbers,
 every unblocked shot for the map, and how their misses miss. Goalies get their role and their goalie ratings.
@@ -12,7 +15,7 @@ import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
-from pipeline.ingest import edge, rosters
+from pipeline.ingest import careers, edge, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
 
@@ -119,14 +122,51 @@ EDGE_HIGHER = {"topSpeed": True, "bursts": True, "shotSpeed": True, "distance": 
 EDGE_SPLIT = {"shotSpeed", "distance"}  # centres and wingers differ here (standardized gap 0.3+), so each is compared with his own
 
 
+def _idle(season: int, dressed: set[int], abbr: dict[int, str]) -> pl.DataFrame:
+    """Players a club holds today who have not dressed for a regular-season game this season, shaped like `latest`.
+
+    From the availability table (listed players, players the club holds but does not list, injury reports); players
+    with no club are left out. Position and number come from the roster listing, else his last game last season."""
+    from pipeline.metrics import availability
+
+    a = availability.load(season)
+    cols = {"player_id": pl.Int64, "team_id": pl.Int64, "first": pl.String, "last": pl.String, "pos": pl.String, "number": pl.Int64}
+    if not a.height:
+        return pl.DataFrame(schema=cols)
+    a = a.filter((pl.col("date") == a["date"].max()) & (pl.col("status") != "no_club") & ~pl.col("player_id").is_in(list(dressed))).unique("player_id", keep="first")
+    team_id = {v: k for k, v in abbr.items()}
+    known = []
+    lst = rosters.path(season)
+    if lst.exists():
+        known.append(pl.read_parquet(lst).sort("date").select("player_id", "first", "last", "pos", "number"))
+    for s in (season - 1, season - 2):
+        f = TABLES / str(s) / "players.parquet"
+        if f.exists():
+            known.append(pl.read_parquet(f).sort("game_id").select("player_id", "first", "last", "pos", pl.col("number").cast(pl.Int64)))
+    info = {}
+    for k in known:  # first source wins: the latest listing, then last season's games, then the season before
+        for r_ in k.unique("player_id", keep="last").iter_rows(named=True):
+            info.setdefault(r_["player_id"], r_)
+    rows = []
+    for r_ in a.iter_rows(named=True):
+        i = info.get(r_["player_id"], {})
+        pos = r_["pos"] or i.get("pos")
+        if r_["team"] not in team_id or not pos:
+            continue
+        rows.append({"player_id": r_["player_id"], "team_id": team_id[r_["team"]], "first": r_["first"] or i.get("first"), "last": r_["last"] or i.get("last"),
+                     "pos": pos, "number": i.get("number")})
+    return pl.DataFrame(rows, schema=cols)
+
+
 def run(season: int) -> int:
-    r = rating.run(season)
     abbr = _abbr(season)
     pg = _seasons_frame(season, "player_game")
     games = _seasons_frame(season, "games").filter(pl.col("game_type") == REGULAR)
     pg = pg.join(games.select("game_id"), on="game_id")
     roster = pl.read_parquet(TABLES / str(season) / "players.parquet").join(games.select("game_id", "date"), on="game_id").sort("date", "game_id")
     latest = roster.unique("player_id", keep="last")
+    idle = _idle(season, set(latest["player_id"]), abbr)
+    r = rating.run(season, idle={row["player_id"]: row["team_id"] for row in idle.iter_rows(named=True) if row["pos"] != "G"})
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     goalies = json.loads((SITE_DATA / "goalies.json").read_text())
     carried = carries.run(season, latest, lines, abbr)
@@ -206,11 +246,14 @@ def run(season: int) -> int:
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     photos = rosters.headshots(season)
     goalie_rec = {g["id"]: (abbr_, g) for abbr_, gs in goalies["teams"].items() for g in gs}
-    for row in latest.iter_rows(named=True):
+    unplayed = set(idle["player_id"])
+    for row in [*latest.iter_rows(named=True), *idle.iter_rows(named=True)]:
         pid, tid = row["player_id"], row["team_id"]
         team = abbr.get(tid)
         e_now = edge.read(season, pid) or edge.read(season - 1, pid) or {}
         bio = e_now.get("player") or {}
+        if not bio.get("birthDate"):  # no tracking file yet (a player who has not dressed): his career landing has the birth date
+            bio = {**bio, "birthDate": ((careers.read(pid) or {}).get("landing") or {}).get("birthDate")}
         base = {"id": pid, "first": row["first"], "last": row["last"], "name": f'{row["first"]} {row["last"]}', "number": row["number"], "pos": row["pos"],
                 "team": team, "shoots": bio.get("shootsCatches"), "age": _age(bio.get("birthDate")), "generated_at": now_iso, "season": season,
                 "photo": photos.get(pid) or (f"{MUGS}/{season_id(season)}/{team}/{pid}.png" if team else None)}
@@ -220,8 +263,12 @@ def run(season: int) -> int:
             if c:
                 stats[key] = {"gp": c["gp"], "g": int(c["g"]), "a": int(c["a"]), "p": int(c["g"] + c["a"]), "sog": int(c["sog"]), "toi": round(c["sec"] / c["gp"]), "pim_pens": int(c["pen_taken"])}
         base["stats"] = stats
+        if pid in unplayed:
+            base["unplayed"] = True
         if row["pos"] == "G":
             team_g, g = goalie_rec.get(pid, (team, None))
+            if g is None and pid in unplayed and str(pid) in goalies.get("idle", {}):
+                g = {**goalies["idle"][str(pid)], "season": None}
             if g is None:
                 continue
             gp_team = team_games.get(tid, 0)
@@ -229,10 +276,16 @@ def run(season: int) -> int:
             base["shots_against"] = _goalie_areas(ev, xg, pid, season)
         else:
             rec = r["players"].get(pid)
+            if rec is None and pid in unplayed:
+                # No NHL games this season or last: the page is his name card and why he is out.
+                base |= {"group": "D" if row["pos"] == "D" else "F", "games": 0, "games_last": 0}
+                (OUT / f"{pid}.json").write_text(json.dumps(base, separators=(",", ":"), default=_num))
+                index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"], "unplayed": True})
+                continue
             if rec is None:
                 continue
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
-                     "role": _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
+                     "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
                      "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
@@ -250,7 +303,7 @@ def run(season: int) -> int:
             mb = miss_by.get(pid, {})
             base["misses"] = {"season": mb.get(season), "blend": _add(mb.get(season), mb.get(season - 1))}
         (OUT / f"{pid}.json").write_text(json.dumps(base, separators=(",", ":"), default=_num))
-        index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"]})
+        index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"], **({"unplayed": True} if pid in unplayed else {})})
     (OUT / "index.json").write_text(json.dumps(sorted(index, key=lambda x: (x["team"] or "", x["last"])), separators=(",", ":")))
     return len(index)
 

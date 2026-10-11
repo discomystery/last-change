@@ -22,6 +22,8 @@ import { clock, compared } from '../../lib/format';
 import { teamColour } from '../../lib/teams';
 import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
+import rosterData from '../../../public/data/roster.json';
+import { describe, type RosterPlayer } from '../../lib/roster';
 import '../../styles/blocks.css';
 
 export function getStaticPaths() {
@@ -47,6 +49,14 @@ const tough = (p: number) => (p > 55 ? `tougher than ${p}%` : p < 45 ? `easier t
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(p.generated_at));
 const isG = p.group === 'G';
 const s = p as Skater;
+// A player his club holds who has not dressed this season (injured, in the minors): why, in the roster's words.
+const unplayed = !!p.unplayed;
+const listed = unplayed ? (((rosterData as any).teams[p.team] ?? []) as RosterPlayer[]).find((x) => x.id === p.id) : undefined;
+const out = listed ? describe(listed) : { tag: '', tip: '', out: false };
+const outTag = out.tag || 'Not playing yet';
+const outTip = out.tip || 'With the club, but has not dressed for a game this season.';
+const hasStats = Object.keys((p as any).stats ?? {}).length > 0;
+const lastStats = (p as any).stats?.last as { gp: number; g: number; a: number; p: number; toi: number } | undefined;
 const words = isG ? 'goalies' : groupWord[s.group];
 const posName = posWord[p.pos] ?? p.pos;
 const shoots = p.shoots === 'L' ? (isG ? 'Catches left' : 'Shoots left') : p.shoots === 'R' ? (isG ? 'Catches right' : 'Shoots right') : null;
@@ -73,11 +83,11 @@ const pk = (() => {
   return { main: `${k.kills_in} of ${k.kills} kills`, more, tip: `On the ice for ${k.kills_in} of ${team?.place ?? p.team}’s ${k.kills} kills ${pkSpan}.` };
 })();
 let strengths: ReturnType<typeof standouts> | null = null;
-const strengthsBy = isG ? null : Object.fromEntries(modes.map(([m]) => [m, standouts(s, m)])) as Record<Mode, ReturnType<typeof standouts>>;
+const strengthsBy = isG || !s.traits ? null : Object.fromEntries(modes.map(([m]) => [m, standouts(s, m)])) as Record<Mode, ReturnType<typeof standouts>>;
 
 // ---- Goalie ----
 type GMode = { starts: number; games: number; shots: number; goals: number; gsax: number; gsax60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
-const g = isG ? (p.goalie as { name: string; blend: GMode; season: GMode }) : null;
+const g = isG ? (p.goalie as { name: string; blend: GMode; season: GMode | null }) : null;
 const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
 const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 const gSay: Record<string, (x: GMode) => string> = {
@@ -97,7 +107,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -107,14 +117,14 @@ const statRow = (x: any) => (isG ? null : x);
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
-    <div class:list={['card', 'phead', isG && 'no-stats']}>
+    <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats']}>
       {p.number !== null && <span class="pnum" aria-hidden="true">{p.number}</span>}
       <header class="team-top">
         <h1>{p.name}</h1>
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
-      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}</p>
-      {!isG && (
+      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
+      {!isG && hasStats && (
         <div class="pstats-in">
           <table class="pstats">
             <thead><tr><th></th>{cols.map(([full, short, tip]) => <th>{tip ? <span class="term" tabindex="0" data-tip={tip}><span class="full">{full}</span><span class="short">{short}</span></span> : <><span class="full">{full}</span><abbr class="short" title={full}>{short}</abbr></>}</th>)}</tr></thead>
@@ -129,8 +139,31 @@ const statRow = (x: any) => (isG ? null : x);
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} />
 
-    {!isG && role && (
+    {!isG && !s.traits && (
+      <Section id="role" title="Role" placeholder={false} takeaway="Why he isn’t playing.">
+        <div class="card prole">
+          <dl class="rl">
+            <div><dt>Status</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>
+          </dl>
+        </div>
+        <p class="note">He has not played in the NHL this season or last, so there is nothing to rate him on yet. His page fills in once he dresses.</p>
+      </Section>
+    )}
+
+    {!isG && s.traits && (
       <>
+        {!role && (
+          <Section id="role" title="Role" placeholder={false} takeaway={`He hasn’t played for ${team?.place ?? p.team} this season.`}>
+            <div class="card prole">
+              <dl class="rl">
+                <div><dt>Status</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>
+                {lastStats && <div><dt>Last season</dt><dd><p><strong>{lastStats.gp}</strong> games, {lastStats.g} goals and {lastStats.a} assists<span class="n"> · {clock(lastStats.toi)} a game</span></p></dd></div>}
+              </dl>
+            </div>
+            <p class="note">Until he plays, his ratings below come from last season alone.</p>
+          </Section>
+        )}
+        {role && (
         <Section id="role" title="Role" placeholder={false} takeaway={`Where he fits on ${team?.place ?? p.team} right now.`}>
           <div class="card prole">
             <dl class="rl">
@@ -195,6 +228,7 @@ const statRow = (x: any) => (isG ? null : x);
             <div class="card worth"><p class="mini-h">What’s changed</p><ul>{role.notes.map((n) => <li>{n}</li>)}</ul></div>
           )}
         </Section>
+        )}
 
         <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
         <PlayerReport p={p} place={team?.place ?? p.team} />
@@ -210,6 +244,7 @@ const statRow = (x: any) => (isG ? null : x);
             const cmpOf = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
               ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
               : <>{cmpTip(it, true)}</>;
+            if (unplayed && m === 'season') return <div class="gmode m-season"><p class="note">He hasn’t played this season. Pick “this season and last” in the settings to see what he did last season.</p></div>;
             return (
               <div class={`gmode m-${m}`}>
                 <div class="two sw">
@@ -232,24 +267,30 @@ const statRow = (x: any) => (isG ? null : x);
 
         <Section id="ratings" title="All ratings" placeholder={false} takeaway={`Every rating, against other ${groupWord[s.group]}.`}>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
-          <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
+          {unplayed
+            ? <p class="note m-blend">He hasn’t played this season, so these come from last season’s {s.games_last} games alone, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
+            : <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>}
           {s.moved_from && <p class="note m-blend">He played for {(teams.find((t) => t.abbr === s.moved_from)?.name) ?? s.moved_from} last season. Habits that travel with a player (shooting, hitting, penalties) still use that season in full; setting up goals, finishing, faceoffs and power-play chances depend more on linemates and role, so they lean on it less. We measured how much each one carries over for players who change teams.</p>}
           {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
-          <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>
+          {unplayed
+            ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The grey dots show last season.</p>
+            : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
           {GROUPS.map((grp) => (
             <>
               <h3 class="sub">{grp}</h3>
               <ul class="fpgrid">
                 {Object.entries(TRAITS).filter(([, t]) => t.group === grp).filter(([k]) => s.traits[k]).map(([k, t]) => {
                   const e = s.traits[k];
+                  // No games this season (or no this-season rating): the season lane keeps last season's dot, greyed.
+                  const cur = unplayed || !e.season ? e.blend : e.season;
                   return (
-                    <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season.ok }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e[m].vs)} data-tip={rankTip(e[m].rank, e[m].of, t.label, peerOf(k, e[m].vs ?? s.group))}>{tag}</a>; })}</span></span></span>
+                    <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season?.ok }]}>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const x = e[m]; const tag = x && rankTag(x.rank, x.ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, x.vs)} data-tip={rankTip(x.rank, x.of, t.label, peerOf(k, x.vs ?? s.group))}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
-                      <div class="lanes"><div class="lane" style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${e.season.pct};--clo:${e.season.lo};--chi:${e.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
+                      <div class="lanes"><div class:list={['lane', { noseason: cur !== e.season }]} style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${cur.pct};--clo:${cur.lo};--chi:${cur.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
                         <p class={`fpc-line m-${m}`}>
-                          {e[m].raw === undefined
+                          {m === 'season' && cur !== e.season ? <span class="n">{unplayed ? 'No games this season' : 'Not rated this season'}</span> : e[m].raw === undefined
                             ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} /></>
                             : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} class='a-adj' />
                                 <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerOf(k, e[m].vs ?? s.group))} class='a-raw' /></>}
@@ -337,7 +378,9 @@ const statRow = (x: any) => (isG ? null : x);
         <Section id="role" title="Role" placeholder={false} takeaway={`How much ${team?.place ?? p.team} leans on him.`}>
           <div class="card prole">
             <dl class="rl">
-              <div><dt>This season</dt><dd><p>Started <strong>{g.season.starts}</strong> of the team’s {p.team_games} games{p.team_games ? ` (${Math.round((100 * g.season.starts) / p.team_games)}%)` : ''}.</p></dd></div>
+              {g.season
+                ? <div><dt>This season</dt><dd><p>Started <strong>{g.season.starts}</strong> of the team’s {p.team_games} games{p.team_games ? ` (${Math.round((100 * g.season.starts) / p.team_games)}%)` : ''}.</p></dd></div>
+                : <div><dt>This season</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>}
               <div><dt>Over two seasons</dt><dd><p>{g.blend.starts} starts and {g.blend.shots} shots faced, this season and last.</p></dd></div>
             </dl>
           </div>
@@ -345,6 +388,7 @@ const statRow = (x: any) => (isG ? null : x);
         <Section id="card" title="Goalie card" placeholder={false} takeaway="Is he stopping more than he should, and what is his team asking him to face?">
           {modes.map(([m, mw]) => {
             const x = g[m];
+            if (!x) return <div class={`gmode m-${m}`}><p class="note">He hasn’t played this season. Pick “this season and last” in the settings to see last season.</p></div>;
             const few = x.pct.gsax === null;
             return (
               <div class={`gmode m-${m}`}>
@@ -477,6 +521,10 @@ const statRow = (x: any) => (isG ? null : x);
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
+  .pout { display: inline-block; margin-top: 6px; color: var(--ink); }
+  /* No games this season: the season lane shows last season's dot, faded, with no range. */
+  :global(html[data-mode='season']) .lane.noseason .dot { opacity: 0.35; }
+  :global(html[data-mode='season']) .lane.noseason .whisk { display: none; }
   /* The intro is the name card's second half: joined below the stats, the story on the left and the next game on the right. */
   .phead:has(+ :global(.pstory)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
   :global(.pstory) { max-width: none !important; margin: -1px 0 0 !important; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; }

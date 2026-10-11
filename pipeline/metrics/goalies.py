@@ -100,4 +100,6 @@ def run(season: int) -> dict:
     use = current.group_by("team_id", "goalie_id").agg(pl.col("sec").sum(), pl.col("started").sum().alias("starts"), pl.col("date").max()).sort("sec", descending=True)
     for r in use.iter_rows(named=True):
         by_team[r["team_id"]].append(r["goalie_id"])
-    return {"goalies": {gid: m for gid, m in goalies.items() if "season" in m}, "league": league, "by_team": dict(by_team), "league_sv": league_sv, "min_starts": MIN_STARTS}
+    # Goalies who played last season but not yet this one (injured, in the minors), for their player pages.
+    idle = {gid: m for gid, m in goalies.items() if "season" not in m}
+    return {"goalies": {gid: m for gid, m in goalies.items() if "season" in m}, "idle": idle, "league": league, "by_team": dict(by_team), "league_sv": league_sv, "min_starts": MIN_STARTS}

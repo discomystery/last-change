@@ -145,7 +145,9 @@ def _pct(v: float, pool: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * p, 1, 99))
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dict:
+    """Ratings for everyone who has dressed this season. `idle` (player id -> current team id) adds players a club
+    holds who have not dressed yet (injured, in the minors): rated from last season alone, with no games this season."""
     from pipeline.metrics import rapm
 
     stab = stabilization()
@@ -174,13 +176,18 @@ def run(season: int = CURRENT_SEASON) -> dict:
         return (n * v + k * prior) / (n + k)
 
     team_now, team_last = _teams(now_pg, latest=True), _teams(last_pg)
+    empty = np.zeros((0, len(COLS)))
+    for pid, tid in (idle or {}).items():
+        if pid not in now and pid in last:
+            now[pid] = empty
+            team_now[pid] = tid
     players = {}
     for pid, m in now.items():
         g, sb = grp[pid], sub[pid]
         prev = last.get(pid)
         moved = prev is not None and team_last.get(pid) != team_now.get(pid)
         s_now, s_prev = m.sum(axis=0), None if prev is None else prev.sum(axis=0)
-        boot_now = rng.multinomial(len(m), np.full(len(m), 1 / len(m)), size=BOOTSTRAPS) @ m
+        boot_now = rng.multinomial(len(m), np.full(len(m), 1 / len(m)), size=BOOTSTRAPS) @ m if len(m) else np.zeros((BOOTSTRAPS, len(COLS)))
         boot_prev = None if prev is None else rng.multinomial(len(prev), np.full(len(prev), 1 / len(prev)), size=BOOTSTRAPS) @ prev
         p = {"group": g, "sub": sb, "moved_from": team_last.get(pid) if moved else None, "games": len(m), "games_last": 0 if prev is None else len(prev), "sums": {"season": s_now, "last": s_prev}, "est": {}, "boot": {}}
         for mode in ("blend", "season"):
