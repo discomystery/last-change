@@ -9,15 +9,15 @@ const team = 'Boston';
 type Tile = { key: string; label: string; big: string; of: string; share: number; ref?: [number, string]; next: string; tip: string; what: string };
 const tiles: Record<'blend' | 'season', Tile[]> = {
   blend: [
-    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '40%', of: '107 of Boston’s 271 goals', share: 39.5, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Zacha and Geekie, 23% each', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played. 10th-highest share in the league last season.' },
+    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '40%', of: '107 of 271', share: 39.5, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Zacha and Geekie, 23% each', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played. 10th-highest share in the league last season.' },
     { key: 'g_sh', what: 'score this big a share of their team’s goals', label: 'Goals he scores', big: '11%', of: '31 of 271', share: 11.4, next: 'Geekie scores more: 35 goals, 13%', tip: 'His own goals, out of all Boston goals in the games he played.' },
-    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals he’s in on', big: '54%', of: '29 of 54, scoring or first assist', share: 53.7, next: 'Next: Geekie, 30%', tip: 'Power-play goals he scored or set up with the last pass, out of Boston’s power-play goals in his games.' },
+    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals', big: '54%', of: '29 of 54', share: 53.7, next: 'Next: Geekie, 30%', tip: 'Power-play goals he scored or set up with the last pass, out of Boston’s power-play goals in his games.' },
     { key: 's_sh', what: 'take this big a share of their team’s shots', label: 'Shots on goal', big: '13%', of: '284 of 2,241', share: 12.7, ref: [5.6, 'An even share among 18 skaters: 6%'], next: 'Next: Geekie, 8%', tip: 'His shots on goal, out of all of Boston’s in his games.' },
   ],
   season: [
-    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '35%', of: '7 of Boston’s 20 goals', share: 35, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Minten, 25%', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played.' },
+    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '35%', of: '7 of 20', share: 35, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Minten, 25%', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played.' },
     { key: 'g_sh', what: 'score this big a share of their team’s goals', label: 'Goals he scores', big: '10%', of: '2 of 20', share: 10, next: 'Tied with Mittelstadt and Peterka', tip: 'His own goals, out of all Boston goals in the games he played.' },
-    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals he’s in on', big: '3 of 3', of: 'scoring or first assist', share: 100, next: 'Next: Geekie, 2 of 3', tip: 'Power-play goals he scored or set up with the last pass.' },
+    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals', big: '100%', of: '3 of 3', share: 100, next: 'Next: Geekie, 2 of 3', tip: 'Power-play goals he scored or set up with the last pass.' },
     { key: 's_sh', what: 'take this big a share of their team’s shots', label: 'Shots on goal', big: '15%', of: '23 of 153', share: 15, ref: [5.6, 'An even share among 18 skaters: 6%'], next: 'Next: Minten, 10%', tip: 'His shots on goal, out of all of Boston’s in his games.' },
   ],
 };
@@ -38,21 +38,22 @@ const jobs: Record<'blend' | 'season', Job[]> = {
 };
 // Goals he is in on per game, against typical forwards by where they rank on their team in ice time (2025-26).
 const lane = { max: 1.5, him: 1.29, marks: [[0.3, 'Typical fill-in', '10th to 13th forward'], [0.61, 'Second line', '4th to 6th forward'], [0.93, 'First line', 'top three forwards']] as [number, string, string][] };
-// Verdict from how many skaters in the league carry at least his share (about one per team = hard to replace).
-const VERDICTS: [number, string][] = [[16, 'Irreplaceable'], [32, 'Hard to replace'], [96, 'Replaceable'], [Infinity, 'Easy to cover']];
-const seasonOf = { blend: '2025', season: '2026' } as const;
+// Verdict from how many skaters in the league carry at least his share (32 = about one a team).
+const TIERS: [number, string, string][] = [
+  [10, 'One of a kind', 'v1'], [32, 'Load-bearing', 'v2'], [64, 'Major piece', 'v3'], [128, 'Contributor', 'v4'], [Infinity, 'Spread around', 'v5']];
+const TIER_TIP = 'How many skaters in the NHL carry this big a share of their team: One of a kind (10 or fewer), Load-bearing (about one a team), Major piece (about two a team), Contributor (about four a team), Spread around (more).';
+const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 const lanes = (m: 'blend' | 'season', t: Tile) => {
-  const d = (dist as any)[seasonOf[m]][t.key] as { n: number; vals: number[] };
-  const n = d.vals.filter((v) => v >= t.share - 1e-9).length; // counts him when he is in the pool
-  const max = Math.max(t.share, d.vals[d.vals.length - 1]) * 1.04;
-  const verdict = VERDICTS.find(([c]) => n <= c)![1];
-  const perTeam = n / 32;
-  const say = n <= 32 ? `Only ${n} skaters in the league ${t.what}.` : `About ${Math.round(perTeam)} skaters per team ${t.what}.`;
-  // A light jitter (three rows) keeps 600 dots readable, like Swing's lanes.
-  const dots = d.vals.map((v, k) => [Math.round((1000 * v) / max) / 10, (k * 7919) % 3]);
-  return { n, verdict, say, dots, me: Math.round((1000 * t.share) / max) / 10, of: d.n };
+  const league = (dist as any).league[m][t.key] as number[];
+  const mates = (dist as any)[m][t.key] as [string, number, boolean][];
+  const n = Math.max(1, league.filter((v) => v > t.share + 1e-9).length + 1);
+  const tier = TIERS.find(([c]) => n <= c)!;
+  const max = Math.max(...mates.map((x) => x[1])) * 1.08;
+  const at = (v: number) => Math.round((1000 * v) / max) / 10;
+  const next = mates.find((x) => !x[2])!;
+  return { n, tier, at, mates, next };
 };
-const ppg = (dist as any)['2025'].ppg_vals as number[];
+const ppg = (dist as any).blend.ppg as [string, number, boolean][];
 ---
 <Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${team}’s game runs through him, and what they would have to replace without him.`}>
   {(['blend', 'season'] as const).map((m) => (
@@ -61,19 +62,17 @@ const ppg = (dist as any)['2025'].ppg_vals as number[];
         {tiles[m].map((t) => (
           <li class="card ld-tile">{(() => { const L = lanes(m, t); return (<>
             <p class="ld-h"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span></p>
-            <p class="ld-big">{t.big}<span class:list={['ld-verdict', `v-${L.verdict.split(' ')[0].toLowerCase()}`]}>{L.verdict}</span></p>
-            <p class="ld-of">{t.of}</p>
-            <div class="ld-dots" role="img" aria-label={L.say}>
-              {L.dots.map(([x, r]) => <i style={`left:${x}%;top:${4 + 5 * r}px`}></i>)}
-              <b style={`left:${L.me}%`}></b>
+            <p class="ld-big">{t.big}<span class:list={['ld-verdict', L.tier[2]]} tabindex="0" data-tip={TIER_TIP}>{L.tier[1]}</span></p>
+            <p class="ld-of">{t.of} · <span class="term" tabindex="0" data-tip={`${L.n === 1 ? 'No skater' : `${L.n - 1} ${L.n === 2 ? 'skater' : 'skaters'}`} in the NHL carried a bigger share of their team’s ${t.label.toLowerCase()}.`}>{ord(L.n)} in NHL</span></p>
+            <div class="ld-dots" role="img" aria-label={`${t.big}, against Boston teammates`}>
+              {L.mates.map(([name, v, me]) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
+              <em style={`left:${L.at(L.next[1])}%`}>{L.next[0].split(' ').slice(-1)[0]}</em>
             </div>
-            <p class="ld-say-s">{L.say}</p>
-            <p class="ld-next">{t.next}</p>
           </>); })()}</li>
         ))}
       </ul>
       <div class="card ld-jobs">
-        <p class="ld-h">If he’s out, who picks it up</p>
+        <p class="chart-title">If he’s out, who picks it up</p>
         <dl>
           {jobs[m].map((j) => (
             <div>
@@ -89,18 +88,18 @@ const ppg = (dist as any)['2025'].ppg_vals as number[];
   ))}
   <div class="ld-two">
     <div class="card">
-      <p class="ld-h">What a fill-in gives back</p>
+      <p class="chart-title">What a fill-in gives back</p>
       <p class="ld-say">He’s in on <strong>1.29 goals a game</strong>. A typical depth forward called up to replace him is in on about 0.30.</p>
       <div class="ld-lane">
         <span class="ld-line"></span>
-        {ppg.map((v, k) => <i class="ld-f" style={`left:${Math.min(100, (100 * v) / lane.max)}%;top:${17 + 5 * ((k * 7919) % 3)}px`}></i>)}
+        {ppg.filter((x) => !x[2]).map(([name, v]) => <i class="ld-f" style={`left:${Math.min(100, (100 * v) / lane.max)}%`} tabindex="0" data-tip={`${name}: ${v.toFixed(2)} a game`}></i>)}
         {lane.marks.map(([v, l, tip]) => <span class="ld-mark" style={`left:${(100 * v) / lane.max}%`} tabindex="0" data-tip={`${l} (${tip}): ${v.toFixed(2)} goals a game`}><i></i><em>{l}</em></span>)}
         <span class="ld-him" style={`left:${(100 * lane.him) / lane.max}%`}><i></i><em>Pastrnak</em></span>
       </div>
-      <p class="n">Goals scored or assisted per game last season. Faint dots are every forward with 40+ games; ticks are the typical forward by where he ranks on his own team in ice time.</p>
+      <p class="n">Goals scored or assisted per game, this season and last. Faint dots are his Boston teammates up front; ticks are the typical NHL forward by ice-time rank on his team.</p>
     </div>
     <div class="card">
-      <p class="ld-h">When he’s been out</p>
+      <p class="chart-title">When he’s been out</p>
       <p class="ld-say">He missed <strong>5 games</strong> last season (Nov 28 to Dec 6). Boston won 2 of them.</p>
       <table class="ld-ww">
         <thead><tr><th></th><th>With him</th><th>Without</th></tr></thead>
@@ -116,23 +115,22 @@ const ppg = (dist as any)['2025'].ppg_vals as number[];
 </Section>
 
 <style>
-  .ld-h { font: 700 13px/1.4 var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink); margin-bottom: 6px; }
-  .ld-h .term { text-decoration-color: var(--ink-3); }
+  .ld-h { font: 600 18px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 6px; }
   .ld-tiles { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
   @media (max-width: 900px) { .ld-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 480px) { .ld-tiles { grid-template-columns: 1fr; } }
   .ld-tile { display: grid; align-content: start; gap: 2px; }
   .ld-big { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; font: 600 40px/1.05 var(--display); font-variation-settings: 'SOFT' 100; margin-top: 2px; }
-  .ld-verdict { font: 700 12px/1 var(--ui); letter-spacing: 0.02em; padding: 6px 10px; border-radius: 999px; background: var(--track); color: var(--ink-2); }
-  .ld-verdict.v-irreplaceable { background: var(--team); color: #fff; }
-  .ld-verdict.v-hard { background: color-mix(in oklab, var(--team) 35%, var(--sheet)); color: var(--ink); }
+  .ld-verdict { font: 700 12px/1 var(--ui); letter-spacing: 0.02em; padding: 6px 10px; border-radius: 999px; background: var(--track); color: var(--ink-2); white-space: nowrap; cursor: help; }
+  .ld-verdict.v1 { background: var(--team); color: #fff; }
+  .ld-verdict.v2 { background: color-mix(in oklab, var(--team) 40%, var(--sheet)); color: var(--ink); }
+  .ld-verdict.v3 { background: color-mix(in oklab, var(--team) 18%, var(--sheet)); color: var(--ink); }
   .ld-of { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
-  .ld-dots { position: relative; height: 22px; margin: 12px 6px 6px; }
-  .ld-dots::before { content: ''; position: absolute; left: -6px; right: -6px; top: 9px; height: 4px; border-radius: 2px; background: var(--track); }
-  .ld-dots i { position: absolute; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--ink-3); opacity: 0.16; }
-  .ld-dots b { position: absolute; top: 4px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
-  .ld-say-s { font: 400 14px/1.4 var(--ui); color: var(--ink); }
-  .ld-next { font: 400 13px/1.4 var(--ui); color: var(--ink-3); margin-top: 2px; }
+  .ld-dots { position: relative; height: 40px; margin: 14px 7px 0; }
+  .ld-dots::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .ld-dots i { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
+  .ld-dots b { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; }
+  .ld-dots em { position: absolute; top: 18px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-3); white-space: nowrap; }
   .ld-jobs { margin-top: 14px; }
   .ld-jobs dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr); gap: 2px 24px; padding: 10px 0; border-top: 1px solid var(--rule); align-items: start; }
   .ld-jobs dl > div:first-child { border-top: 0; padding-top: 2px; }
@@ -148,7 +146,7 @@ const ppg = (dist as any)['2025'].ppg_vals as number[];
   .ld-say { font: 400 16px/1.5 var(--ui); }
   .ld-lane { position: relative; height: 70px; margin: 6px 10px 0; }
   .ld-line { position: absolute; left: -10px; right: -10px; top: 26px; height: 4px; border-radius: 2px; background: var(--track); }
-  .ld-f { position: absolute; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--ink-3); opacity: 0.16; }
+  .ld-f { position: absolute; top: 23px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
   .ld-mark, .ld-him { position: absolute; top: 0; width: 0; }
   .ld-mark i { position: absolute; top: 18px; left: -1px; width: 2px; height: 20px; background: var(--ink-2); border-radius: 1px; }
   .ld-mark em, .ld-him em { position: absolute; top: 44px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-2); white-space: nowrap; }
