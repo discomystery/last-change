@@ -168,6 +168,21 @@ const teamList = teams as { abbr: string; name: string }[];
       })();
     </script>
     <script is:inline>
+      // Matchup strips: pointing at (or tapping) an opposing line's box lights that line up in every strip of the card.
+      (() => {
+        const light = (e) => {
+          const box = e.target.closest?.('.strip > span');
+          const card = e.target.closest?.('.stripcard');
+          if (!card) return;
+          if (box) card.dataset.hl = String([...box.parentElement.children].indexOf(box));
+          else delete card.dataset.hl;
+        };
+        document.addEventListener('pointerover', light);
+        document.addEventListener('focusin', light);
+        document.addEventListener('pointerout', (e) => { const card = e.target.closest?.('.stripcard'); if (card && !card.contains(e.relatedTarget)) delete card.dataset.hl; });
+      })();
+    </script>
+    <script is:inline>
       // Reveal cards, headings and charts as they scroll into view (see styles/motion.css). Cards a page script adds
       // later, like a day's games, are picked up too. Ones that arrive together come in one after another.
       (() => {
@@ -381,6 +396,14 @@ const teamList = teams as { abbr: string; name: string }[];
 
   /* Sections */
   .sec { margin-top: 72px; scroll-margin-top: 96px; }
+  /* Placeholders shown while a page builds itself in the browser; the page's script replaces them. */
+  .skel { display: block; background: var(--track); border-radius: 14px; list-style: none; }
+  .skel-card { height: 112px; }
+  .skel-row { height: 58px; margin-bottom: 8px; }
+  .skel-day { width: 76px; height: 58px; border-radius: 12px; }
+  .skel-line { display: inline-block; width: 14ch; height: 0.8em; border-radius: 8px; }
+  html.motion .skel { background: linear-gradient(100deg, var(--track) 40%, color-mix(in oklab, var(--track) 55%, var(--sheet)) 50%, var(--track) 60%) 0 0 / 300% 100%; animation: skel-sheen 1.6s ease-in-out infinite; }
+  @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
   .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; }
   .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }

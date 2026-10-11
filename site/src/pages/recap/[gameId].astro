@@ -110,11 +110,12 @@ const takeaway = graded.length
 const season = recapIndex.tally as Record<string, number>;
 const seasonTotal = season.held + season.partly + season.missed;
 const sgn = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
-const rows: [string, string, (n: Nums) => string][] = [
-  ['Shots on goal', 'Every shot that reached the net, including goals.', (n) => String(n.shots)],
-  ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out.', (n) => n.xg.toFixed(1)],
-  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked.', (n) => String(n.cf5)],
-  ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
+// Each row also says how far its bar leans: the share of the row's total each team had.
+const rows: [string, string, (n: Nums) => string, (n: Nums) => number][] = [
+  ['Shots on goal', 'Every shot that reached the net, including goals. The bar splits them between the teams.', (n) => String(n.shots), (n) => n.shots],
+  ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out. The bar splits them between the teams.', (n) => n.xg.toFixed(1), (n) => n.xg],
+  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked. The bar splits them between the teams.', (n) => String(n.cf5), (n) => n.cf5],
+  ['Power plays', 'Power-play goals, out of times on the power play. The bar splits the times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`, (n) => n.pp_opps],
 ];
 // Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
 const dw = r.replays ?? null;
@@ -170,39 +171,56 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <section class="sec top" id="story" aria-label="Overview">
     {story ? (
       <GameStory story={story} kicker={false}>
-        <table class="numbers">
-          <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{a}</th>)}</tr></thead>
-          <tbody>
-            {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
-          </tbody>
-        </table>
+        <div class="tug">
+          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
+          {rows.map(([name, tip, f, v]) => {
+            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
+            const g = x + y > 0 ? [x, y] : [1, 1];
+            return (
+              <div class="tug-row">
+                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
+                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
+              </div>
+            );
+          })}
+        </div>
         {r.end === 'SO' && <p class="note small">The shootout decides the result but is left out of every other number on this site.</p>}
       </GameStory>
     ) : (
       <div class="card">
-        <table class="numbers">
-          <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{a}</th>)}</tr></thead>
-          <tbody>
-            {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
-          </tbody>
-        </table>
+        <div class="tug">
+          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
+          {rows.map(([name, tip, f, v]) => {
+            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
+            const g = x + y > 0 ? [x, y] : [1, 1];
+            return (
+              <div class="tug-row">
+                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
+                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     )}
 
     {dw && replays && (
       <div class="card meter" id="replays">
+        <p class="mini-h">Run it back</p>
+        <h3 class="h">{replayHead}</h3>
+        <div class="rp-head">
+          <div class="rp-counts">
+            <span class="t-away"><b data-k="t-away">{replays.away}</b> {place(away)}</span>
+            <span class="rp-tie"><b data-k="tie">{replays.tie}</b> even</span>
+            <span class="t-home"><b data-k="t-home">{replays.home}</b> {place(home)}</span>
+          </div>
+          <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
+        </div>
         <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
-          {dots.map((d, i) => <i class={d === 'tie' ? 'tie' : `t-${d}`} style={`--i:${i}`}></i>)}
+          {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
         </div>
         <div class="meter-text">
-          <p class="mini-h">Run it back</p>
-          <h3 class="h">{replayHead}</h3>
           <p>{replayBody}</p>
-          <dl class="compare">
-            {order.map((a) => (
-              <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: {replays[side(a)]} wins, plus half of the {replays.tie} ties</span></div>
-            ))}
-          </dl>
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
           <Gloss label="How the replays work">
             <p class="note">Every shot in regulation that was on target or missed the net goes in as often as our <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says it should, and the game is played out 100 times. A rebound scramble counts as one chance, and empty-net shots are left out. A replay tied after regulation counts as half a win each, since overtime and shootouts are close to coin flips.</p>
@@ -306,6 +324,77 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   </Section>
 
   <p class="note foot">Team pages: <a href={`${import.meta.env.BASE_URL}team/${away}/`}>{T[away]?.name ?? away}</a> · <a href={`${import.meta.env.BASE_URL}team/${home}/`}>{T[home]?.name ?? home}</a></p>
+<script is:inline>
+  // The numbers: each bar starts even and leans to the team that had more once it is on screen. Without motion
+  // (or before this runs) the bars simply show their split.
+  (() => {
+    const ropes = [...document.querySelectorAll('.rope')];
+    if (!ropes.length || !document.documentElement.classList.contains('motion') || !('IntersectionObserver' in window)) return;
+    ropes.forEach((r) => r.classList.add('mid'));
+    const io = new IntersectionObserver((es) => {
+      if (!es.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      ropes.forEach((r, i) => setTimeout(() => r.classList.remove('mid'), 150 + i * 140));
+    }, { threshold: 0.4 });
+    io.observe(ropes[0].closest('.tug'));
+  })();
+
+  // Run it again: deal the same 100 replays out in a random order, counting as they land, then let the dots slide back into their sorted seats.
+  (() => {
+    const btn = document.querySelector('.rp-again');
+    const grid = document.querySelector('.replays');
+    if (!btn || !grid) return;
+    const dots = [...grid.children];
+    const sorted = dots.map((d) => d.className);
+    const nums = [...document.querySelectorAll('.rp-counts b')];
+    const saved = nums.map((b) => b.textContent);
+    const run = () => {
+      if (!document.documentElement.classList.contains('motion') || btn.disabled) return;
+      btn.disabled = true;
+      // Close the button's tooltip so it doesn't sit over the dots while they land.
+      setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+      const deal = sorted.map((c, i) => [c, Math.random(), i]).sort((a, b) => a[1] - b[1]);
+      dots.forEach((d) => { d.className = 'rp-empty'; });
+      const count = { 't-away': 0, 't-home': 0, tie: 0 };
+      const show = () => nums.forEach((b) => { b.textContent = count[b.dataset.k]; });
+      show();
+      let n = 0;
+      const step = () => {
+        for (let k = 0; k < 2 && n < deal.length; k++, n++) {
+          dots[n].className = `${deal[n][0]} rp-pop`;
+          count[deal[n][0]]++;
+        }
+        show();
+        if (n < deal.length) setTimeout(step, 28);
+        else setTimeout(settle, 350);
+      };
+      const settle = () => {
+        // FLIP: remember where each outcome sits now, put the sorted order back, then slide each dot from there.
+        const from = deal.map(([, , seat], i) => [seat, dots[i].getBoundingClientRect()]);
+        dots.forEach((d, i) => { d.className = sorted[i]; });
+        let left = from.length;
+        from.forEach(([seat, r], i) => {
+          const to = dots[seat].getBoundingClientRect();
+          const a = dots[seat].animate({ translate: [`${r.left - to.left}px ${r.top - to.top}px`, '0 0'] },
+            { duration: 700, delay: Math.min(i, 60) * 4, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'backwards' });
+          a.finished.catch(() => {}).then(() => {
+            if (--left) return;
+            nums.forEach((b, j) => { b.textContent = saved[j]; });
+            btn.disabled = false;
+          });
+        });
+      };
+      setTimeout(step, 120);
+    };
+    btn.addEventListener('click', run);
+    // The first time the dots come into view they are dealt out the same way. Until then they simply show,
+    // so nothing is hidden if this never runs.
+    if (document.documentElement.classList.contains('motion') && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run(); } }, { threshold: 0.6 });
+      io.observe(grid);
+    }
+  })();
+</script>
 </Base>
 
 <style>
@@ -329,29 +418,47 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
   .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
-  .numbers { width: 100%; border-collapse: collapse; font: 400 15px var(--ui); margin-top: 8px; }
-  .numbers th, .numbers td { padding: 10px 6px; border-top: 1px solid var(--rule); text-align: right; }
-  .numbers thead th, .numbers thead td { border-top: 0; font-weight: 600; white-space: nowrap; }
-  .numbers thead th i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; }
-  .numbers tbody th { text-align: left; font-weight: 500; }
-  .numbers td { font-weight: 600; font-variant-numeric: tabular-nums; width: 22%; }
+  .tug { display: grid; gap: 14px; margin-top: 12px; }
+  .tug-head { display: flex; justify-content: space-between; font: 600 14px var(--ui); margin: 0; }
+  .tug-head span { display: inline-flex; align-items: center; gap: 7px; }
+  .tug-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .tug-row { display: grid; gap: 6px; }
+  .tug-top { display: grid; grid-template-columns: 4.5em 1fr 4.5em; align-items: baseline; margin: 0; font: 500 14px var(--ui); color: var(--ink-2); }
+  .tug-top span { justify-self: center; text-align: center; }
+  .tug-top strong { font: 700 20px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tug-top strong:last-child { text-align: right; }
+  .rope { position: relative; display: flex; gap: 3px; height: 10px; }
+  .rope b { flex: var(--g) 1 0; min-width: 4px; border-radius: 5px; background: var(--team); transition: flex-grow 1s cubic-bezier(0.3, 0.9, 0.25, 1); }
+  .rope::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.6; }
+  .rope.mid b { flex-grow: 1; }
   .surp, .gl { margin-top: 18px; }
   .surp .eyebrow { margin-bottom: 6px; }
   .surp .mild .h { font-size: 19px; }
   .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
-  .meter { margin-top: 20px; display: grid; gap: 22px; align-items: center; scroll-margin-top: 80px; }
+  .meter { margin-top: 20px; scroll-margin-top: 80px; }
   .meter .mini-h { margin-bottom: 4px; }
-  @media (min-width: 640px) { .meter { grid-template-columns: auto 1fr; gap: 32px; } }
-  .replays { display: grid; grid-template-columns: repeat(10, 10px); gap: 5px; justify-content: start; }
-  .replays i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  /* Phones: a wide 20 x 5 grid across the card instead of a square with empty space beside it. */
-  @media (max-width: 639px) { .replays { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 4px; } .replays i { width: 100%; height: auto; aspect-ratio: 1; } }
-  .replays i.tie { background: var(--ink-3); opacity: 0.4; }
+  .rp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; max-width: 520px; }
+  .rp-counts { display: flex; flex-wrap: wrap; gap: 4px 20px; font: 600 15px var(--ui); color: var(--ink-2); }
+  .rp-counts b { font: 600 26px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; display: inline-block; min-width: 1.4em; color: var(--team); }
+  .rp-counts .rp-tie b { color: var(--ink-3); }
+  @media (max-width: 480px) { .rp-head { gap: 8px; } .rp-counts { gap: 4px 10px; font-size: 13.5px; } .rp-counts b { font-size: 21px; min-width: 0; } }
+  /* 100 replays as a 20 by 5 grid, away wins first, then games level after 60 minutes, then home wins. */
+  .replays { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 5px; margin-top: 12px; max-width: 520px; }
+  .replays i { aspect-ratio: 1; border-radius: 50%; background: var(--team); }
+  .replays i.tie { background: var(--ink-3); opacity: 0.6; }
+  .replays i.rp-empty { background: var(--track); opacity: 1; }
+  .replays i.rp-pop { animation: rp-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  @keyframes rp-pop { from { transform: scale(0.2); } }
+  .meter-text { margin-top: 12px; }
+  /* Run it again: a small replay icon beside the counts, only for visitors who get the site's motion. */
+  .rp-again { display: none; flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink-2); cursor: pointer; place-items: center; padding: 0; transition: border-color 0.15s, color 0.15s, rotate 0.5s ease; }
+  :global(html.motion) .rp-again { display: grid; }
+  .rp-again:hover { border-color: var(--ink-3); color: var(--ink); }
+  .rp-again:active { rotate: -40deg; }
+  .rp-again:disabled { opacity: 0.4; cursor: default; }
+  .rp-again svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .meter-text > p:not(.detail) { margin-bottom: 4px; }
-  .meter .compare { margin-bottom: 12px; }
-  .meter .compare dd { display: inline-flex; align-items: center; gap: 8px; }
-  .meter .compare dd i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
   .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .job-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
