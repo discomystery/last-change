@@ -550,6 +550,16 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     pulled = [x for x in in_net if x.get("started") and x["team"] in relieved and x.get("ga", 0) >= 3]
     for x in pulled[:1]:
         s1.append(f"{W.place(x['team'])} pulled {name(x['id']) or x['name']} after {num(x['ga'])} goals.")
+    # Pulling the goalie for an extra attacker and giving up an empty-net goal: name whoever was last in net.
+    en = [g for g in goals if g["strength"] == "en" and side(g) == winner]
+    if en:
+        mine = [x for x in in_net if x["team"] == loser]
+        last = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0), None) or next((x for x in mine if x.get("started")), None)
+        who = (name(last["id"]) or last["name"]) if last else "their goalie"
+        into = "into the empty net" if len(en) == 1 else ("twice" if len(en) == 2 else f"{num(len(en))} times") + " into the empty net"
+        s1.append(_pick([f"{W.place(loser)} pulled {who} for an extra attacker, and {W.the(winner)} made them pay {into}.",
+                         f"{W.place(loser)} went for the extra skater late and got burned: {W.the(winner)} scored {into}."],
+                        r["game_id"], "en"))
     if ls == 0 and wg:
         s1.append(f"{name(wg['id']) or wg['name']} stopped all {wg['saves']} shots.")
     # paragraph two: was it fair, and who stood out
