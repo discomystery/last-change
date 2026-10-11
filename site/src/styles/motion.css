@@ -40,6 +40,11 @@ html.motion .seen .shot:nth-child(3n) { animation-delay: calc(var(--rv-delay, 0m
 html.motion .seen .shot:nth-child(3n + 1) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
 html.motion .seen .am-area use { animation: lc-fade 0.7s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
 
+/* Swing: each player's bar grows out from the zero line when his team's card comes into view, biggest night first. */
+html.motion .seen .sw-bar { animation: lc-sw 0.7s cubic-bezier(0.25, 1, 0.35, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--i, 0) * 45ms); }
+html.motion .seen .sw-n { animation: lc-fade 0.4s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 400ms + var(--i, 0) * 45ms); }
+@keyframes lc-sw { from { clip-path: inset(-6px calc(100% - var(--z, 50%)) -6px var(--z, 50%)); } to { clip-path: inset(-6px 0 -6px 0); } }
+
 /* Run it back: the 100 replays drop in one after another, away wins, ties, then home wins. */
 html.motion .seen .replays i { animation: lc-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 14ms + 150ms); }
 

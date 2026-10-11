@@ -191,8 +191,11 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
     {dw && replays && (
       <div class="card meter" id="replays">
-        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
-          {dots.map((d, i) => <i class={d === 'tie' ? 'tie' : `t-${d}`} style={`--i:${i}`}></i>)}
+        <div class="rp-box">
+          <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
+            {dots.map((d, i) => <i class={d === 'tie' ? 'tie' : `t-${d}`} style={`--i:${i}`}></i>)}
+          </div>
+          <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
         </div>
         <div class="meter-text">
           <p class="mini-h">Run it back</p>
@@ -200,7 +203,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           <p>{replayBody}</p>
           <dl class="compare">
             {order.map((a) => (
-              <div class={`t-${side(a)}`}><dd><i></i>{pct(a)}%</dd><span>{place(a)}: {replays[side(a)]} wins, plus half of the {replays.tie} ties</span></div>
+              <div class={`t-${side(a)}`} data-side={side(a)}><dd><i></i><span><span class="rp-pct">{pct(a)}</span>%</span></dd><span>{place(a)}: <span class="rp-w">{replays[side(a)]}</span> wins, plus half of the <span class="rp-t">{replays.tie}</span> ties</span></div>
             ))}
           </dl>
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
@@ -306,6 +309,63 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   </Section>
 
   <p class="note foot">Team pages: <a href={`${import.meta.env.BASE_URL}team/${away}/`}>{T[away]?.name ?? away}</a> · <a href={`${import.meta.env.BASE_URL}team/${home}/`}>{T[home]?.name ?? home}</a></p>
+<script is:inline>
+  // Run it again: deal the same 100 replays out in a random order, counting as they land, then let the dots slide back into their sorted seats.
+  (() => {
+    const btn = document.querySelector('.rp-again');
+    const grid = document.querySelector('.replays');
+    if (!btn || !grid) return;
+    const dots = [...grid.children];
+    const sorted = dots.map((d) => d.className);
+    const rows = [...document.querySelectorAll('.meter .compare [data-side]')].map((el) => ({
+      side: el.dataset.side, pct: el.querySelector('.rp-pct'), w: el.querySelector('.rp-w'), t: el.querySelector('.rp-t'),
+    }));
+    const saved = rows.map((r) => [r.pct.textContent, r.w.textContent, r.t.textContent]);
+    btn.addEventListener('click', () => {
+      if (!document.documentElement.classList.contains('motion')) return;
+      btn.disabled = true;
+      grid.classList.add('rp-ran');
+      // Close the button's tooltip so it doesn't sit over the dots while they land.
+      setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+      const deal = sorted.map((c, i) => [c, Math.random(), i]).sort((a, b) => a[1] - b[1]);
+      dots.forEach((d) => { d.className = 'rp-empty'; });
+      const count = { 't-away': 0, 't-home': 0, tie: 0 };
+      const show = () => rows.forEach((r) => {
+        const w = count[`t-${r.side}`];
+        r.w.textContent = w; r.t.textContent = count.tie;
+        r.pct.textContent = Math.round(w + count.tie / 2);
+      });
+      show();
+      let n = 0;
+      const step = () => {
+        for (let k = 0; k < 2 && n < deal.length; k++, n++) {
+          dots[n].className = `${deal[n][0]} rp-pop`;
+          count[deal[n][0]]++;
+        }
+        show();
+        if (n < deal.length) setTimeout(step, 28);
+        else setTimeout(settle, 350);
+      };
+      const settle = () => {
+        // FLIP: remember where each outcome sits now, put the sorted order back, then slide each dot from there.
+        const from = deal.map(([, , seat], i) => [seat, dots[i].getBoundingClientRect()]);
+        dots.forEach((d, i) => { d.className = sorted[i]; });
+        let left = from.length;
+        from.forEach(([seat, r], i) => {
+          const to = dots[seat].getBoundingClientRect();
+          const a = dots[seat].animate({ translate: [`${r.left - to.left}px ${r.top - to.top}px`, '0 0'] },
+            { duration: 700, delay: Math.min(i, 60) * 4, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'backwards' });
+          a.finished.catch(() => {}).then(() => {
+            if (--left) return;
+            rows.forEach((row, j) => { [row.pct.textContent, row.w.textContent, row.t.textContent] = saved[j]; });
+            btn.disabled = false;
+          });
+        });
+      };
+      setTimeout(step, 120);
+    });
+  })();
+</script>
 </Base>
 
 <style>
@@ -328,7 +388,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .compare { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
-  .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
+  .compare > div > span { font: 400 12px var(--ui); color: var(--ink-3); }
   .numbers { width: 100%; border-collapse: collapse; font: 400 15px var(--ui); margin-top: 8px; }
   .numbers th, .numbers td { padding: 10px 6px; border-top: 1px solid var(--rule); text-align: right; }
   .numbers thead th, .numbers thead td { border-top: 0; font-weight: 600; white-space: nowrap; }
@@ -348,6 +408,18 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   /* Phones: a wide 20 x 5 grid across the card instead of a square with empty space beside it. */
   @media (max-width: 639px) { .replays { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 4px; } .replays i { width: 100%; height: auto; aspect-ratio: 1; } }
   .replays i.tie { background: var(--ink-3); opacity: 0.4; }
+  .rp-box { display: grid; gap: 10px; justify-items: start; }
+  .replays i.rp-empty { background: var(--track); opacity: 1; }
+  .replays.rp-ran i:not(.rp-pop) { animation: none; }
+  .replays i.rp-pop { animation: rp-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  @keyframes rp-pop { from { transform: scale(0.2); } }
+  /* Run it again: a small replay icon under the dots, only for visitors who get the site's motion. */
+  .rp-again { display: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink-2); cursor: pointer; place-items: center; padding: 0; transition: border-color 0.15s, color 0.15s, rotate 0.5s ease; }
+  :global(html.motion) .rp-again { display: grid; }
+  .rp-again:hover { border-color: var(--ink-3); color: var(--ink); }
+  .rp-again:active { rotate: -40deg; }
+  .rp-again:disabled { opacity: 0.4; cursor: default; }
+  .rp-again svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .meter-text > p:not(.detail) { margin-bottom: 4px; }
   .meter .compare { margin-bottom: 12px; }
   .meter .compare dd { display: inline-flex; align-items: center; gap: 8px; }
