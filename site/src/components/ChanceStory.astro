@@ -10,11 +10,8 @@ const { team, teamCls, other, otherCls, chance, outcome, beats } = Astro.props;
 const at = (v: number) => Math.max(0, Math.min(100, ((v - 20) / 60) * 100));
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const final = Math.round(beats[beats.length - 1].end);
-const moves = beats.filter((b) => !b.sum && b.key !== 'start');
-interface Extra { progress?: 'segments' | 'line' | 'ticks' }
-const { progress = 'segments' } = Astro.props as Extra;
 ---
-<div class="cs" data-team={team} data-other={other} data-pv={progress}>
+<div class="cs" data-team={team} data-other={other}>
   <div class="cs-head">
     <p class="mini-h">Our win chance, kept hidden until the final</p>
     <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
@@ -27,7 +24,6 @@ const { progress = 'segments' } = Astro.props as Extra;
         <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
         <i class="cs-mid"></i>
         <i class="cs-ghost" style="left:50%"></i>
-        {moves.map((b) => <i class="cs-mark" data-i={beats.indexOf(b)} style={`left:${b.end.toFixed(1)}%`}></i>)}
         <i class="cs-needle" style="left:50%"></i>
       </div>
       <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
@@ -43,7 +39,6 @@ const { progress = 'segments' } = Astro.props as Extra;
     <div class="cs-foot">
       <button type="button" class="cs-play" aria-label="Replay"><span class="i-pause" aria-hidden="true">❚❚</span><span class="i-play" aria-hidden="true">▶</span><span class="i-again" aria-hidden="true">↻</span></button>
       <ol class="cs-prog">{beats.slice(1).map((b, i) => <li><button type="button" data-i={i + 1} aria-label={b.label}><i></i></button></li>)}</ol>
-      <span class="cs-count"></span>
     </div>
   </div>
 
@@ -76,7 +71,6 @@ const { progress = 'segments' } = Astro.props as Extra;
       const story = cs.querySelector('.cs-story'), list = cs.querySelector('.cs-list'), btn = cs.querySelector('.cs-toggle');
       const val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill'), needle = cs.querySelector('.cs-needle'), ghost = cs.querySelector('.cs-ghost');
       const texts = [...cs.querySelectorAll('.cs-text')], segs = [...cs.querySelectorAll('.cs-prog button')], play = cs.querySelector('.cs-play'), n = texts.length;
-      const marks = [...cs.querySelectorAll('.cs-mark')], count = cs.querySelector('.cs-count');
       let shown = 50, raf = 0, current = 0, timer = 0, state = 'idle';  // idle (not started), playing, paused, done
       const tween = (to) => {
         cancelAnimationFrame(raf);
@@ -99,8 +93,6 @@ const { progress = 'segments' } = Astro.props as Extra;
         texts.forEach((x, j) => x.classList.toggle('on', j === i));
         // Segment k belongs to step k + 1: filled once that step has shown, running while it is the one coming up.
         segs.forEach((g, k) => { g.classList.toggle('done', k + 1 <= i); g.classList.remove('run'); g.setAttribute('aria-current', k + 1 === i ? 'step' : 'false'); });
-        marks.forEach((m) => m.classList.toggle('on', +m.dataset.i <= i));
-        count.textContent = i === 0 ? '' : i === n - 1 ? 'Final' : `${i} of ${n - 2}`;
         tween(end);
       };
       const setState = (s) => { state = s; cs.dataset.state = s; play.setAttribute('aria-label', s === 'playing' ? 'Pause' : s === 'done' ? 'Play again' : 'Play'); };
@@ -181,22 +173,7 @@ const { progress = 'segments' } = Astro.props as Extra;
   .cs-prog .run i::after { animation: cs-fill var(--dur, 2.6s) linear forwards; }
   .cs[data-state="paused"] .cs-prog .run i::after { animation-play-state: paused; }
   @keyframes cs-fill { to { transform: scaleX(1); } }
-  .cs-count { display: none; font: 600 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
-  .cs-mark { display: none; }
 
-  /* Idea B (line): one continuous hairline along the bottom edge of the card. */
-  .cs[data-pv="line"] .cs-story { position: relative; overflow: hidden; }
-  .cs[data-pv="line"] .cs-prog { position: absolute; left: 0; right: 0; bottom: 0; gap: 0; }
-  .cs[data-pv="line"] .cs-prog button { height: 12px; padding: 9px 0 0; }
-  .cs[data-pv="line"] .cs-prog i { border-radius: 0; height: 3px; background: transparent; }
-  .cs[data-pv="line"] .cs-prog i::after { background: var(--ink-3); }
-  .cs[data-pv="line"] .cs-count { display: inline; }
-
-  /* Idea C (ticks): no bar; each step leaves a tick on the gauge where the needle stopped, with "3 of 5" beside play. */
-  .cs[data-pv="ticks"] .cs-prog { display: none; }
-  .cs[data-pv="ticks"] .cs-count { display: inline; }
-  .cs[data-pv="ticks"] .cs-mark { display: block; position: absolute; top: 19px; width: 2px; height: 7px; margin-left: -1px; border-radius: 1px; background: var(--ink-3); opacity: 0; transition: opacity 0.3s; }
-  .cs[data-pv="ticks"] .cs-mark.on { opacity: 0.8; }
 
   /* Every step at once. */
   .cs-list { margin-top: 12px; }
