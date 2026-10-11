@@ -38,7 +38,6 @@ html.motion .seen .q-pt, html.motion .seen .quad g[class^='t-'] { animation: lc-
 html.motion .seen .shot { transform-box: fill-box; transform-origin: center; animation: lc-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
 html.motion .seen .shot:nth-child(3n) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
 html.motion .seen .shot:nth-child(3n + 1) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
-html.motion .seen .am-area use { animation: lc-fade 0.7s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
 
 /* Swing: each player's bar grows out from the zero line when his team's card comes into view, biggest night first. */
 html.motion .seen .sw-bar { animation: lc-sw 0.7s cubic-bezier(0.25, 1, 0.35, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--i, 0) * 45ms); }
