@@ -5,6 +5,7 @@ import Section from '../components/Section.astro';
 import SectionNav from '../components/SectionNav.astro';
 import '../styles/blocks.css';
 import track from '../../public/data/track.json';
+import { teamColour } from '../lib/teams';
 
 type Count = { held: number; partly: number; missed: number };
 type Latest = { game_id: number; date: string; away: string; home: string; kind: string; head: string; call: string | null; verdict: keyof Count; usual: string | null; tonight: string | null };
@@ -43,87 +44,145 @@ const kindRows = (s: CallSet) => {
     .map(([label, c]) => ({ label, rule: Object.values(kindInfo).find((x) => x.label === label)?.rule ?? '', c }))
     .sort((a, b) => total(b.c) - total(a.c));
 };
-const weekMax = Math.max(1, ...calls.weeks.map(total));
+const V = ['held', 'partly', 'missed'] as const;
 const mark = { held: '✓', partly: '≈', missed: '✕' } as const;
 const word = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
-const SHOW = 12;
+const plural = (k: number, one: string, many = one + 's') => `${k} ${k === 1 ? one : many}`;
+// One puck per call, held first: filled ink like the site's quality pips, partly half filled, missed an empty one.
+const pucks = (c: Count) => V.flatMap((v) => Array.from({ length: c[v] }, () => v));
+const THIN = 10; // fewer calls than this and a kind's rate is shown greyed, as too few to judge
 const emptyText = `No graded calls yet.${track.waiting > 0 ? ` ${track.waiting} previews are waiting on their games.` : ''}`;
 const seasonsLabel = (s: number[]) => `${s[0]}–${String(s[0] + 1).slice(2)} to ${s[s.length - 1]}–${String(s[s.length - 1] + 1).slice(2)}`;
+const seasonLabel = `${track.season}–${String(track.season + 1).slice(2)}`;
+
+// Latest calls, grouped by game (newest first), the first few games open and the rest behind a fold.
+type Game = { game_id: number; date: string; away: string; home: string; calls: Latest[] };
+const games: Game[] = [];
+for (const c of calls.latest) {
+  const g = games.find((x) => x.game_id === c.game_id);
+  if (g) g.calls.push(c);
+  else games.push({ game_id: c.game_id, date: c.date, away: c.away, home: c.home, calls: [c] });
+}
+const SHOW = 5;
+const shown = (v: string | null | undefined) => v && v !== '–';
+
 // Calibration scale: the favourite's chance runs from 50% up, results can fall below it.
 const LO = 30, HI = 100;
 const x = (p: number) => `${((100 * p - LO) / (HI - LO)) * 100}%`;
-const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
+const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
 ---
 <Base section="record" title="Track record" mock={false} description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
   <header class="team-top"><h1>Track record</h1></header>
   <p class="lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />
 
-  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Every graded call this season. Bolder is better.">
+  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Every graded call this season, one puck each.">
     {n > 0 ? (
-      <div class="card summary">
-        <p class="big">{pct(calls.tally.held, n)}%<span> held up</span></p>
-        <div class="stack lg" role="img" aria-label={`${calls.tally.held} held up, ${calls.tally.partly} partly, ${calls.tally.missed} didn’t happen`}>
-          {(['held', 'partly', 'missed'] as const).map((v) => calls.tally[v] > 0 && <span class={v} style={`flex-grow:${calls.tally[v]}`}>{calls.tally[v]}</span>)}
+      <div class="card score">
+        <div class="sc-main">
+          <p class="eyebrow">{seasonLabel} so far</p>
+          <p class="hero">{pct(calls.tally.held, n)}<span class="pc">%</span></p>
+          <p class="hero-sub">of the previews’ calls held up</p>
+          <dl class="counts">
+            {V.map((v) => <div><dt><i class:list={['pk', v]} aria-hidden="true"></i>{word[v]}</dt><dd>{calls.tally[v]}</dd></div>)}
+          </dl>
+          <p class="sub">{plural(n, 'call')} in {plural(calls.games, 'game')}{track.waiting > 0 && <> · {plural(track.waiting, 'preview')} waiting on {track.waiting === 1 ? 'its game' : 'their games'}</>}</p>
         </div>
-        <p class="sub">{n} calls in {calls.games} {calls.games === 1 ? 'game' : 'games'}</p>
-        <p class="key" aria-hidden="true"><span class="held"></span>Held up <span class="partly"></span>Partly <span class="missed"></span>Didn’t happen</p>
+        <div class="sc-grid" role="img" aria-label={`${calls.tally.held} held up, ${calls.tally.partly} partly, ${calls.tally.missed} didn’t happen`}>
+          {pucks(calls.tally).map((v) => <i class:list={['pk', v]}></i>)}
+        </div>
       </div>
     ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others.">
+  <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others. Greyed rates rest on too few calls to judge.">
     {n > 0 ? (
-      <ol class="rows">
-        {kindRows(calls).map(({ label, rule, c }) => (
-          <li>
-            <div class="rl"><strong>{label}</strong><span>{rule}</span></div>
-            <div class="stack">{(['held', 'partly', 'missed'] as const).map((v) => c[v] > 0 && <span class={v} style={`flex-grow:${c[v]}`}>{c[v]}</span>)}</div>
-            <p class="rn"><strong>{pct(c.held, total(c))}%</strong> of {total(c)}</p>
-          </li>
-        ))}
+      <ol class="kinds">
+        {kindRows(calls).map(({ label, rule, c }) => {
+          const t = total(c);
+          return (
+            <li class:list={['card', 'kind', { thin: t < THIN }]}>
+              <div class="k-top">
+                <h3>{label}</h3>
+                <p class="k-pct" title={`${c.held} held up, ${c.partly} partly, ${c.missed} didn’t happen`}><strong>{pct(c.held, t)}%</strong><span>of {t}</span></p>
+              </div>
+              <p class="k-rule">{rule}</p>
+              <div class="k-pucks" role="img" aria-label={`${c.held} held up, ${c.partly} partly, ${c.missed} didn’t happen`}>
+                {pucks(c).map((v) => <i class:list={['pk', v]}></i>)}
+              </div>
+            </li>
+          );
+        })}
       </ol>
     ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <Section id="weeks" title="Week by week" placeholder={false} takeaway="Each column is one week of graded calls.">
+  <Section id="weeks" title="Week by week" placeholder={false} takeaway="The share of each week’s calls that held up. The dashed line is half.">
     {n > 0 ? (
-      <div class="weeks" style={`--n:${calls.weeks.length}`}>
-        {calls.weeks.map((w) => (
-          <div class="wk">
-            <p class="wp">{pct(w.held, total(w))}%</p>
-            <div class="col" style={`height:${(100 * total(w)) / weekMax}%`} title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
-              {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
+      <div class="card weeks-card">
+        <div class="weeks" style={`--n:${calls.weeks.length}`}>
+          <span class="half" aria-hidden="true"></span>
+          {calls.weeks.map((w) => (
+            <div class="wk" title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+              <p class="wp">{pct(w.held, total(w))}%</p>
+              <div class="col">
+                {(['missed', 'partly', 'held'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
+              </div>
+              <p class="wl">{day(w.week)}</p>
+              <p class="wn">{plural(total(w), 'call')}</p>
             </div>
-            <p class="wl">{day(w.week)}</p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <Section id="latest" title="Latest calls" placeholder={false} takeaway="The most recent calls and how each one went.">
+  <Section id="latest" title="Latest calls" placeholder={false} takeaway="The most recent games with graded calls, and how each call went.">
     {n > 0 ? (
       <>
-        <ol class="latest">{calls.latest.slice(0, SHOW).map((c) => <li>
-              <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
-              <div class="lc">
-                <a class="lh hl" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
-                <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
-              </div>
-            </li>)}</ol>
-        {calls.latest.length > SHOW && (
-          <details class="fold">
-            <summary><span class="more-word">Show {calls.latest.length - SHOW} more</span><span class="less-word">Show fewer</span></summary>
-            <ol class="latest">{calls.latest.slice(SHOW).map((c) => <li>
-              <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
-              <div class="lc">
-                <a class="lh hl" href={`${base}recap/${c.game_id}/`}>{c.head}</a>
-                <p class="lm">{c.away} at {c.home} · {day(c.date)}{c.tonight && c.tonight !== '–' && <> · {c.tonight} <span class="usual">(usual {c.usual})</span></>}</p>
-              </div>
-            </li>)}</ol>
-          </details>
-        )}
+        {[games.slice(0, SHOW), games.slice(SHOW)].map((set, i) => {
+          if (!set.length) return null;
+          const list = (
+            <ol class="gcards">
+              {set.map((g) => (
+                <li class="card gcard">
+                  <header class="g-head">
+                    <p class="g-teams">
+                      <a class="tlink" href={`${base}team/${g.away}/`}><i class="tdot" style={`--tc:${teamColour(g.away)}`}></i>{g.away}</a>
+                      <span class="at">at</span>
+                      <a class="tlink" href={`${base}team/${g.home}/`}><i class="tdot" style={`--tc:${teamColour(g.home)}`}></i>{g.home}</a>
+                      <span class="g-day">{day(g.date, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    </p>
+                    <a class="g-link" href={`${base}recap/${g.game_id}/`}>Post-game <span aria-hidden="true">›</span></a>
+                  </header>
+                  <ol class="g-calls">
+                    {g.calls.map((c) => (
+                      <li>
+                        <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
+                        <div class="lc">
+                          <p class="lh">{c.head}</p>
+                          {c.call && <p class="lcall">{c.call}</p>}
+                        </div>
+                        {shown(c.tonight) && (
+                          <dl class="nums">
+                            {shown(c.usual) && <div><dt>Coming in</dt><dd>{c.usual}</dd></div>}
+                            <div><dt>In this game</dt><dd>{c.tonight}</dd></div>
+                          </dl>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              ))}
+            </ol>
+          );
+          return i === 0 ? list : (
+            <details class="fold">
+              <summary><span class="closed">Show {plural(set.length, 'more game')}</span><span class="opened">Show fewer games</span></summary>
+              {list}
+            </details>
+          );
+        })}
       </>
     ) : <p class="note">{emptyText}</p>}
   </Section>
@@ -154,39 +213,41 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
             </div>
           )}
         </div>
-        <div class="pick"><span>Show</span>
-          <select id="win-pick" aria-label="Which games">
-            {win.season && <option value="season">this season</option>}
-            {win.past && win.past.seasons && <option value="past">{seasonsLabel(win.past.seasons)}</option>}
-          </select>
+        <div class="card calib-card">
+          <div class="pick"><span>Show</span>
+            <select id="win-pick" aria-label="Which games">
+              {win.season && <option value="season">this season</option>}
+              {win.past && win.past.seasons && <option value="past">{seasonsLabel(win.past.seasons)}</option>}
+            </select>
+          </div>
+          {(['season', 'past'] as const).map((k) => {
+            const w = win[k];
+            if (!w) return null;
+            return (
+              <div class="calib" data-win={k} hidden={k !== (win.season ? 'season' : 'past')}>
+                <p class="key"><span class="said"></span>Chance we gave <span class="won"></span>How often they won <span class="rng"></span>Likely range</p>
+                <ol>
+                  {w.bands.map((b) => (
+                    <li>
+                      <span class="bl">{b.band.replace('-', '–')}</span>
+                      <div class="lane" title={`Given ${Math.round(100 * b.said)}% on average, won ${Math.round(100 * b.won)}% of ${b.games} games`}>
+                        <span class="even" style={`left:${x(0.5)}`}></span>
+                        <span class="whisk" style={`left:${x(b.lo)};width:calc(${x(b.hi)} - ${x(b.lo)})`}></span>
+                        <span class="said" style={`left:${x(b.said)}`}></span>
+                        <span class="won" style={`left:${x(b.won)}`}></span>
+                      </div>
+                      <span class="bn"><strong>{Math.round(100 * b.won)}%</strong> of {b.games}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div class="axis" aria-hidden="true"><span class="bl"></span><div class="ticks">{[30, 50, 70, 90].map((t) => <span style={`left:${x(t / 100)}`}>{t}%</span>)}</div><span class="bn"></span></div>
+                {k === 'season' && w.games < 300 && <p class="note">Small samples: each row is only a handful of games so far, so the ranges are wide.</p>}
+                {k === 'past' && <p class="note">Each of these seasons was predicted by the model fitted on the other two, so no game was scored by a model that had seen it.</p>}
+              </div>
+            );
+          })}
         </div>
-        {(['season', 'past'] as const).map((k, i) => {
-          const w = win[k];
-          if (!w) return null;
-          return (
-            <div class="card calib" data-win={k} hidden={k !== (win.season ? 'season' : 'past')}>
-              <p class="key"><span class="said"></span>Chance we gave <span class="won"></span>How often they won <span class="rng"></span>Likely range</p>
-              <ol>
-                {w.bands.map((b) => (
-                  <li>
-                    <span class="bl">{b.band}</span>
-                    <div class="lane" title={`Given ${Math.round(100 * b.said)}% on average, won ${Math.round(100 * b.won)}% of ${b.games} games`}>
-                      <span class="even" style={`left:${x(0.5)}`}></span>
-                      <span class="whisk" style={`left:${x(b.lo)};width:calc(${x(b.hi)} - ${x(b.lo)})`}></span>
-                      <span class="said" style={`left:${x(b.said)}`}></span>
-                      <span class="won" style={`left:${x(b.won)}`}></span>
-                    </div>
-                    <span class="bn"><strong>{Math.round(100 * b.won)}%</strong> of {b.games}</span>
-                  </li>
-                ))}
-              </ol>
-              <div class="axis" aria-hidden="true"><span class="bl"></span><div class="ticks">{[30, 50, 70, 90].map((t) => <span style={`left:${x(t / 100)}`}>{t}%</span>)}</div><span class="bn"></span></div>
-              {k === 'season' && w.games < 300 && <p class="note">Small samples: each row is only a handful of games so far, so the ranges are wide.</p>}
-              {k === 'past' && <p class="note">Each of these seasons was predicted by the model fitted on the other two, so no game was scored by a model that had seen it.</p>}
-            </div>
-          );
-        })}
-        <p class="note">The win chance is never shown before a game. It is worked out afterwards from what was known that morning, and each post-game page reveals it with the reasons.</p>
+        <p class="note foot">The win chance is never shown before a game. It is worked out afterwards from what was known that morning, and each post-game page reveals it with the reasons.</p>
       </>
     ) : <p class="note">No finished games to score yet.</p>}
   </Section>
@@ -198,81 +259,124 @@ const nav: [string, string][] = [['calls', 'Calls'], ['kinds', 'By kind'], ['wee
 </script>
 
 <style>
-  .big { font: 700 40px / 1.1 var(--display); margin: 8px 0 12px; }
-  .big span { font: 500 17px var(--ui); color: var(--ink-2); }
-  .summary { margin-top: 22px; max-width: 640px; }
-  .sub { font: 500 14px var(--ui); color: var(--ink-2); margin-top: 10px; }
+  /* Pucks: held filled in ink, partly half filled, missed an empty puck (the site's quality-pip language). */
+  .pk { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--rule); }
+  .pk.held { background: var(--ink); }
+  .pk.partly { background: linear-gradient(90deg, var(--ink) 50%, var(--rule) 50%); }
 
+  .eyebrow { margin: 0; }
+  .sub { font: 500 14px var(--ui); color: var(--ink-2); }
 
-  /* Darker is better: held in ink, partly in a mid tone, missed as the pale track. */
-  .stack { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--sheet); }
-  .stack.lg { height: 30px; }
-  .stack span { display: flex; align-items: center; justify-content: center; min-width: 0; font: 700 12px var(--ui); overflow: hidden; }
-  .held { background: var(--ink); color: var(--sheet); }
-  .partly { background: color-mix(in oklab, var(--ink) 42%, var(--track)); color: var(--sheet); }
-  .missed { background: var(--track); color: var(--ink-2); }
-    .key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 14px; }
-  .key span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: -8px; vertical-align: -1px; }
+  /* The score: big number and counts on the left, every call as a puck on the right. */
+  .score { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 1.25fr); gap: 28px 40px; align-items: center; padding: 26px 28px; }
+  .hero { font: 700 88px / 0.95 var(--display); font-variation-settings: 'SOFT' 100; letter-spacing: -0.02em; margin-top: 8px; }
+  .hero .pc { font-size: 0.5em; margin-left: 2px; vertical-align: 0.62em; }
+  .hero-sub { font: 400 19px var(--body); color: var(--ink-2); margin-top: 6px; }
+  .counts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 22px 0 14px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .counts dt { display: flex; align-items: center; gap: 7px; font: 500 13px var(--ui); color: var(--ink-2); }
+  .counts dd { margin: 2px 0 0; font: 700 26px / 1.1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .sc-grid .pk { width: 14px; height: 14px; }
+  .sc-grid { display: flex; flex-wrap: wrap; gap: 7px; align-content: center; max-width: 504px; justify-self: end; }
 
+  /* By kind: one card per kind, a puck per call so the sample size is plain to see. */
+  .kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .kind { display: flex; flex-direction: column; gap: 6px; }
+  .k-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .kind h3 { font: 600 20px / 1.25 var(--display); }
+  .k-pct { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font: 500 13px var(--ui); color: var(--ink-2); }
+  .k-pct strong { font: 700 26px var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); }
+  .k-rule { font: 400 14px / 1.45 var(--ui); color: var(--ink-2); max-width: 46ch; }
+  .k-pucks { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 10px; }
+  .k-pucks .pk { width: 11px; height: 11px; }
+  .kind.thin .k-pct strong { color: var(--ink-3); }
+  .kind.thin .k-pucks { opacity: 0.6; }
 
-  .rows { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 14px; }
-  .rows li { display: grid; grid-template-columns: minmax(200px, 1.1fr) 2fr 92px; gap: 16px; align-items: center; }
-  .rl strong { display: block; font: 600 16px var(--ui); }
-  .rl span { font-size: 14px; color: var(--ink-2); }
-  .rn { font: 500 14px var(--ui); color: var(--ink-2); text-align: right; white-space: nowrap; }
-  .rn strong { font-size: 17px; color: var(--ink); }
+  /* Week by week: each column is one week's calls split by result, held at the bottom. */
+  .weeks-card { padding: 22px 28px 18px; width: fit-content; max-width: 100%; }
+  .weeks { position: relative; display: flex; width: max-content; max-width: 100%; gap: 14px; align-items: flex-end; height: 220px; overflow-x: auto; }
+  .half { position: absolute; left: 0; right: 0; bottom: calc(46px + 0.5 * (220px - 46px - 26px)); border-top: 1px dashed var(--ink-3); opacity: 0.6; pointer-events: none; }
+  .wk { flex: 0 0 56px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+  .wp { font: 700 15px var(--ui); text-align: center; height: 26px; }
+  .col { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; border-radius: 8px; overflow: hidden; }
+  .col span { flex-basis: 0; min-height: 3px; }
+  .col .held { background: var(--ink); }
+  .col .partly { background: color-mix(in oklab, var(--ink) 40%, var(--rule)); }
+  .col .missed { background: var(--track); }
+  .wl { font: 600 12px var(--ui); text-align: center; margin-top: 8px; white-space: nowrap; height: 18px; }
+  .wn { font: 500 11px var(--ui); color: var(--ink-3); text-align: center; white-space: nowrap; height: 20px; }
 
-  .weeks { display: flex; gap: 10px; align-items: flex-end; height: 200px; margin-top: 20px; max-width: calc(var(--n) * 90px); }
-  .wk { flex: 1 1 0; max-width: 80px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
-  .col { display: flex; flex-direction: column; gap: 2px; border-radius: 6px 6px 2px 2px; overflow: hidden; min-height: 6px; }
-  .col span { flex-basis: 0; min-height: 2px; }
-  .wp { font: 700 14px var(--ui); text-align: center; margin-bottom: 6px; }
-  .wl { font: 500 12px var(--ui); color: var(--ink-3); text-align: center; margin-top: 6px; white-space: nowrap; }
-
-  .latest { list-style: none; padding: 0; margin-top: 16px; }
-  .latest li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--rule); }
-  .vchip { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 128px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+  /* Latest calls: a card per game. */
+  .gcards { display: grid; gap: 14px; }
+  .fold .gcards { margin-top: 14px; }
+  .gcard { padding: 0; overflow: hidden; }
+  .g-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--rule); }
+  .g-teams { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font: 700 15px var(--ui); }
+  .tdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--tc); margin-right: 6px; vertical-align: 1px; }
+  .at { font-weight: 500; color: var(--ink-3); }
+  .g-day { font-weight: 500; color: var(--ink-2); margin-left: 6px; }
+  .g-link { font: 600 13px var(--ui); color: var(--ink-2); padding: 5px 12px; border-radius: 999px; background: var(--track); white-space: nowrap; transition: background-color 0.15s ease; }
+  .g-link:hover { background: var(--rule); color: var(--ink); }
+  .g-calls > li { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 14px 18px; }
+  .g-calls > li + li { border-top: 1px solid var(--rule); }
+  .vchip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; margin-top: 1px; }
   .vchip.held { background: var(--ink); color: var(--sheet); }
-  .vchip.partly { background: transparent; color: var(--ink); }
-  .vchip.missed { background: transparent; border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
-  .lh { font: 600 17px var(--body); color: var(--ink); }
-  .lm { font: 500 13px var(--ui); color: var(--ink-2); margin-top: 3px; }
-  .usual { color: var(--ink-3); }
-  .fold { margin-top: 10px; }
-  .fold .less-word, .fold[open] .more-word { display: none; }
-  .fold[open] .less-word { display: inline; }
+  .vchip.partly { color: var(--ink); }
+  .vchip.missed { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .lh { font: 600 18px / 1.35 var(--display); }
+  .lcall { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin-top: 3px; }
+  .nums { display: flex; gap: 18px; text-align: right; }
+  .nums dt { font: 500 11px var(--ui); color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .nums dd { margin: 2px 0 0; font: 600 15px var(--ui); white-space: nowrap; }
+  .nums div:first-child:not(:last-child) dd { color: var(--ink-2); font-weight: 500; }
 
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 22px; }
-  .tile .big { font-size: 34px; }
-
-  .calib { margin-top: 12px; }
+  /* Win chances. */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .big { font: 700 36px / 1.1 var(--display); font-variation-settings: 'SOFT' 100; margin: 8px 0 6px; }
+  .big span { font: 500 17px var(--ui); color: var(--ink-2); }
+  .calib-card { margin-top: 16px; padding: 8px 22px 20px; }
+  .calib-card .pick { margin-top: 12px; }
   .calib ol { list-style: none; padding: 0; margin-top: 16px; display: grid; gap: 12px; }
   .calib li, .axis { display: grid; grid-template-columns: 70px 1fr 84px; gap: 14px; align-items: center; }
-  .bl { font: 600 14px var(--ui); }
+  .bl { font: 600 14px var(--ui); white-space: nowrap; }
   .bn { font: 500 13px var(--ui); color: var(--ink-2); text-align: right; white-space: nowrap; }
   .bn strong { font-size: 15px; color: var(--ink); }
   .lane { position: relative; height: 22px; }
   .lane::before { content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--track); border-radius: 1px; }
   .lane span { position: absolute; top: 50%; transform: translate(-50%, -50%); }
   .lane .even { width: 1px; height: 22px; background: var(--rule); }
-  .lane .whisk { transform: translateY(-50%); height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--ink) 18%, var(--track)); }
+  .lane .whisk { transform: translateY(-50%); height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--ink) 14%, var(--track)); }
   .lane .said, .key .said { width: 3px; height: 20px; border-radius: 2px; background: var(--ink-3); }
   .lane .won, .key .won { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
-  .key .said { width: 3px; height: 14px; margin-right: -6px; }
-  .key .won { width: 12px; height: 12px; }
-  .key .rng { width: 18px; height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--ink) 18%, var(--track)); }
+  .key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 14px; }
+  .key span { display: inline-block; vertical-align: -1px; }
+  .key .said { height: 14px; margin-right: -6px; }
+  .key .won { width: 12px; height: 12px; margin-right: -6px; }
+  .key .rng { width: 18px; height: 8px; border-radius: 4px; margin-right: -6px; background: color-mix(in oklab, var(--ink) 14%, var(--track)); }
   .axis { margin-top: 6px; }
   .ticks { position: relative; height: 16px; }
   .ticks span { position: absolute; transform: translateX(-50%); font: 500 12px var(--ui); color: var(--ink-3); }
+  .calib .note { margin-top: 14px; }
+  .foot { margin-top: 14px; }
+
+  @media (prefers-color-scheme: dark) {
+    .tdot { background: color-mix(in oklab, var(--tc) 55%, white); }
+  }
 
   @media (max-width: 719px) {
+    .score { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+    .hero { font-size: 72px; }
+    .sc-grid { justify-self: start; gap: 5px; }
+    .sc-grid .pk { width: 11px; height: 11px; }
+    .kinds { grid-template-columns: 1fr; gap: 12px; }
     .tiles { grid-template-columns: 1fr; }
-    .rows li { grid-template-columns: 1fr auto; gap: 6px 12px; }
-    .rows .stack { grid-column: 1 / -1; grid-row: 2; }
-    .rows .rn { grid-row: 1; grid-column: 2; }
-    .vchip { min-width: 0; padding: 4px 8px; }
+    .weeks-card { padding: 18px 16px 14px; }
+    .g-head { padding: 12px 14px; }
+    .g-calls > li { grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding: 12px 14px; }
+    .vchip { width: 30px; height: 30px; padding: 0; grid-row: span 2; }
     .vchip .vh { display: none; }
-    .vchip { width: 30px; height: 30px; padding: 0; }
+    .nums { grid-column: 2; text-align: left; margin-top: 6px; flex-wrap: wrap; gap: 6px 18px; }
+    .nums dd { white-space: normal; }
+    .calib-card { padding: 4px 16px 16px; }
     .calib li, .axis { grid-template-columns: 58px 1fr 70px; gap: 10px; }
   }
 </style>
