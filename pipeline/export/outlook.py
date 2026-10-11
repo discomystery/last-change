@@ -131,6 +131,9 @@ def _with_rosters(df: pl.DataFrame, done: pl.DataFrame, upcoming: dict[int, floa
                                             dtype=pl.Float64))
 
 
+CLOSE = (45, 55)  # the reveal calls a game "close to even" only inside this range (user, 2026-10-11: "a little closer")
+
+
 def _a(pct: int) -> str:
     """"a 72%", but "an 83%", "an 18%", "an 8%"."""
     return f"{'an' if pct in (8, 11, 18) or 80 <= pct <= 89 else 'a'} {pct}%"
@@ -228,15 +231,20 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
         sides = {}
         for team, opp, p, won in ((g["home"], g["away"], ph, home_won), (g["away"], g["home"], 1 - ph, not home_won)):
             pct, T, O = round(100 * p), say[team], say[opp]
-            # bands on the shown figure, so "60%" is never also "close to even"
+            # bands on the shown figure, so "60%" is never also "close to even"; 45-55% is a coin flip, 40-44% and 56-59%
+            # a lean, under 40% or 60%+ a clear call
             if won:
-                head = (f"We gave {T} {_a(pct)} chance, and {T} proved us wrong." if pct < 40 else
-                        f"We gave {T} {_a(pct)} chance, and {T} delivered." if pct >= 60 else
-                        f"We had this close to even ({pct}% for {T}), and {T} came through.")
+                head = (f"We gave {T} only {_a(pct)} chance, and {T} proved us wrong." if pct < 40 else
+                        f"We had {T} as slight underdogs ({pct}%), and {T} pulled it off." if pct < CLOSE[0] else
+                        f"We had this close to even ({pct}% for {T}), and {T} came through." if pct <= CLOSE[1] else
+                        f"We leaned {T}’s way ({pct}%), and {T} came through." if pct < 60 else
+                        f"We gave {T} {_a(pct)} chance, and {T} delivered.")
             else:
-                head = (f"We gave {T} {_a(pct)} chance, but {O} had other ideas." if pct >= 60 else
-                        f"We gave {T} only {_a(pct)} chance, and it went the way we feared." if pct < 40 else
-                        f"We had this close to even ({pct}% for {T}), and it went {O}’s way.")
+                head = (f"We gave {T} only {_a(pct)} chance, and it went the way we feared." if pct < 40 else
+                        f"We had {T} as slight underdogs ({pct}%), and it went {O}’s way." if pct < CLOSE[0] else
+                        f"We had this close to even ({pct}% for {T}), and it went {O}’s way." if pct <= CLOSE[1] else
+                        f"We leaned {T}’s way ({pct}%), but {O} had other ideas." if pct < 60 else
+                        f"We gave {T} {_a(pct)} chance, but {O} had other ideas.")
             sides[team] = {"head": wording.tidy(head), "chance": pct}
         out[g["id"]] = {"p_home": round(ph, 4), "p_home_puck": round(float(puck[g["id"]]), 4) if has_lineup else None,
                         "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides}

@@ -60,6 +60,7 @@ class Season:
         players = pl.read_parquet(d / "players.parquet")
         self.pos = {(r["game_id"], r["player_id"]): r["pos"] for r in players.select("game_id", "player_id", "pos").iter_rows(named=True)}
         self.name = {r["player_id"]: f"{r['first'][0]}. {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
+        self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)

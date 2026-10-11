@@ -30,6 +30,7 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
+from pipeline.export import wording
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
@@ -88,7 +89,8 @@ def book() -> tuple[pl.DataFrame, pl.DataFrame, dict[int, str]]:
                        pts=pl.col("g") + pl.col("a1") + pl.col("a2"))
          .drop("home", "away", "home_id").sort("date", "game_id"))
     N = pl.concat(names).sort("game_id").group_by("player_id").agg(pl.col("first").last(), pl.col("last").last())
-    return G, P, {r["player_id"]: f"{r['first']} {r['last']}" for r in N.iter_rows(named=True)}
+    # two teammates with the same name (Vancouver's Elias Petterssons) get their numbers
+    return G, P, {r["player_id"]: f"{r['first']} {r['last']}" for r in N.iter_rows(named=True)} | wording.number_clashes(CURRENT_SEASON, wording.full)
 
 
 def results(G: pl.DataFrame, team: str, season: int) -> list[dict]:
@@ -154,11 +156,10 @@ class Words:
 
 def _short(pid: int, P: pl.DataFrame, N: dict[int, str], season: int) -> str:
     """His last name, or his full name when a teammate this season shares it (the Tkachuks, the two Elias Petterssons)."""
-    full = N.get(pid, "")
-    last = full.split(" ", 1)[-1]
+    surname = lambda p: N.get(p, "").split(" (#")[0].split(" ", 1)[-1]
     teams = P.filter((pl.col("season") == season) & (pl.col("player_id") == pid))["team"].unique().to_list()
     mates = P.filter((pl.col("season") == season) & pl.col("team").is_in(teams) & (pl.col("player_id") != pid))["player_id"].unique().to_list()
-    return full if any(N.get(m, "").split(" ", 1)[-1] == last for m in mates) else last
+    return N.get(pid, "") if any(surname(m) == surname(pid) for m in mates) else surname(pid)
 
 
 def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
@@ -271,7 +272,30 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                         when = "latest game" if missed == 1 else f"last {num(missed)} games"
                         items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
                                       "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
+    item = _goalie_on_the_road(away, home, before, W, N, season)
+    if item:
+        items.append(item)
     return out
+
+
+def _goalie_on_the_road(away: str, home: str, before: str, W: Words, N: dict[int, str], season: int) -> dict | None:
+    """The visitors' clear No. 1 goalie (60%+ of their starts this season) and his record on tonight's ice, when
+    it makes a story: never won there, a long winless run there, or a run of wins."""
+    from pipeline.metrics import venues
+    try:
+        st = venues.starts()
+    except Exception as e:  # no saved boxscores or career files: no goalie storyline
+        print(f"goalie records unavailable: {e!r}")
+        return None
+    mine = st.filter((pl.col("team") == away) & (pl.col("date") < before[:10]) & (pl.col("game_id") // 10_000 == season * 100 + REGULAR))
+    if mine.height < 2:
+        return None
+    top = mine.group_by("player_id").len().sort("len", descending=True).row(0, named=True)
+    if top["len"] / mine.height < 0.6:
+        return None
+    where = f"on {W.poss(home)} ice" if W.places[home].startswith("NY ") else f"in {W.place(home)}"
+    story = venues.storyline(top["player_id"], N.get(top["player_id"], ""), home, where, before)
+    return {"tag": "In net", "pid": top["player_id"], **story} if story and N.get(top["player_id"]) else None
 
 
 def _still_out(notes: list[str], team: str, N: dict[int, str], season: int) -> list[dict]:

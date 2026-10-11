@@ -6,6 +6,7 @@ import polars as pl
 
 from pipeline.build import join_xg, validate
 from pipeline.build.stints import penalty_shot
+from pipeline.export import wording
 from pipeline.config import OFFLINE, SITE_DATA, TABLES
 from pipeline.metrics.lines import game_units
 
@@ -200,6 +201,7 @@ def export_lines(season: int) -> int:
     for s_ in (season - 1, season):
         for r in pl.read_parquet(TABLES / str(s_) / "players.parquet").iter_rows(named=True):
             names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
+    names |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
     now = units.special_usage(season)
     before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum(),
                                                                      teams_last=pl.col("team_id").unique())
