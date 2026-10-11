@@ -26,7 +26,6 @@ export type Skater = {
   group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
-  career?: [number, number, number][] | null; // [season start year, games, points], every NHL regular season
 };
 
 export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };

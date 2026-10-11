@@ -52,7 +52,7 @@ html.motion .seen .strips ~ .strips { animation-delay: calc(var(--rv-delay, 0ms)
 
 /* The rule under each section heading paints in left to right, like a blue line going down on fresh ice. */
 html.motion .sec-head { position: relative; border-bottom-color: transparent; }
-html.motion .sec-head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -5px; height: 5px; background: var(--rule-accent); transform-origin: left; transform: scaleX(0); }
+html.motion .sec-head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -5px; height: 5px; background: var(--line-blue); transform-origin: left; transform: scaleX(0); }
 html.motion .sec-head.seen::after { transform: scaleX(1); transition: transform 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) calc(var(--rv-delay, 0ms) + 120ms); }
 
 /* Folds open with a short slide instead of a jump. */

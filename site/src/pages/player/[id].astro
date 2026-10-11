@@ -47,20 +47,6 @@ const tough = (p: number) => (p > 55 ? `tougher than ${p}%` : p < 45 ? `easier t
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(p.generated_at));
 const isG = p.group === 'G';
 const s = p as Skater;
-// Career line for the name card: points a game in each NHL season. Only when his whole career has been fetched,
-// and only once there are at least three seasons to make a line.
-const careerLine = (() => {
-  const c = !isG ? (s.career ?? []).filter(([, gp]) => gp > 0) : [];
-  if (c.length < 3) return null;
-  const W = 220, H = 58, L = 6, R = 6, T = 8, B = 16;
-  const ppg = c.map(([, gp, pts]) => pts / gp);
-  const top = Math.max(1, Math.ceil(Math.max(...ppg) * 4) / 4);
-  const x = (i: number) => +(L + (i * (W - L - R)) / (c.length - 1)).toFixed(1);
-  const y = (v: number) => +(T + (1 - v / top) * (H - T - B)).toFixed(1);
-  const yr = (sn: number) => `${sn}-${String((sn + 1) % 100).padStart(2, '0')}`;
-  const pts = c.map(([sn, gp, pt], i) => ({ x: x(i), y: y(ppg[i]), tip: `${yr(sn)}: ${pt} points in ${gp} games (${ppg[i].toFixed(2)} a game)${i === c.length - 1 ? ', this season so far' : ''}` }));
-  return { W, H, pts, path: pts.map((q, i) => `${i ? 'L' : 'M'}${q.x} ${q.y}`).join(' '), first: yr(c[0][0]), last: 'Now', top, base: y(0) };
-})();
 const words = isG ? 'goalies' : groupWord[s.group];
 const posName = posWord[p.pos] ?? p.pos;
 const shoots = p.shoots === 'L' ? (isG ? 'Catches left' : 'Shoots left') : p.shoots === 'R' ? (isG ? 'Catches right' : 'Shoots right') : null;
@@ -136,20 +122,6 @@ const statRow = (x: any) => (isG ? null : x);
               {([['season', 'This season'], ['last', 'Last season']] as const).map(([k, label]) => { const x = s.stats[k]; return x && <tr><th>{label}</th><td>{x.gp}</td><td>{x.g}</td><td>{x.a}</td><td>{x.p}</td><td>{x.sog}</td><td>{clock(x.toi)}</td></tr>; })}
             </tbody>
           </table>
-          {careerLine && (
-            <figure class="pcareer">
-              <figcaption>Points a game, each NHL season</figcaption>
-              <svg viewBox={`0 0 ${careerLine.W} ${careerLine.H}`} role="img" aria-label={`Points a game in each of his ${careerLine.pts.length} NHL seasons`}>
-                <line class="pc-base" x1="0" x2={careerLine.W} y1={careerLine.base} y2={careerLine.base} />
-                <path class="pc-line" d={careerLine.path} />
-                {careerLine.pts.map((q, i) => i === careerLine.pts.length - 1
-                  ? <g class="pc-now"><circle class="pc-ring" cx={q.x} cy={q.y} r="4" /><circle class="pc-dot" cx={q.x} cy={q.y} r="4" data-tip={q.tip} tabindex="0" /></g>
-                  : <circle class="pc-dot" cx={q.x} cy={q.y} r="2.6" data-tip={q.tip} tabindex="0" />)}
-                <text x="0" y={careerLine.H - 3}>{careerLine.first}</text>
-                <text x={careerLine.W} y={careerLine.H - 3} text-anchor="end">{careerLine.last}</text>
-              </svg>
-            </figure>
-          )}
         </div>
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
@@ -486,19 +458,7 @@ const statRow = (x: any) => (isG ? null : x);
   .phead .pnum { position: absolute; z-index: -1; right: 34px; bottom: -58px; font: 700 280px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
   .phead .pmeta { grid-column: 1; grid-row: 2; }
-  .pstats-in { grid-column: 1; grid-row: 3; margin: 18px 0 16px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 32px; }
-  .pcareer { margin: 0 0 4px; width: 220px; max-width: 100%; }
-  .pcareer figcaption { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 4px; }
-  .pcareer svg { width: 100%; height: auto; display: block; overflow: visible; }
-  .pcareer .pc-base { stroke: var(--rule); }
-  .pcareer .pc-line { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-linejoin: round; }
-  .pcareer .pc-dot { fill: var(--ink-3); cursor: help; outline: none; }
-  .pcareer .pc-dot:is(:hover, :focus-visible) { fill: var(--ink); }
-  .pcareer .pc-now .pc-dot { fill: var(--team); }
-  .pcareer .pc-ring { fill: none; stroke: var(--team); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
-  :global(html.motion) .pcareer .pc-ring { animation: pc-pulse 1.1s ease-out 1.7s 2; }
-  @keyframes pc-pulse { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
-  .pcareer text { font: 500 10px var(--ui); fill: var(--ink-3); }
+  .pstats-in { grid-column: 1; grid-row: 3; margin: 18px 0 16px; }
   .phead.no-stats .pmeta { padding-bottom: 26px; }
   .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 4; width: 230px; height: 230px; margin-right: 10px; }
   .phead.no-stats :global(.phead-photo) { width: 170px; height: 170px; }
@@ -512,8 +472,6 @@ const statRow = (x: any) => (isG ? null : x);
     .phead .pmeta { grid-row: 3; padding-bottom: 14px; }
     .phead :global(.phead-photo) { grid-row: 2 / 4; width: 112px; height: 112px; margin: 0 -6px 0 0; }
     .pstats-in { grid-column: 1 / -1; grid-row: 4; margin-top: 0; border-top: 1px solid var(--rule); }
-    .pcareer { width: 100%; margin-bottom: 14px; }
-    .pcareer svg { max-width: 320px; }
     .pstats { width: 100%; }
     .phead.no-stats .pmeta { padding-bottom: 20px; }
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
