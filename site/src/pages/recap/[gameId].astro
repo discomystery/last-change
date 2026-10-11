@@ -110,11 +110,12 @@ const takeaway = graded.length
 const season = recapIndex.tally as Record<string, number>;
 const seasonTotal = season.held + season.partly + season.missed;
 const sgn = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
-const rows: [string, string, (n: Nums) => string][] = [
-  ['Shots on goal', 'Every shot that reached the net, including goals.', (n) => String(n.shots)],
-  ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out.', (n) => n.xg.toFixed(1)],
-  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked.', (n) => String(n.cf5)],
-  ['Power plays', 'Power-play goals, out of times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`],
+// Each row also says how far its bar leans: the share of the row's total each team had.
+const rows: [string, string, (n: Nums) => string, (n: Nums) => number][] = [
+  ['Shots on goal', 'Every shot that reached the net, including goals. The bar splits them between the teams.', (n) => String(n.shots), (n) => n.shots],
+  ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out. The bar splits them between the teams.', (n) => n.xg.toFixed(1), (n) => n.xg],
+  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked. The bar splits them between the teams.', (n) => String(n.cf5), (n) => n.cf5],
+  ['Power plays', 'Power-play goals, out of times on the power play. The bar splits the times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`, (n) => n.pp_opps],
 ];
 // Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
 const dw = r.replays ?? null;
@@ -170,22 +171,36 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <section class="sec top" id="story" aria-label="Overview">
     {story ? (
       <GameStory story={story} kicker={false}>
-        <table class="numbers">
-          <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{a}</th>)}</tr></thead>
-          <tbody>
-            {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
-          </tbody>
-        </table>
+        <div class="tug">
+          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
+          {rows.map(([name, tip, f, v]) => {
+            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
+            const g = x + y > 0 ? [x, y] : [1, 1];
+            return (
+              <div class="tug-row">
+                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
+                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
+              </div>
+            );
+          })}
+        </div>
         {r.end === 'SO' && <p class="note small">The shootout decides the result but is left out of every other number on this site.</p>}
       </GameStory>
     ) : (
       <div class="card">
-        <table class="numbers">
-          <thead><tr><td></td>{order.map((a) => <th scope="col" class={`t-${side(a)}`}><i></i>{a}</th>)}</tr></thead>
-          <tbody>
-            {rows.map(([name, tip, f]) => <tr><th scope="row"><span class="term" tabindex="0" data-tip={tip}>{name}</span></th>{order.map((a) => <td>{f(r.numbers[a])}</td>)}</tr>)}
-          </tbody>
-        </table>
+        <div class="tug">
+          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
+          {rows.map(([name, tip, f, v]) => {
+            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
+            const g = x + y > 0 ? [x, y] : [1, 1];
+            return (
+              <div class="tug-row">
+                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
+                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     )}
 
@@ -310,6 +325,20 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
   <p class="note foot">Team pages: <a href={`${import.meta.env.BASE_URL}team/${away}/`}>{T[away]?.name ?? away}</a> · <a href={`${import.meta.env.BASE_URL}team/${home}/`}>{T[home]?.name ?? home}</a></p>
 <script is:inline>
+  // The numbers: each bar starts even and leans to the team that had more once it is on screen. Without motion
+  // (or before this runs) the bars simply show their split.
+  (() => {
+    const ropes = [...document.querySelectorAll('.rope')];
+    if (!ropes.length || !document.documentElement.classList.contains('motion') || !('IntersectionObserver' in window)) return;
+    ropes.forEach((r) => r.classList.add('mid'));
+    const io = new IntersectionObserver((es) => {
+      if (!es.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      ropes.forEach((r, i) => setTimeout(() => r.classList.remove('mid'), 150 + i * 140));
+    }, { threshold: 0.4 });
+    io.observe(ropes[0].closest('.tug'));
+  })();
+
   // Run it again: deal the same 100 replays out in a random order, counting as they land, then let the dots slide back into their sorted seats.
   (() => {
     const btn = document.querySelector('.rp-again');
@@ -389,12 +418,19 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
   .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
-  .numbers { width: 100%; border-collapse: collapse; font: 400 15px var(--ui); margin-top: 8px; }
-  .numbers th, .numbers td { padding: 10px 6px; border-top: 1px solid var(--rule); text-align: right; }
-  .numbers thead th, .numbers thead td { border-top: 0; font-weight: 600; white-space: nowrap; }
-  .numbers thead th i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; }
-  .numbers tbody th { text-align: left; font-weight: 500; }
-  .numbers td { font-weight: 600; font-variant-numeric: tabular-nums; width: 22%; }
+  .tug { display: grid; gap: 14px; margin-top: 12px; }
+  .tug-head { display: flex; justify-content: space-between; font: 600 14px var(--ui); margin: 0; }
+  .tug-head span { display: inline-flex; align-items: center; gap: 7px; }
+  .tug-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .tug-row { display: grid; gap: 6px; }
+  .tug-top { display: grid; grid-template-columns: 4.5em 1fr 4.5em; align-items: baseline; margin: 0; font: 500 14px var(--ui); color: var(--ink-2); }
+  .tug-top span { justify-self: center; text-align: center; }
+  .tug-top strong { font: 700 20px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tug-top strong:last-child { text-align: right; }
+  .rope { position: relative; display: flex; gap: 3px; height: 10px; }
+  .rope b { flex: var(--g) 1 0; min-width: 4px; border-radius: 5px; background: var(--team); transition: flex-grow 1s cubic-bezier(0.3, 0.9, 0.25, 1); }
+  .rope::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.6; }
+  .rope.mid b { flex-grow: 1; }
   .surp, .gl { margin-top: 18px; }
   .surp .eyebrow { margin-bottom: 6px; }
   .surp .mild .h { font-size: 19px; }

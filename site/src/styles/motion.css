@@ -45,6 +45,11 @@ html.motion .seen .sw-bar { animation: lc-sw 0.7s cubic-bezier(0.25, 1, 0.35, 1)
 html.motion .seen .sw-n { animation: lc-fade 0.4s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 400ms + var(--i, 0) * 45ms); }
 @keyframes lc-sw { from { clip-path: inset(-6px calc(100% - var(--z, 50%)) -6px var(--z, 50%)); } to { clip-path: inset(-6px 0 -6px 0); } }
 
+/* Matchup strips start in even columns, as they would with no line matching, then slide to the real split of ice
+   time: the boxes that grow are the matchups the coach chases. Forward lines first, then the pairs. */
+html.motion .seen .strips { animation: lc-settle 1s cubic-bezier(0.3, 0.9, 0.25, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 350ms); }
+html.motion .seen .strips ~ .strips { animation-delay: calc(var(--rv-delay, 0ms) + 750ms); }
+@keyframes lc-settle { from { --even: 1; } }
 
 /* Folds open with a short slide instead of a jump. */
 html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }

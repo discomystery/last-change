@@ -74,14 +74,31 @@ const base = import.meta.env.BASE_URL;
       li.append(b);
       strip.append(li);
     });
+    // A small puck under the strip glides to the day picked (motion only, styled below).
+    const puck = el('li', 'day-puck');
+    puck.setAttribute('aria-hidden', 'true');
+    strip.append(puck);
+    const motion = () => document.documentElement.classList.contains('motion');
+    let shown = null;
     const showDay = (d) => {
+      // Moving to a later day, the games come in from the right; to an earlier one, from the left.
+      const from = shown && motion() ? (d > shown ? 'from-r' : d < shown ? 'from-l' : '') : '';
+      shown = d;
       current = d;
       history.replaceState(null, '', '#' + d);
       strip.querySelectorAll('.day').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.date === d)));
       strip.querySelector(`[data-date="${d}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
       monthPick.value = d.slice(0, 7);
       document.getElementById('day-h').textContent = (d === today ? 'Today, ' : '') + dayLong.format(asDate(d));
-      document.getElementById('day-games').replaceChildren(...games.filter((g) => g.date === d).map((g) => card(g)));
+      const list = document.getElementById('day-games');
+      const cards = games.filter((g) => g.date === d).map((g) => card(g));
+      if (from) cards.forEach((c, i) => { c.classList.add('rv', 'seen'); c.style.setProperty('--k', String(Math.min(i, 8))); });
+      list.classList.remove('from-l', 'from-r');
+      void list.offsetWidth;
+      if (from) list.classList.add(from);
+      list.replaceChildren(...cards);
+      const b = strip.querySelector(`[data-date="${d}"]`);
+      if (b) puck.style.translate = `${b.parentElement.offsetLeft + b.offsetWidth / 2}px 0`;
     };
     // Fade whichever end of the strip has more days hidden past it, so the last visible day isn't sliced in half.
     const edges = () => {
@@ -91,6 +108,7 @@ const base = import.meta.env.BASE_URL;
     };
     strip.addEventListener('scroll', edges, { passive: true });
     window.addEventListener('resize', edges);
+    window.addEventListener('resize', () => { const b = strip.querySelector('[aria-pressed="true"]'); if (b) puck.style.translate = `${b.parentElement.offsetLeft + b.offsetWidth / 2}px 0`; });
 
     // Month menu: jumps to the first day with games that month (today, if it falls in the month picked).
     const monthPick = document.getElementById('games-month');
@@ -141,6 +159,13 @@ const base = import.meta.env.BASE_URL;
   .strip-wrap { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; margin-top: 16px; }
   .days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; --fl: 0px; --fr: 0px; -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent); }
   .days::-webkit-scrollbar { display: none; }
+  .day-puck { display: none; }
+  html.motion .days { position: relative; padding-bottom: 14px; }
+  html.motion .day-puck { display: block; position: absolute; left: -3.5px; bottom: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); transition: translate 0.5s cubic-bezier(0.3, 1.25, 0.5, 1); }
+  html.motion .glist.from-l > .card { animation: g-from-l 0.4s cubic-bezier(0.25, 0.9, 0.3, 1) backwards; animation-delay: calc(var(--k, 0) * 30ms); }
+  html.motion .glist.from-r > .card { animation: g-from-r 0.4s cubic-bezier(0.25, 0.9, 0.3, 1) backwards; animation-delay: calc(var(--k, 0) * 30ms); }
+  @keyframes g-from-l { from { opacity: 0; translate: -36px 0; } }
+  @keyframes g-from-r { from { opacity: 0; translate: 36px 0; } }
   .days.more-l { --fl: 64px; }
   .days.more-r { --fr: 64px; }
   .pick-pair { display: inline-flex; align-items: center; gap: 10px; }
