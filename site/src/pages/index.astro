@@ -1,6 +1,9 @@
 ---
 // Home: built in the browser from the real schedule, around whichever team the visitor has chosen.
 import Base from '../layouts/Base.astro';
+import { teamColour } from '../lib/teams';
+import teams from '../../public/data/teams.json';
+const COLOURS = Object.fromEntries((teams as { abbr: string }[]).map((t) => [t.abbr, teamColour(t.abbr)]));
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="home" title="Spare Line Change" mock={false}>
@@ -29,7 +32,7 @@ const base = import.meta.env.BASE_URL;
 
     <section id="league">
       <h2 id="slate-h">Around the league</h2>
-      <ul class="games slate" id="slate"></ul>
+      <ul class="games slate" id="slate">{Array.from({ length: 4 }, () => <li class="skel skel-row" aria-hidden="true"></li>)}</ul>
       <p class="more-link"><a href={`${base}games/`}>Every game, day by day →</a></p>
       <h2 id="results-h" hidden>Latest results</h2>
       <ul class="games slate" id="results"></ul>
@@ -37,7 +40,7 @@ const base = import.meta.env.BASE_URL;
   </div>
 </Base>
 
-<script is:inline>
+<script is:inline define:vars={{ COLOURS }}>
   (async () => {
     const root = document.getElementById('home');
     const base = root.dataset.base;
@@ -73,6 +76,17 @@ const base = import.meta.env.BASE_URL;
       return li;
     };
 
+    // Picking a team: a band of the club's colour sweeps across like the ice resurfacer, and the page turns into
+    // theirs behind it. Without motion the page simply switches.
+    const choose = (abbr, btn) => {
+      if (!document.documentElement.classList.contains('motion')) return window.lcPrefs.set('team', abbr);
+      const w = el('div', 'ice-wipe');
+      w.style.setProperty('--tc', btn.style.getPropertyValue('--tc'));
+      w.setAttribute('aria-hidden', 'true');
+      document.body.append(w);
+      setTimeout(() => { window.lcPrefs.set('team', abbr); scrollTo(0, 0); }, 420);
+      w.addEventListener('animationend', () => w.remove());
+    };
     const render = () => {
       const me = window.lcPrefs.get('team');
       const now = new Date();
@@ -84,7 +98,8 @@ const base = import.meta.env.BASE_URL;
           const b = el('button', 'card row teambtn');
           b.type = 'button';
           b.append(el('span', 'tb-abbr', t.abbr), el('span', 'tb-name', t.name));
-          b.addEventListener('click', () => window.lcPrefs.set('team', t.abbr));
+          b.style.setProperty('--tc', COLOURS[t.abbr] ?? 'var(--ink)');
+          b.addEventListener('click', () => choose(t.abbr, b));
           const li = el('li');
           li.append(b);
           return li;
@@ -158,7 +173,7 @@ const base = import.meta.env.BASE_URL;
 
 <style is:global>
   /* Same look as a section heading on every other page. */
-  #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 56px 0 16px; }
+  #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--rule-accent); padding-bottom: 10px; margin: 56px 0 16px; }
   #home .latest { display: grid; gap: 4px; margin-top: 14px; padding: 16px 18px; text-decoration: none; color: var(--ink); }
   #home .l-score { font: 600 22px/1.2 var(--display); }
   #home .l-sub { font: 400 14px var(--ui); color: var(--ink-2); }
@@ -166,7 +181,12 @@ const base = import.meta.env.BASE_URL;
   #home .mine-meta { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
   .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }
   .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
-  .teambtn:hover { border-color: var(--ink); }
+  .teambtn:hover { border-color: var(--tc); }
+  .teambtn .tb-abbr { transition: color 0.2s ease; }
+  .teambtn:hover .tb-abbr, .teambtn:focus-visible .tb-abbr { color: var(--tc); }
+  @media (prefers-color-scheme: dark) { .teambtn:hover .tb-abbr, .teambtn:focus-visible .tb-abbr { color: color-mix(in oklab, var(--tc) 55%, white); } .teambtn:hover { border-color: color-mix(in oklab, var(--tc) 55%, white); } }
+  .ice-wipe { position: fixed; inset: 0; z-index: 100; pointer-events: none; background: linear-gradient(90deg, transparent 0, color-mix(in oklab, var(--tc) 30%, var(--ice)) 18%, var(--ice) 40%, var(--ice) 60%, color-mix(in oklab, var(--tc) 30%, var(--ice)) 82%, transparent 100%); animation: ice-wipe 0.9s cubic-bezier(0.45, 0, 0.3, 1) forwards; }
+  @keyframes ice-wipe { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
   .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
   .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
   .cols { display: grid; gap: 0 28px; }

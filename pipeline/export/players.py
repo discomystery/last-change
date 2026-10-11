@@ -12,7 +12,7 @@ import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
-from pipeline.ingest import edge, rosters
+from pipeline.ingest import careers, edge, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
 
@@ -206,6 +206,7 @@ def run(season: int) -> int:
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     photos = rosters.headshots(season)
     goalie_rec = {g["id"]: (abbr_, g) for abbr_, gs in goalies["teams"].items() for g in gs}
+    career = careers.load_all()
     for row in latest.iter_rows(named=True):
         pid, tid = row["player_id"], row["team_id"]
         team = abbr.get(tid)
@@ -233,7 +234,8 @@ def run(season: int) -> int:
                 continue
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
-                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid)}
+                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid),
+                     "career": _career_line(career.get(pid))}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
                              for s_ in mine.select("x_norm", "y_norm", "xg", "type", "season").iter_rows(named=True)]
@@ -253,6 +255,22 @@ def run(season: int) -> int:
         index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"]})
     (OUT / "index.json").write_text(json.dumps(sorted(index, key=lambda x: (x["team"] or "", x["last"])), separators=(",", ":")))
     return len(index)
+
+
+def _career_line(c: dict | None) -> list[list[int]] | None:
+    """[season start year, games, points] for each NHL regular season, oldest first, from a complete career's game logs
+    (this site's own tables for 2023-24 on). None until his career history has finished downloading."""
+    if not c:
+        return None
+    per: dict[int, list[int]] = {}
+    for key, games in c["logs"].items():
+        if "-" in key and int(key.split("-")[1]) != REGULAR:
+            continue
+        for g in games:
+            r = per.setdefault(int(key[:4]), [0, 0])
+            r[0] += 1
+            r[1] += int(g.get("points") or 0)
+    return [[s, gp, pts] for s, (gp, pts) in sorted(per.items()) if gp > 0] or None
 
 
 def _num(v):

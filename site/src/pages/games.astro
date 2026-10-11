@@ -14,11 +14,11 @@ const base = import.meta.env.BASE_URL;
   <div id="day-view">
     <div class="strip-wrap">
       <button type="button" class="step" id="prev-day" aria-label="Previous day">‹</button>
-      <ol class="days" id="days"></ol>
+      <ol class="days" id="days">{Array.from({ length: 9 }, () => <li aria-hidden="true"><span class="skel skel-day"></span></li>)}</ol>
       <button type="button" class="step" id="next-day" aria-label="Next day">›</button>
     </div>
-    <h2 class="day-h" id="day-h"></h2>
-    <ul class="glist" id="day-games"></ul>
+    <h2 class="day-h" id="day-h"><span class="skel skel-line" aria-hidden="true"></span></h2>
+    <ul class="glist" id="day-games">{Array.from({ length: 4 }, () => <li class="skel skel-card" aria-hidden="true"></li>)}</ul>
   </div>
   <div id="team-view" hidden></div>
   <p class="note">Times are shown in your own time zone. Previews open a week before each game; post-game pages appear once the nightly update has the final result.</p>
@@ -63,6 +63,7 @@ const base = import.meta.env.BASE_URL;
     let current = location.hash.slice(1);
     if (!dates.includes(current)) current = dates.find((d) => d >= today) ?? dates[dates.length - 1];
     const strip = document.getElementById('days');
+    strip.replaceChildren();
     dates.forEach((d) => {
       const li = el('li');
       const b = el('button', 'day');
@@ -189,5 +190,5 @@ const base = import.meta.env.BASE_URL;
   .gcard .g-btn { display: inline-block; font: 600 13px var(--ui); padding: 7px 13px; border-radius: 999px; border: 1px solid var(--ink); white-space: nowrap; transition: background-color 0.15s ease, color 0.15s ease; }
   .gcard.go:hover .g-btn { background: var(--ink); color: var(--sheet); }
   .gcard .g-venue { grid-column: 1 / -1; font-size: 12px; }
-  .gcard.next { outline: 2px solid var(--ink); }
+  .gcard.next { outline: 2px solid var(--tab-accent); }
 </style>

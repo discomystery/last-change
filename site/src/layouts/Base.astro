@@ -1,6 +1,7 @@
 ---
 import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
+import { teamColour } from '../lib/teams';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
@@ -16,6 +17,8 @@ const SITE_NAME = 'Spare Line Change';
 const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
 const teamList = teams as { abbr: string; name: string }[];
+// Each club's colour, so a visitor's own team can tint the page's accents (rules under headings, the active tab).
+const teamColours = Object.fromEntries(teamList.map((t) => [t.abbr, teamColour(t.abbr)]));
 ---
 <!doctype html>
 <html lang="en">
@@ -105,7 +108,7 @@ const teamList = teams as { abbr: string; name: string }[];
       <p class="checks">Behind the numbers: <a href={`${base}methods/`}>Methods</a> · <a href={`${base}check/`}>Real lines check</a> · <a href={`${base}xg-check/`}>Chance check</a></p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
-    <script is:inline>
+    <script is:inline define:vars={{ teamColours }}>
       // Visitor settings: remembered in this browser only, applied before anything else runs.
       (() => {
         const defaults = { team: '', mode: 'blend', arena: 'adjusted' };
@@ -115,6 +118,7 @@ const teamList = teams as { abbr: string; name: string }[];
           root.dataset[k] = v;
           document.querySelectorAll(`[data-pref="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
           if (k === 'team') document.getElementById('team-pick').value = v;
+          if (k === 'team') { if (teamColours[v]) root.style.setProperty('--my', teamColours[v]); else root.style.removeProperty('--my'); }
           if (k === 'team') {
             ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
             if (v) document.getElementById('my-team-link').textContent = v;
@@ -165,6 +169,21 @@ const teamList = teams as { abbr: string; name: string }[];
         document.addEventListener('click', (e) => { const el = target(e); if (!el) return hide(); current === el && !tip.hidden && e.pointerType === 'touch' ? hide() : show(el); });
         window.addEventListener('scroll', hide, { passive: true });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+      })();
+    </script>
+    <script is:inline>
+      // Matchup strips: pointing at (or tapping) an opposing line's box lights that line up in every strip of the card.
+      (() => {
+        const light = (e) => {
+          const box = e.target.closest?.('.strip > span');
+          const card = e.target.closest?.('.stripcard');
+          if (!card) return;
+          if (box) card.dataset.hl = String([...box.parentElement.children].indexOf(box));
+          else delete card.dataset.hl;
+        };
+        document.addEventListener('pointerover', light);
+        document.addEventListener('focusin', light);
+        document.addEventListener('pointerout', (e) => { const card = e.target.closest?.('.stripcard'); if (card && !card.contains(e.relatedTarget)) delete card.dataset.hl; });
       })();
     </script>
     <script is:inline>
@@ -238,6 +257,13 @@ const teamList = teams as { abbr: string; name: string }[];
       --line-blue: rgba(90, 144, 234, 0.38);
     }
   }
+  /* Accents: the rule under each section heading and the active tab. Once a visitor picks a team they take that
+     club's colour, softened (and lightened in dark mode, as team colours are everywhere). */
+  :root { --rule-accent: var(--line-blue); --tab-accent: var(--ink); }
+  html[style*='--my'] { --rule-accent: color-mix(in oklab, var(--my) 42%, var(--sheet)); --tab-accent: var(--my); }
+  @media (prefers-color-scheme: dark) {
+    html[style*='--my'] { --rule-accent: color-mix(in oklab, color-mix(in oklab, var(--my) 55%, white) 45%, var(--sheet)); --tab-accent: color-mix(in oklab, var(--my) 55%, white); }
+  }
   .t-CAR { --team: var(--CAR); }
   .t-EDM { --team: var(--EDM); }
 
@@ -295,7 +321,7 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-nav { align-items: center; }
   .site-nav a, .site-nav .soon { padding: 6px 0; border-bottom: 2px solid transparent; }
   .site-nav a:hover { border-bottom-color: var(--rule); }
-  .site-nav a[aria-current='page'] { border-bottom-color: var(--ink); }
+  .site-nav a[aria-current='page'] { border-bottom-color: var(--tab-accent); }
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
   .site-nav .my-team { border: 1px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
@@ -310,7 +336,7 @@ const teamList = teams as { abbr: string; name: string }[];
     .tabbar a, .tabbar button { display: grid; justify-items: center; gap: 3px; font: 600 11px var(--ui); color: var(--ink-3); text-decoration: none; background: none; border: 0; padding: 4px 0; cursor: pointer; }
     .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
     .tabbar [aria-current='page'], .tabbar button[aria-expanded='true'] { color: var(--ink); }
-    .tabbar [aria-current='page'] svg { stroke-width: 2.4; }
+    .tabbar [aria-current='page'] svg { stroke-width: 2.4; stroke: var(--tab-accent); }
     .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
     .more a, .more .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
     .more a:hover { background: var(--track); }
@@ -381,7 +407,15 @@ const teamList = teams as { abbr: string; name: string }[];
 
   /* Sections */
   .sec { margin-top: 72px; scroll-margin-top: 96px; }
-  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; }
+  /* Placeholders shown while a page builds itself in the browser; the page's script replaces them. */
+  .skel { display: block; background: var(--track); border-radius: 14px; list-style: none; }
+  .skel-card { height: 112px; }
+  .skel-row { height: 58px; margin-bottom: 8px; }
+  .skel-day { width: 76px; height: 58px; border-radius: 12px; }
+  .skel-line { display: inline-block; width: 14ch; height: 0.8em; border-radius: 8px; }
+  html.motion .skel { background: linear-gradient(100deg, var(--track) 40%, color-mix(in oklab, var(--track) 55%, var(--sheet)) 50%, var(--track) 60%) 0 0 / 300% 100%; animation: skel-sheen 1.6s ease-in-out infinite; }
+  @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--rule-accent); padding-bottom: 10px; }
   .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
   .takeaway { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
