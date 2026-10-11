@@ -36,7 +36,8 @@ from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics import rapm
 
 RAPM_LAMBDA = 40000.0  # same ridge penalty as player pages (metrics/players.py)
-RAPM_SEASONS = 3  # impact from three seasons: steadier than two, and closer to expert rankings (ESPN rho 0.54 -> 0.66)
+# Impact comes from rapm.chained (ratings that carry every season since 2023-24 forward); three seasons had been
+# steadier than two and closer to expert rankings (ESPN rho 0.54 -> 0.66).
 LAST_SEASON_GAMES = 30  # last season counts as at most this many games beside this season's
 LAST_SEASON_WEIGHT = 0.8
 MOVED_WEIGHT = 0.6  # a player on a new team: his old scoring share carries over less (year-to-year r 0.80 vs 0.88)
@@ -88,7 +89,7 @@ def _scale(season: int) -> dict:
     """League scale from the last full season's regulars: means and spreads by position group, and the score list
     every player is ranked against (so the scale does not wobble with five games of this season)."""
     lines = season_lines(season)
-    r = rapm.run(_rapm_seasons(season), RAPM_LAMBDA)
+    r = rapm.chained(season)
     d = lines.filter(pl.col("gp") >= REGULAR_GP).join(r.select("player_id", "off", "def"), on="player_id", how="left")
     d = d.with_columns(share=pl.col("pts") / pl.col("tgf"), impact=(pl.col("off").fill_null(0) + pl.col("def").fill_null(0)) * pl.col("sec5") / 3600,
                        grp=pl.col("pos").map_elements(_group, return_dtype=pl.Utf8))
@@ -129,7 +130,7 @@ def run(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame
     mean = sc["means"]
     d = d.with_columns(share=(pl.col("pts_b") + pl.col("grp").replace_strict(mean) * SHRINK_GAMES * gpg) / (pl.col("tgf_b") + SHRINK_GAMES * gpg))
     sec5 = (pl.col("sec5").fill_null(0) * pl.col("gp") + pl.col("sec5_l").fill_null(0) * pl.col("c") * pl.col("gp_l")) / pl.col("eff_gp")
-    r = rapm.run(_rapm_seasons(season), RAPM_LAMBDA) if before is None else _rapm_before(season, before)
+    r = rapm.chained(season, before)
     d = d.join(r.select("player_id", "off", "def"), on="player_id", how="left").with_columns(
         sec5_b=sec5, impact=(pl.col("off").fill_null(0) + pl.col("def").fill_null(0)) * sec5 / 3600)
     z = _score(d, sc)
@@ -154,11 +155,6 @@ def _last_full(season: int) -> pl.DataFrame:
     return last.rename({c: f"{c}_l" for c in cols})
 
 
-def _rapm_seasons(season: int) -> list[int]:
-    # Never before 2023-24: event timing was recorded differently earlier, which our expected goals cannot bridge.
-    return [s for s in range(max(season - RAPM_SEASONS + 1, FULL_SEASONS[0]), season + 1) if (TABLES / str(s) / "stints.parquet").exists()]
-
-
 def _listed(season: int, before: str | None) -> pl.DataFrame:
     """Latest roster listing (on or before the day before `before`) as player_id, team_id."""
     path = TABLES / str(season) / "rosters.parquet"
@@ -172,17 +168,6 @@ def _listed(season: int, before: str | None) -> pl.DataFrame:
     g = pl.read_parquet(TABLES / str(season) / "games.parquet")
     ids = pl.concat([g.select(pl.col("home").alias("team"), pl.col("home_id").alias("team_id")), g.select(pl.col("away").alias("team"), pl.col("away_id").alias("team_id"))]).unique()
     return r.join(ids, on="team").select("player_id", "team_id").unique("player_id")
-
-
-def _rapm_before(season: int, before: str) -> pl.DataFrame:
-    """Two-season ratings using only games before a date (for pages frozen before puck drop)."""
-    keep = _games(season).filter(pl.col("date") < before)["game_id"]
-    st = rapm.stretches(season)
-    full = pl.concat([rapm.stretches(s) for s in _rapm_seasons(season) if s != season] + [st.filter(pl.col("game_id").is_in(keep))])
-    X, y, w, players, _ = rapm.design(full)
-    m = rapm.fit(X, y, w, RAPM_LAMBDA, len(players), intervals=False)
-    n = len(players)
-    return pl.DataFrame({"player_id": players, "off": m["beta"][:n], "def": -m["beta"][n: 2 * n]})
 
 
 def with_without(season: int, rel: pl.DataFrame, before: str | None = None) -> pl.DataFrame:
