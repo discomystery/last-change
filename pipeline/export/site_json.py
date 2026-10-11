@@ -135,7 +135,7 @@ def export_xg_check(season: int) -> int:
     bundle = xg_model.saved()
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").sort("game_id")
-    feats = pl.read_parquet(d / "shot_features.parquet").filter(pl.col("type") != "blocked-shot")
+    feats = xg_model.load(season)  # with the features the model derives at load time
     feats = feats.with_columns(ours=pl.Series(xg_model.predict(bundle, feats)))
     events = pl.read_parquet(d / "events.parquet").select("game_id", "event_id", "p1", "period", "situation_code")
     mp = pl.read_parquet(d / "shots_xg.parquet").select("game_id", "event_id", pl.col("xGoal").alias("mp"))
