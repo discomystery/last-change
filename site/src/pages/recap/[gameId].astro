@@ -82,19 +82,11 @@ const why = (a: string, input: string, pts: number): { short: string; long: stri
 // The steps for one team's side, ready for the story: start at 50, each input, the morning figure, and the puck-drop
 // figure when tonight's lineups moved it.
 const beatsFor = (a: string): Beat[] => {
-  const steps = ladder(a);
-  const moved = steps.find((x) => x.input === 'lineup' && x.pts !== 0);
+  const steps = ladder(a).filter((x) => !(x.input === 'lineup' && x.pts === 0));
   const out: Beat[] = [{ key: 'start', label: 'Start at even', short: 'Two evenly matched teams on neutral ice: 50–50.', pts: 0, before: 50, end: 50 }];
-  for (const x of steps) {
-    if (x.input === 'lineup') continue;
-    out.push({ key: x.input, label: x.label, ...why(a, x.input, x.pts), pts: x.pts, before: x.before, end: x.end });
-    if (x.input === 'b2b') out.push({ key: 'morning', label: moved ? 'The morning of the game' : 'Our final number', sum: true, pts: 0, before: x.end, end: x.end,
-      short: moved ? 'That was our number that morning. One more check at puck drop.' : `That was our number, and nothing changed at puck drop.` });
-  }
-  if (moved) {
-    out.push({ key: 'lineup', label: moved.label, ...why(a, 'lineup', moved.pts), pts: moved.pts, before: moved.before, end: moved.end });
-    out.push({ key: 'puck', label: 'At puck drop', sum: true, pts: 0, before: moved.end, end: moved.end, short: 'Our final number.' });
-  }
+  for (const x of steps) out.push({ key: x.input, label: x.label, ...why(a, x.input, x.pts), pts: x.pts, before: x.before, end: x.end });
+  const last = out[out.length - 1].end;
+  out.push({ key: 'end', label: 'Our final number', sum: true, short: '', pts: 0, before: last, end: last });
   return out;
 };
 // The reveal headline without the number the page already shows big: "We gave Carolina a 76% chance, and Carolina
