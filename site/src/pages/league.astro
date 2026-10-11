@@ -362,13 +362,39 @@ const _ = ordinal;
   (() => {
     const remember = (k, v) => { try { localStorage.setItem('lc-league-' + k, v); } catch {} };
     const recall = (k) => { try { return localStorage.getItem('lc-league-' + k); } catch { return null; } };
+    // Rows glide to their new places when a picker re-ranks a list, so a team can be followed up or down.
+    // Positions are read before the change and each row (and its dot) is animated back from where it was.
+    // Only with the site's motion on (html.motion: off for reduced motion and automated browsers).
+    const glide = (change) => {
+      const root = document.documentElement;
+      if (!root.classList.contains('motion') || !Element.prototype.animate) return change();
+      const rows = () => [...document.querySelectorAll('.ranks li, .uranks li, .sranks li, #tb tbody tr')].filter((el) => el.offsetParent);
+      const key = (el) => (el.closest('section')?.id ?? '') + '|' + el.dataset.t + '|' + (el.querySelector('.rname, .uwho')?.textContent ?? '');
+      const was = new Map(rows().map((el) => [key(el), { y: el.getBoundingClientRect().top, x: el.querySelector('.dot')?.getBoundingClientRect().left }]));
+      change();
+      const ease = { duration: 650, easing: 'cubic-bezier(0.3, 0.8, 0.25, 1)', fill: 'backwards' };
+      for (const el of rows()) {
+        const w = was.get(key(el));
+        if (!w) continue;
+        const dy = w.y - el.getBoundingClientRect().top;
+        // Long jumps leave a little later, so the eye can follow the big movers.
+        const delay = Math.min(Math.abs(dy) / 40, 20) * 10;
+        if (Math.abs(dy) > 1) {
+          // a moving row carries the card's background so rows crossing each other stay readable
+          el.classList.add('gliding');
+          el.animate([{ translate: `0 ${dy}px` }, { translate: '0 0' }], { ...ease, delay }).finished.then(() => el.classList.remove('gliding'), () => el.classList.remove('gliding'));
+        }
+        const dot = el.querySelector('.dot');
+        if (dot && w.x !== undefined) { const dx = w.x - dot.getBoundingClientRect().left; if (Math.abs(dx) > 1) dot.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { ...ease, delay }); }
+      }
+    };
     // A sentence picker that shows one of several cards.
     const picker = (id, cards, match) => {
       const sel = document.getElementById(id);
       const show = () => { document.querySelectorAll(cards).forEach((c) => { c.hidden = !match(c, sel.value); }); remember(id, sel.value); };
       const saved = recall(id);
       if (saved && [...sel.options].some((o) => o.value === saved)) sel.value = saved;
-      sel.addEventListener('change', show);
+      sel.addEventListener('change', () => glide(show));
       show();
       return sel;
     };
@@ -379,11 +405,11 @@ const _ = ordinal;
     const setStat = () => { document.querySelectorAll('[data-unit]').forEach((c) => { c.dataset.stat = stat.value; }); remember('stat-pick', stat.value); };
     const savedStat = recall('stat-pick');
     if (savedStat && [...stat.options].some((o) => o.value === savedStat)) stat.value = savedStat;
-    stat.addEventListener('change', setStat);
+    stat.addEventListener('change', () => glide(setStat));
     setStat();
     const side = document.getElementById('side-pick'), src = document.getElementById('src-pick');
     const showSrc = () => { document.querySelectorAll('[data-src]').forEach((c) => { c.hidden = c.dataset.side !== side.value || c.dataset.src !== src.value; }); remember('side-pick', side.value); remember('src-pick', src.value); };
-    [['side-pick', side], ['src-pick', src]].forEach(([k, s]) => { const v = recall(k); if (v && [...s.options].some((o) => o.value === v)) s.value = v; s.addEventListener('change', showSrc); });
+    [['side-pick', side], ['src-pick', src]].forEach(([k, s]) => { const v = recall(k); if (v && [...s.options].some((o) => o.value === v)) s.value = v; s.addEventListener('change', () => glide(showSrc)); });
     showSrc();
     void unit;
 
@@ -460,7 +486,7 @@ const _ = ordinal;
     rest.addEventListener('change', () => { highlight(); save(); });
     document.querySelectorAll('#tb [data-sort]').forEach((h) => h.addEventListener('click', () => {
       if (sortBy === h.dataset.sort) dir = -dir; else { sortBy = h.dataset.sort; dir = 1; }
-      sort();
+      glide(sort);
     }));
     document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') { syncMine(); highlight(); } else { paint(); sort(); } });
     // Crosshair: the column under the pointer lights up along with its row.
@@ -490,6 +516,7 @@ const _ = ordinal;
 
   /* One row per team: rank, name, the trait's scale, the number in words. Order follows the season and arena switches. */
   .ranks, .uranks, .sranks { display: flex; flex-direction: column; margin-top: 10px; }
+  .gliding { position: relative; z-index: 1; background: var(--sheet); }
   .ranks li, .rank-ends { display: grid; grid-template-columns: 2.2em minmax(150px, 210px) minmax(120px, 1fr) minmax(200px, 300px); gap: 0 16px; align-items: center; }
   .ranks li { padding: 7px 8px; margin-inline: -8px; border-top: 1px solid var(--rule); order: var(--ob); }
   html[data-mode='season'] .ranks li { order: var(--os); }
