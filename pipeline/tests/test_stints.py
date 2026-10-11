@@ -85,3 +85,37 @@ def test_shift_gap_never_reads_as_empty_net():
     assert _goalie_in_net("1560", True, None, 30, None) is None
     # The shift chart wins when it names a goalie.
     assert _goalie_in_net("1551", True, 33, 30, 31) == 33
+
+
+def _game(skater_end: str = "20:00", stray: bool = False) -> tuple[dict, dict, list[dict]]:
+    """A one-period game: two skaters and a goalie a side, one hit at 10:00 at 2-on-2, boxscore ice times to match."""
+    pbp = {"homeTeam": {"id": 1}, "awayTeam": {"id": 2}, "gameType": 2,
+           "rosterSpots": [{"playerId": p, "positionCode": "G" if p in (19, 29) else "C"} for p in (11, 12, 19, 21, 22, 29)],
+           "plays": [{"periodDescriptor": {"number": 1, "periodType": "REG"}, "timeInPeriod": "10:00", "typeDescKey": "hit", "situationCode": "1221"},
+                     {"periodDescriptor": {"number": 1, "periodType": "REG"}, "timeInPeriod": "20:00", "typeDescKey": "period-end"}]}
+    box = {"playerByGameStats": {side: {"forwards": [{"playerId": p, "toi": "20:00"} for p in pids], "defense": [], "goalies": [{"playerId": g, "toi": "20:00"}]}
+                                 for side, pids, g in (("homeTeam", (11, 12), 19), ("awayTeam", (21, 22), 29))}}
+    rows = [{**_shift(1 if p < 20 else 2, 1, "00:00", skater_end if p == 12 else "20:00"), "playerId": p} for p in (11, 12, 19, 21, 22, 29)]
+    if stray:  # another game's shifts filed under this game (BUF at NJD, 2025-12-21)
+        rows += [{**_shift(54, 1, "00:00", "20:00"), "playerId": 99}]
+    return pbp, box, rows
+
+
+def test_shift_problems_and_source_choice(tmp_path, monkeypatch):
+    from pipeline.ingest import nhl
+
+    pbp, box, good = _game()
+    assert nhl.shifts_problems(good, pbp, box) == 0
+    assert nhl.shifts_problems(_game(stray=True)[2], pbp, box) == 0  # the stray club is dropped
+    _, _, bad = _game(skater_end="05:00")  # a skater's shift stops early: missing at the hit and 15 minutes short
+    assert nhl.shifts_problems(bad, pbp, box) == 2
+
+    monkeypatch.setattr(nhl, "RAW", tmp_path)
+    for kind, payload in (("pbp", pbp), ("box", box), ("shifts", {"data": bad})):
+        nhl._write(nhl.raw_path(2025, kind, 1), payload)
+    assert nhl.read_shifts(2025, 1)[1] == "api"
+    nhl._write(nhl.raw_path(2025, "shifts_html", 1), {"data": good})
+    rows, src = nhl.read_shifts(2025, 1)
+    assert src == "html" and rows == good
+    nhl._write(nhl.raw_path(2025, "shifts", 1), {"data": good})
+    assert nhl.read_shifts(2025, 1)[1] == "api"  # a tie keeps the API chart

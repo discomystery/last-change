@@ -10,6 +10,7 @@ import polars as pl
 from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import REGULAR, TABLES
 from pipeline.metrics import adjust, rink_bias
+from pipeline.metrics.team_game import TEAMMATE_BLOCK
 
 ATTEMPTS = ["shot-on-goal", "missed-shot", "goal", "blocked-shot"]
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
@@ -106,7 +107,7 @@ def build(season: int) -> pl.DataFrame:
     venue = roster.select("game_id", "player_id", pl.col("is_home").alias("p_home"))
     credited = []
     for typ, who, event in (("hit", "p1", "hits"), ("giveaway", "p1", "gives"), ("takeaway", "p1", "takes"), ("blocked-shot", "p2", "blocks")):
-        part = ev.filter((pl.col("type") == typ) & pl.col(who).is_not_null()).select("game_id", "home_id", pl.col(who).alias("player_id"))
+        part = ev.filter((pl.col("type") == typ) & pl.col(who).is_not_null() & (pl.col("reason").fill_null("") != TEAMMATE_BLOCK)).select("game_id", "home_id", pl.col(who).alias("player_id"))
         part = part.join(venue, on=["game_id", "player_id"]).join(f.select("home_id", pl.col(event).alias("f")), on="home_id", how="left").with_columns(pl.col("f").fill_null(1.0))
         credited.append(part.select("game_id", "player_id", pl.lit(event).alias("event"),
                                     (pl.when(pl.col("p_home")).then(hr[event]["w_home"]).otherwise(hr[event]["w_away"]) / pl.col("f")).alias("adj")))

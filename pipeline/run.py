@@ -45,6 +45,7 @@ def update(season: int) -> dict:
     if season == CURRENT_SEASON:
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
     moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
+    out["shift_checks"] = check_saved_shifts(season)
     out["build"] = games.build_season(season)
     if season == CURRENT_SEASON:
         out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
@@ -80,8 +81,31 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 2  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 3  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
+# 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
+
+
+def check_saved_shifts(season: int) -> dict:
+    """Once per season (2026-10-11 data audit): fetch the HTML shift reports for saved games whose API shift chart
+    disagrees with the play-by-play or boxscore. An earlier season with new reports gets its game tables rebuilt and
+    shots re-rated here, and its team, unit and player tables rebuilt by refresh_saved."""
+    import pickle
+
+    from pipeline.build import games, shot_features
+    from pipeline.ingest import nhl
+    from pipeline.metrics import xg_model
+
+    out = {}
+    for s in [*FULL_SEASONS, season]:
+        fetched = nhl.check_saved(s)
+        out[s] = len(fetched)
+        if fetched and s != season:
+            games.build_season(s)
+            shot_features.build(s)
+            xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), s)
+            (TABLES / str(s) / "rules.json").unlink(missing_ok=True)
+    return out
 
 
 def refresh_saved(season: int) -> list[int]:

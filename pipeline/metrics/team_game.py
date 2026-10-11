@@ -18,6 +18,9 @@ POINT_DISTANCE = 50  # feet; only for the retired "point" trait, kept so calls f
 CLOSE_DISTANCE = 20  # feet from the middle of the goal line: "in close"
 BREAKDOWN_XG = 0.15  # an off-turnover shot at least this dangerous counts as a breakdown chance
 FACEOFF_WINDOW = 5  # seconds from an offensive-zone faceoff win to a goal for it to count as off the draw
+# A shot that hits the shooter's own teammate is filed as a blocked shot with this reason and the teammate as the
+# "blocker". It stays a shot attempt, but it is no block for the other team (the NHL boxscore does not count it either).
+TEAMMATE_BLOCK = "teammate-blocked"
 COUNTS = ["cf", "ff", "sf", "gf", "xgf", "reb_xgf", "to_xgf", "point_cf", "d_cf", "close_ff", "hits", "gives", "takes", "blocks"]
 
 
@@ -129,7 +132,7 @@ def build(season: int) -> dict:
                     "off_faceoff": last_faceoff is not None and last_faceoff[1] == home and e["sec"] - last_faceoff[0] <= FACEOFF_WINDOW,
                     "xg": xg,
                 })
-            if typ == "blocked-shot":
+            if typ == "blocked-shot" and e["reason"] != TEAMMATE_BLOCK:
                 bump(not home, "blocks")
         if typ in ATTEMPTS:
             continue
