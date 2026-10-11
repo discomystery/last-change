@@ -358,6 +358,7 @@ SKILL = {
     "finishing": "finishes better than most",
     "playmaking": "sets up a lot of goals",
     "powerPlay": "is a real threat on the power play",
+    "ppImpact": "makes the power play better whenever he's on it",
     "shThreat": "stays dangerous even while killing penalties",
     "hits": "plays a heavy, physical game",
     "blocks": "throws himself in front of shots",
@@ -373,6 +374,8 @@ def _skills(p: dict) -> list[str]:
         e = (p.get("traits", {}).get(k) or {}).get("blend")
         if e and e.get("ok") and e["pct"] >= 85 and e.get("lo", 0) >= 60:
             found.append((k, e["pct"]))
+    if any(k == "ppImpact" for k, _ in found):  # one power-play line is enough
+        found = [kv for kv in found if kv[0] != "powerPlay"]
     found.sort(key=lambda kv: -kv[1])
     return [SKILL[k] for k, _ in found[:2]]
 

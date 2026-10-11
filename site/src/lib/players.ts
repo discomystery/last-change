@@ -38,11 +38,13 @@ export const peerWord: Record<string, string> = { F: 'forwards', D: 'defensemen'
  */
 const POOL: Record<string, (w: string) => string> = {
   powerPlay: (w) => `power-play ${w}`,
+  ppImpact: (w) => `power-play ${w}`,
   shThreat: (w) => `penalty-killing ${w}`,
   faceoffs: (w) => `${w} who take faceoffs`,
 };
 export const POOL_RULE: Record<string, Record<Mode, string>> = {
   powerPlay: { blend: '60+ minutes on the power play', season: '10+ minutes on the power play' },
+  ppImpact: { blend: '60+ minutes on the power play', season: '10+ minutes on the power play' },
   shThreat: { blend: '30+ minutes killing penalties', season: '5+ minutes killing penalties' },
   faceoffs: { blend: '200+ faceoffs', season: '40+ faceoffs' },
 };
@@ -64,7 +66,10 @@ export const TRAITS: Record<string, TraitInfo> = {
   playmaking: { group: 'Scoring', short: (v) => `${v.toFixed(2)} first assists /60`, label: 'Setting up goals', lo: 'Rarely sets up', hi: 'Playmaker', say: (v) => `${v.toFixed(2)} first assists per 60 at 5-on-5`,
     tip: 'First assists (the last pass before a goal) per 60 minutes at 5-on-5.' },
   powerPlay: { group: 'Special teams', short: (v) => `${v.toFixed(2)} expected goals /60`, label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,
-    tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play will rate lower here than their value.' },
+    tip: 'Expected goals from shots he takes himself, per 60 minutes on the power play. Only rated for players with real power-play time. Passers on the power play rate lower here than their value; Power-play impact counts them.' },
+  ppImpact: { group: 'Special teams', short: (v) => `${sign(v)} expected goals /60`, label: 'Power-play impact', lo: 'Along for the ride', hi: 'Makes it go',
+    say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances on the power play`,
+    tip: 'How much better his team’s power play gets with him on it, in expected goals per 60 of 5-on-4 time, whoever takes the shot. It separates him from the rest of his unit and the penalty killers by comparing every power play since 2023-24, and starts each player from how well he creates chances at 5-on-5, so a few minutes of power-play time cannot make a rating on their own. Only rated for players with real power-play time.' },
   offImpact: { group: 'Driving play at 5-on-5', short: (v) => `${sign(v)} expected goals /60`, label: 'Creating chances', lo: 'Along for the ride', hi: 'Drives play',
     say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances at 5-on-5`,
     tip: 'How much better his team’s chances get at 5-on-5 when he is on the ice, in expected goals per 60. It separates him from his linemates and opponents by comparing every shift since 2023-24, each player starting from where he stood at the end of last season, and allows for where shifts start and the score.' },
