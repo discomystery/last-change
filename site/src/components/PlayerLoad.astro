@@ -1,118 +1,130 @@
 ---
-// MOCK (design discussion, not for merge): "What he carries" on a skater's page. How much of his team's scoring,
-// power play and ice time runs through him, who is next in line for each job, and what happened when he was out.
-// Numbers below are Pastrnak's, computed by hand from player_game / team_game for the mock.
+// "What he carries": how much of his team's scoring, power play and shots run through him (with a verdict from how
+// many skaters in the league carry as much, and his teammates as dots), who is next in line for each thing he does,
+// what a fill-in gives back, and how the team did in games he missed. Data: `carries` in his player JSON
+// (pipeline/export/carries.py).
 import Section from './Section.astro';
-import dist from './player-load-mock.json';
+import { clock } from '../lib/format';
+import { most, ordinal } from '../lib/players';
 
-const team = 'Boston';
-type Tile = { key: string; label: string; big: string; of: string; share: number; ref?: [number, string]; next: string; tip: string; what: string };
-const tiles: Record<'blend' | 'season', Tile[]> = {
-  blend: [
-    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '40%', of: '107 of 271', share: 39.5, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Zacha and Geekie, 23% each', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played. 10th-highest share in the league last season.' },
-    { key: 'g_sh', what: 'score this big a share of their team’s goals', label: 'Goals he scores', big: '11%', of: '31 of 271', share: 11.4, next: 'Geekie scores more: 35 goals, 13%', tip: 'His own goals, out of all Boston goals in the games he played.' },
-    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals', big: '54%', of: '29 of 54', share: 53.7, next: 'Next: Geekie, 30%', tip: 'Power-play goals he scored or set up with the last pass, out of Boston’s power-play goals in his games.' },
-    { key: 's_sh', what: 'take this big a share of their team’s shots', label: 'Shots on goal', big: '13%', of: '284 of 2,241', share: 12.7, ref: [5.6, 'An even share among 18 skaters: 6%'], next: 'Next: Geekie, 8%', tip: 'His shots on goal, out of all of Boston’s in his games.' },
-  ],
-  season: [
-    { key: 'p_sh', what: 'are in on this big a share of their team’s goals', label: 'Goals he’s in on', big: '35%', of: '7 of 20', share: 35, ref: [29.8, 'A typical first-line forward: 30%'], next: 'Next: Minten, 25%', tip: 'Goals he scored or assisted on, out of all Boston goals in the games he played.' },
-    { key: 'g_sh', what: 'score this big a share of their team’s goals', label: 'Goals he scores', big: '10%', of: '2 of 20', share: 10, next: 'Tied with Mittelstadt and Peterka', tip: 'His own goals, out of all Boston goals in the games he played.' },
-    { key: 'pp_sh', what: 'are in on this big a share of their team’s power-play goals', label: 'Power-play goals', big: '100%', of: '3 of 3', share: 100, next: 'Next: Geekie, 2 of 3', tip: 'Power-play goals he scored or set up with the last pass.' },
-    { key: 's_sh', what: 'take this big a share of their team’s shots', label: 'Shots on goal', big: '15%', of: '23 of 153', share: 15, ref: [5.6, 'An even share among 18 skaters: 6%'], next: 'Next: Minten, 10%', tip: 'His shots on goal, out of all of Boston’s in his games.' },
-  ],
+interface Props { p: any; place: string; moved?: string }
+const { p, place, moved } = Astro.props;
+const c = p.carries;
+const base = import.meta.env.BASE_URL;
+const isD = p.group === 'D';
+type Mode = 'blend' | 'season';
+const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
+const INFO: Record<string, { label: string; of: string; tip: (mw: string) => string }> = {
+  inOn: { label: 'Goals he’s in on', of: 'goals', tip: (mw) => `Goals he scored or assisted on, out of all ${place} goals in the games he played, ${mw}.` },
+  goals: { label: 'Goals he scores', of: 'goals', tip: (mw) => `His own goals, out of all ${place} goals in the games he played, ${mw}.` },
+  pp: { label: 'Power-play goals', of: 'power-play goals', tip: (mw) => `Power-play goals he scored or set up with the last pass, out of ${place}’s power-play goals in his games, ${mw}.` },
+  shots: { label: 'Shots on goal', of: 'shots on goal', tip: (mw) => `His shots on goal, out of all of ${place}’s in his games, ${mw}.` },
 };
-type Job = { job: string; load: string; more: string; next: string; nextMore?: string };
-const jobs: Record<'blend' | 'season', Job[]> = {
-  blend: [
-    { job: 'First line', load: 'Right wing with Zacha and Geekie', more: '7:49 a game together lately', next: 'Peterka', nextMore: 'Boston’s next most-used right wing' },
-    { job: 'Power play', load: 'Both units, as the trigger', more: 'on for 77% of Boston’s power-play time', next: 'Peterka joins PP2', nextMore: 'Geekie stays the PP1 shooter beside Zacha' },
-    { job: 'Ice time', load: '20:30 a game', more: 'most of any Boston forward', next: 'E. Lindholm', nextMore: '17:49 a game' },
-    { job: 'Penalty kill', load: 'Not used', more: 'no shorthanded minutes', next: '' },
-  ],
-  season: [
-    { job: 'First line', load: 'Right wing with Zacha and Geekie', more: '7:49 a game together lately', next: 'Peterka', nextMore: 'Boston’s next most-used right wing' },
-    { job: 'Power play', load: 'Both units, as the trigger', more: 'on for 78% of Boston’s power-play time', next: 'Peterka joins PP2', nextMore: 'Geekie stays the PP1 shooter beside Zacha' },
-    { job: 'Ice time', load: '18:31 a game', more: 'most of any Boston forward', next: 'Zacha', nextMore: '17:16 a game' },
-    { job: 'Penalty kill', load: 'Not used', more: 'no shorthanded minutes', next: '' },
-  ],
-};
-// Goals he is in on per game, against typical forwards by where they rank on their team in ice time (2025-26).
-const lane = { max: 1.5, him: 1.29, marks: [[0.3, 'Typical fill-in', '10th to 13th forward'], [0.61, 'Second line', '4th to 6th forward'], [0.93, 'First line', 'top three forwards']] as [number, string, string][] };
-// Verdict from how many skaters in the league carry at least his share (32 = about one a team).
-const TIERS: [number, string, string][] = [
-  [10, 'One of a kind', 'v1'], [32, 'Load-bearing', 'v2'], [64, 'Major piece', 'v3'], [128, 'Contributor', 'v4'], [Infinity, 'Spread around', 'v5']];
+// Verdict from how many skaters in the league carry at least his share (32 is about one a team).
+const TIERS: [number, string, string][] = [[10, 'One of a kind', 'v1'], [32, 'Load-bearing', 'v2'], [64, 'Major piece', 'v3'], [128, 'Contributor', 'v4'], [Infinity, 'Spread around', 'v5']];
 const TIER_TIP = 'How many skaters in the NHL carry this big a share of their team: One of a kind (10 or fewer), Load-bearing (about one a team), Major piece (about two a team), Contributor (about four a team), Spread around (more).';
-const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
-const lanes = (m: 'blend' | 'season', t: Tile) => {
-  const league = (dist as any).league[m][t.key] as number[];
-  const mates = (dist as any)[m][t.key] as [string, number, boolean][];
-  const n = Math.max(1, league.filter((v) => v > t.share + 1e-9).length + 1);
-  const tier = TIERS.find(([c]) => n <= c)!;
-  const max = Math.max(...mates.map((x) => x[1])) * 1.08;
+const lane = (t: any) => {
+  const max = Math.max(...t.mates.map((x: any) => x[1]), t.v, 1) * 1.08;
   const at = (v: number) => Math.round((1000 * v) / max) / 10;
-  const next = mates.find((x) => !x[2])!;
-  return { n, tier, at, mates, next };
+  const next = t.mates.find((x: any) => !x[2]);
+  return { at, next, tier: t.rank == null ? null : TIERS.find(([n]) => t.rank <= n)! };
 };
-const ppg = (dist as any).blend.ppg as [string, number, boolean][];
+const pct = (v: number) => `${Math.round(v)}%`;
+const last = (name: string) => name.split(' ').slice(-1)[0];
+const n = c?.next ?? {};
+const line = p.role?.line;
+const pp = p.role?.pp;
+const jobs = [
+  line && { job: isD ? 'Pair' : 'Line', load: `${line.label}${n.line && !isD ? `, ${n.line.pos}` : ''} with ${line.mates.map((m: any) => last(m.name)).join(' and ')}`,
+    more: line.toi_sec ? `${clock(line.toi_sec)} a game together lately` : '', next: n.line?.next, nextMore: n.line?.next ? `${place}’s next most-used ${n.line.pos}` : '' },
+  n.pp ? { job: 'Power play', load: pp ? `${pp.label}${pp.both ? ' and the second unit' : ''}${pp.role ? `, as the ${pp.role.toLowerCase()}` : ''}` : `${clock(n.pp.sec)} a game`,
+    more: n.pp.share !== null ? `on for ${n.pp.share}% of ${place}’s power-play time` : '', next: n.pp.next, nextMore: n.pp.next ? `${clock(n.pp.next.sec)} a game on the power play` : '' }
+    : { job: 'Power play', load: 'Not a regular', more: p.role?.toi ? `${clock(p.role.toi.toi_pp)} a game` : '', next: null },
+  n.toi && { job: 'Ice time', load: `${clock(n.toi.sec)} a game`, more: `${most(n.toi.rank)} of any ${place} ${isD ? 'defenseman' : 'forward'}`, next: n.toi.next, nextMore: n.toi.next ? `${clock(n.toi.next.sec)} a game` : '' },
+  n.pk && (n.pk.sec >= 60
+    ? { job: 'Penalty kill', load: `${clock(n.pk.sec)} a game`, more: 'killing penalties', next: n.pk.next, nextMore: n.pk.next ? `${clock(n.pk.next.sec)} a game` : '' }
+    : { job: 'Penalty kill', load: 'Not used', more: 'no regular shorthanded minutes', next: null }),
+].filter(Boolean) as any[];
+const f = c?.fill;
+const fMax = f ? Math.max(f.v, ...f.mates.map((x: any) => x[1]), ...f.ticks.map((x: any) => x[0])) * 1.12 : 1;
+const fAt = (v: number) => Math.min(100, (100 * v) / fMax);
+const fillIn = f?.ticks.find((x: any) => x[1] === 'Typical fill-in');
+const out = c?.out;
+const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const span = out?.missed ? (out.first === out.last ? `on ${day(out.first)}` : `between ${day(out.first)} and ${day(out.last)}`) : '';
+const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
 ---
-<Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${team}’s game runs through him, and what they would have to replace without him.`}>
-  {(['blend', 'season'] as const).map((m) => (
+{c && (
+<Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${place}’s game runs through him, and what they would have to replace without him.`}>
+  {modes.map(([m, mw]) => (
     <div class={`gmode m-${m}`}>
-      <ul class="ld-tiles">
-        {tiles[m].map((t) => (
-          <li class="card ld-tile">{(() => { const L = lanes(m, t); return (<>
-            <p class="ld-h"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span></p>
-            <p class="ld-big">{t.big}<span class:list={['ld-verdict', L.tier[2]]} tabindex="0" data-tip={TIER_TIP}>{L.tier[1]}</span></p>
-            <p class="ld-of">{t.of} · <span class="term" tabindex="0" data-tip={`${L.n === 1 ? 'No skater' : `${L.n - 1} ${L.n === 2 ? 'skater' : 'skaters'}`} in the NHL carried a bigger share of their team’s ${t.label.toLowerCase()}.`}>{ord(L.n)} in NHL</span></p>
-            <div class="ld-dots" role="img" aria-label={`${t.big}, against Boston teammates`}>
-              {L.mates.map(([name, v, me]) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
-              <em style={`left:${L.at(L.next[1])}%`}>{L.next[0].split(' ').slice(-1)[0]}</em>
-            </div>
-          </>); })()}</li>
-        ))}
-      </ul>
-      <div class="card ld-jobs">
-        <p class="chart-title">If he’s out, who picks it up</p>
-        <dl>
-          {jobs[m].map((j) => (
-            <div>
-              <dt>{j.job}</dt>
-              <dd class="ld-load"><span>{j.load}</span><span class="n">{j.more}</span></dd>
-              {j.next ? <dd class="ld-who"><span><span class="ld-nx">Next in line</span> <a class="plink" href="#">{j.next}</a></span>{j.nextMore && <span class="n">{j.nextMore}</span>}</dd> : <dd class="ld-who"><span class="n">Nothing to hand over</span></dd>}
-            </div>
-          ))}
-        </dl>
-        <p class="note">“Next in line” is the player who already does the most of that job after him. It is not a guess at the coach’s choice.</p>
-      </div>
+      {c.tiles[m] ? (
+        <ul class="ld-tiles">
+          {c.tiles[m].map((t: any) => { const info = INFO[t.key]; if (!t.den) return (
+            <li class="card ld-tile"><p class="ld-h">{info.label}</p><p class="ld-big">–</p><p class="ld-of">No {info.of} for {place} in his games yet</p></li>
+          ); const L = lane(t); return (
+            <li class="card ld-tile">
+              <p class="ld-h"><span class="term" tabindex="0" data-tip={info.tip(mw)}>{info.label}</span></p>
+              <p class="ld-big">{pct(t.v)}{L.tier && <span class:list={['ld-verdict', L.tier[2]]} tabindex="0" data-tip={TIER_TIP}>{L.tier[1]}</span>}</p>
+              {!L.tier ? <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · not a power-play regular</p> : <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · <span class="term" tabindex="0" data-tip={`Among ${t.of} skaters who have played at least ${m === 'blend' ? '20 games over the two seasons' : '3 games this season'}${t.key === 'pp' ? ' and are regulars on the power play' : ''}.`}>{ordinal(t.rank)} in NHL</span></p>}
+              <div class="ld-dots" role="img" aria-label={`${pct(t.v)}, against ${place} teammates`}>
+                {t.mates.map(([name, v, me]: any) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
+                {L.next && <em style={`left:${Math.min(88, Math.max(12, L.at(L.next[1])))}%`}>{last(L.next[0])}</em>}
+              </div>
+            </li>
+          ); })}
+        </ul>
+      ) : <p class="note">No games this season yet.</p>}
+      {m === 'blend' && moved && c.tiles.blend && <p class="note">This season and last includes his games for {moved} last season, counted against {moved}’s goals and shots. Switch to this season for {place} alone.</p>}
     </div>
   ))}
+  <div class="card ld-jobs">
+    <p class="chart-title">If he’s out, who picks it up</p>
+    <dl>
+      {jobs.map((j) => (
+        <div>
+          <dt>{j.job}</dt>
+          <dd class="ld-load"><span>{j.load}</span>{j.more && <span class="n">{j.more}</span>}</dd>
+          {j.next ? <dd class="ld-who"><span><span class="ld-nx">Next in line</span> <a class="plink" href={`${base}player/${j.next.id}/`}>{j.next.name}</a></span>{j.nextMore && <span class="n">{j.nextMore}</span>}</dd> : <dd class="ld-who"><span class="n">Nothing to hand over</span></dd>}
+        </div>
+      ))}
+    </dl>
+    <p class="note">“Next in line” is the teammate who already does the most of that after him this season. It is not a guess at the coach’s choice. Dots in the cards above are his {place} teammates, each over the games they played; hover one for the name.</p>
+  </div>
   <div class="ld-two">
-    <div class="card">
-      <p class="chart-title">What a fill-in gives back</p>
-      <p class="ld-say">He’s in on <strong>1.29 goals a game</strong>. A typical depth forward called up to replace him is in on about 0.30.</p>
-      <div class="ld-lane">
-        <span class="ld-line"></span>
-        {ppg.filter((x) => !x[2]).map(([name, v]) => <i class="ld-f" style={`left:${Math.min(100, (100 * v) / lane.max)}%`} tabindex="0" data-tip={`${name}: ${v.toFixed(2)} a game`}></i>)}
-        {lane.marks.map(([v, l, tip]) => <span class="ld-mark" style={`left:${(100 * v) / lane.max}%`} tabindex="0" data-tip={`${l} (${tip}): ${v.toFixed(2)} goals a game`}><i></i><em>{l}</em></span>)}
-        <span class="ld-him" style={`left:${(100 * lane.him) / lane.max}%`}><i></i><em>Pastrnak</em></span>
+    {f && (
+      <div class="card">
+        <p class="chart-title">What a fill-in gives back</p>
+        <p class="ld-say">He’s in on <strong>{f.v.toFixed(2)} goals a game</strong>.{fillIn && ` A typical depth ${isD ? 'defenseman' : 'forward'} called up to replace him is in on about ${fillIn[0].toFixed(2)}.`}</p>
+        <div class="ld-lane">
+          <span class="ld-line"></span>
+          {f.mates.map(([name, v]: any) => <i class="ld-f" style={`left:${fAt(v)}%`} tabindex="0" data-tip={`${name}: ${v.toFixed(2)} a game`}></i>)}
+          {f.ticks.map(([v, l]: any, k: number) => <span class:list={['ld-mark', { up: k === 1 && Math.abs(fAt(v) - fAt(f.v)) >= 18, low: k === 1 && Math.abs(fAt(v) - fAt(f.v)) < 18 }]} style={`left:${fAt(v)}%`} tabindex="0" data-tip={`${l}: ${v.toFixed(2)} goals a game`}><i></i><em>{l}</em></span>)}
+          <span class="ld-him" style={`left:${fAt(f.v)}%`}><i></i><em>{p.last}</em></span>
+        </div>
+        <p class="n">Goals scored or assisted per game, this season and last. Faint dots are his {place} teammates {isD ? 'on defense' : 'up front'}; ticks are the typical NHL {isD ? 'defenseman' : 'forward'} by ice-time rank on his team.</p>
       </div>
-      <p class="n">Goals scored or assisted per game, this season and last. Faint dots are his Boston teammates up front; ticks are the typical NHL forward by ice-time rank on his team.</p>
-    </div>
+    )}
     <div class="card">
       <p class="chart-title">When he’s been out</p>
-      <p class="ld-say">He missed <strong>5 games</strong> last season (Nov 28 to Dec 6). Boston won 2 of them.</p>
-      <table class="ld-ww">
-        <thead><tr><th></th><th>With him</th><th>Without</th></tr></thead>
-        <tbody>
-          <tr><th>Won</th><td>39 of 77</td><td>2 of 5</td></tr>
-          <tr><th>Goals a game</th><td>3.3</td><td>3.4</td></tr>
-          <tr><th><span class="term" tabindex="0" data-tip="Expected goals for minus against per game, all situations, empty nets left out.">Chance edge a game</span></th><td>−0.34</td><td>−0.73</td></tr>
-        </tbody>
-      </table>
-      <p class="n">Steeves moved up beside E. Lindholm and Geekie. Five games is mostly luck either way.</p>
+      {out && out.missed ? (
+        <>
+          <p class="ld-say">He missed <strong>{out.missed} {out.missed === 1 ? 'game' : 'games'}</strong> {span}. {place} won {out.without.won} of {out.missed === 1 ? 'it' : 'them'}.</p>
+          <table class="ld-ww">
+            <thead><tr><th></th><th>With him</th><th>Without</th></tr></thead>
+            <tbody>
+              <tr><th>Won</th><td>{out.with.won} of {out.with.gp}</td><td>{out.without.won} of {out.without.gp}</td></tr>
+              <tr><th>Goals a game</th><td>{out.with.gf.toFixed(1)}</td><td>{out.without.gf.toFixed(1)}</td></tr>
+              <tr><th><span class="term" tabindex="0" data-tip="Expected goals for minus against per game, all situations, empty nets left out.">Chance edge a game</span></th><td>{sgn(out.with.xgd)}</td><td>{sgn(out.without.xgd)}</td></tr>
+            </tbody>
+          </table>
+          <p class="n">{out.missed < 10 ? `${out.missed} ${out.missed === 1 ? 'game is' : 'games is'} far too few to read much into: short stretches swing either way by luck.` : 'Even over this many games, results swing a lot by luck, and other players come and go too.'}</p>
+        </>
+      ) : <p class="ld-say">He hasn’t missed a game for {place} this season or last, so there is nothing to compare yet.</p>}
     </div>
   </div>
 </Section>
+)}
 
 <style>
   .ld-h { font: 600 18px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 6px; }
@@ -144,13 +156,14 @@ const ppg = (dist as any).blend.ppg as [string, number, boolean][];
   @media (min-width: 820px) { .ld-two { grid-template-columns: 1fr 1fr; } }
   .ld-two .card { display: grid; align-content: start; gap: 10px; }
   .ld-say { font: 400 16px/1.5 var(--ui); }
-  .ld-lane { position: relative; height: 70px; margin: 6px 10px 0; }
+  .ld-lane { position: relative; height: 78px; margin: 6px 10px 0; }
   .ld-line { position: absolute; left: -10px; right: -10px; top: 26px; height: 4px; border-radius: 2px; background: var(--track); }
   .ld-f { position: absolute; top: 23px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
   .ld-mark, .ld-him { position: absolute; top: 0; width: 0; }
   .ld-mark i { position: absolute; top: 18px; left: -1px; width: 2px; height: 20px; background: var(--ink-2); border-radius: 1px; }
   .ld-mark em, .ld-him em { position: absolute; top: 44px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-2); white-space: nowrap; }
-  .ld-mark:nth-of-type(odd) em { top: 0; }
+  .ld-mark.up em { top: 0; }
+  .ld-mark.low em { top: 60px; }
   .ld-him i { position: absolute; top: 21px; left: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
   .ld-him em { font-weight: 600; color: var(--ink); top: 0; }
   .ld-ww { border-collapse: collapse; font: 400 15px var(--ui); width: 100%; }
