@@ -70,6 +70,8 @@ def run(season: int) -> dict:
     jobs.run(season)  # post-game report cards: did each player do his jobs
     from pipeline.export import game_scores
     game_scores.run(season)  # post-game Impact: one number per player, with its parts
+    from pipeline.export import flow
+    flow.run(season)  # post-game flow chart: every shot, power play and shift, read in the browser
     from pipeline.export import stories
     stories.run_recaps(season)  # last: the plain-English story reads the recap, report cards and Swing
     from pipeline.export import track
