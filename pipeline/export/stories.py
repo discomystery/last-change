@@ -557,11 +557,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     en = [g for g in goals if g.get("extra") and side(g) == winner]
     if en:
         mine = [x for x in in_net if x["team"] == loser]
-        last = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0), None) or next((x for x in mine if x.get("started")), None)
-        who = (name(last["id"]) or last["name"]) if last else "their goalie"
+        pulled = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0), None) or next((x for x in mine if x.get("started")), None)
+        who = (name(pulled["id"]) or pulled["name"]) if pulled else "their goalie"
         into = "into the empty net" if len(en) == 1 else ("twice" if len(en) == 2 else f"{num(len(en))} times") + " into the empty net"
-        s1.append(_pick([f"{W.place(loser)} pulled {who} for an extra attacker, and {W.the(winner)} made them pay {into}.",
-                         f"{W.place(loser)} went for the extra skater late and got burned: {W.the(winner)} scored {into}."],
+        s1.append(_pick([f"{_cap(W.place(loser))} pulled {who} for an extra attacker, and {W.the(winner)} made them pay {into}.",
+                         f"{_cap(W.place(loser))} went for the extra skater late and got burned: {W.the(winner)} scored {into}."],
                         r["game_id"], "en"))
     if ls == 0 and wg:
         s1.append(f"{name(wg['id']) or wg['name']} stopped all {wg['saves']} shots.")
