@@ -457,12 +457,13 @@ const teamList = teams as { abbr: string; name: string }[];
   .histo text, .quad text { font: 500 9px var(--body); fill: var(--ink-3); }
 
   .quad { width: 100%; height: auto; display: block; }
-  .q-axis { stroke: var(--rule); stroke-width: 1; }
+  .q-box { fill: var(--ice); }
+  .q-axis { stroke: var(--ink-3); stroke-width: 1; opacity: 0.45; }
   .q-lg { fill: var(--ink-3); opacity: 0.3; }
   @media (prefers-color-scheme: dark) { .q-lg { opacity: 0.6; } }
-  .q-hi { fill: var(--team); stroke: var(--sheet); stroke-width: 2; }
-  .q-hi.backup { fill: var(--sheet); stroke: var(--team); stroke-width: 2.5; }
-  .quad .q-name { font: 600 11px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 3px; }
+  .q-hi { fill: var(--team); stroke: var(--ice); stroke-width: 2; }
+  .q-hi.backup { fill: var(--ice); stroke: var(--team); stroke-width: 2.5; }
+  .quad .q-name { font: 600 11px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--ice); stroke-width: 3px; }
   .quad .q-corner { font: 600 7.6px var(--ui); letter-spacing: 0.05em; text-transform: uppercase; fill: var(--ink-2); }
   .quad .q-axis-label { font: 600 7.6px var(--ui); letter-spacing: 0.05em; text-transform: uppercase; fill: var(--ink-3); }
   .q-hit { fill: transparent; }
