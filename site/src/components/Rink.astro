@@ -1,6 +1,6 @@
 ---
 // The matchup drawn as a rink seen from above: visitors on the left, home team on the right.
-// With the site's motion on, it drops the puck once when it comes into view: the lines paint in from centre ice,
+// With the site's motion on, it drops the puck once when it comes into view (script in Base.astro): the boards trace round, the lines paint in from centre ice,
 // the centre circle draws itself, the teams skate in from their own ends, and a final score ticks up.
 // Real pages pass `sides`; the mock recap still falls back to the mock teams.
 import { order, home, teams, type Abbr } from '../data/mock';
@@ -40,11 +40,8 @@ const scored = list.some((s) => s.score !== undefined);
   /* The boards, drawn by the script below once it knows the rink's size; until then the plain border shows. */
   .rk-boards { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .rk-boards rect { fill: none; stroke: var(--ink); stroke-width: 2; }
-  .rk-boards :global(.rk-ring) { fill: none; stroke: var(--line-red); stroke-width: 1.5; }
-  .rk-boards :global(.rk-dot) { fill: var(--line-red); }
   .rk-boards :global(.rk-crease) { fill: var(--line-blue); fill-opacity: 0.45; stroke: var(--line-red); stroke-width: 1; }
-  .run .rk-boards :global(.rk-ring) { stroke-dasharray: 100; animation: rk-trace 0.9s ease-out 0.45s backwards; }
-  .run .rk-boards :global(:is(.rk-dot, .rk-crease)) { animation: rk-fade 0.5s ease 0.6s backwards; }
+  .run .rk-boards :global(.rk-crease) { animation: rk-fade 0.5s ease 0.6s backwards; }
   .rink.boards { border-color: transparent; background-clip: padding-box; }
   .rink.boards .rk-boards { display: block; }
   .side { position: relative; padding: 28px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
@@ -86,63 +83,5 @@ const scored = list.some((s) => s.score !== undefined);
   @keyframes rk-in-r { from { opacity: 0; transform: translateX(46px); } }
 </style>
 
-<script>
-  // The boards and the rink's markings are drawn in an SVG fitted to each rink, so the circles stay round whatever
-  // the rink's shape. With the site's motion on, the puck drops once when the rink is half on screen: the lines
-  // draw themselves and a final score counts up from zero as the teams arrive.
-  const root = document.documentElement;
-  const NS = 'http://www.w3.org/2000/svg';
-  const add = (parent: Element, tag: string, attrs: Record<string, string | number>) => {
-    const el = document.createElementNS(NS, tag);
-    for (const k in attrs) el.setAttribute(k, String(attrs[k]));
-    parent.append(el);
-    return el;
-  };
-  // Positions as a share of the rink's length (200 ft) and width (85 ft), so the markings sit where they do on real ice.
-  const fit = (rink: HTMLElement) => {
-    const svg = rink.querySelector('.rk-boards'), r = svg?.querySelector('rect');
-    const w = rink.clientWidth, h = rink.clientHeight;
-    if (!svg || !r || !w || (rink.dataset.fw === String(w) && rink.dataset.fh === String(h))) return;
-    rink.dataset.fw = String(w); rink.dataset.fh = String(h);
-    const rad = parseFloat(getComputedStyle(rink).borderTopLeftRadius) - 3;
-    r.setAttribute('x', '1'); r.setAttribute('y', '1');
-    r.setAttribute('width', String(w - 2)); r.setAttribute('height', String(h - 2));
-    r.setAttribute('rx', String(Math.max(0, Math.min(rad, h / 2 - 1))));
-    svg.querySelector('.rk-marks')?.remove();
-    const g = add(svg, 'g', { class: 'rk-marks' });
-    const ft = h / 85, dot = Math.max(2.5, 1.2 * ft), y1 = h / 2 - 22 * ft, y2 = h / 2 + 22 * ft;
-    for (const side of [0, 1]) {
-      const gx = side ? w * 0.945 : w * 0.055, dir = side ? -1 : 1;
-      // goal crease: a half circle of 6 ft in front of the net
-      add(g, 'path', { class: 'rk-crease', d: `M${gx} ${h / 2 - 6 * ft} a${6 * ft} ${6 * ft} 0 0 ${side ? 0 : 1} 0 ${12 * ft}Z` });
-      // end-zone face-off circles (15 ft) with their dots, 20 ft out from the goal line
-      for (const y of [y1, y2]) {
-        const cx = gx + dir * w * 0.1;
-        add(g, 'circle', { class: 'rk-ring', cx, cy: y, r: 15 * ft, pathLength: 100 });
-        add(g, 'circle', { class: 'rk-dot', cx, cy: y, r: dot });
-      }
-      // neutral-zone dots, 5 ft inside the blue line
-      for (const y of [y1, y2]) add(g, 'circle', { class: 'rk-dot', cx: w * (side ? 0.6 : 0.4), cy: y, r: dot });
-    }
-    rink.classList.add('boards');
-  };
-  const rinks = document.querySelectorAll<HTMLElement>('[data-drop]');
-  rinks.forEach(fit);
-  if ('ResizeObserver' in window) { const ro = new ResizeObserver((es) => es.forEach((e) => fit(e.target as HTMLElement))); rinks.forEach((r) => ro.observe(r)); }
-  if (root.classList.contains('motion') && 'IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        io.unobserve(e.target);
-        const rink = e.target as HTMLElement;
-        rink.querySelectorAll<HTMLElement>('.score[data-to]').forEach((s) => {
-          const to = +s.dataset.to!;
-          s.textContent = '0';
-          for (let i = 1; i <= to; i++) setTimeout(() => { s.textContent = String(i); }, 700 + i * Math.min(140, 700 / to));
-        });
-        rink.classList.add('run');
-      }
-    }, { threshold: 0.5 });
-    rinks.forEach((r) => io.observe(r));
-  }
-</script>
+<!-- The boards, creases and the puck drop are run by the rink script in Base.astro, which also serves the next-game
+     rinks that home and team pages build in the browser. -->

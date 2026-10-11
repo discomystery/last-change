@@ -453,7 +453,8 @@ const tiText = teamIntro(abbr)?.text ?? [];
     const box = document.getElementById('next-card');
     if (next) {
       const rink = el('div', 'nrink');
-      ['rl blue l', 'rl red', 'rl blue r'].forEach((c) => rink.append(el('span', c)));
+      rink.dataset.drop = '';
+      ['rl goal l', 'rl blue l', 'rl red', 'rl blue r', 'rl goal r'].forEach((c) => rink.append(el('span', c)));
       rink.append(el('span', 'circle', 'at'));
       [next.away, next.home].forEach((a, i) => {
         const side = el('div', 'side' + (i ? ' home' : ''));
