@@ -13,7 +13,7 @@ const base = import.meta.env.BASE_URL;
 <div class="card gflow" id="gflow" data-src={`${base}data/flow/${id}.json`} data-away={away} data-home={home} data-an={awayName} data-hn={homeName} data-score={score.join(',')} data-end={end}>
   <div class="pick gf-pick"><span>Show the game as</span><select id="gf-view" aria-label="Chart"><option value="pile">chances piling up</option><option value="ice">who had the ice</option></select></div>
   <div class="gf-bar">
-    <button class="gf-play" type="button" id="gf-play"><svg viewBox="0 0 10 10" id="gf-pi" aria-hidden="true"><path d="M1 0.5 9.5 5 1 9.5Z" /></svg><span>Play the game</span></button>
+    <button class="gf-play" type="button" id="gf-play" aria-label="Play the game"><svg viewBox="0 0 10 10" id="gf-pi" aria-hidden="true"><path d="M1.5 0.5 9.5 5 1.5 9.5Z" /></svg></button>
     <div class="gf-board" aria-live="polite"><span class="gf-clk" id="gf-clk">Final</span><span class="gf-sc" id="gf-sc"></span></div>
   </div>
   <div class="gf-calls" id="gf-calls" aria-live="polite"></div>
@@ -26,14 +26,15 @@ const base = import.meta.env.BASE_URL;
   @media (prefers-color-scheme: dark) { .gflow { --c0: color-mix(in oklab, var(--away) 55%, white); --c1: color-mix(in oklab, var(--home) 55%, white); } }
   .gflow .gf-pick { margin-top: 0; }
   .gf-wait { font: 500 14px var(--ui); color: var(--ink-3); padding: 40px 0; text-align: center; }
-  .gf-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-  .gf-play { font: 600 13px var(--ui); color: var(--sheet); background: var(--ink); border: 0; border-radius: 999px; padding: 7px 16px 7px 13px; cursor: pointer; display: inline-flex; gap: 7px; align-items: center; }
+  .gf-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+  /* A small round play button, the same size as Run it back's replay icon. */
+  .gf-play { flex: none; width: 30px; height: 30px; padding: 0; color: var(--sheet); background: var(--ink); border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
   .gf-play svg { width: 11px; height: 11px; fill: currentColor; }
   .gf-play:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .gf-board { display: flex; align-items: center; gap: 12px; font: 600 15px var(--ui); font-variant-numeric: tabular-nums; }
-  .gf-clk { color: var(--ink-3); min-width: 74px; text-align: right; }
+  .gf-board { display: flex; align-items: center; gap: 12px; margin-left: auto; white-space: nowrap; font: 600 15px var(--ui); font-variant-numeric: tabular-nums; }
+  .gf-clk { color: var(--ink-3); width: 6.6em; text-align: right; white-space: nowrap; }
   .gf-sc { display: inline-flex; gap: 8px; align-items: center; }
-  .gf-n { font: 600 22px/1 var(--display); font-variation-settings: 'SOFT' 100; display: inline-block; }
+  .gf-n { font: 600 22px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; min-width: 0.75em; text-align: center; display: inline-block; }
   .gf-n.bump { animation: gf-bump 0.7s cubic-bezier(0.3, 1.8, 0.5, 1); }
   @keyframes gf-bump { 0% { transform: scale(1); } 30% { transform: scale(1.7); } 100% { transform: scale(1); } }
   .gf-pp { font: 800 10px var(--ui); letter-spacing: 0.08em; color: #fff; background: var(--c); border-radius: 4px; padding: 2px 5px; opacity: 0; transform: scale(0.6); transition: opacity 0.25s, transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
@@ -106,7 +107,7 @@ const base = import.meta.env.BASE_URL;
 </style>
 
 <script>
-  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number };
+  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number };
   type Skater = { id: number; n: string; h: number; grp: string; s: [number, number][]; toi: number };
   type Flow = { game_id: number; len: number; shots: (number | null)[][]; pp: number[][]; players: { id: number; n: string; h: number; grp: string; s: number[] }[]; goalies: { id: number; n: string; h: number; s: number[] }[]; names?: Record<string, string> };
 
@@ -119,6 +120,7 @@ const base = import.meta.env.BASE_URL;
     const mk = (tag: string, attrs: Record<string, string | number> = {}, parent?: Element): any => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, String(attrs[k])); if (parent) parent.append(n); return n; };
     const txt = (parent: Element, x: number, y: number, s: string | number, cls: string, anchor = 'start') => { const t = mk('text', { x, y, class: cls, 'text-anchor': anchor }, parent); t.textContent = String(s); return t; };
     const last = (n: string) => n.split('. ').slice(1).join('. ') || n;
+    const tag = (s: Shot) => (s.en ? 'EN' : s.st > 0 ? 'PP' : s.st < 0 ? 'SH' : '');
     const clock = (t: number) => { t = Math.floor(t); if (t >= 3600) { const s = t - 3600; return `OT ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; } const p = Math.min(2, Math.floor(t / 1200)), s = t - p * 1200; return `${['1st', '2nd', '3rd'][p]} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
     const clockMS = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
     const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -142,11 +144,13 @@ const base = import.meta.env.BASE_URL;
         const pairs = (s: number[]) => { const o: [number, number][] = []; for (let i = 0; i < s.length; i += 2) o.push([s[i], s[i + 1]]); return o; };
         g = {
           away: ds.away, home: ds.home, an: ds.an, hn: ds.hn, score: sc, end: endWord, len: f.len,
-          shots: f.shots.map(([t, h, xg, gl, x, y, who, en]) => ({ t, h, xg, g: gl, x, y, who: names[String(who)] ?? '', en }) as Shot),
+          shots: f.shots.map(([t, h, xg, gl, x, y, who, en, st]) => ({ t, h, xg, g: gl, x, y, who: names[String(who)] ?? '', en, st: st ?? NaN }) as Shot),
           pp: f.pp.map(([h, a, b]) => ({ h, a, b })),
           players: f.players.map((p) => { const s = pairs(p.s); return { ...p, s, toi: s.reduce((v, [a, b]) => v + b - a, 0) }; }) as Skater[],
           gk: f.goalies.map((p) => ({ ...p, s: pairs(p.s) })),
         };
+        // older files carry no strength: read it from the power-play stretches (a power-play goal ends the stretch)
+        for (const s of g.shots as Shot[]) if (Number.isNaN(s.st)) { const p = s.en ? null : g.pp.find((q: any) => s.t >= q.a && s.t <= q.b); s.st = p ? (p.h === s.h ? 1 : -1) : 0; }
         draw();
         watchForPlay();
       }).catch(() => { stage.innerHTML = '<p class="gf-wait">The game’s shots could not be loaded.</p>'; btn.hidden = true; });
@@ -158,7 +162,7 @@ const base = import.meta.env.BASE_URL;
     function goalRows(parent: Element, goals: Shot[], X: (t: number) => number, y0: number, maxX: number) {
       const rows: [number, number, number][] = [], els: [Shot, any][] = [];
       for (const s of goals) {
-        const name = last(s.who) + (s.en ? ' (EN)' : ''), w = name.length * 6.6 + 14, x = X(s.t), flip = x + w > maxX;
+        const name = last(s.who) + (tag(s) ? ` (${tag(s)})` : ''), w = name.length * 6.6 + 14, x = X(s.t), flip = x + w > maxX;
         const a0 = flip ? x - w : x - 4, b0 = flip ? x + 4 : x + w; let r = 0;
         while (rows.some(([a, b, rr]) => rr === r && a0 < b && b0 > a)) r++;
         rows.push([a0, b0, r]);
@@ -300,7 +304,7 @@ const base = import.meta.env.BASE_URL;
           const nm = names.find((q) => q[0] === s)![1]; nm.style.opacity = 1; nm.classList.remove('gf-label-in'); void nm.getBBox(); nm.classList.add('gf-label-in');
           svg.querySelectorAll('.gf-gstem').forEach((e: any) => { if (+e.dataset.t === s.t) e.style.opacity = 1; });
           const flash = mk('rect', { x: x - 6, y: T, width: 12, height: B - T, fill: C[s.h], class: 'gf-flash' }, fx); setTimeout(() => flash.remove(), 1000);
-          chip(`<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : ''}`, C[s.h], true); SH.goal(s);
+          chip(`<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : ''}`, C[s.h], true); SH.goal(s);
           board(s.t + 0.01);
           const n = $('gf-n' + s.h); n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump');
         } else if (s.xg >= DANGER && !s.en) {
@@ -424,7 +428,12 @@ const base = import.meta.env.BASE_URL;
     }
     const clearCalls = () => $('gf-calls').replaceChildren();
 
-    function setBtn(playing: boolean) { btn.querySelector('span')!.textContent = playing ? 'Pause' : paused ? 'Resume' : 'Play the game'; $('gf-pi').innerHTML = playing ? '<path d="M1 0.5h3v9H1zM6 0.5h3v9H6z"/>' : '<path d="M1 0.5 9.5 5 1 9.5Z"/>'; }
+    let done = false;
+    const ICON = { play: '<path d="M1.5 0.5 9.5 5 1.5 9.5Z"/>', pause: '<path d="M1.5 0.5h2.6v9H1.5zM5.9 0.5h2.6v9H5.9z"/>', again: '<path d="M8.6 5a3.6 3.6 0 1 1-1-2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M8.9 0.9v2.4H6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>' };
+    function setBtn(playing: boolean) {
+      const [w, i] = playing ? ['Pause', 'pause'] : paused ? ['Resume', 'play'] : done ? ['Play it again', 'again'] : ['Play the game', 'play'];
+      btn.setAttribute('aria-label', w); $('gf-pi').innerHTML = ICON[i as keyof typeof ICON];
+    }
     function stop(asPause?: boolean) {
       if (!anim) return;
       cancelAnimationFrame(anim.raf);
@@ -437,7 +446,7 @@ const base = import.meta.env.BASE_URL;
       if (CALM) { S.show(S.END); return; }
       const from = paused; paused = null; pinned = null; S.iceAt(null); S.tip.hide();
       if (!from) { S.show(0); clearCalls(); }
-      anim = { raf: 0, t0: performance.now() - (from ? from.ms : 0), i: from ? from.i : 0, t: from ? from.t : 0 }; setBtn(true);
+      anim = { raf: 0, t0: performance.now() - (from ? from.ms : 0), i: from ? from.i : 0, t: from ? from.t : 0 }; done = false; setBtn(true);
       const shots = S.shots;
       const step = (now: number) => {
         const t = S.gameAt(now - anim.t0); anim.t = t;
@@ -447,7 +456,7 @@ const base = import.meta.env.BASE_URL;
         S.cur.setAttribute('x1', S.X(t)); S.cur.setAttribute('x2', S.X(t)); S.cur.setAttribute('opacity', t < S.END ? 1 : 0);
         $('gf-clk').textContent = clock(t); S.setPP(t); S.SH.at(t);
         while (anim.i < shots.length && shots[anim.i].t <= t) { S.fire(shots[anim.i]); anim.i++; }
-        if (t < S.END) anim.raf = requestAnimationFrame(step); else { anim = null; setBtn(false); S.show(S.END); }
+        if (t < S.END) anim.raf = requestAnimationFrame(step); else { anim = null; done = true; setBtn(false); S.show(S.END); }
       };
       anim.raf = requestAnimationFrame(step);
     }
