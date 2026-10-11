@@ -35,7 +35,7 @@ type Claim = { id: string; kind: string; head: string; body: string; call?: stri
 // still be shown unchanged after the game. Previews for games played before snapshots began are made from the data before
 // each game and shown exactly like the rest.
 type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]> };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
@@ -113,8 +113,10 @@ const gSay: Record<string, (g: GMode) => string> = {
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
 };
-// Most starts this season first, so each menu opens on the goalie who has played most lately.
-const goaliesOf = (a: string) => [...(G[a] ?? [])].sort((x, y) => y.season.starts - x.season.starts || y.blend.starts - x.blend.starts);
+// The likely starter first (saved with the preview, from who has started lately), then most starts this season.
+const likelyRank = (a: string, id: number) => { const i = snap.starters?.[a]?.indexOf(id) ?? -1; return i < 0 ? 99 : i; };
+const goaliesOf = (a: string) => [...(G[a] ?? [])].sort((x, y) => likelyRank(a, x.id) - likelyRank(a, y.id) || y.season.starts - x.season.starts || y.blend.starts - x.blend.starts);
+const guessed = [away, home].some((t) => (snap.starters?.[t]?.length ?? 0) > 0);
 
 // Goal sources
 type Src = { n: number; share: number | null };
@@ -400,7 +402,7 @@ const _ = ordinal;
         </details>
       </div>
     ))}
-    <p class="note">The menus list every goalie on each team, busiest this season first; the site does not yet know who will start. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
+    <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start, a guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons), not team news.' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
   </Section>
 
   <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">

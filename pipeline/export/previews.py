@@ -477,9 +477,10 @@ def _goalie_history() -> "object | None":
         return None
 
 
-def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, places: dict) -> list[dict]:
-    """A goalie (his team's busiest this season) whose record against tonight's opponent is far from his usual.
-    `hist` holds only starts before the game (see `call_extras`)."""
+def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, places: dict, likely: dict | None = None) -> list[dict]:
+    """A goalie (the likely starter, else his team's busiest this season) whose record against tonight's opponent is
+    far from his usual. `hist` holds only starts before the game (see `call_extras`); `likely` is starters.upcoming's
+    entry for the game."""
     if hist is None:
         return []
     import polars as pl
@@ -488,7 +489,8 @@ def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, pla
         roster = goalies_site.get("teams", {}).get(t) or []
         if not roster:
             continue
-        g = max(roster, key=lambda x: ((x.get("season") or {}).get("starts", 0), (x.get("blend") or {}).get("starts", 0)))
+        first = ((likely or {}).get(t) or [(None, 0)])[0][0]
+        g = next((x for x in roster if x["id"] == first), None) or max(roster, key=lambda x: ((x.get("season") or {}).get("starts", 0), (x.get("blend") or {}).get("starts", 0)))
         mine = hist.filter(pl.col("goalie_id") == g["id"])
         if mine.is_empty():
             continue
@@ -675,7 +677,7 @@ def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, e
     mc = matchup_claim(gid, away, home, lines, places, extra.get("pts"), (extra.get("coaches") or {}).get(home))
     if mc:
         cands.append(mc)
-    cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places)
+    cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places, extra.get("likely"))
     cands += clash_claims(gid, away, home, fp, places)
     cands += tempo_claims(gid, away, home, fp, places)
     ec = edge_claim(gid, away, home, fp, places, set(), hot_only=True)
@@ -742,20 +744,25 @@ def call_extras(site: dict, before: str) -> dict:
             "pts": _points(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
 
 
-def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None, **extra) -> dict:
-    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number."""
+def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
+             likely: dict | None = None, **extra) -> dict:
+    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
+    `likely` is each team's likely starting goalies (starters.upcoming); only their order is saved."""
     away, home = g["away"], g["home"]
     fp = site["fingerprints"]["teams"]
-    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, call_extras(site, g["start"]))
+    if likely is None:
+        likely = _likely([g], g["date"]).get(g["id"]) or {}
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, {**call_extras(site, g["start"]), "likely": likely})
     out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
-           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}
+           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),
+           "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)}}
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
-        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"])
+        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out
@@ -769,6 +776,16 @@ def write_index(out_dir) -> int:
                       "rebuilt": bool(s.get("rebuilt"))})
     (out_dir / "index.json").write_text(json.dumps(index, separators=(",", ":")))
     return len(index)
+
+
+def _likely(games: list[dict], before: str | None = None) -> dict[int, dict]:
+    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them."""
+    try:
+        from pipeline.metrics import starters
+        return starters.upcoming(games, before=before)
+    except Exception as e:
+        print(f"likely starters unavailable: {e!r}")
+        return {}
 
 
 def _chances(games: list[dict]) -> dict[int, dict]:
@@ -802,9 +819,9 @@ def run(now: datetime | None = None) -> dict:
             continue
         if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
             todo.append(g)
-    chances = _chances(todo)
+    chances, likely = _chances(todo), _likely(todo)
     for g in todo:
-        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]))
+        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]), likely.get(g["id"]) or {})
         (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
         written += 1
     return {"written": written, "frozen": frozen, "indexed": write_index(out_dir)}

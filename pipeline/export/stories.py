@@ -35,6 +35,7 @@ from pipeline.export import wording
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 PERIODS = {1: "first", 2: "second", 3: "third"}
+LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
 
 
@@ -167,7 +168,7 @@ def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
     return dict(zip(rows["player_id"], rows["team"]))
 
 
-def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON) -> dict:
+def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
     """Everything the preview story can say, from games before `before` (a date)."""
     G, P, N = book()
     G, P = G.filter(pl.col("date") < before[:10]), P.filter(pl.col("date") < before[:10])
@@ -272,30 +273,28 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                         when = "latest game" if missed == 1 else f"last {num(missed)} games"
                         items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
                                       "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
-    item = _goalie_on_the_road(away, home, before, W, N, season)
+    item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
     if item:
         items.append(item)
     return out
 
 
-def _goalie_on_the_road(away: str, home: str, before: str, W: Words, N: dict[int, str], season: int) -> dict | None:
-    """The visitors' clear No. 1 goalie (60%+ of their starts this season) and his record on tonight's ice, when
-    it makes a story: never won there, a long winless run there, or a run of wins."""
+def _goalie_on_the_road(away: str, home: str, before: str, W: Words, N: dict[int, str], likely: list | None) -> dict | None:
+    """The visitors' likely starting goalie (pipeline/metrics/starters.py, when it gives him LIKELY or better) and his
+    record on tonight's ice, when it makes a story: never won there, a long winless run there, or a run of wins."""
     from pipeline.metrics import venues
+    if not likely or likely[0][1] < LIKELY:
+        return None
+    pid = likely[0][0]
+    if not N.get(pid):
+        return None
     try:
-        st = venues.starts()
+        where = f"on {W.poss(home)} ice" if W.places[home].startswith("NY ") else f"in {W.place(home)}"
+        story = venues.storyline(pid, N[pid], home, where, before)
     except Exception as e:  # no saved boxscores or career files: no goalie storyline
         print(f"goalie records unavailable: {e!r}")
         return None
-    mine = st.filter((pl.col("team") == away) & (pl.col("date") < before[:10]) & (pl.col("game_id") // 10_000 == season * 100 + REGULAR))
-    if mine.height < 2:
-        return None
-    top = mine.group_by("player_id").len().sort("len", descending=True).row(0, named=True)
-    if top["len"] / mine.height < 0.6:
-        return None
-    where = f"on {W.poss(home)} ice" if W.places[home].startswith("NY ") else f"in {W.place(home)}"
-    story = venues.storyline(top["player_id"], N.get(top["player_id"], ""), home, where, before)
-    return {"tag": "In net", "pid": top["player_id"], **story} if story and N.get(top["player_id"]) else None
+    return {"tag": "In net", "pid": pid, **story} if story else None
 
 
 def _still_out(notes: list[str], team: str, N: dict[int, str], season: int) -> list[dict]:
@@ -331,10 +330,10 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
 
 
 def preview_story(gid: int, away: str, home: str, start: str, places: dict, claims: list[dict],
-                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON) -> dict:
+                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
     """The story for one preview, from data before the game and the calls already chosen for it."""
     W = Words(places)
-    facts = preview_facts(away, home, start, W, season)
+    facts = preview_facts(away, home, start, W, season, likely)
     _, _, N = book()
     sents = []
     # the last meeting(s)
