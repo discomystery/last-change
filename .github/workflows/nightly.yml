@@ -33,6 +33,7 @@ on:
 
 permissions:
   contents: write
+  issues: write  # the recording-change alarm opens an issue
 
 concurrency:
   group: nightly
@@ -89,6 +90,21 @@ jobs:
       - name: Quick game-night pass (tonight's previews, new post-game pages)
         if: steps.mode.outputs.mode == 'quick'
         run: uv run --project pipeline python -m pipeline.run quick
+
+      - name: Raise the alarm if the league changed how it records plays
+        if: steps.mode.outputs.mode == 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # pipeline/metrics/drift.py compares this season's play-by-play with the seasons the chance model learned from.
+          text="$(uv run --project pipeline python -m pipeline.metrics.drift --alarm)"
+          if [ -n "$text" ]; then
+            echo "::warning title=Recording change::The NHL's play-by-play no longer looks like the training seasons"
+            title="Recording-change alarm: the NHL's play-by-play looks different"
+            if [ -z "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number')" ]; then
+              gh issue create --title "$title" --body "$text"
+            fi
+          fi
 
       - name: Run the pipeline tests
         if: steps.mode.outputs.mode == 'full'

@@ -140,9 +140,9 @@ const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
 const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
   : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
 const replayBody = !dw ? '' : pct(loser) >= 60
-  ? `Played out 100 times with these chances, ${place(loser)} wins ${pct(loser)}. The goals went the other way.`
-  : pct(winner) >= 60 ? `Played out 100 times with these chances, ${place(winner)} wins ${pct(winner)}.`
-  : `Played out 100 times with these chances, ${place(away)} wins ${pct(away)} and ${place(home)} ${pct(home)}, close to a coin flip.`;
+  ? `With chances like these, ${place(loser)} would win about ${pct(loser)} games in 100. The goals went the other way.`
+  : pct(winner) >= 60 ? `With chances like these, ${place(winner)} would win about ${pct(winner)} games in 100.`
+  : `With chances like these, ${place(away)} would win about ${pct(away)} games in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
 const jobFiles = import.meta.glob<{ default: { game_id: number; players: { pos: string }[] } }>('../../../public/data/jobs/2*.json', { eager: true });
@@ -224,7 +224,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           </div>
           <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
         </div>
-        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
+        <div class="replays" role="img" aria-label={`Of 100 games like this, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
           {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
         </div>
         <div class="meter-text">
@@ -232,7 +232,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
           <Gloss label="How the replays work">
             <p class="note">Every shot in regulation that was on target or missed the net goes in as often as our <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says it should, and the game is played out 100 times. A rebound scramble counts as one chance, and empty-net shots are left out. A replay tied after regulation counts as half a win each, since overtime and shootouts are close to coin flips.</p>
-            <p class="note">It doesn’t know about goalies, finishing skill or passes before a shot. It also favours the team that was chasing, because a team with a lead tends to sit back. Over the last three seasons, teams it gave 80% or more won about two games in three.</p>
+            <p class="note">Played out shot by shot, the team with the better chances wins too often: a team with a lead tends to sit back while the other chases, and the replays don’t know about goalies, finishing skill or passes before a shot. So the share is corrected by how games with chances like these really ended over the last three seasons. Replays that came out 85 to 15 read about 70 to 30, and teams given 60% to 70% have won about 65% of the time.</p>
           </Gloss>
         </div>
       </div>
