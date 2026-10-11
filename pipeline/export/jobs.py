@@ -203,11 +203,13 @@ def binom_median(n: int, p: float) -> int:
     return k
 
 
-def goalie_scoresheet(sa: int, ga: int, gsax: float, sec: float, started: bool) -> tuple[str | None, str | None]:
+def goalie_scoresheet(sa: int, ga: int, gsax: float, sec: float, started: bool,
+                      relieved: bool = False) -> tuple[str | None, str | None]:
     """huge: a shutout on 25+ shots or 3+ goals saved above expected. big: any other shutout of 20+ minutes or 1.5+
-    saved above expected. rough: 2+ goals worse than expected, or pulled early after three or more."""
+    saved above expected. rough: 2+ goals worse than expected, or pulled early after three or more. Pulled needs a
+    teammate goalie who then played (relieved), so an empty net for an extra attacker never counts."""
     why = f"{sa - ga} saves on {sa} shots, {gsax:+.1f} goals saved above expected".replace("-", "−")
-    pulled = started and sec < 2400 and ga >= 3
+    pulled = started and relieved and sec < 2400 and ga >= 3
     if (ga == 0 and sa >= 25) or gsax >= 3:
         return "huge", ("A shutout, " if ga == 0 else "") + why
     if (ga == 0 and sec >= 1200 and sa >= 10) or gsax >= 1.5:
@@ -228,6 +230,8 @@ def goalie_cards(season: int, game_ids: set[int]):
     cols = ["goalie_id", "date_s", "sec", "sa", "ga", "xga", "sa_high", "ga_high", "sa_low", "ga_low", "sa_medium", "ga_medium", "started"]
     hist = pl.concat([last.select(cols), now.select(cols)])
     by = {gid: g for (gid,), g in hist.group_by("goalie_id")}
+    # Teams whose starter was replaced: a goalie who did not start played some of that game.
+    relieved = {(g, t) for g, t, st, sec in now.select("game_id", "team_id", "started", "sec").iter_rows() if not st and sec > 0}
     for r in now.filter(pl.col("game_id").is_in(list(game_ids))).iter_rows(named=True):
         if r["sec"] < G_MIN_SEC and r["sa"] < G_MIN_SHOTS:
             continue
@@ -259,7 +263,8 @@ def goalie_cards(season: int, game_ids: set[int]):
                         "text": f"Saved {saves} of {n} {'dangerous' if key == 'high' else 'routine'} shots. Typical for him: {typ_u}. "
                                 f"Average goalie: {typ_a}. He usually stops {100 * p_usual:.0f}% of these."}
             jobs.append(job)
-        night, why = goalie_scoresheet(r["sa"], r["ga"], gsax, r["sec"], r["started"])
+        night, why = goalie_scoresheet(r["sa"], r["ga"], gsax, r["sec"], r["started"],
+                                       (r["game_id"], r["team_id"]) in relieved)
         summ = summary([(j["key"], j["verdict"]) for j in jobs])
         yield r["game_id"], {"id": r["goalie_id"], "team_id": r["team_id"], "pos": "G", "toi_sec": round(r["sec"]),
                              "toi": clock(r["sec"]), "toi5": clock(r["sec"]), "toi_pp": "", "toi_pk": "",

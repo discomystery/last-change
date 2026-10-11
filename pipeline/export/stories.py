@@ -45,6 +45,14 @@ def _pick(pool: list[str], *key) -> str:
     return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
 
 
+def _secs(toi: str | None) -> int:
+    """Seconds in a "mm:ss" clock string (0 when missing)."""
+    if not toi:
+        return 0
+    m, _, sec = toi.partition(":")
+    return int(m) * 60 + int(sec or 0)
+
+
 def _cap(t: str) -> str:
     return t[:1].upper() + t[1:]
 
@@ -535,7 +543,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 s1[-1] = s1[-1][:-1] + ", and won it in the shootout."
             else:
                 s1.append(f"{_cap(W.the(winner))} won it in the shootout.")
-    pulled = [x for x in r.get("goalies", []) if x.get("started") and x.get("toi", "60:00") < "55:00" and x.get("ga", 0) >= 3]
+    # A starter was pulled only if a teammate goalie then played: a short night on its own is usually the net left
+    # empty for an extra attacker.
+    in_net = r.get("goalies", [])
+    relieved = {x["team"] for x in in_net if not x.get("started") and _secs(x.get("toi")) > 0}
+    pulled = [x for x in in_net if x.get("started") and x["team"] in relieved and x.get("ga", 0) >= 3]
     for x in pulled[:1]:
         s1.append(f"{W.place(x['team'])} pulled {name(x['id']) or x['name']} after {num(x['ga'])} goals.")
     if ls == 0 and wg:
