@@ -400,7 +400,10 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
         strength = "en" if empty else "pp" if mine > theirs else "sh" if mine < theirs else "ev"
         hs, as_ = hs + home, as_ + (not home)
         out.append({"period": r["period"], "sec": r["sec"] - 1200 * (r["period"] - 1), "home": home, "p1": r["p1"], "p2": r["p2"], "p3": r["p3"],
-                    "strength": strength, "hs": hs, "as": as_})
+                    "strength": strength, "hs": hs, "as": as_,
+                    # the other side had pulled its goalie for an extra attacker (more skaters than the scorers), not
+                    # just left the net during a delayed penalty
+                    "extra": empty and theirs > mine})
     return out
 
 
@@ -551,7 +554,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     for x in pulled[:1]:
         s1.append(f"{W.place(x['team'])} pulled {name(x['id']) or x['name']} after {num(x['ga'])} goals.")
     # Pulling the goalie for an extra attacker and giving up an empty-net goal: name whoever was last in net.
-    en = [g for g in goals if g["strength"] == "en" and side(g) == winner]
+    en = [g for g in goals if g.get("extra") and side(g) == winner]
     if en:
         mine = [x for x in in_net if x["team"] == loser]
         last = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0), None) or next((x for x in mine if x.get("started")), None)
