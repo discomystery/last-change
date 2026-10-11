@@ -11,6 +11,8 @@ import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
+import Intro from '../../components/Intro.astro';
+import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
@@ -31,6 +33,8 @@ const known = new Set(index.map((x) => x.id));
 const rankHref = (key: string, vs?: string) => `${base}players/rankings/?t=${key}&g=${vs ?? p.group}&p=${p.id}`;
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
+const intro = playerIntro(p.id);
+const introNext = nextGame(intro?.game, base);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
 // A rank tag is glued to the label's last word so it never drops onto a line of its own.
 const headOf = (label: string) => label.slice(0, label.lastIndexOf(' ') + 1);
@@ -119,6 +123,7 @@ const statRow = (x: any) => (isG ? null : x);
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} />
 
     {!isG && role && (
@@ -422,6 +427,14 @@ const statRow = (x: any) => (isG ? null : x);
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
+  /* The intro is the name card's second half: joined below the stats, the story on the left and the next game on the right. */
+  .phead:has(+ :global(.pstory)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  :global(.pstory) { max-width: none !important; margin: -1px 0 0 !important; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; }
+  :global(.pstory:not(.with-next)) { grid-template-columns: minmax(0, 1fr); }
+  :global(.pstory .intro-next) { margin-top: 0 !important; background: var(--ice) !important; }
+  @media (max-width: 719px) {
+    :global(.pstory) { grid-template-columns: 1fr !important; gap: 14px; padding: 16px; }
+  }
   .rec a { color: inherit; }
   .pstats { border-collapse: collapse; font: 400 14px var(--ui); }
   .pstats th:first-child { padding-left: 0; }

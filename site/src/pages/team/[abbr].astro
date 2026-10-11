@@ -20,6 +20,9 @@ import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
+import Intro from '../../components/Intro.astro';
+import { teamIntro } from '../../lib/intros';
+import { teamColour } from '../../lib/teams';
 import Roster from '../../components/Roster.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
@@ -117,14 +120,21 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 };
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
+const tiText = teamIntro(abbr)?.text ?? [];
 ---
 <Base section="teams" title={team.name} mock={false}>
   <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
-  <header class="team-top">
-    <h1>{team.name}</h1>
-    <p class="rec">{team.w}-{team.l}-{team.otl}</p>
-    <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
-  </header>
+  <div class="tcard-wrap" style={`--team:${teamColour(abbr)}`}>
+    <div class:list={['card', 'tcard', tiText.length > 0 && 'joined']}>
+      <span class="tabbr" aria-hidden="true">{abbr}</span>
+      <header class="team-top">
+        <h1>{team.name}</h1>
+        <p class="rec">{team.w}-{team.l}-{team.otl}</p>
+        <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
+      </header>
+    </div>
+    <Intro text={tiText} colour={teamColour(abbr)} class="tstory" />
+  </div>
   <SectionNav items={nav as [string, string][]} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
@@ -540,3 +550,19 @@ const _ = ordinal;
     sel.addEventListener('change', () => document.querySelectorAll('[data-g]').forEach((b) => { b.hidden = b.dataset.g !== sel.value; }));
   })();
 </script>
+
+<style>
+  /* Name card: the team's name and record, with the plain-English intro (Intro.astro) as the card's second half. */
+  .tcard { position: relative; overflow: hidden; isolation: isolate; margin-top: 4px; padding: 26px 28px 22px; }
+  .tcard.joined { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .tcard .team-top { margin: 0; }
+  .tcard h1 { margin: 0; font-size: 40px; line-height: 1.1; }
+  .tcard .tabbr { position: absolute; z-index: -1; right: 230px; bottom: -48px; font: 700 170px/1 var(--ui); letter-spacing: -0.03em; color: color-mix(in oklab, var(--team) 14%, var(--sheet)); pointer-events: none; user-select: none; }
+  .tcard-wrap :global(.tstory) { max-width: none; margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 4px 28px 24px; }
+  @media (max-width: 719px) {
+    .tcard { padding: 20px 16px 16px; }
+    .tcard h1 { font-size: 30px; }
+    .tcard .tabbr { font-size: 104px; bottom: -22px; right: 8px; }
+    .tcard-wrap :global(.tstory) { padding: 2px 16px 18px; }
+  }
+</style>

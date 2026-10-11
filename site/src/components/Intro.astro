@@ -1,0 +1,39 @@
+---
+// Plain-English intro at the top of team and player pages (pipeline/export/intros.py): who this is, are they good,
+// have they been good; for players, storylines for the next game.
+// `parts` picks what to draw here, so a page can split the lead sentence, the rest and the next-game note across its
+// layout. MOCK-UP: player pages show three placements, switched with ?intro=a|b|c, while the user picks one.
+interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null; colour?: string; parts?: ('lead' | 'rest' | 'next')[]; class?: string }
+const { text, next = [], nextLabel, nextHref, colour = 'var(--ink-3)', parts = ['lead', 'rest', 'next'], class: cls } = Astro.props;
+const [lead, ...rest] = text;
+const show = (k: 'lead' | 'rest' | 'next') => parts.includes(k);
+const hasNext = show('next') && next.length > 0;
+---
+{text.length > 0 && (show('lead') || (show('rest') && rest.length) || hasNext) && (
+  <div class:list={['intro', cls, hasNext && (show('lead') || show('rest')) && 'with-next']} style={`--tc:${colour}`}>
+    {(show('lead') || show('rest')) && (
+      <div class="intro-main">
+        {show('lead') && <p class="intro-lead">{lead}</p>}
+        {show('rest') && rest.length > 0 && <p class="intro-text">{rest.join(' ')}</p>}
+      </div>
+    )}
+    {hasNext && (
+      <aside class="intro-next">
+        <p class="intro-eyebrow">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
+        <p class="intro-story">{next.join(' ')}</p>
+      </aside>
+    )}
+  </div>
+)}
+<style>
+  .intro { margin: 20px 0 8px; max-width: 820px; }
+  .intro p { margin: 0; }
+  .intro-lead { font: 600 25px/1.35 var(--display); font-variation-settings: 'SOFT' 100; }
+  .intro-text { font: 400 18px/1.65 var(--body); color: var(--ink-2); }
+  .intro-lead + .intro-text { margin-top: 10px; }
+  .intro-next { margin-top: 18px; padding: 12px 16px; background: var(--sheet); border-radius: 14px; border-left: 4px solid var(--tc); }
+  .intro-eyebrow { margin-bottom: 4px !important; font: 700 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .intro-eyebrow a { color: inherit; }
+  .intro-story { font: 400 17px/1.6 var(--body); }
+  @media (max-width: 719px) { .intro-lead { font-size: 22px; } }
+</style>
