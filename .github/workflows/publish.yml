@@ -1,7 +1,8 @@
 # Publish changes: recompute every number from the data already saved and republish the site, without fetching
 # new games. For getting layout, wording and maths changes live between the nightly runs.
-# Started by hand from the Actions tab ("Publish changes" > "Run workflow"). Shares a queue with the nightly
-# update so the two never run at the same time.
+# Started by hand from the Actions tab ("Publish changes" > "Run workflow"); merged changes normally go live through
+# the nightly update, which also runs on every merge to main. Shares a queue with the nightly update so the two never
+# run at the same time.
 name: Publish changes
 
 on:
