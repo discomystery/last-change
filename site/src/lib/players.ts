@@ -32,6 +32,22 @@ export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R:
 export const groupWord = { F: 'forwards', D: 'defensemen' } as const;
 /** Who a rating compares him with: all forwards, centers or wingers only (where the two really differ), or defensemen. */
 export const peerWord: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
+/**
+ * Ratings that only count players who do enough of that thing (pipeline/metrics/players.py TRAITS minimums), so their
+ * group is smaller than all forwards or defensemen. Name the group wherever a rank or percentile is shown.
+ */
+const POOL: Record<string, (w: string) => string> = {
+  powerPlay: (w) => `power-play ${w}`,
+  shThreat: (w) => `penalty-killing ${w}`,
+  faceoffs: (w) => `${w} who take faceoffs`,
+};
+export const POOL_RULE: Record<string, Record<Mode, string>> = {
+  powerPlay: { blend: '60+ minutes on the power play', season: '10+ minutes on the power play' },
+  shThreat: { blend: '30+ minutes killing penalties', season: '5+ minutes killing penalties' },
+  faceoffs: { blend: '200+ faceoffs', season: '40+ faceoffs' },
+};
+/** Who a rating compares him with, in words: the position group, narrowed for ratings with a minimum. */
+export const peerOf = (key: string, vs: string) => { const w = peerWord[vs] ?? vs; return POOL[key]?.(w) ?? w; };
 export type Competition = Record<Mode, Record<'all' | 'home' | 'road', { v: number; pct: number } | null>>;
 const sign = (v: number, d = 2) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
 
@@ -101,7 +117,7 @@ export function standouts(p: Skater, mode: Mode) {
   for (const [key, info] of Object.entries(TRAITS)) {
     const e = p.traits[key]?.[mode];
     if (!e || !e.ok) continue;
-    if ((e.pct >= 75 && e.lo >= 55) || (e.pct <= 25 && e.hi <= 45)) out.push({ key, info, pct: e.pct, v: e.index ?? e.v, est: e, vs: peerWord[e.vs ?? p.group], rank: e.rank, of: e.of });
+    if ((e.pct >= 75 && e.lo >= 55) || (e.pct <= 25 && e.hi <= 45)) out.push({ key, info, pct: e.pct, v: e.index ?? e.v, est: e, vs: peerOf(key, e.vs ?? p.group), rank: e.rank, of: e.of });
   }
   for (const [key, info] of Object.entries(EDGE)) {
     const e = p.edge?.[mode]?.[key];

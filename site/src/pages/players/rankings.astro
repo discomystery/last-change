@@ -4,6 +4,7 @@
 import Base from '../../layouts/Base.astro';
 import teams from '../../../public/data/teams.json';
 import { skaters, RATINGS, ratingGroups, groupOf, ratingRows, roster, ordered, GROUP_PICK, modes } from '../../lib/leaders';
+import { peerOf, POOL_RULE } from '../../lib/players';
 import '../../styles/blocks.css';
 
 const base = import.meta.env.BASE_URL;
@@ -15,7 +16,7 @@ const board = Object.fromEntries(RATINGS.map((r) => {
   const rows = ratingRows(r.key);
   return [r.key, Object.fromEntries(GROUP_PICK.map(([g]) => [g, Object.fromEntries(modes.map((m) => [m, ordered(rows[m], g, byId).slice(0, 5).map((x) => ({ id: x.id, n: x.n, s: x.s, t: x.t }))]))]))];
 }));
-const info = Object.fromEntries(RATINGS.map((r) => [r.key, { label: r.info.label, tip: r.info.tip, lo: r.info.lo, hi: r.info.hi, edge: r.edge, raw: !!r.info.raw }]));
+const info = Object.fromEntries(RATINGS.map((r) => [r.key, { label: r.info.label, tip: r.info.tip, lo: r.info.lo, hi: r.info.hi, edge: r.edge, raw: !!r.info.raw, who: Object.fromEntries(['F', 'C', 'W', 'D'].map((g) => [g, peerOf(r.key, g)])), rule: POOL_RULE[r.key] ?? null }]));
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(skaters[0]?.generated_at ?? Date.now()));
 ---
 <Base section="players" title="Skater rankings" mock={false} description="Every NHL skater ranked on every rating: who creates the most chances, shoots the most, kills penalties best, skates fastest.">
@@ -122,7 +123,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
         <span class="rk">${x.n}</span>
         <span class="rname gwho">${pname(p)} ${tname(p.t)}</span>
         <div class="lanes"><div class="lane"><span class="whisk"></span><span class="dot"></span></div></div>
-        <span class="say" data-tip="${esc(x.t)} Better than ${x.p}% of ${groupWord[x.vs] || 'his position'}." tabindex="0">${esc(x.s)}</span></li>`;
+        <span class="say" data-tip="${esc(x.t)} Better than ${x.p}% of ${info[rating.value].who[x.vs] || 'his position'}." tabindex="0">${esc(x.s)}</span></li>`;
     };
     const gapRow = (n) => `<li class="gap"><span></span><span class="n">${n} more</span></li>`;
 
@@ -137,7 +138,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
       document.getElementById('r-hi').textContent = i.hi;
       const split = all.length && !all.every((r) => r.vs === g);
       document.getElementById('r-who').textContent = all.length
-        ? `${all.length} ${groupWord[g]} rated ${m === 'blend' ? 'over this season and last' : 'this season'}, through ${asOf}.` + (split ? ' On this rating centers and wingers are compared with their own kind, so the dots show where each sits among his own group.' : '')
+        ? `${all.length} ${i.who[g]} rated ${m === 'blend' ? 'over this season and last' : 'this season'}, through ${asOf}.` + (i.rule ? ` It counts only players with ${i.rule[m]}.` : '') + (split ? ' On this rating centers and wingers are compared with their own kind, so the dots show where each sits among his own group.' : '')
         : `No ${groupWord[g]} are rated on this one.`;
       const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
       let xs = all.filter((x) => { const p = who.get(x.id); return (!team.value || p.t === team.value) && words.every((w) => fold(p.n).includes(w)); });

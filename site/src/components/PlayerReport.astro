@@ -6,6 +6,7 @@ import Section from './Section.astro';
 import Pips from './Pips.astro';
 import { clock } from '../lib/format';
 import { cardsFor } from '../lib/reportCards';
+import { peerOf } from '../lib/players';
 
 interface Props { p: any; place: string }
 const { p, place } = Astro.props;
@@ -19,7 +20,7 @@ const word = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’
 const pillWord = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
 const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
 const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
-const why = (j: any) => (j.key === 'pp' ? `Relied on for ${j.per_game} a game on the power play` : j.key === 'pk' ? `Relied on for ${j.per_game} a game killing penalties` : j.why === 'role' ? 'Relied on to take plenty of faceoffs' : `Better than ${j.pct}% of ${peer[j.vs ?? 'F']}`);
+const why = (j: any) => (j.key === 'pp' ? `Relied on for ${j.per_game} a game on the power play` : j.key === 'pk' ? `Relied on for ${j.per_game} a game killing penalties` : j.why === 'role' ? 'Relied on to take plenty of faceoffs' : `Better than ${j.pct}% of ${peerOf(j.key, j.vs ?? 'F')}`);
 const record = (key: string) => rows.slice().reverse().map((r) => ({ v: (r.card.jobs.find((j: any) => j.key === key)?.verdict ?? 'na') as keyof typeof mark, date: r.date }));
 // What a player can be graded on, with his standing on the rest. Bars match the report cards: 1:30 a game on the
 // power play, 1:00 on the kill, 8 draws a game, or better than 75% at his position for a strength.
@@ -61,7 +62,7 @@ const SW = 1.2; // Swing bar half-width, in Swing points
       {others.map(([k, label, text, trait]) => { const t = trait ? traits[trait]?.blend : null; const bar = k === 'pp' ? 'Bar: 1:30 a game' : k === 'pk' ? 'Bar: 1:00 a game' : k === 'faceoffs' && !t ? 'Bar: 8 draws a game' : 'Bar: better than 75%'; return (
         <li>
           <span class="rp-ol">{label}</span>
-          <span class="rp-ov">{t ? <><Pips pct={t.pct} tip={`Better than ${t.pct}% of ${peer[t.vs ?? 'F']}.`} /> <span>better than {t.pct}%{t.pct >= 65 && t.pct < 75 ? ', just short' : ''}</span></> : <span>{text}</span>}</span>
+          <span class="rp-ov">{t ? <><Pips pct={t.pct} tip={`Better than ${t.pct}% of ${peerOf(trait!, t.vs ?? 'F')}.`} /> <span>better than {t.pct}%{t.pct >= 65 && t.pct < 75 ? ', just short' : ''}</span></> : <span>{text}</span>}</span>
           <span class="rp-bar">{bar}</span>
         </li>
       ); })}
