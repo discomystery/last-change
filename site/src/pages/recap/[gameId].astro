@@ -191,21 +191,21 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
     {dw && replays && (
       <div class="card meter" id="replays">
-        <div class="rp-box">
-          <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
-            {dots.map((d, i) => <i class={d === 'tie' ? 'tie' : `t-${d}`} style={`--i:${i}`}></i>)}
+        <p class="mini-h">Run it back</p>
+        <h3 class="h">{replayHead}</h3>
+        <div class="rp-head">
+          <div class="rp-counts">
+            <span class="t-away"><b data-k="t-away">{replays.away}</b> {place(away)}</span>
+            <span class="rp-tie"><b data-k="tie">{replays.tie}</b> level after 60</span>
+            <span class="t-home"><b data-k="t-home">{replays.home}</b> {place(home)}</span>
           </div>
           <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
         </div>
+        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
+          {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
+        </div>
         <div class="meter-text">
-          <p class="mini-h">Run it back</p>
-          <h3 class="h">{replayHead}</h3>
           <p>{replayBody}</p>
-          <dl class="compare">
-            {order.map((a) => (
-              <div class={`t-${side(a)}`} data-side={side(a)}><dd><i></i><span><span class="rp-pct">{pct(a)}</span>%</span></dd><span>{place(a)}: <span class="rp-w">{replays[side(a)]}</span> wins, plus half of the <span class="rp-t">{replays.tie}</span> ties</span></div>
-            ))}
-          </dl>
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
           <Gloss label="How the replays work">
             <p class="note">Every shot in regulation that was on target or missed the net goes in as often as our <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says it should, and the game is played out 100 times. A rebound scramble counts as one chance, and empty-net shots are left out. A replay tied after regulation counts as half a win each, since overtime and shootouts are close to coin flips.</p>
@@ -317,24 +317,17 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     if (!btn || !grid) return;
     const dots = [...grid.children];
     const sorted = dots.map((d) => d.className);
-    const rows = [...document.querySelectorAll('.meter .compare [data-side]')].map((el) => ({
-      side: el.dataset.side, pct: el.querySelector('.rp-pct'), w: el.querySelector('.rp-w'), t: el.querySelector('.rp-t'),
-    }));
-    const saved = rows.map((r) => [r.pct.textContent, r.w.textContent, r.t.textContent]);
+    const nums = [...document.querySelectorAll('.rp-counts b')];
+    const saved = nums.map((b) => b.textContent);
     btn.addEventListener('click', () => {
       if (!document.documentElement.classList.contains('motion')) return;
       btn.disabled = true;
-      grid.classList.add('rp-ran');
       // Close the button's tooltip so it doesn't sit over the dots while they land.
       setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       const deal = sorted.map((c, i) => [c, Math.random(), i]).sort((a, b) => a[1] - b[1]);
       dots.forEach((d) => { d.className = 'rp-empty'; });
       const count = { 't-away': 0, 't-home': 0, tie: 0 };
-      const show = () => rows.forEach((r) => {
-        const w = count[`t-${r.side}`];
-        r.w.textContent = w; r.t.textContent = count.tie;
-        r.pct.textContent = Math.round(w + count.tie / 2);
-      });
+      const show = () => nums.forEach((b) => { b.textContent = count[b.dataset.k]; });
       show();
       let n = 0;
       const step = () => {
@@ -357,7 +350,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
             { duration: 700, delay: Math.min(i, 60) * 4, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'backwards' });
           a.finished.catch(() => {}).then(() => {
             if (--left) return;
-            rows.forEach((row, j) => { [row.pct.textContent, row.w.textContent, row.t.textContent] = saved[j]; });
+            nums.forEach((b, j) => { b.textContent = saved[j]; });
             btn.disabled = false;
           });
         });
@@ -388,7 +381,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .compare { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
-  .compare > div > span { font: 400 12px var(--ui); color: var(--ink-3); }
+  .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
   .numbers { width: 100%; border-collapse: collapse; font: 400 15px var(--ui); margin-top: 8px; }
   .numbers th, .numbers td { padding: 10px 6px; border-top: 1px solid var(--rule); text-align: right; }
   .numbers thead th, .numbers thead td { border-top: 0; font-weight: 600; white-space: nowrap; }
@@ -400,30 +393,28 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .surp .mild .h { font-size: 19px; }
   .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
-  .meter { margin-top: 20px; display: grid; gap: 22px; align-items: center; scroll-margin-top: 80px; }
+  .meter { margin-top: 20px; scroll-margin-top: 80px; }
   .meter .mini-h { margin-bottom: 4px; }
-  @media (min-width: 640px) { .meter { grid-template-columns: auto 1fr; gap: 32px; } }
-  .replays { display: grid; grid-template-columns: repeat(10, 10px); gap: 5px; justify-content: start; }
-  .replays i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  /* Phones: a wide 20 x 5 grid across the card instead of a square with empty space beside it. */
-  @media (max-width: 639px) { .replays { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 4px; } .replays i { width: 100%; height: auto; aspect-ratio: 1; } }
-  .replays i.tie { background: var(--ink-3); opacity: 0.4; }
-  .rp-box { display: grid; gap: 10px; justify-items: start; }
+  .rp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; max-width: 520px; }
+  .rp-counts { display: flex; flex-wrap: wrap; gap: 4px 20px; font: 600 15px var(--ui); color: var(--ink-2); }
+  .rp-counts b { font: 600 26px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; display: inline-block; min-width: 1.4em; color: var(--team); }
+  .rp-counts .rp-tie b { color: var(--ink-3); }
+  /* 100 replays as a 20 by 5 grid, away wins first, then games level after 60 minutes, then home wins. */
+  .replays { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 5px; margin-top: 12px; max-width: 520px; }
+  .replays i { aspect-ratio: 1; border-radius: 50%; background: var(--team); }
+  .replays i.tie { background: var(--ink-3); opacity: 0.6; }
   .replays i.rp-empty { background: var(--track); opacity: 1; }
-  .replays.rp-ran i:not(.rp-pop) { animation: none; }
   .replays i.rp-pop { animation: rp-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
   @keyframes rp-pop { from { transform: scale(0.2); } }
-  /* Run it again: a small replay icon under the dots, only for visitors who get the site's motion. */
-  .rp-again { display: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink-2); cursor: pointer; place-items: center; padding: 0; transition: border-color 0.15s, color 0.15s, rotate 0.5s ease; }
+  .meter-text { margin-top: 12px; }
+  /* Run it again: a small replay icon beside the counts, only for visitors who get the site's motion. */
+  .rp-again { display: none; flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink-2); cursor: pointer; place-items: center; padding: 0; transition: border-color 0.15s, color 0.15s, rotate 0.5s ease; }
   :global(html.motion) .rp-again { display: grid; }
   .rp-again:hover { border-color: var(--ink-3); color: var(--ink); }
   .rp-again:active { rotate: -40deg; }
   .rp-again:disabled { opacity: 0.4; cursor: default; }
   .rp-again svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .meter-text > p:not(.detail) { margin-bottom: 4px; }
-  .meter .compare { margin-bottom: 12px; }
-  .meter .compare dd { display: inline-flex; align-items: center; gap: 8px; }
-  .meter .compare dd i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
   .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .job-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
