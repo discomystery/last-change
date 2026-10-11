@@ -60,7 +60,7 @@ const example = (() => {
 })();
 const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(fp.generated_at));
 ---
-<Base section="methods" title="Methods" mock={false}>
+<Base section="methods" title="Methods">
   <h1 class="page-top">How the numbers are made</h1>
   <p class="lede">This site is about how teams play, not who’s going to win. Everything here is built from the NHL’s own public data, and four things set it apart from most stats sites: we <a href="#arena">correct for each arena’s scorers</a>, we <a href="#blend">blend this season with last</a> by an amount that depends on the trait, we rate every chance with <a href="#xg">our own model</a>, and player ratings <a href="#players">account for linemates and opponents</a>. This page walks through all of it, in the order the numbers are built.</p>
 

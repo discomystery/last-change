@@ -160,7 +160,7 @@ const nav = [
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
-<Base section="games" title={`${away} at ${home}, final`} mock={false}>
+<Base section="games" title={`${away} at ${home}, final`}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />

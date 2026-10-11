@@ -149,7 +149,7 @@ const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{displ
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
 const _ = ordinal;
 ---
-<Base section="games" title={`${away} at ${home} preview`} mock={false}>
+<Base section="games" title={`${away} at ${home} preview`}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />

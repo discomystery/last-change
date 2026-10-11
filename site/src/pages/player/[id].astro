@@ -112,7 +112,7 @@ const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots f
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
 ---
-<Base section="players" title={`${p.name} · ${p.team}`} mock={false} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
+<Base section="players" title={`${p.name} · ${p.team}`} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
