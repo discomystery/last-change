@@ -76,6 +76,29 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
   <Section id="xg" title="Rating every chance" placeholder={false} takeaway="Every shot gets a rating: how often shots like it go in.">
     <div class="card explain">
       <p>Goals are rare and streaky, so most of this site works from expected goals: every shot that gets past the shot blockers gets a chance of going in, and adding those up says how many goals a team’s chances were worth. The model is our own, trained on about 360,000 shots from three seasons. For each shot it looks at where it came from, what kind of shot it was, what happened just before (a save, a turnover, a faceoff win) and how long before, the manpower, the score and the period. It deliberately doesn’t know who shot or who was in net, so a goalie or a sniper is judged against the shot, not against himself.</p>
+      <div class="try" id="try-xg" data-src={`${base}data/xg_grid.json`} hidden>
+        <p class="try-pick"><span>Try</span>
+          <select id="try-type" aria-label="Shot type"><option value="wrist">a wrist shot</option><option value="snap">a snap shot</option><option value="slap">a slap shot</option><option value="backhand">a backhand</option><option value="tip">a tip or deflection</option></select>
+        </p>
+        <div class="try-body">
+          <svg id="try-rink" viewBox="-1 -1 87 78" role="img" aria-label="Half rink: drag the puck to see the chance of scoring from there">
+            <path class="rk-board" d="M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75 Z" />
+            <g id="try-heat"></g>
+            <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
+            <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
+            <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
+            <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
+            <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
+            <circle id="try-puck" class="try-puck" cx="30" cy="34" r="2.2" tabindex="0" />
+          </svg>
+          <div class="try-read" aria-live="polite">
+            <p class="try-big"><strong id="try-pct">–</strong></p>
+            <p id="try-say" class="try-say">Drag the puck anywhere in the zone.</p>
+            <p id="try-avg" class="note"></p>
+          </div>
+        </div>
+        <p class="note">The average rating our model gave real 5-on-5 shots of that kind from that spot, <span id="try-n"></span>. Darker means more dangerous. A spot with few shots of one kind leans on all shots from there.</p>
+      </div>
       <p>Tested on a full season it had never seen, it was about as sharp as the best public models on the same shots, and well calibrated: shots it rated around 10% went in about 10% of the time. Because one model rates every season, a team’s numbers from different years can be compared fairly. <a href={`${base}xg-check/`}>See how it rated the chances in recent games.</a></p>
     </div>
   </Section>
@@ -92,6 +115,18 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
       <p><strong>How we measure it.</strong> For each arena we compare two sets of games from the last three seasons ({data.seasons}): the home team’s games in their own building, and the same team’s road games. Both sets have the same team in them, so that team’s own style cancels out, and what’s left is the building. The opponents differ, but over 120-odd road games the home team visits every other arena, so those quirks wash out. Dividing one rate by the other gives the arena’s factor: {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong> for hits at {ex.venue}.</p>
       <p><strong>Not taking it at face value.</strong> Even three seasons is a limited sample, so each factor is pulled part of the way back toward “no difference”, as if we’d also watched {SHRINK_GAMES} perfectly ordinary games there. With {ex.home_games} home games that keeps about {keep}% of the gap, and {ex.venue} settles at <strong>{(ex.hits as number).toFixed(2)}</strong>. A building with only a season of games behind it is pulled harder toward neutral and earns its factor as games come in.</p>
       <p><strong>Applying it.</strong> Each event is divided by the factor of the building it happened in, for both teams. Thirty hits at {ex.venue} count as about <strong>{(sample / (ex.hits as number)).toFixed(0)}</strong>; thirty at {stingy.venue}, where scorers are stingy, count as about <strong>{(sample / (stingy.hits as number)).toFixed(0)}</strong>. That feeds Physicality and Forecheck pressure on team pages, and hits, blocks, takeaways and giveaways on player pages and post-game report cards.</p>
+      <div class="arena-count" role="img" aria-label={`Thirty recorded hits count as ${(sample / (ex.hits as number)).toFixed(0)} at ${ex.venue} and ${(sample / (stingy.hits as number)).toFixed(0)} at ${stingy.venue}`}>
+        {[ex, stingy].map((a) => (
+          <div class="ac">
+            <p class="ac-venue">{a.venue}<span>{(a.hits as number) > 1 ? 'generous scorers' : 'stingy scorers'}</span></p>
+            <div class="ac-nums">
+              <p><strong data-to={sample}>{sample}</strong><span>hits recorded</span></p>
+              <p class="ac-arrow" aria-hidden="true">→</p>
+              <p><strong data-to={Math.round(sample / (a.hits as number))} data-from={sample}>{Math.round(sample / (a.hits as number))}</strong><span>after the correction</span></p>
+            </div>
+          </div>
+        ))}
+      </div>
       <p><strong>Home teams get more everywhere.</strong> Separately from any one building, home teams across the league are credited with about {tilt('hits')}% more hits, {tilt('gives')}% more giveaways and {tilt('takes')}% more takeaways than visitors, and {tilt('blocks')}% fewer blocks. It might be scorers watching the home side more closely, or teams really having the puck more at home; public data can’t tell the two apart. Either way it would flatter a team in the middle of a long homestand, so events are reweighted to put home and road games on the same footing.</p>
       <p><strong>What we tried and threw out.</strong> We tested whether some buildings tilt toward their own team more than others. In any one season it looks that way, but the arenas that tilted one year weren’t the ones that tilted the next, so it’s the bounces of a season rather than a habit of the scorers. Correcting for it would make the numbers worse, so we don’t.</p>
       <p><strong>Why it’s a score, not a count.</strong> We never show an adjusted count of “real hits” because that is, in the end, just another subjective number. We take arena-scored stats and turn them into a <em>score</em> where 100 is the league average. Flipping the switch at the top of every page toggles the score with raw numbers, so you can see how arena scoring impacts your team and use the site with the league’s official numbers if it suits you.</p>
@@ -118,6 +153,28 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
       <ul class="settle">{settle.map(([k, g]) => <li><span>{label(k)}</span><strong>{g >= 300 ? 'over 300' : Math.round(g)} games</strong></li>)}</ul>
       <p><strong>What “what we knew before” means.</strong> It’s last season, but not last season raw: last season gets the same treatment, pulled toward league average by the same number of games. So for a trait that settles quickly, last season counts almost in full; for a slow one, even a whole season doesn’t move far from average.</p>
       <p><strong>What that does {N} games in.</strong> A team’s shot volume is about {vol.now}% this season and {vol.last}% last season. Their penalty kill is {pk.now}% this season, {pk.last}% last season and {pk.league}% league average. Their goaltending is only {gNow}% this season, which is why a hot two weeks in net barely shows on the blended view.</p>
+      <div class="settle-try">
+        <p class="try-pick"><span>Watch</span>
+          <select id="st-trait" aria-label="Trait">
+            <option value={kOf('volume')} data-name="shot volume">shot volume</option>
+            <option value={kOf('pp')} data-name="the power play" selected>the power play</option>
+            <option value={kOf('goalie')} data-name="goaltending">goaltending</option>
+          </select>
+          <span>settle</span>
+        </p>
+        <p class="note">Say a team ranked near the bottom last season but has played like a top-quarter team since. Slide through the season.</p>
+        <div class="st-lane" aria-hidden="true">
+          <span class="st-avg" style="left:50%"></span>
+          <span class="st-whisk"></span>
+          <span class="st-last" style="left:22%" data-tip="Last season"></span>
+          <span class="st-now" style="left:78%" data-tip="This season so far"></span>
+          <span class="st-blend"></span>
+        </div>
+        <div class="st-ends"><span>Bottom of the league</span><span>Top</span></div>
+        <label class="st-slide"><span>Games played: <strong id="st-n">10</strong></span><input type="range" id="st-games" min="0" max="82" value="10" /></label>
+        <p class="st-say" id="st-say"></p>
+        <p class="note st-key"><span><i class="k-last"></i>Last season</span> <span><i class="k-now"></i>This season so far</span> <span><i class="k-blend"></i>What the site shows, with its likely range</span></p>
+      </div>
       <p><strong>Goaltending follows the goalies.</strong> A team’s system carries over from one season to the next and pulls new players into it; their goaltending belongs to whoever is in net. So for goaltending, “what we knew before” is the goalies who have actually played for the team this season, each on his own last season wherever he played it (pulled toward league average the same way), weighted by his time in net. We tested it on the last two seasons: a team’s goaltending one season says almost nothing about the next, even when the starter stays the same, and we get better results relying on a goalie’s own records.</p>
       {example && <p><strong>An example from today.</strong> As of {asOf}, the {nick(example.abbr)} rank {ordinal(example.s)} in {label(example.key).toLowerCase()} on this season alone but {ordinal(example.b)} blended. After only {example.games} games that’s still mostly bounces, so the blend leans on what we knew before.</p>}
       <p><strong>The likely range.</strong> Every number carries a whisker: the middle 80% of results when a team’s games are reshuffled at random and the whole calculation is redone. Early in a season, or for a slow trait, it’s wide.</p>
@@ -163,6 +220,168 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </ul>
   </Section>
 </Base>
+
+<script is:inline>
+  // Drag a puck: read the chance map, shade it for the chosen shot type, and say the chance under the puck.
+  (async () => {
+    const box = document.getElementById('try-xg');
+    let g;
+    try { g = await (await fetch(box.dataset.src)).json(); } catch { return; }
+    box.hidden = false;
+    const svg = document.getElementById('try-rink'), heat = document.getElementById('try-heat'), puck = document.getElementById('try-puck');
+    const type = document.getElementById('try-type');
+    const NS = 'http://www.w3.org/2000/svg';
+    const words = { wrist: 'wrist shot', snap: 'snap shot', slap: 'slap shot', backhand: 'backhand', tip: 'tip or deflection' };
+    // Rink drawing: the net at the top, seen from the shooter's side. x toward the net (89 at the goal line), y across.
+    const toSvg = (x, y) => [42.5 - y, 11 + (g.net_x - x)];
+    const fromSvg = (sx, sy) => [g.net_x - (sy - 11), 42.5 - sx];
+    const cellOf = (x, y) => { const cx = Math.floor((x - g.x0) / g.cell), cy = Math.floor(Math.abs(y) / g.cell); return cx >= 0 && cx < g.nx && cy >= 0 && cy < g.ny ? [cx, cy] : null; };
+    document.getElementById('try-n').textContent = `${g.shots.toLocaleString()} shots over ${g.seasons}`;
+    const shade = () => {
+      const rows = g.grid[type.value];
+      heat.replaceChildren();
+      rows.forEach((row, cy) => row.forEach((v, cx) => {
+        if (v == null) return;
+        [1, -1].forEach((side) => {
+          const x0 = g.x0 + cx * g.cell, y0 = side * cy * g.cell, y1 = side * (cy + 1) * g.cell;
+          const [ax, ay] = toSvg(x0 + g.cell, Math.max(y0, y1)), [bx, by] = toSvg(x0, Math.min(y0, y1));
+          const r = document.createElementNS(NS, 'rect');
+          r.setAttribute('x', Math.min(ax, bx).toFixed(2)); r.setAttribute('y', Math.min(ay, by).toFixed(2));
+          r.setAttribute('width', Math.abs(bx - ax).toFixed(2)); r.setAttribute('height', Math.abs(by - ay).toFixed(2));
+          r.setAttribute('class', 'try-cell'); r.style.setProperty('--v', Math.min(1, v / 30).toFixed(3));
+          heat.append(r);
+        });
+      }));
+      heat.setAttribute('clip-path', 'url(#try-clip)');
+      heat.setAttribute('filter', 'url(#try-soft)');
+      document.getElementById('try-avg').textContent = `The average ${words[type.value]} at 5-on-5 goes in ${g.types[type.value].avg}% of the time.`;
+      read();
+    };
+    const clip = document.createElementNS(NS, 'clipPath'); clip.id = 'try-clip';
+    const cp = document.createElementNS(NS, 'path'); cp.setAttribute('d', 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75 Z'); clip.append(cp);
+    // A slight blur turns the squares into a smooth wash.
+    const soft = document.createElementNS(NS, 'filter'); soft.id = 'try-soft'; soft.setAttribute('color-interpolation-filters', 'sRGB');
+    const blur = document.createElementNS(NS, 'feGaussianBlur'); blur.setAttribute('stdDeviation', '1.1'); soft.append(blur);
+    const defs = document.createElementNS(NS, 'defs'); defs.append(clip, soft); svg.prepend(defs);
+    const read = () => {
+      const [x, y] = fromSvg(+puck.getAttribute('cx'), +puck.getAttribute('cy'));
+      const c = cellOf(x, y);
+      const v = c ? g.grid[type.value][c[1]][c[0]] : null;
+      document.getElementById('try-pct').textContent = v == null ? '–' : `${v < 1 ? '<1' : Math.round(v)}%`;
+      const ft = Math.round(Math.hypot(x - g.net_x, y));
+      document.getElementById('try-say').textContent = v == null ? 'Too few shots from here to say.' : x > g.net_x ? `A ${words[type.value]} from behind the goal line, ${ft} ft from the net.` : `Chance that a ${words[type.value]} from here, ${ft} ft out, goes in.`;
+    };
+    const move = (e) => {
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      puck.setAttribute('cx', Math.max(1, Math.min(84, p.x)).toFixed(2));
+      puck.setAttribute('cy', Math.max(1, Math.min(74, p.y)).toFixed(2));
+      read();
+    };
+    let drag = false;
+    svg.addEventListener('pointerdown', (e) => { drag = true; svg.setPointerCapture(e.pointerId); move(e); });
+    svg.addEventListener('pointermove', (e) => { if (drag) move(e); });
+    svg.addEventListener('pointerup', () => { drag = false; });
+    puck.addEventListener('keydown', (e) => {
+      const d = { ArrowUp: [0, -1.5], ArrowDown: [0, 1.5], ArrowLeft: [-1.5, 0], ArrowRight: [1.5, 0] }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      puck.setAttribute('cx', Math.max(1, Math.min(84, +puck.getAttribute('cx') + d[0])));
+      puck.setAttribute('cy', Math.max(1, Math.min(74, +puck.getAttribute('cy') + d[1])));
+      read();
+    });
+    type.addEventListener('change', shade);
+    shade();
+  })();
+
+  // Arena counter: when it comes into view, both buildings count up to thirty recorded hits, then each slides to what
+  // those thirty count as after the correction. Without motion the final numbers simply show.
+  (() => {
+    const box = document.querySelector('.arena-count');
+    if (!box || !document.documentElement.classList.contains('motion') || !('IntersectionObserver' in window)) return;
+    const tween = (el, a, b, ms, done) => { const t0 = performance.now(); const f = (t) => { const k = Math.min(1, (t - t0) / ms); el.textContent = String(Math.round(a + (b - a) * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(f); else done && done(); }; requestAnimationFrame(f); };
+    const nums = [...box.querySelectorAll('strong')];
+    nums.forEach((n) => { n.textContent = '0'; });
+    box.classList.add('ac-wait');
+    const io = new IntersectionObserver((es) => {
+      if (!es.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      const rec = nums.filter((n) => !n.dataset.from), adj = nums.filter((n) => n.dataset.from);
+      rec.concat(adj).forEach((n) => { n.textContent = '0'; });
+      rec.forEach((n) => tween(n, 0, +n.dataset.to, 900));
+      adj.forEach((n) => tween(n, 0, 30, 900, () => setTimeout(() => { box.classList.remove('ac-wait'); tween(n, 30, +n.dataset.to, 900); }, 350)));
+    }, { threshold: 0.6 });
+    io.observe(box);
+  })();
+
+  // Watch a blend settle: the same arithmetic as the site's blending, for a made-up team on a real trait's settling speed.
+  (() => {
+    const sel = document.getElementById('st-trait'), slider = document.getElementById('st-games');
+    if (!sel || !slider) return;
+    const LAST = 82, lastV = 22, nowV = 78, avg = 50;
+    const blend = document.querySelector('.st-blend'), whisk = document.querySelector('.st-whisk');
+    const update = () => {
+      const k = +sel.value, n = +slider.value;
+      const prior = (LAST * lastV + k * avg) / (LAST + k);
+      const v = (n * nowV + k * prior) / (n + k);
+      const hw = 30 * Math.sqrt(k / (n + k));
+      blend.style.left = `${v}%`;
+      whisk.style.left = `${Math.max(0, v - hw)}%`; whisk.style.width = `${Math.min(100, v + hw) - Math.max(0, v - hw)}%`;
+      document.getElementById('st-n').textContent = String(n);
+      const now = n / (n + k), rest = 1 - now;
+      const pc = (x) => `${Math.round(100 * x)}%`;
+      document.getElementById('st-say').textContent = `After ${n} ${n === 1 ? 'game' : 'games'}, ${sel.selectedOptions[0].dataset.name} is ${pc(now)} this season, ${pc(rest * LAST / (LAST + k))} last season and ${pc(rest * k / (LAST + k))} league average. It settles halfway at ${Math.round(k)} games.`;
+    };
+    sel.addEventListener('change', update);
+    slider.addEventListener('input', update);
+    update();
+  })();
+</script>
+
+<style is:global>
+  .try { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .try-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font: 600 18px var(--display); margin: 0 0 12px; }
+  .try-pick select { font: 600 15px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 5px 8px; max-width: 100%; cursor: pointer; }
+  .try-body { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 18px 28px; align-items: center; }
+  #try-rink { width: 100%; height: auto; display: block; touch-action: none; cursor: grab; user-select: none; }
+  .try-cell { fill: var(--ink); fill-opacity: calc(var(--v) * 0.75); }
+  .try-puck { fill: var(--ink); stroke: var(--sheet); stroke-width: 0.8; cursor: grab; outline: none; }
+  .try-puck:focus-visible { stroke: var(--line-red); stroke-width: 1.2; }
+  .explain .try .try-read p.try-big { margin: 0; font: 700 56px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; }
+  .explain .try .try-read p.try-say { margin: 6px 0; font: 500 15px var(--ui); color: var(--ink-2); }
+  @media (max-width: 640px) { .try-body { grid-template-columns: 1fr; } .try-big { font-size: 44px; } }
+
+  .arena-count { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 6px 0 18px; }
+  .ac { background: var(--ice); border-radius: 14px; padding: 14px 16px; }
+  .ac-venue { margin: 0 0 6px; font: 600 14px var(--ui); display: grid; }
+  .ac-venue span { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  .ac-nums { display: flex; align-items: flex-end; gap: 14px; }
+  .ac-nums p { margin: 0; display: grid; }
+  .ac-nums strong { font: 700 36px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .ac-nums span { font: 500 12px var(--ui); color: var(--ink-3); }
+  .ac-arrow { font: 400 22px var(--ui); color: var(--ink-3); padding-bottom: 14px; }
+  .arena-count.ac-wait .ac-arrow { opacity: 0.25; }
+  @media (max-width: 560px) { .arena-count { grid-template-columns: 1fr; } }
+
+  .settle-try { margin: 6px 0 18px; padding: 16px; background: var(--ice); border-radius: 14px; }
+  .st-lane { position: relative; height: 26px; margin: 16px 8px 4px; }
+  .st-lane::before { content: ''; position: absolute; left: -8px; right: -8px; top: 12px; height: 2px; background: var(--track); }
+  .st-avg { position: absolute; top: 4px; width: 1px; height: 18px; background: var(--ink-3); }
+  .st-whisk { position: absolute; top: 10px; height: 6px; border-radius: 3px; background: color-mix(in oklab, var(--ink) 22%, var(--track)); }
+  .st-last, .st-now, .st-blend { position: absolute; top: 6px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; }
+  .st-last { border: 2px dashed var(--ink-3); background: var(--ice); }
+  .st-now { border: 2px solid var(--ink-2); background: var(--ice); }
+  .st-blend { background: var(--ink); border: 2px solid var(--ice); top: 5px; width: 16px; height: 16px; margin-left: -8px; }
+  html.motion .st-blend { transition: left 0.25s ease; } html.motion .st-whisk { transition: left 0.25s ease, width 0.25s ease; }
+  .st-ends { display: flex; justify-content: space-between; font: 500 12px var(--ui); color: var(--ink-3); }
+  .st-slide { display: grid; gap: 4px; margin-top: 14px; font: 500 14px var(--ui); color: var(--ink-2); }
+  .st-slide input { width: 100%; accent-color: var(--ink); appearance: auto; border: 0; padding: 0; background: none; box-shadow: none; }
+  .explain .settle-try p.st-say.st-say { margin: 10px 0 6px; font: 500 15px var(--ui); }
+  .st-key i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin: 0 5px 0 12px; vertical-align: -1px; }
+  .st-key span { white-space: nowrap; }
+  .st-key span:first-child i { margin-left: 0; }
+  .st-key .k-last { border: 2px dashed var(--ink-3); } .st-key .k-now { border: 2px solid var(--ink-2); } .st-key .k-blend { background: var(--ink); }
+</style>
 
 <style>
   .lede a { color: inherit; }

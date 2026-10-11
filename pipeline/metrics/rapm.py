@@ -20,14 +20,17 @@ of 2025-26 from everything before it, the chained ratings explained 13% more tha
 earlier season (second half of 2024-25) they did 4% worse, so they pay off once two seasons are chained. The
 penalty (80,000 s) and no decay between seasons were picked from a grid (40-240k, decay 0.7-1).
 """
+import hashlib
+import json
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import polars as pl
 from scipy import sparse
 
 from pipeline.build.stints import PENALTY_SHOT
-from pipeline.config import REGULAR, TABLES
+from pipeline.config import CURRENT_SEASON, REGULAR, TABLES
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 Z80 = 1.2816
@@ -149,8 +152,52 @@ def cross_validate(stints: pl.DataFrame, lams: list[float], folds: int = 5) -> d
     return err
 
 
+INPUTS = ("games.parquet", "stints.parquet", "events.parquet", "shots_xg_own.parquet")  # everything stretches() reads
+
+
+def _cache_path(seasons: list[int], lam: float, weights: dict[int, float] | None) -> Path | None:
+    """Where a fit over finished seasons only is kept between runs (about 25 s each, and several pages ask for the same
+    ones). The key covers the inputs' contents and this file's code, so a rebuilt table or a change here refits."""
+    if not seasons or max(seasons) >= CURRENT_SEASON:
+        return None
+    h = hashlib.sha1(Path(__file__).read_bytes())
+    h.update(json.dumps([sorted(seasons), lam, sorted((weights or {}).items())]).encode())
+    for s in sorted(seasons):
+        for name in INPUTS:
+            f = TABLES / str(s) / name
+            if not f.exists():
+                return None
+            h.update(f.read_bytes())
+    return TABLES / "_cache" / f"rapm_{h.hexdigest()[:20]}.parquet"
+
+
 def run(seasons: list[int], lam: float, weights: dict[int, float] | None = None) -> pl.DataFrame:
     """Offense and defense impact per player (expected goals per 60), with 80% ranges and 5v5 minutes."""
+    cache = _cache_path(seasons, lam, weights)
+    if cache is None:
+        return _run(seasons, lam, weights)
+    USED.add(cache.name)
+    if cache.exists():
+        return pl.read_parquet(cache)
+    out = _run(seasons, lam, weights)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    out.write_parquet(cache)
+    return out
+
+
+USED: set[str] = set()  # cached fits read or written by this process
+
+
+def prune_cache() -> int:
+    """After a full update: drop cached fits nothing asked for (their inputs changed), so the folder stays small."""
+    folder = TABLES / "_cache"
+    stale = [f for f in folder.glob("rapm_*.parquet") if f.name not in USED] if folder.exists() else []
+    for f in stale:
+        f.unlink()
+    return len(stale)
+
+
+def _run(seasons: list[int], lam: float, weights: dict[int, float] | None) -> pl.DataFrame:
     parts = [stretches(s).with_columns(pl.lit((weights or {}).get(s, 1.0)).alias("sw")) for s in seasons]
     st = pl.concat(parts)
     X, y, w, players, extra = design(st, st["sw"].to_numpy())

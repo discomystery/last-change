@@ -134,12 +134,12 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
           {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
           <p class="sw-key" aria-hidden="true">{PARTS.map((p) => <span><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}</p>
           <ol class="sw-rows">
-            {mine.map((r) => (
-              <li class="sw-item" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}>
+            {mine.map((r, i) => (
+              <li class="sw-item" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} style={`--i:${Math.min(i, 20)}`}>
                 <div class="sw-row" role="button" tabindex="0" aria-expanded="false">
                   <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag">{of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}</span></span>
                   <span class="sw-foot">Swing tonight</span>
-                  <span class="sw-bar" aria-hidden="true">
+                  <span class="sw-bar" aria-hidden="true" style={`--z:${zero.toFixed(1)}%`}>
                     <span class="sw-zero" style={`left:${zero.toFixed(1)}%`}></span>
                     {layout(r).map((p) => <span class:list={['sw-piece', { neg: p.v < 0 }]} data-part={p.key} style={`left:${p.l.toFixed(1)}%;width:${p.w.toFixed(1)}%;--mix:${p.mix}%`}></span>)}
                   </span>

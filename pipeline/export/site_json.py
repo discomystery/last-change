@@ -54,6 +54,8 @@ def run(season: int) -> dict:
     export_lines(season)
     export_goalies(season)
     export_goal_sources(season)
+    from pipeline.export import xg_grid
+    xg_grid.run()  # Methods page: average shot chance by spot and shot type
     if not OFFLINE:  # needs MoneyPuck's shot file, which offline runs don't have: keep the saved page
         export_xg_check(season)
     from pipeline.export import roster

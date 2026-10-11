@@ -30,8 +30,8 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
     <defs><clipPath id={`${id}-clip`}><path d={`${board} Z`} /></clipPath></defs>
     <path class="rk-board" d={board} />
     <g clip-path={`url(#${id}-clip)`} class="am-areas">
-      {AREA_KEYS.map((k) => (
-        <g class="am-area" data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? { shots: 0, goals: 0, share: 0, avg: 0 })}`}>
+      {AREA_KEYS.map((k, i) => (
+        <g class="am-area" data-i={i} data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? { shots: 0, goals: 0, share: 0, avg: 0 })}`}>
           <use href={`#${shapeId(k)}`} />
         </g>
       ))}
@@ -42,7 +42,7 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
     <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
     <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
     <g class="am-labels">
-      {AREA_KEYS.map((k) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text x={+x.toFixed(1)} y={+(y + 1.3).toFixed(1)} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
+      {AREA_KEYS.map((k, i) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text data-i={i} x={+x.toFixed(1)} y={+(y + 1.3).toFixed(1)} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
     </g>
     <g class="am-shots">
       {shots.filter((s) => s[0] >= 25).map(([x, y, xg, goal, cur]) => <circle class:list={['ps', { goal: goal === 1, old: cur === 0 }]} cx={sx(y)} cy={sy(x)} r={+(0.7 + Math.sqrt(xg / 1000) * 3.6).toFixed(2)} />)}
@@ -53,6 +53,44 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
     </g>
   </svg>
 </figure>
+
+<script is:inline>
+  // The map heats up the first time it comes into view: areas darken one at a time, quietest first, and each
+  // count ticks up once its area is in. Motion only; without it (or before this runs) the map simply shows.
+  // One copy of this runs per map on the page, so the setup is guarded to happen once.
+  if (!window.lcAreaHeat) {
+    window.lcAreaHeat = true;
+    const start = () => {
+      if (!document.documentElement.classList.contains('motion') || !('IntersectionObserver' in window)) return;
+      const ease = (k) => 1 - Math.pow(1 - k, 3);
+      const tween = (ms, f) => { const t0 = performance.now(); const step = (t) => { const k = Math.min(1, (t - t0) / ms); f(ease(k)); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+      const heat = (fig) => {
+        const areas = [...fig.querySelectorAll('.am-area')];
+        const s0 = areas.map((a) => parseFloat(a.style.getPropertyValue('--s')) || 0);
+        const texts = new Map([...fig.querySelectorAll('.am-labels text')].map((t) => [t.dataset.i, t]));
+        const order = areas.map((_, i) => i).sort((a, b) => s0[a] - s0[b]);
+        const gap = Math.min(110, 1500 / order.length);
+        areas.forEach((a) => a.style.setProperty('--s', '0'));
+        texts.forEach((t) => { t.style.opacity = '0'; });
+        order.forEach((i, n) => setTimeout(() => {
+          tween(500, (k) => areas[i].style.setProperty('--s', String(s0[i] * k)));
+          const t = texts.get(areas[i].dataset.i);
+          if (!t) return;
+          const full = t.textContent;
+          const m = full.match(/\d+/);
+          setTimeout(() => {
+            t.style.transition = 'opacity 0.3s';
+            t.style.opacity = '';
+            if (m) tween(450, (k) => { t.textContent = full.replace(m[0], String(Math.round(+m[0] * k))); });
+          }, 250);
+        }, 150 + n * gap));
+      };
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); heat(e.target); } }), { threshold: 0.5 });
+      document.querySelectorAll('.areamap').forEach((f) => io.observe(f));
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  }
+</script>
 
 <style is:global>
   .areamap svg { width: 100%; height: auto; display: block; }

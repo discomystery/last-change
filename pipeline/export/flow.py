@@ -12,6 +12,7 @@ import json
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import units as U
 
 OUT = SITE_DATA / "flow"
@@ -49,6 +50,15 @@ def power_plays(codes: list[tuple[int, str]], end: int) -> list[list[int]]:
     return [p for p in out if p[2] - p[1] >= MIN_PP]
 
 
+def strength(c: str, h: int) -> int:
+    """1 when the shooting side had more skaters (power play), -1 when it had fewer (shorthanded), else 0.
+    Only with both goalies in, so empty nets and penalty shots read 0."""
+    if len(c) != 4 or c[0] != "1" or c[3] != "1":
+        return 0
+    own, other = (int(c[2]), int(c[1])) if h else (int(c[1]), int(c[2]))
+    return (own > other) - (own < other)
+
+
 def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame, gu: pl.DataFrame | None, roster: pl.DataFrame) -> dict:
     ev = ev.filter(pl.col("period_type") != "SO").sort("sort")
     length = int(ev["sec"].max() or 0)
@@ -60,7 +70,7 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
         x, y = r["x_norm"], r["y_norm"]
         if x is None or y is None:
             continue
-        shots.append([int(r["sec"]), h, round(r["xg"], 3), int(r["type"] == "goal"), round(x, 1), round(y, 1), r["p1"], en])
+        shots.append([int(r["sec"]), h, round(r["xg"], 3), int(r["type"] == "goal"), round(x, 1), round(y, 1), r["p1"], en, strength(c, h)])
     pp = power_plays([(int(s), c) for s, c in ev.select("sec", "situation_code").iter_rows()], length)
 
     # Tonight's lines and pairs by 5-on-5 time together; anyone else is listed under "other".
@@ -100,7 +110,8 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
 def run(season: int = CURRENT_SEASON) -> dict:
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
-    ids = games["game_id"].to_list()
+    ids = [g for g in games["game_id"].to_list() if g not in pending.games(season)]  # unfinished shift charts wait
+    games = games.filter(pl.col("game_id").is_in(ids))
     ev = pl.read_parquet(d / "events.parquet").filter(pl.col("game_id").is_in(ids))
     xg = pl.read_parquet(d / "shots_xg_own.parquet").filter(pl.col("game_id").is_in(ids))
     st = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(ids))

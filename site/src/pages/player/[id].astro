@@ -399,6 +399,50 @@ const statRow = (x: any) => (isG ? null : x);
   </div>
 </Base>
 
+<script is:inline>
+  // Name card: his sweater number spins up like a scoreboard and lands, while the stats count up to their totals.
+  // Motion only; the number and stats are already on the page if this never runs, and the plain number is put
+  // back once it lands.
+  (() => {
+    const root = document.documentElement;
+    const pn = document.querySelector('.phead .pnum');
+    if (!root.classList.contains('motion') || !pn) return;
+    const num = pn.textContent.trim();
+    if (!/^\d+$/.test(num)) return;
+    const roll = document.createElement('span');
+    roll.style.cssText = 'display:inline-flex;overflow:hidden;height:1em;line-height:1;vertical-align:top';
+    let longest = 0;
+    const cols = [...num].map((d, i) => {
+      const c = document.createElement('span');
+      c.style.cssText = 'display:flex;flex-direction:column;transition:transform 1.2s cubic-bezier(0.2, 0.75, 0.2, 1)';
+      const loops = 1 + i;
+      for (let l = 0; l <= loops; l++) for (let k = 0; k < 10; k++) { const s = document.createElement('span'); s.textContent = k; s.style.cssText = 'display:block;height:1em'; c.append(s); }
+      const dur = 1.1 + i * 0.35;
+      longest = Math.max(longest, dur);
+      c.style.transitionDuration = dur + 's';
+      c.dataset.to = String(loops * 10 + +d);
+      roll.append(c);
+      return c;
+    });
+    pn.replaceChildren(roll);
+    const cells = [...document.querySelectorAll('.phead .pstats tbody td')].filter((td) => /^\d+$/.test(td.textContent.trim()));
+    const final = cells.map((td) => +td.textContent.trim());
+    cells.forEach((td) => { td.textContent = '0'; });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      cols.forEach((c) => { c.style.transform = `translateY(-${c.dataset.to}em)`; });
+      const t0 = performance.now();
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / 1300);
+        const e = 1 - Math.pow(1 - k, 3);
+        cells.forEach((td, i) => { td.textContent = String(Math.round(final[i] * e)); });
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+      setTimeout(() => { pn.textContent = num; }, longest * 1000 + 100);
+    }));
+  })();
+</script>
+
 <script>
   document.querySelectorAll<HTMLSelectElement>('.map-pick').forEach((sel) => {
     const apply = () => document.querySelectorAll('.areamap').forEach((m) => m.classList.toggle('dots', sel.value === 'dots'));
