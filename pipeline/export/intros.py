@@ -168,6 +168,7 @@ STYLE = {
     "suppression": ("give up very few shots", "let the other team shoot a lot"),
     "qualityAllowed": ("keep the other team to hopeful shots", "give up dangerous chances"),
     "breakdowns": ("rarely get burned after losing the puck", "get caught after turnovers too often"),
+    "longShifts": ("rarely get stuck out on long shifts", "get pinned in their own end on long shifts"),
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
