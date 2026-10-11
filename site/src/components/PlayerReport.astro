@@ -74,7 +74,7 @@ const SW = 1.2; // Swing bar half-width, in Swing points
         </li>
       ); })}
     </ul>
-    <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position. These are the others, against the same bars.</p>
+    <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position: better than 75% of {peer[p.sub === 'C' || p.sub === 'W' ? p.sub : p.group] ?? 'players'}, or a regular share of the power play, penalty kill or faceoffs. These are the others.</p>
   </div>
 </Section>
 
@@ -128,7 +128,13 @@ const SW = 1.2; // Swing bar half-width, in Swing points
   .rp-ol { font-weight: 600; }
   .rp-ov { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
   .rp-bar { font-size: 13px; color: var(--ink-3); }
-  @media (max-width: 640px) { .rp-other li { grid-template-columns: 1fr; gap: 2px; } }
+  @media (max-width: 640px) {
+    .rp-other li { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0; font-size: 14px; }
+    .rp-bar { display: none; }
+    .rp-ov { justify-content: flex-end; text-align: right; }
+    .rp-ov > span:not(:first-child) { display: none; }
+    .rp-ov > span:only-child { display: inline; font-size: 13px; }
+  }
   .rp-games { margin-top: 18px; }
   .rp-head, .rp-games li { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.6fr) minmax(150px, 0.9fr); gap: 6px 18px; align-items: center; }
   .rp-head { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding-bottom: 6px; }
@@ -153,7 +159,13 @@ const SW = 1.2; // Swing bar half-width, in Swing points
   .rp-sw strong { font: 700 15px var(--ui); text-align: right; }
   @media (max-width: 719px) {
     .rp-head { display: none; }
-    .rp-games li { grid-template-columns: 1fr 120px; }
-    .rp-card { grid-column: 1 / -1; grid-row: 2; }
+    .rp-games li { grid-template-columns: minmax(0, 1fr) 96px; gap: 8px 12px; }
+    .rp-game { flex-wrap: nowrap; gap: 8px; font-size: 14px; white-space: nowrap; }
+    .rp-d { min-width: 0; }
+    .rp-card { grid-column: 1 / -1; grid-row: 2; gap: 6px 8px; }
+    .rp-card .pc-sum { min-width: 0; }
+    .rp-box { margin-left: auto; }
+    .rp-sw { grid-template-columns: 1fr 34px; gap: 6px; }
+    .rp-sw strong { font-size: 14px; }
   }
 </style>
