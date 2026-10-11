@@ -12,6 +12,7 @@ const list: Side[] = sides ?? order.map((a) => ({ abbr: a, cls: `t-${a}`, full: 
 const scored = list.some((s) => s.score !== undefined);
 ---
 <div class="rink" data-drop>
+  <svg class="rk-boards" aria-hidden="true"><rect pathLength="100" /></svg>
   <span class="rl goal l"></span><span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span><span class="rl goal r"></span>
   <span class="dot-circle"><span>{centre}</span></span>
   {list.map((s) => (
@@ -33,6 +34,14 @@ const scored = list.some((s) => s.score !== undefined);
   .rl.goal { width: 1px; background: var(--line-red); }
   .rl.goal.l { left: 5.5%; } .rl.goal.r { right: 5.5%; }
   .dot-circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
+  /* The ring is its own layer so it can draw itself while the disc already covers the red line. */
+  .dot-circle::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--line-blue); }
+  .dot-circle { border-color: transparent; }
+  /* The boards, drawn by the script below once it knows the rink's size; until then the plain border shows. */
+  .rk-boards { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .rk-boards rect { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .rink.boards { border-color: transparent; background-clip: padding-box; }
+  .rink.boards .rk-boards { display: block; }
   .side { position: relative; padding: 28px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
   .side.is-home { text-align: right; align-items: flex-end; }
   .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
@@ -51,11 +60,14 @@ const scored = list.some((s) => s.score !== undefined);
 
   /* Dropping the puck (html.motion only, so reduced motion and automated browsers see the rink as it is).
      Until the rink is on screen its moving parts wait out of sight; `.run` plays them once. */
-  :global(html.motion) .rink:not(.run) :is(.rl, .dot-circle, .abbr, .fullname, .rec, .lc) { opacity: 0; }
-  .run .rl { animation: rk-line 0.6s cubic-bezier(0.3, 0.8, 0.25, 1) backwards; }
-  .run .rl.blue { animation-delay: 0.08s; }
-  .run .rl.goal { animation-delay: 0.16s; }
-  .run .dot-circle { animation: rk-draw 0.8s ease-out 0.2s backwards; }
+  :global(html.motion) .rink:not(.run) :is(.rl, .dot-circle, .abbr, .fullname, .rec, .lc, .rk-boards) { opacity: 0; }
+  .run .rk-boards rect { stroke-dasharray: 100; animation: rk-trace 1.1s cubic-bezier(0.5, 0, 0.3, 1) backwards; }
+  @keyframes rk-trace { from { stroke-dashoffset: 100; } }
+  .run .rl { animation: rk-line 0.6s cubic-bezier(0.3, 0.8, 0.25, 1) 0.15s backwards; }
+  .run .rl.blue { animation-delay: 0.25s; }
+  .run .rl.goal { animation-delay: 0.35s; }
+  .run .dot-circle { animation: rk-fade 0.3s ease 0.1s backwards; }
+  .run .dot-circle::before { animation: rk-draw 0.8s ease-out 0.3s backwards; }
   .run .dot-circle > span { animation: rk-fade 0.5s ease 0.6s backwards; }
   .run .is-away .abbr { animation: rk-in-l 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
   .run .is-home .abbr { animation: rk-in-r 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
@@ -63,7 +75,7 @@ const scored = list.some((s) => s.score !== undefined);
   @property --rk-arc { syntax: '<angle>'; inherits: false; initial-value: 360deg; }
   @keyframes rk-line { from { transform: scaleY(0); } }
   @keyframes rk-draw { from { --rk-arc: 0deg; } }
-  .run .dot-circle { -webkit-mask: conic-gradient(#000 var(--rk-arc), transparent 0); mask: conic-gradient(#000 var(--rk-arc), transparent 0); }
+  .run .dot-circle::before { -webkit-mask: conic-gradient(#000 var(--rk-arc), transparent 0); mask: conic-gradient(#000 var(--rk-arc), transparent 0); }
   @keyframes rk-fade { from { opacity: 0; } }
   @keyframes rk-in-l { from { opacity: 0; transform: translateX(-46px); } }
   @keyframes rk-in-r { from { opacity: 0; transform: translateX(46px); } }
@@ -73,6 +85,18 @@ const scored = list.some((s) => s.score !== undefined);
   // Drop the puck once per rink, when it is half on screen. A final score counts up from zero as the teams arrive.
   const root = document.documentElement;
   if (root.classList.contains('motion') && 'IntersectionObserver' in window) {
+    // Fit the boards' outline to each rink (inside its 2px border, which then turns clear) and keep it fitted.
+    const fit = (rink: HTMLElement) => {
+      const r = rink.querySelector('.rk-boards rect');
+      if (!r || !rink.clientWidth) return;
+      const w = rink.clientWidth, h = rink.clientHeight, rad = parseFloat(getComputedStyle(rink).borderTopLeftRadius) - 3;
+      r.setAttribute('x', '1'); r.setAttribute('y', '1');
+      r.setAttribute('width', String(w - 2)); r.setAttribute('height', String(h - 2));
+      r.setAttribute('rx', String(Math.max(0, Math.min(rad, h / 2 - 1))));
+      rink.classList.add('boards');
+    };
+    const ro = 'ResizeObserver' in window ? new ResizeObserver((es) => es.forEach((e) => fit(e.target as HTMLElement))) : null;
+    document.querySelectorAll<HTMLElement>('[data-drop]').forEach((r) => { fit(r); ro?.observe(r); });
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;

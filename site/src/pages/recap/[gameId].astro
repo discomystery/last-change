@@ -319,8 +319,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     const sorted = dots.map((d) => d.className);
     const nums = [...document.querySelectorAll('.rp-counts b')];
     const saved = nums.map((b) => b.textContent);
-    btn.addEventListener('click', () => {
-      if (!document.documentElement.classList.contains('motion')) return;
+    const run = () => {
+      if (!document.documentElement.classList.contains('motion') || btn.disabled) return;
       btn.disabled = true;
       // Close the button's tooltip so it doesn't sit over the dots while they land.
       setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
@@ -356,7 +356,14 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
         });
       };
       setTimeout(step, 120);
-    });
+    };
+    btn.addEventListener('click', run);
+    // The first time the dots come into view they are dealt out the same way. Until then they simply show,
+    // so nothing is hidden if this never runs.
+    if (document.documentElement.classList.contains('motion') && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run(); } }, { threshold: 0.6 });
+      io.observe(grid);
+    }
   })();
 </script>
 </Base>
