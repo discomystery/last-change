@@ -1,0 +1,164 @@
+---
+// Ties a skater's page to his post-game report cards and Swing. "What [team] count on him for": what his report
+// cards grade him on, why, and how often he has done it; then where he stands on what he isn't graded on, against
+// the same bars. "Recent games": one row per game with the report-card result, each mark, and his Swing.
+import Section from './Section.astro';
+import Pips from './Pips.astro';
+import { clock } from '../lib/format';
+import { cardsFor } from '../lib/reportCards';
+
+interface Props { p: any; place: string }
+const { p, place } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const rows = cardsFor(p.id, p.team);
+const RECENT = 10;
+const latest = rows[0]?.card;
+const duties = (latest?.jobs ?? []) as any[];
+const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
+const word = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
+const pillWord = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
+const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
+const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
+const why = (j: any) => (j.key === 'pp' ? `Relied on for ${j.per_game} a game on the power play` : j.key === 'pk' ? `Relied on for ${j.per_game} a game killing penalties` : j.why === 'role' ? 'Relied on to take plenty of faceoffs' : `Better than ${j.pct}% of ${peer[j.vs ?? 'F']}`);
+const record = (key: string) => rows.slice().reverse().map((r) => ({ v: (r.card.jobs.find((j: any) => j.key === key)?.verdict ?? 'na') as keyof typeof mark, date: r.date }));
+// What a player can be graded on, with his standing on the rest. Bars match the report cards: 1:30 a game on the
+// power play, 1:00 on the kill, 8 draws a game, or better than 75% at his position for a strength.
+const traits = p.traits ?? {};
+const toi = p.role?.toi ?? {};
+const others = ([
+  ['pp', 'Power play', `${clock(toi.toi_pp ?? 0)} a game`, null],
+  ['pk', 'Killing penalties', (toi.toi_pk ?? 0) >= 15 ? `${clock(toi.toi_pk)} a game` : 'Rarely kills penalties', null],
+  ['faceoffs', 'Faceoffs', p.group === 'D' ? null : p.sub === 'W' ? 'A winger: rarely takes the draw' : null, p.sub === 'C' ? 'faceoffs' : null],
+  ['shooting', 'Shooting', null, 'shooting'],
+  ['chances', 'Creating his own chances', null, 'chances'],
+  ['offImpact', 'Creating chances at 5-on-5', null, 'offImpact'],
+  ['defImpact', 'Preventing chances at 5-on-5', null, 'defImpact'],
+  ['takeaways', 'Takeaways', null, 'takeaways'],
+  ['hits', 'Hitting', null, 'hits'],
+  ['blocks', 'Blocking shots', null, 'blocks'],
+] as [string, string, string | null, string | null][]).filter(([k, , text, trait]) => !duties.some((j) => j.key === k) && (text || (trait && traits[trait]?.blend)));
+const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const SW = 1.2; // Swing bar half-width, in Swing points
+---
+{rows.length > 0 && (<>
+<Section id="counted" title={`What ${place} count on him for`} placeholder={false} takeaway="What his post-game report cards judge him on, why, and how often he has done it.">
+  <ul class="rp-duties">
+    {duties.map((j) => { const v = record(j.key); return (
+      <li class="card rp-duty">
+        <p class="ld-h2">{j.label}</p>
+        <p class="rp-why">{why(j)}</p>
+        <p class="rp-typ">A typical night: <strong>{j.usual}</strong> <span>{String(j.usual) === '1' ? j.unit.replace(/^(\w+ )?(\w+?)s\b/, '$1$2') : j.unit}</span></p>
+        <div class="rp-rec">
+          <span class="rp-marks">{v.slice(-RECENT).map((x) => <span class:list={['rp-m', x.v]} tabindex="0" data-tip={`${fmtDate(x.date)}: ${word[x.v]}`}>{mark[x.v]}</span>)}</span>
+          <span class="rp-n"><strong>{v.filter((x) => x.v === 'held').length} of {v.filter((x) => x.v !== 'na').length}</strong> games</span>
+        </div>
+      </li>
+    ); })}
+  </ul>
+  <div class="card rp-other">
+    <p class="chart-title">Not on his report card</p>
+    <ul>
+      {others.map(([k, label, text, trait]) => { const t = trait ? traits[trait]?.blend : null; const bar = k === 'pp' ? 'Bar: 1:30 a game' : k === 'pk' ? 'Bar: 1:00 a game' : k === 'faceoffs' && !t ? 'Bar: 8 draws a game' : 'Bar: better than 75%'; return (
+        <li>
+          <span class="rp-ol">{label}</span>
+          <span class="rp-ov">{t ? <><Pips pct={t.pct} tip={`Better than ${t.pct}% of ${peer[t.vs ?? 'F']}.`} /> <span>better than {t.pct}%{t.pct >= 65 && t.pct < 75 ? ', just short' : ''}</span></> : <span>{text}</span>}</span>
+          <span class="rp-bar">{bar}</span>
+        </li>
+      ); })}
+    </ul>
+    <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position: better than 75% of {peer[p.sub === 'C' || p.sub === 'W' ? p.sub : p.group] ?? 'players'}, or a regular share of the power play, penalty kill or faceoffs. These are the others.</p>
+  </div>
+</Section>
+
+<Section id="recent" title="Recent games" placeholder={false} takeaway={`His report card and Swing from his last ${Math.min(RECENT, rows.length)} ${rows.length === 1 ? 'game' : 'games'}, newest first.`}>
+  <div class="card rp-games">
+    <div class="rp-head" aria-hidden="true"><span>Game</span><span>Report card <em class="rp-keys">{duties.map((j) => j.label.replace(' at 5-on-5', '').toLowerCase()).join(' · ')}</em></span><span>Swing</span></div>
+    <ul>
+      {rows.slice(0, RECENT).map((r) => { const s = r.swing; const w = s ? Math.min(1, Math.abs(s.score) / SW) * 50 : 0; return (
+        <li>
+          <a class="rp-game" href={`${base}recap/${r.id}/`}>
+            <span class="rp-d">{fmtDate(r.date)}</span>
+            <span class="rp-o">{r.home ? 'vs' : 'at'} {r.opp}</span>
+            <span class="rp-res">{r.us > r.them ? 'W' : r.end === 'REG' ? 'L' : 'OTL'} {r.us}–{r.them}{r.end !== 'REG' ? ` ${r.end}` : ''}</span>
+          </a>
+          <span class="rp-card">
+            <span class:list={['pc-sum', pillClass[r.card.pill as keyof typeof pillClass]]}>{pillWord[r.card.pill as keyof typeof pillWord]}</span>
+            <span class="rp-marks">{r.card.jobs.map((j: any) => <span class:list={['rp-m', j.verdict]} tabindex="0" data-tip={`${j.label}: ${word[j.verdict as keyof typeof word]}. ${j.text}`}>{mark[j.verdict as keyof typeof mark]}</span>)}</span>
+            <span class="rp-box">{r.card.box.g} G · {r.card.box.a} A · {r.card.toi}</span>
+          </span>
+          {s ? <span class="rp-sw" tabindex="0" data-tip={`Swing ${s.score.toFixed(2)}: better than ${s.pct}% of nights by ${peer[p.group]} last season.`}>
+            <span class="rp-track"><i class:list={{ neg: s.score < 0 }} style={s.score >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}></i></span>
+            <strong>{s.score >= 0 ? '+' : '−'}{Math.abs(s.score).toFixed(1)}</strong>
+          </span> : <span class="rp-sw n">–</span>}
+        </li>
+      ); })}
+    </ul>
+    <p class="note">Swing is how much his night moved the game, from the post-game page. Tap a game for the full report.</p>
+  </div>
+</Section>
+</>)}
+
+<style>
+  .ld-h2 { font: 600 18px/1.15 var(--display); font-variation-settings: 'SOFT' 100; }
+  .rp-duties { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); margin-top: 18px; }
+  .rp-duty { display: grid; gap: 8px; align-content: start; }
+  .rp-why { font: 400 15px/1.4 var(--ui); }
+  .rp-keys { font: 400 11px var(--ui); font-style: normal; text-transform: none; letter-spacing: 0; color: var(--ink-3); margin-left: 6px; }
+  .rp-tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 4px; }
+  .rp-typ { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .rp-typ strong { color: var(--ink); }
+  .rp-rec { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+  .rp-marks { display: inline-flex; gap: 4px; }
+  .rp-m { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink); font: 700 11px var(--ui); cursor: help; }
+  .rp-m.held { background: var(--ink); color: var(--sheet); }
+  .rp-m.missed, .rp-m.na { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .rp-n { font: 400 14px var(--ui); color: var(--ink-2); white-space: nowrap; }
+  .rp-n strong { color: var(--ink); }
+  .rp-other { margin-top: 14px; }
+  .rp-other ul { display: grid; }
+  .rp-other li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 4px 16px; align-items: center; padding: 9px 0; border-top: 1px solid var(--rule); font: 400 15px/1.4 var(--ui); }
+  .rp-other li:first-child { border-top: 0; }
+  .rp-ol { font-weight: 600; }
+  .rp-ov { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  .rp-bar { font-size: 13px; color: var(--ink-3); }
+  @media (max-width: 640px) {
+    .rp-other li { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0; font-size: 14px; }
+    .rp-bar { display: none; }
+    .rp-ov { justify-content: flex-end; text-align: right; }
+    .rp-ov > span:not(:first-child) { display: none; }
+    .rp-ov > span:only-child { display: inline; font-size: 13px; }
+  }
+  .rp-games { margin-top: 18px; }
+  .rp-head, .rp-games li { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.6fr) minmax(150px, 0.9fr); gap: 6px 18px; align-items: center; }
+  .rp-head { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding-bottom: 6px; }
+  .rp-games li { padding: 10px 0; border-top: 1px solid var(--rule); }
+  .rp-game { display: flex; flex-wrap: wrap; gap: 2px 10px; color: inherit; text-decoration: none; font: 400 15px var(--ui); }
+  .rp-game:hover .rp-o { text-decoration: underline; }
+  .rp-d { color: var(--ink-3); min-width: 48px; }
+  .rp-o { font-weight: 600; }
+  .rp-res { color: var(--ink-2); }
+  .rp-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .pc-sum { font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; min-width: 92px; text-align: center; }
+  .pc-sum.did { background: var(--ink); color: var(--sheet); }
+  .pc-sum.huge { background: var(--team); border-color: var(--team); color: var(--sheet); }
+  .pc-sum.rough { background: var(--ink-3); border-color: var(--ink-3); color: var(--sheet); }
+  .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .rp-box { font: 400 13px var(--ui); color: var(--ink-3); }
+  .rp-sw { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 10px; cursor: help; }
+  .rp-track { position: relative; height: 12px; border-radius: 3px; background: var(--track); }
+  .rp-track::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+  .rp-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--team); }
+  .rp-track i.neg { opacity: 0.45; }
+  .rp-sw strong { font: 700 15px var(--ui); text-align: right; }
+  @media (max-width: 719px) {
+    .rp-head { display: none; }
+    .rp-games li { grid-template-columns: minmax(0, 1fr) 96px; gap: 8px 12px; }
+    .rp-game { flex-wrap: nowrap; gap: 8px; font-size: 14px; white-space: nowrap; }
+    .rp-d { min-width: 0; }
+    .rp-card { grid-column: 1 / -1; grid-row: 2; gap: 6px 8px; }
+    .rp-card .pc-sum { min-width: 0; }
+    .rp-box { margin-left: auto; }
+    .rp-sw { grid-template-columns: 1fr 34px; gap: 6px; }
+    .rp-sw strong { font-size: 14px; }
+  }
+</style>

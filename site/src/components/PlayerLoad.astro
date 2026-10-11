@@ -1,0 +1,174 @@
+---
+// "What he carries": how much of his team's scoring, power play and shots run through him (with a verdict from how
+// many skaters in the league carry as much, and his teammates as dots), who is next in line for each thing he does,
+// what a fill-in gives back, and how the team did in games he missed. Data: `carries` in his player JSON
+// (pipeline/export/carries.py).
+import Section from './Section.astro';
+import { clock } from '../lib/format';
+import { most, ordinal } from '../lib/players';
+
+interface Props { p: any; place: string; moved?: string }
+const { p, place, moved } = Astro.props;
+const c = p.carries;
+const base = import.meta.env.BASE_URL;
+const isD = p.group === 'D';
+type Mode = 'blend' | 'season';
+const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
+const INFO: Record<string, { label: string; of: string; tip: (mw: string) => string }> = {
+  inOn: { label: 'Goals he’s in on', of: 'goals', tip: (mw) => `Goals he scored or assisted on, out of all ${place} goals in the games he played, ${mw}.` },
+  goals: { label: 'Goals he scores', of: 'goals', tip: (mw) => `His own goals, out of all ${place} goals in the games he played, ${mw}.` },
+  pp: { label: 'Power-play goals', of: 'power-play goals', tip: (mw) => `Power-play goals he scored or set up with the last pass, out of ${place}’s power-play goals in his games, ${mw}.` },
+  shots: { label: 'Shots on goal', of: 'shots on goal', tip: (mw) => `His shots on goal, out of all of ${place}’s in his games, ${mw}.` },
+};
+// Verdict from how many skaters in the league carry at least his share (32 is about one a team).
+const TIERS: [number, string, string][] = [[10, 'One of a kind', 'v1'], [32, 'Load-bearing', 'v2'], [64, 'Major piece', 'v3'], [128, 'Contributor', 'v4'], [Infinity, 'Spread around', 'v5']];
+const TIER_TIP = 'How many skaters in the NHL carry this big a share of their team: One of a kind (10 or fewer), Load-bearing (about one a team), Major piece (about two a team), Contributor (about four a team), Spread around (more).';
+const lane = (t: any) => {
+  const max = Math.max(...t.mates.map((x: any) => x[1]), t.v, 1) * 1.08;
+  const at = (v: number) => Math.round((1000 * v) / max) / 10;
+  const next = t.mates.find((x: any) => !x[2]);
+  return { at, next, tier: t.rank == null ? null : TIERS.find(([n]) => t.rank <= n)! };
+};
+const pct = (v: number) => `${Math.round(v)}%`;
+const last = (name: string) => name.split(' ').slice(-1)[0];
+const n = c?.next ?? {};
+const line = p.role?.line;
+const pp = p.role?.pp;
+const jobs = [
+  line && { job: isD ? 'Pair' : 'Line', load: `${line.label}${n.line && !isD ? `, ${n.line.pos}` : ''} with ${line.mates.map((m: any) => last(m.name)).join(' and ')}`,
+    more: line.toi_sec ? `${clock(line.toi_sec)} a game together lately` : '', next: n.line?.next, nextMore: n.line?.next ? `${place}’s next most-used ${n.line.pos}` : '' },
+  n.pp ? { job: 'Power play', load: pp ? `${pp.label}${pp.both ? ' and the second unit' : ''}${pp.role ? `, as the ${pp.role.toLowerCase()}` : ''}` : `${clock(n.pp.sec)} a game`,
+    more: n.pp.share !== null ? `on for ${n.pp.share}% of ${place}’s power-play time` : '', next: n.pp.next, nextMore: n.pp.next ? `${clock(n.pp.next.sec)} a game on the power play` : '' }
+    : { job: 'Power play', load: 'Not a regular', more: p.role?.toi ? `${clock(p.role.toi.toi_pp)} a game` : '', next: null },
+  n.toi && { job: 'Ice time', load: `${clock(n.toi.sec)} a game`, more: `${most(n.toi.rank)} of any ${place} ${isD ? 'defenseman' : 'forward'}`, next: n.toi.next, nextMore: n.toi.next ? `${clock(n.toi.next.sec)} a game` : '' },
+  n.pk && (n.pk.sec >= 60
+    ? { job: 'Penalty kill', load: `${clock(n.pk.sec)} a game`, more: 'killing penalties', next: n.pk.next, nextMore: n.pk.next ? `${clock(n.pk.next.sec)} a game` : '' }
+    : { job: 'Penalty kill', load: 'Not used', more: 'no regular shorthanded minutes', next: null }),
+].filter(Boolean) as any[];
+const f = c?.fill;
+const fMax = f ? Math.max(f.v, ...f.mates.map((x: any) => x[1]), ...f.ticks.map((x: any) => x[0])) * 1.12 : 1;
+const fAt = (v: number) => Math.min(100, (100 * v) / fMax);
+const fillIn = f?.ticks.find((x: any) => x[1] === 'Typical fill-in');
+const out = c?.out;
+const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const span = out?.missed ? (out.first === out.last ? `on ${day(out.first)}` : `between ${day(out.first)} and ${day(out.last)}`) : '';
+const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
+---
+{c && (
+<Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${place}’s game runs through him, and what they would have to replace without him.`}>
+  {modes.map(([m, mw]) => (
+    <div class={`gmode m-${m}`}>
+      {c.tiles[m] ? (
+        <ul class="ld-tiles">
+          {c.tiles[m].map((t: any) => { const info = INFO[t.key]; if (!t.den) return (
+            <li class="card ld-tile"><p class="ld-h">{info.label}</p><p class="ld-big">–</p><p class="ld-of">No {info.of} for {place} in his games yet</p></li>
+          ); const L = lane(t); return (
+            <li class="card ld-tile">
+              <p class="ld-h"><span class="term" tabindex="0" data-tip={info.tip(mw)}>{info.label}</span></p>
+              <p class="ld-big">{pct(t.v)}{L.tier && <span class:list={['ld-verdict', L.tier[2]]} tabindex="0" data-tip={TIER_TIP}>{L.tier[1]}</span>}</p>
+              {!L.tier ? <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · not a power-play regular</p> : <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · <span class="term" tabindex="0" data-tip={`Among ${t.of} skaters who have played at least ${m === 'blend' ? '20 games over the two seasons' : '3 games this season'}${t.key === 'pp' ? ' and are regulars on the power play' : ''}.`}>{ordinal(t.rank)} in NHL</span></p>}
+              <div class="ld-dots" role="img" aria-label={`${pct(t.v)}, against ${place} teammates`}>
+                {t.mates.map(([name, v, me]: any) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
+                {L.next && <em style={`left:${Math.min(88, Math.max(12, L.at(L.next[1])))}%`}>{last(L.next[0])}</em>}
+              </div>
+            </li>
+          ); })}
+        </ul>
+      ) : <p class="note">No games this season yet.</p>}
+      {m === 'blend' && moved && c.tiles.blend && <p class="note">This season and last includes his games for {moved} last season, counted against {moved}’s goals and shots. Switch to this season for {place} alone.</p>}
+    </div>
+  ))}
+  <div class="card ld-jobs">
+    <p class="chart-title">If he’s out, who picks it up</p>
+    <dl>
+      {jobs.map((j) => (
+        <div>
+          <dt>{j.job}</dt>
+          <dd class="ld-load"><span>{j.load}</span>{j.more && <span class="n">{j.more}</span>}</dd>
+          {j.next ? <dd class="ld-who"><span><span class="ld-nx">Next in line</span> <a class="plink" href={`${base}player/${j.next.id}/`}>{j.next.name}</a></span>{j.nextMore && <span class="n">{j.nextMore}</span>}</dd> : <dd class="ld-who"><span class="n">Nothing to hand over</span></dd>}
+        </div>
+      ))}
+    </dl>
+    <p class="note">“Next in line” is the teammate who already does the most of that after him this season. It is not a guess at the coach’s choice. Dots in the cards above are his {place} teammates, each over the games they played; hover one for the name.</p>
+  </div>
+  <div class="ld-two">
+    {f && (
+      <div class="card">
+        <p class="chart-title">What a fill-in gives back</p>
+        <p class="ld-say">He’s in on <strong>{f.v.toFixed(2)} goals a game</strong>.{fillIn && ` A typical depth ${isD ? 'defenseman' : 'forward'} called up to replace him is in on about ${fillIn[0].toFixed(2)}.`}</p>
+        <div class="ld-lane">
+          <span class="ld-line"></span>
+          {f.mates.map(([name, v]: any) => <i class="ld-f" style={`left:${fAt(v)}%`} tabindex="0" data-tip={`${name}: ${v.toFixed(2)} a game`}></i>)}
+          {f.ticks.map(([v, l]: any, k: number) => <span class:list={['ld-mark', { up: k === 1 && Math.abs(fAt(v) - fAt(f.v)) >= 18, low: k === 1 && Math.abs(fAt(v) - fAt(f.v)) < 18 }]} style={`left:${fAt(v)}%`} tabindex="0" data-tip={`${l}: ${v.toFixed(2)} goals a game`}><i></i><em>{l}</em></span>)}
+          <span class="ld-him" style={`left:${fAt(f.v)}%`}><i></i><em>{p.last}</em></span>
+        </div>
+        <p class="n">Goals scored or assisted per game, this season and last. Faint dots are his {place} teammates {isD ? 'on defense' : 'up front'}; ticks are the typical NHL {isD ? 'defenseman' : 'forward'} by ice-time rank on his team.</p>
+      </div>
+    )}
+    <div class="card">
+      <p class="chart-title">When he’s been out</p>
+      {out && out.missed ? (
+        <>
+          <p class="ld-say">He missed <strong>{out.missed} {out.missed === 1 ? 'game' : 'games'}</strong> {span}. {place} won {out.without.won} of {out.missed === 1 ? 'it' : 'them'}.</p>
+          <table class="ld-ww">
+            <thead><tr><th></th><th>With him</th><th>Without</th></tr></thead>
+            <tbody>
+              <tr><th>Won</th><td>{out.with.won} of {out.with.gp}</td><td>{out.without.won} of {out.without.gp}</td></tr>
+              <tr><th>Goals a game</th><td>{out.with.gf.toFixed(1)}</td><td>{out.without.gf.toFixed(1)}</td></tr>
+              <tr><th><span class="term" tabindex="0" data-tip="Expected goals for minus against per game, all situations, empty nets left out.">Chance edge a game</span></th><td>{sgn(out.with.xgd)}</td><td>{sgn(out.without.xgd)}</td></tr>
+            </tbody>
+          </table>
+          <p class="n">{out.missed < 10 ? `${out.missed} ${out.missed === 1 ? 'game is' : 'games is'} far too few to read much into: short stretches swing either way by luck.` : 'Even over this many games, results swing a lot by luck, and other players come and go too.'}</p>
+        </>
+      ) : <p class="ld-say">He hasn’t missed a game for {place} this season or last, so there is nothing to compare yet.</p>}
+    </div>
+  </div>
+</Section>
+)}
+
+<style>
+  .ld-h { font: 600 18px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 6px; }
+  .ld-tiles { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+  @media (max-width: 900px) { .ld-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .ld-tiles { grid-template-columns: 1fr; } }
+  .ld-tile { display: grid; align-content: start; gap: 2px; }
+  .ld-big { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; font: 600 40px/1.05 var(--display); font-variation-settings: 'SOFT' 100; margin-top: 2px; }
+  .ld-verdict { font: 700 12px/1 var(--ui); letter-spacing: 0.02em; padding: 6px 10px; border-radius: 999px; background: var(--track); color: var(--ink-2); white-space: nowrap; cursor: help; }
+  .ld-verdict.v1 { background: var(--team); color: #fff; }
+  .ld-verdict.v2 { background: color-mix(in oklab, var(--team) 40%, var(--sheet)); color: var(--ink); }
+  .ld-verdict.v3 { background: color-mix(in oklab, var(--team) 18%, var(--sheet)); color: var(--ink); }
+  .ld-of { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .ld-dots { position: relative; height: 40px; margin: 14px 7px 0; }
+  .ld-dots::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .ld-dots i { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
+  .ld-dots b { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; }
+  .ld-dots em { position: absolute; top: 18px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .ld-jobs { margin-top: 14px; }
+  .ld-jobs dl > div { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr); gap: 2px 24px; padding: 10px 0; border-top: 1px solid var(--rule); align-items: start; }
+  .ld-jobs dl > div:first-child { border-top: 0; padding-top: 10px; }
+  .ld-jobs dt { font: 600 11px/2.1 var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .ld-jobs dd { display: grid; gap: 0; font: 400 16px/1.4 var(--ui); }
+  .ld-jobs dd .n { font-size: 14px; }
+  .ld-nx { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 4px; }
+  .ld-jobs .note { margin-top: 6px; }
+  @media (max-width: 640px) { .ld-jobs dl > div { grid-template-columns: 1fr; gap: 4px; } .ld-jobs dt { line-height: 1.6; } }
+  .ld-two { display: grid; gap: 14px; margin-top: 14px; }
+  @media (min-width: 820px) { .ld-two { grid-template-columns: 1fr 1fr; } }
+  .ld-two .card { display: grid; align-content: start; gap: 10px; }
+  .ld-say { font: 400 16px/1.5 var(--ui); }
+  .ld-lane { position: relative; height: 78px; margin: 6px 10px 0; }
+  .ld-line { position: absolute; left: -10px; right: -10px; top: 26px; height: 4px; border-radius: 2px; background: var(--track); }
+  .ld-f { position: absolute; top: 23px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
+  .ld-mark, .ld-him { position: absolute; top: 0; width: 0; }
+  .ld-mark i { position: absolute; top: 18px; left: -1px; width: 2px; height: 20px; background: var(--ink-2); border-radius: 1px; }
+  .ld-mark em, .ld-him em { position: absolute; top: 44px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-2); white-space: nowrap; }
+  .ld-mark.up em { top: 0; }
+  .ld-mark.low em { top: 60px; }
+  .ld-him i { position: absolute; top: 21px; left: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
+  .ld-him em { font-weight: 600; color: var(--ink); top: 0; }
+  .ld-ww { border-collapse: collapse; font: 400 15px var(--ui); width: 100%; }
+  .ld-ww th, .ld-ww td { padding: 7px 0; text-align: right; }
+  .ld-ww tbody th { text-align: left; font-weight: 600; }
+  .ld-ww thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .ld-ww tbody tr { border-top: 1px solid var(--rule); }
+</style>

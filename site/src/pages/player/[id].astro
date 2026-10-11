@@ -11,6 +11,9 @@ import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
+import PlayerLoad from '../../components/PlayerLoad.astro';
+import PlayerReport from '../../components/PlayerReport.astro';
+import { cardsFor } from '../../lib/reportCards';
 import Intro from '../../components/Intro.astro';
 import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
@@ -94,7 +97,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -192,6 +195,9 @@ const statRow = (x: any) => (isG ? null : x);
             <div class="card worth"><p class="mini-h">What’s changed</p><ul>{role.notes.map((n) => <li>{n}</li>)}</ul></div>
           )}
         </Section>
+
+        <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
+        <PlayerReport p={p} place={team?.place ?? p.team} />
 
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           {modes.map(([m, mw]) => {
