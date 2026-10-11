@@ -196,7 +196,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
         <div class="rp-head">
           <div class="rp-counts">
             <span class="t-away"><b data-k="t-away">{replays.away}</b> {place(away)}</span>
-            <span class="rp-tie"><b data-k="tie">{replays.tie}</b> level after 60</span>
+            <span class="rp-tie"><b data-k="tie">{replays.tie}</b> even</span>
             <span class="t-home"><b data-k="t-home">{replays.home}</b> {place(home)}</span>
           </div>
           <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
@@ -399,6 +399,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .rp-counts { display: flex; flex-wrap: wrap; gap: 4px 20px; font: 600 15px var(--ui); color: var(--ink-2); }
   .rp-counts b { font: 600 26px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; display: inline-block; min-width: 1.4em; color: var(--team); }
   .rp-counts .rp-tie b { color: var(--ink-3); }
+  @media (max-width: 480px) { .rp-head { gap: 8px; } .rp-counts { gap: 4px 10px; font-size: 13.5px; } .rp-counts b { font-size: 21px; min-width: 0; } }
   /* 100 replays as a 20 by 5 grid, away wins first, then games level after 60 minutes, then home wins. */
   .replays { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 5px; margin-top: 12px; max-width: 520px; }
   .replays i { aspect-ratio: 1; border-radius: 50%; background: var(--team); }
