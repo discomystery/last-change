@@ -247,5 +247,9 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
                         f"We gave {T} {_a(pct)} chance, but {O} had other ideas.")
             sides[team] = {"head": wording.tidy(head), "chance": pct}
         out[g["id"]] = {"p_home": round(ph, 4), "p_home_puck": round(float(puck[g["id"]]), 4) if has_lineup else None,
-                        "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides}
+                        "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides,
+                        # What each step was made of, per team, so the page can say what every adjustment was for.
+                        "inputs": {t: {"xgd": round(r[f"{k}_xgd"], 2), "b2b": int(r[f"{k}_b2b"]),
+                                       **{c: round(r[f"{k}_{c}"], 3) for c in ("roster", "lineup") if r.get(f"{k}_{c}") is not None}}
+                                   for t, k in ((g["home"], "h"), (g["away"], "a"))}}
     return out

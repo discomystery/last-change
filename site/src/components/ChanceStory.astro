@@ -1,0 +1,204 @@
+---
+// The post-game reveal of our hidden pre-game win chance, told as a short story in one compact card: when the card comes
+// into view it plays through the steps by itself, fading each step's note in and out in place while the needle moves
+// by what that input was worth. Dots jump to a step, and the card replays on request. "Show every step at once" swaps
+// the story for the full list with the longer explanations (also what shows without scripts or with reduced motion).
+export type Beat = { key: string; label: string; short: string; long?: string; pts: number; before: number; end: number; sum?: boolean };
+interface Props { team: string; teamCls: string; other: string; otherCls: string; chance: number; outcome: string; beats: Beat[] }
+const { team, teamCls, other, otherCls, chance, outcome, beats } = Astro.props;
+// Small tracks in the full list run from 20% to 80% so a few points still show; the big gauge runs 0 to 100.
+const at = (v: number) => Math.max(0, Math.min(100, ((v - 20) / 60) * 100));
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+const final = Math.round(beats[beats.length - 1].end);
+---
+<div class="cs" data-team={team} data-other={other}>
+  <div class="cs-head">
+    <p class="mini-h">Our win chance, kept hidden until the final</p>
+    <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
+  </div>
+
+  <div class="cs-story card" hidden>
+    <div class="cs-gauge">
+      <p class="cs-num"><span class="cs-val">50</span>%<small>for {team} to win</small></p>
+      <div class={`cs-track ${otherCls}`}>
+        <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
+        <i class="cs-mid"></i>
+        <i class="cs-ghost" style="left:50%"></i>
+        <i class="cs-needle" style="left:50%"></i>
+      </div>
+      <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
+    </div>
+    <ol class="cs-texts" aria-live="polite">
+      {beats.map((b, i) => (
+        <li class:list={['cs-text', { on: i === 0 }]} data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts}>
+          <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts">{signed(b.pts)}</span>}</p>
+          <p class="cs-line">{b.key === 'end' ? <span class="cs-out">{outcome}</span> : b.short}</p>
+        </li>
+      ))}
+    </ol>
+    <div class="cs-foot">
+      <button type="button" class="cs-play" aria-label="Replay"><span class="i-pause" aria-hidden="true">❚❚</span><span class="i-play" aria-hidden="true">▶</span><span class="i-again" aria-hidden="true">↻</span></button>
+      <ol class="cs-prog">{beats.slice(1).map((b, i) => <li><button type="button" data-i={i + 1} aria-label={b.label}><i></i></button></li>)}</ol>
+    </div>
+  </div>
+
+  <div class="cs-list card">
+    <p class="cs-num static"><span>{final}%</span><small>for {team} to win</small></p>
+    <p class="cs-out">{outcome}</p>
+    <ol class="steps">
+      {beats.map((b) => (
+        <li class:list={['step', { sum: b.sum, start: b.key === 'start' }]}>
+          <div class="st-l"><b>{b.label}</b>{(b.long ?? (b.sum || b.key === 'start' ? '' : b.short)) && <span>{b.long ?? b.short}</span>}</div>
+          <div class="st-t" aria-hidden="true">
+            <i class="mid"></i>
+            {b.pts !== 0 && !b.sum && <span class={`seg ${b.pts > 0 ? teamCls : otherCls}`} style={`left:${Math.min(at(b.before), at(b.end)).toFixed(1)}%;width:${Math.abs(at(b.end) - at(b.before)).toFixed(1)}%`}></span>}
+            <i class="dot" style={`left:${at(b.end).toFixed(1)}%`}></i>
+          </div>
+          <div class="st-n">{!b.sum && b.key !== 'start' && signed(b.pts)}<b>{Math.round(b.end)}%</b></div>
+        </li>
+      ))}
+    </ol>
+    <p class="note small">Worked out the morning of the game, from earlier games only. The preview could hint at it in words but never showed the number.</p>
+  </div>
+</div>
+
+<script is:inline>
+  (() => {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const STEP = 2600;  // how long each note stays up while playing
+    document.querySelectorAll('.cs:not([data-ready])').forEach((cs) => {
+      cs.dataset.ready = '1';
+      const story = cs.querySelector('.cs-story'), list = cs.querySelector('.cs-list'), btn = cs.querySelector('.cs-toggle');
+      const val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill'), needle = cs.querySelector('.cs-needle'), ghost = cs.querySelector('.cs-ghost');
+      const texts = [...cs.querySelectorAll('.cs-text')], segs = [...cs.querySelectorAll('.cs-prog button')], play = cs.querySelector('.cs-play'), n = texts.length;
+      let shown = 50, raf = 0, current = 0, timer = 0, state = 'idle';  // idle (not started), playing, paused, done
+      const tween = (to) => {
+        cancelAnimationFrame(raf);
+        const from = shown, t0 = performance.now(), dur = 650;
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+          shown = from + (to - from) * e;
+          val.textContent = Math.round(shown);
+          if (k < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      };
+      const setStep = (i) => {
+        current = i;
+        const t = texts[i], end = +t.dataset.end, before = +t.dataset.before, pts = +t.dataset.pts;
+        fill.style.width = `${end}%`;
+        needle.style.left = `${end}%`;
+        ghost.style.left = `${before}%`;
+        ghost.classList.toggle('seen', pts !== 0);
+        texts.forEach((x, j) => x.classList.toggle('on', j === i));
+        // Segment k belongs to step k + 1: filled once that step has shown, running while it is the one coming up.
+        segs.forEach((g, k) => { g.classList.toggle('done', k + 1 <= i); g.classList.remove('run'); g.setAttribute('aria-current', k + 1 === i ? 'step' : 'false'); });
+        tween(end);
+      };
+      const setState = (s) => { state = s; cs.dataset.state = s; play.setAttribute('aria-label', s === 'playing' ? 'Pause' : s === 'done' ? 'Play again' : 'Play'); };
+      // The next step's segment fills while the current note is up, so the bar shows how long until it changes.
+      const run = (wait) => {
+        const g = segs[current];
+        if (g) { g.style.setProperty('--dur', `${wait}ms`); void g.offsetWidth; g.classList.add('run'); }
+        timer = setTimeout(tick, wait);
+      };
+      const tick = () => {
+        if (current >= n - 1) { setState('done'); return; }
+        setStep(current + 1);
+        if (current >= n - 1) { setState('done'); return; }
+        run(STEP);
+      };
+      const start = (from) => { clearTimeout(timer); setState('playing'); setStep(from); run(from === 0 ? 1600 : STEP); };
+      const pause = () => { clearTimeout(timer); segs.forEach((g) => g.classList.remove('run')); setState('paused'); };
+      play.addEventListener('click', () => (state === 'playing' ? pause() : start(state === 'done' ? 0 : current)));
+      segs.forEach((g) => g.addEventListener('click', () => { pause(); setStep(+g.dataset.i); if (+g.dataset.i === n - 1) setState('done'); }));
+      // Plays once, the first time most of the card is on screen; pauses if it scrolls away mid-way.
+      const io = new IntersectionObserver((es) => es.forEach((e) => {
+        if (e.isIntersecting && state === 'idle') start(0);
+        else if (!e.isIntersecting && state === 'playing') pause();
+      }), { threshold: 0.6 });
+      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); };
+      btn.hidden = false;
+      btn.addEventListener('click', () => mode(story.hidden));
+      setState('idle');
+      setStep(0);
+      mode(!reduce);
+      io.observe(story);
+    });
+  })();
+</script>
+
+<style>
+  .cs { margin-top: 22px; }
+  .cs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+  .cs-toggle { font: 500 13px var(--ui); color: var(--ink-2); background: var(--track); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .cs-toggle:hover { color: var(--ink); background: var(--rule); }
+  .cs .to-list, .cs.as-story .to-story { display: none; }
+  .cs.as-story .to-list { display: inline; }
+
+  /* The story: one compact card; the notes share one spot and cross-fade. */
+  .cs-story { margin-top: 12px; }
+  .cs-num { display: flex; align-items: baseline; gap: 2px; margin: 0 0 12px; font: 700 56px/0.95 var(--display); font-variant-numeric: tabular-nums; }
+  .cs-num small { font: 600 15px var(--ui); color: var(--ink-2); margin-left: 12px; }
+  .cs-track { position: relative; height: 14px; border-radius: 999px; background: color-mix(in oklab, var(--team) 35%, var(--track)); }
+  .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); transition: width 0.65s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cs-mid { position: absolute; left: 50%; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--sheet); }
+  .cs-ghost { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink-3); opacity: 0; transition: left 0.65s, opacity 0.3s; }
+  .cs-ghost.seen { opacity: 0.6; }
+  .cs-needle { position: absolute; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--sheet);
+    transition: left 0.65s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cs-ends { display: flex; justify-content: space-between; margin-top: 10px; font: 600 13px var(--ui); }
+  .cs-ends i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin: 0 6px; }
+
+  .cs-texts { list-style: none; padding: 0; margin: 18px 0 0; display: grid; }
+  .cs-text { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); transition: opacity 0.45s, transform 0.45s; pointer-events: none; }
+  .cs-text.on { opacity: 1; transform: none; transition-delay: 0.2s; pointer-events: auto; }
+  .cs-title { font: 600 11.5px var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+  .cs-pts { font: 700 11.5px var(--ui); color: var(--ink); background: var(--track); border-radius: 999px; padding: 1px 8px; letter-spacing: 0.02em; }
+  .cs-line { font: 400 16px/1.45 var(--body); color: var(--ink-2); margin: 0; text-wrap: pretty; }
+  .cs-out { font: 600 19px/1.3 var(--display); color: var(--ink); }
+  .cs-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .cs-play { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 0; background: var(--track); color: var(--ink-2); font: 700 10px var(--ui); cursor: pointer; display: grid; place-items: center; }
+  .cs-play:hover { color: var(--ink); background: var(--rule); }
+  .cs-play span { display: none; }
+  .cs[data-state="playing"] .i-pause, .cs:is([data-state="paused"], [data-state="idle"]) .i-play, .cs[data-state="done"] .i-again { display: block; }
+
+  /* Progress, idea A (segments): one short bar per step, like story apps; the coming step's bar fills while you read. */
+  .cs-prog { list-style: none; padding: 0; margin: 0; display: flex; gap: 4px; flex: 1; }
+  .cs-prog li { flex: 1; }
+  .cs-prog button { display: block; width: 100%; height: 18px; padding: 7px 0; border: 0; background: none; cursor: pointer; }
+  .cs-prog i { display: block; height: 4px; border-radius: 999px; background: var(--rule); position: relative; overflow: hidden; }
+  .cs-prog i::after { content: ''; position: absolute; inset: 0; background: var(--ink-2); transform: scaleX(0); transform-origin: left; }
+  .cs-prog .done i::after { transform: scaleX(1); }
+  .cs-prog .run i::after { animation: cs-fill var(--dur, 2.6s) linear forwards; }
+  .cs[data-state="paused"] .cs-prog .run i::after { animation-play-state: paused; }
+  @keyframes cs-fill { to { transform: scaleX(1); } }
+
+
+  /* Every step at once. */
+  .cs-list { margin-top: 12px; }
+  .cs-num.static { margin-top: 0; }
+  .cs-list > .cs-out { margin: -4px 0 16px; }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .step { display: grid; grid-template-columns: minmax(0, 1fr) 180px 74px; grid-template-areas: 'l t n'; gap: 6px 16px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--rule); font: 400 14px/1.45 var(--ui); }
+  .step:first-child { border-top: 0; }
+  .st-l { grid-area: l; }
+  .st-l b { display: block; font-weight: 600; }
+  .st-l span { display: block; color: var(--ink-2); font-size: 13.5px; }
+  .st-n { grid-area: n; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .st-n b { color: var(--ink); font-weight: 600; margin-left: 10px; }
+  .st-t { grid-area: t; position: relative; height: 8px; background: var(--track); border-radius: 999px; }
+  .st-t .mid { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.5; }
+  .st-t .seg { position: absolute; top: 0; bottom: 0; background: var(--team); border-radius: 999px; }
+  .st-t .dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
+  .step.sum { border-top-color: var(--ink-3); }
+  .step.sum .st-l b, .step.sum .st-n b { font-weight: 700; }
+
+  @media (max-width: 719px) {
+    .cs-num { font-size: 46px; }
+    .cs-line { font-size: 15px; }
+    .step { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'l n' 't t'; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost, .cs-text { transition: none; } .cs-prog .run i::after { animation: none; } }
+</style>

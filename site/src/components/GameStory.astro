@@ -4,13 +4,13 @@
 // right, and drops under the story on narrow screens. A preview's first paragraph ends with the matchup's lean, written
 // from one team's side: both versions are rendered and the page's pov CSS shows the visitor's team's, else the home team's.
 export type Story = { kicker: string; head: string; paras: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
-interface Props { story: Story; sides?: Record<string, 'away' | 'home'> }
-const { story, sides = {} } = Astro.props;
+interface Props { story: Story; sides?: Record<string, 'away' | 'home'>; kicker?: boolean }
+const { story, sides = {}, kicker = true } = Astro.props;
 const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
 ---
 <div class="card story">
   <div class="s-head">
-    <p class="mini-h">{story.kicker}</p>
+    {kicker && <p class="mini-h">{story.kicker}</p>}
     <h3>{story.head}</h3>
   </div>
   <div class="s-text">
@@ -20,6 +20,7 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
         {story.paras.slice(1).map((p) => <p class="para">{p}</p>)}
       </>
     ) : story.paras.map((p) => <p class="para">{p}</p>)}
+    <slot />
   </div>
   {story.items.length > 0 && (
     <div class="s-list">
