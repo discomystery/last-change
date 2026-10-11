@@ -12,6 +12,7 @@ const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'league', label: 'League', href: 'league/' },
   { id: 'record', label: 'Track record', href: 'record/' },
 ];
+const SITE_NAME = 'Spare Line Change';
 const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
 const teamList = teams as { abbr: string; name: string }[];
@@ -21,7 +22,7 @@ const teamList = teams as { abbr: string; name: string }[];
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
+    <title>{title === SITE_NAME ? title : `${title} · ${SITE_NAME}`}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
     <script is:inline>
@@ -48,8 +49,7 @@ const teamList = teams as { abbr: string; name: string }[];
     )}
     <header class="site-head">
       <div class="brand">
-        <a class="wordmark" href={base}>Last Change</a>
-        <span class="wordmark-note">working title</span>
+        <a class="wordmark" href={base}>Spare Line Change</a>
         <nav class="site-nav" aria-label="Site">
           <a id="my-team-link" class="my-team" href={base} data-base={base} hidden></a>
           {tabs.map((t) => t.soon

@@ -1,0 +1,53 @@
+---
+// The short version: the plain-English story at the top of preview and post-game pages (pipeline/export/stories.py).
+// The story reads at a comfortable width on the left; "Who to watch" (or "What it means") sits in a pale panel on the
+// right, and drops under the story on narrow screens. A preview's first paragraph ends with the matchup's lean, written
+// from one team's side: both versions are rendered and the page's pov CSS shows the visitor's team's, else the home team's.
+export type Story = { kicker: string; head: string; paras: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
+interface Props { story: Story; sides?: Record<string, 'away' | 'home'> }
+const { story, sides = {} } = Astro.props;
+const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
+---
+<div class="card story">
+  <div class="s-head">
+    <p class="mini-h">{story.kicker}</p>
+    <h3>{story.head}</h3>
+  </div>
+  <div class="s-text">
+    {leanTeams.length > 0 ? (
+      <>
+        {leanTeams.map((t) => <p class={`para pov pov-${sides[t]}`}>{[story.paras[0], story.lean![t]].filter(Boolean).join(' ')}</p>)}
+        {story.paras.slice(1).map((p) => <p class="para">{p}</p>)}
+      </>
+    ) : story.paras.map((p) => <p class="para">{p}</p>)}
+  </div>
+  {story.items.length > 0 && (
+    <div class="s-list">
+      <h4 class="list-h">{story.list_head}</h4>
+      <ul>
+        {story.items.map((i) => <li><span class="tag">{i.tag}</span><span>{i.text}</span></li>)}
+      </ul>
+    </div>
+  )}
+</div>
+<style>
+  .story { margin-bottom: 20px; padding: 24px 26px; display: grid; gap: 0 36px;
+    grid-template-columns: minmax(0, 64ch) minmax(270px, 1fr); grid-template-areas: 'head list' 'text list'; grid-template-rows: auto 1fr; }
+  .s-head { grid-area: head; }
+  .s-text { grid-area: text; align-self: start; }
+  .s-list { grid-area: list; background: var(--ice); border-radius: 12px; padding: 16px 18px; align-self: start; }
+  .story h3 { font: 600 28px/1.15 var(--display); margin: 6px 0 12px; }
+  .story .para { font: 400 18px/1.6 var(--body); margin: 0 0 12px; }
+  .list-h { font: 700 12.5px/1.2 var(--ui); margin: 0 0 4px; color: var(--ink); text-transform: uppercase; letter-spacing: 0.08em;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.12)); }
+  .story ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 12px; }
+  .story li { display: grid; gap: 2px; align-content: start; font: 400 16px/1.5 var(--ui); }
+  .story .tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  @media (max-width: 900px) {
+    .story { grid-template-columns: 1fr; grid-template-areas: 'head' 'text' 'list'; grid-template-rows: auto; }
+  }
+  @media (max-width: 560px) {
+    .story { padding: 18px 16px; }
+    .story h3 { font-size: 24px; }
+  }
+</style>

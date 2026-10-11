@@ -4,7 +4,8 @@
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
   .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
   .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
-  .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); }
+  .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); transition: border-color 0.15s ease; }
+  .jump a:hover { border-color: var(--ink); }
   .next { margin-top: 18px; }
   .cols { display: grid; gap: 0 28px; }
   @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }

@@ -3,10 +3,12 @@
 // scrolling when `pinned`). Phones: a thin bar pinned under the top strip, "Jump to [section]", using the phone's
 // own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
 // pinned elements stick for the whole page, not just inside a short wrapper.
+// Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it:
+// without one, unclicked pills turned square and the highlighted one stayed round.
 interface Props { items: [string, string][]; pinned?: boolean }
 const { items, pinned = false } = Astro.props;
 ---
-<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}</nav>
 <div class="secnav-bar">
   <label for="secnav-pick">Jump to</label>
   <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
