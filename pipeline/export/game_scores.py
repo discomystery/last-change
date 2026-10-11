@@ -6,10 +6,13 @@ A skater's night is the sum of four parts, in goal-sized units:
                worth 0.16 goals to the other team: measured 0.156-0.171 net expected goals per minor over 2023-25)
                and faceoffs won minus lost (a 5-on-5 draw is worth 0.006 expected goals over the next 20 seconds);
   5-on-5 play  chances for minus against with him on the ice, half against league average (score-and-venue
-               adjusted) and half against his own team with him off the ice, plus a quarter weight on goals for
-               minus against (expected goals predict future goals far better than goals do);
-  special teams power-play chances for above a league-average power play in the same time, and penalty-kill
-               chances against below a league-average kill;
+               adjusted) and half against his own team with him off the ice, plus goals for minus against at half
+               weight (expected goals predict future goals far better than goals do, but the goals he was on the
+               ice for are what fans saw; at half weight rather than a quarter a team's total follows the score far
+               better, 0.76 to 0.87 over 2025-26, while staying mostly about chances);
+  special teams everything with him on the ice on the power play or penalty kill, both ways: chances and goals for
+               minus against, each judged against what a league-average unit creates and allows in the same time
+               (so a shorthanded goal against costs the power-play unit that gave it up);
   usage        a small give-back for strong linemates and weak opponents (and credit for the reverse), from the
                5-on-5 impact ratings of the two seasons before.
 PLAY sets how much on-ice play counts against the scoresheet; the user chose "play-led" (2026-10-10), so it is the
@@ -23,6 +26,7 @@ import json
 import numpy as np
 import polars as pl
 
+from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.metrics import players as P
 from pipeline.metrics import rapm
@@ -34,13 +38,42 @@ GOALS = 0.5  # weight of goal credit; the other half of a goal's worth is in the
 SHOOTER = 0.25  # weight of the expected goals of his own shots
 SPLIT = (0.4, 0.35, 0.25)  # scorer, first assist, second assist
 PENALTY, FACEOFF = 0.16, 0.006
-GOALS_ON_ICE = 0.25  # on-ice goals for and against, relative to on-ice expected goals
+GOALS_ON_ICE = 0.5  # on-ice goals for and against, relative to on-ice expected goals (0.25 until 2026-10-11)
 MIN_OFF = 600  # seconds of 5-on-5 team time with him off the ice before his team's off-ice rate is trusted
 G_MIN_SHOTS = 5  # goalies facing fewer shots get no score
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 
 
-SPECIAL = ("pp_xgf", "sec_pp", "sh_xga", "sec_pk")  # newer player_game columns; older saved seasons get rebuilt
+SPECIAL = ("pp_xgf", "sec_pp", "sh_xga", "sh_xgf", "sec_pk")  # newer player_game columns; older saved seasons get rebuilt
+ST_COLS = ("pp_xga", "pp_gf", "pp_ga", "pk_gf", "pk_ga")
+ST_GOALS = ST_COLS[1:]  # special-teams goals with him on the ice, named in the Swing breakdown
+
+
+def special_on_ice(season: int) -> pl.DataFrame:
+    """Per player-game, the special-teams events player_game leaves out: chances against on the power play, and goals
+    for and against with him on the ice on the power play and on the penalty kill (both goalies in, no penalty shots)."""
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    xg = pl.read_parquet(d / "shots_xg_own.parquet").select("game_id", "event_id", "xg")
+    s = pl.read_parquet(d / "events.parquet").join(games, on="game_id").filter(
+        pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & (pl.col("period_type") != "SO")
+        & ~pl.col("situation_code").is_in(list(PENALTY_SHOT)) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null()
+    ).join(xg, on=["game_id", "event_id"], how="left").with_columns(
+        pl.col("xg").fill_null(0.0), goal=(pl.col("type") == "goal").cast(pl.Float64),
+        n_own=pl.when(pl.col("is_home")).then(pl.col("home_on").list.len()).otherwise(pl.col("away_on").list.len()),
+        n_opp=pl.when(pl.col("is_home")).then(pl.col("away_on").list.len()).otherwise(pl.col("home_on").list.len()),
+        own_on=pl.when(pl.col("is_home")).then(pl.col("home_on")).otherwise(pl.col("away_on")),
+        opp_on=pl.when(pl.col("is_home")).then(pl.col("away_on")).otherwise(pl.col("home_on")))
+    pp, sh = s.filter(pl.col("n_own") > pl.col("n_opp")), s.filter(pl.col("n_own") < pl.col("n_opp"))
+    zero = pl.lit(0.0)
+    cols = lambda *xs: [x.alias(n) for x, n in zip(xs, ST_COLS)]
+    parts = [
+        pp.select("game_id", pl.col("own_on").alias("player_id"), *cols(zero, pl.col("goal"), zero, zero, zero)),  # his power play scores
+        pp.select("game_id", pl.col("opp_on").alias("player_id"), *cols(zero, zero, zero, zero, pl.col("goal"))),  # scored on while he kills
+        sh.select("game_id", pl.col("own_on").alias("player_id"), *cols(zero, zero, zero, pl.col("goal"), zero)),  # his kill scores
+        sh.select("game_id", pl.col("opp_on").alias("player_id"), *cols(pl.col("xg"), zero, pl.col("goal"), zero, zero)),  # his power play gives one up
+    ]
+    return pl.concat(parts).explode("player_id").drop_nulls("player_id").group_by("game_id", "player_id").agg(pl.all().sum())
 
 
 def _ratings(seasons: list[int]) -> dict[int, tuple[float, float]]:
@@ -101,20 +134,23 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
     pg = P.load(season, need=SPECIAL)
     credit, goalies = shot_credit(season)
     ctx = usage(season, ratings) if ratings else pl.DataFrame(schema={"game_id": pl.Int64, "player_id": pl.Int64, "ctx": pl.Float64})
-    d = pg.join(credit, on=["game_id", "player_id"], how="left").join(ctx, on=["game_id", "player_id"], how="left").with_columns(
-        pl.col("ixg", "credit", "ctx").fill_null(0.0))
+    d = pg.join(credit, on=["game_id", "player_id"], how="left").join(ctx, on=["game_id", "player_id"], how="left").join(
+        special_on_ice(season), on=["game_id", "player_id"], how="left").with_columns(pl.col("ixg", "credit", "ctx", "sh_xgf", *ST_COLS).fill_null(0.0))
     off_share = pl.col("sec5") / (pl.col("t_sec5") - pl.col("sec5")).clip(MIN_OFF)
     rel = (pl.col("on_xgf") - pl.col("on_xga")) - ((pl.col("t_xgf") - pl.col("on_xgf")) - (pl.col("t_xga") - pl.col("on_xga"))) * off_share
     sk = d.select(
-        "game_id", "player_id", "team_id", "pos",
+        "game_id", "player_id", "team_id", "pos", *ST_GOALS,
         sheet=GOALS * pl.col("credit") + SHOOTER * pl.col("ixg") + PENALTY * (pl.col("pen_drawn") - pl.col("pen_taken")) + FACEOFF * (pl.col("fow") - pl.col("fol")),
         play=PLAY * (0.5 * (pl.col("on_xgf_adj") - pl.col("on_xga_adj")) + 0.5 * rel + GOALS_ON_ICE * (pl.col("on_gf") - pl.col("on_ga"))),
-        special=PLAY * ((pl.col("pp_xgf") - league["pp"] * pl.col("sec_pp")) + (league["pk"] * pl.col("sec_pk") - pl.col("sh_xga"))),
+        special=PLAY * ((pl.col("pp_xgf") - pl.col("pp_xga")) - (league["pp"] - league["sh"]) * pl.col("sec_pp")
+                        + (pl.col("sh_xgf") - pl.col("sh_xga")) - (league["sh"] - league["pp"]) * pl.col("sec_pk")
+                        + GOALS_ON_ICE * ((pl.col("pp_gf") - pl.col("pp_ga")) - (league["pp_g"] - league["sh_g"]) * pl.col("sec_pp")
+                                          + (pl.col("pk_gf") - pl.col("pk_ga")) - (league["sh_g"] - league["pp_g"]) * pl.col("sec_pk"))),
         usage=-PLAY * 0.5 * pl.col("ctx"),
         net=pl.lit(0.0))
     roster = pl.read_parquet(TABLES / str(season) / "players.parquet").select("game_id", "player_id", "team_id", "pos")
     gk = goalies.filter(pl.col("shots") >= G_MIN_SHOTS).join(roster, on=["game_id", "player_id"]).select(
-        "game_id", "player_id", "team_id", "pos", *[pl.lit(0.0).alias(c) for c in ("sheet", "play", "special", "usage")],
+        "game_id", "player_id", "team_id", "pos", *[pl.lit(0.0).alias(c) for c in (*ST_GOALS, "sheet", "play", "special", "usage")],
         net=pl.col("xga") - pl.col("ga").cast(pl.Float64))
     out = pl.concat([sk, gk], how="vertical_relaxed").with_columns(
         score=pl.sum_horizontal("sheet", "play", "special", "usage", "net"),
@@ -123,10 +159,13 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
 
 
 def league_rates(season: int) -> dict[str, float]:
-    """League power-play chances per second and penalty-kill chances allowed per second (every skater on the ice
-    shares the same chances and seconds, so the ratio of the sums is the team rate)."""
+    """Per second of power play, what the league's power plays create (pp, pp_g) and give up shorthanded (sh, sh_g),
+    in chances and goals (every skater on the ice shares the same events and seconds, so the ratio of the sums is the
+    team rate). A penalty kill's baseline is the same thing from the other side."""
     t = P.load(season, need=SPECIAL).select(SPECIAL).sum().row(0, named=True)
-    return {"pp": t["pp_xgf"] / t["sec_pp"], "pk": t["sh_xga"] / t["sec_pk"]}
+    g = special_on_ice(season).select(ST_COLS).sum().row(0, named=True)
+    return {"pp": t["pp_xgf"] / t["sec_pp"], "sh": g["pp_xga"] / t["sec_pp"],
+            "pp_g": g["pp_gf"] / t["sec_pp"], "sh_g": g["pp_ga"] / t["sec_pp"]}
 
 
 def run(season: int = CURRENT_SEASON) -> dict:
@@ -164,7 +203,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             players.append({
                 "id": r["player_id"], "name": names.get(r["player_id"], "?"), "team": abbr.get(r["team_id"]), "pos": r["pos"],
                 "score": round(r["score"], 2), "pct": pct(r["grp"], r["score"]),
-                "parts": {k: round(r[k], 2) for k in (("net",) if r["pos"] == "G" else ("sheet", "play", "special", "usage"))}})
+                "parts": {k: round(r[k], 2) for k in (("net",) if r["pos"] == "G" else ("sheet", "play", "special", "usage"))},
+                **({"st": st} if (st := {k: int(r[k]) for k in ST_GOALS if r[k]}) else {})})
         units = {g["away"]: lines(gid, g["away_id"]), g["home"]: lines(gid, g["home_id"])}
         (OUT / f"{gid}.json").write_text(json.dumps({"game_id": gid, "away": g["away"], "home": g["home"], "players": players, "units": units}, separators=(",", ":"), ensure_ascii=False))
     return {"games": now["game_id"].n_unique()}

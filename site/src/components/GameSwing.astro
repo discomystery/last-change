@@ -5,7 +5,7 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 
-type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number } };
+type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number }; st?: { pp_gf?: number; pp_ga?: number; pk_gf?: number; pk_ga?: number } };
 type Unit = { kind: 'F' | 'D'; n: number; ids: number[]; sec: number; xgf: number; xga: number };
 type Scores = { game_id: number; away: string; home: string; players: Row[]; units?: Record<string, Unit[]> };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
@@ -49,7 +49,15 @@ const why = (r: Row, k: string, opp: string) => {
     return c ? `${c.toi5} against ${opp}. Chances ${(b.xgf ?? 0).toFixed(1)}–${(b.xga ?? 0).toFixed(1)}, plus-minus ${pm > 0 ? '+' : pm < 0 ? '−' : ''}${Math.abs(pm)}${co}.` : `His 5-on-5 minutes against ${opp}${co}.`;
   }
   const t = [c && c.toi_pp !== '0:00' ? `${c.toi_pp} on the power play` : '', c && c.toi_pk !== '0:00' ? `${c.toi_pk} killing penalties` : ''].filter(Boolean).join(' and ');
-  return t ? `${t}. Measured against an average unit.` : 'No special-teams time.';
+  const st = r.st ?? {};
+  const goals = [
+    st.pp_gf ? `${st.pp_gf === 1 ? 'a' : st.pp_gf} power-play goal${st.pp_gf === 1 ? '' : 's'}` : '',
+    st.pp_ga ? `${st.pp_ga === 1 ? 'a' : st.pp_ga} shorthanded goal${st.pp_ga === 1 ? '' : 's'} against` : '',
+    st.pk_gf ? `${st.pk_gf === 1 ? 'a' : st.pk_gf} shorthanded goal${st.pk_gf === 1 ? '' : 's'}` : '',
+    st.pk_ga ? `${st.pk_ga === 1 ? 'a' : st.pk_ga} power-play goal${st.pk_ga === 1 ? '' : 's'} against` : '',
+  ].filter(Boolean);
+  const on = goals.length ? ` On the ice for ${goals.length > 1 ? `${goals.slice(0, -1).join(', ')} and ${goals.at(-1)}` : goals[0]}.` : '';
+  return t ? `${t}.${on} Measured against an average unit.` : 'No special-teams time.';
 };
 const order = d ? [d.away, d.home] : [];
 const one = (v: number) => (Math.round(v * 10) === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
@@ -161,7 +169,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
       <summary><span class="show">How Swing is worked out</span><span class="hide">Hide how Swing is worked out</span></summary>
       <div class="how-body">
         <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
-        <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus a smaller amount for actual goals. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: power-play and penalty-kill time compared with a league-average unit.</p>
+        <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus actual goals for and against at half the weight of a chance. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: everything with him on the ice on the power play and penalty kill, chances and goals both ways (a shorthanded goal against counts against the power-play unit), compared with a league-average unit.</p>
         <p class="note"><strong>Company kept</strong> (counted inside 5-on-5): from every player’s 5-on-5 impact over the two seasons before, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who swung this result, not who is better.</p>
       </div>
     </details>
