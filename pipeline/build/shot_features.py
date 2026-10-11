@@ -6,6 +6,7 @@ import math
 
 import polars as pl
 
+from pipeline.build.stints import penalty_shot
 from pipeline.config import TABLES
 
 NET_X = 89.0
@@ -17,11 +18,13 @@ LIVE_RESET = {"stoppage", "period-start", "period-end"}
 def build(season: int) -> dict:
     d = TABLES / str(season)
     events = pl.read_parquet(d / "events.parquet").sort("game_id", "sort")
-    rows, prev, game = [], None, None
+    rows, prev, game, faceoff = [], None, None, None
     for e in events.iter_rows(named=True):
         if e["game_id"] != game:
-            game, prev = e["game_id"], None
+            game, prev, faceoff = e["game_id"], None, None
         typ = e["type"]
+        if typ == "faceoff":
+            faceoff = e["sec"]
         if typ in LIVE_RESET:
             prev = None
             continue
@@ -39,6 +42,8 @@ def build(season: int) -> dict:
                 "score_diff": max(-3, min(3, (e["home_score"] - e["away_score"]) * (1 if home else -1))),
                 "period": min(e["period"], 4), "sec": e["sec"],
                 "prev_type": "none", "prev_same_team": False, "prev_gap": 60.0, "prev_dist": 0.0, "prev_x": 0.0, "prev_angle_change": 0.0,
+                "prev_dy": 0.0, "since_faceoff": float(min(max(e["sec"] - faceoff, 0), 120)) if faceoff is not None else 120.0,
+                "penalty_shot": penalty_shot(e["situation_code"]),
             }
             if prev is not None and e["period"] == prev["period"]:
                 same = prev["is_home"] == home
@@ -46,6 +51,7 @@ def build(season: int) -> dict:
                 gap = float(e["sec"] - prev["sec"])
                 p_angle = math.degrees(math.atan2(py, NET_X - px))
                 row |= {"prev_type": prev["type"], "prev_same_team": same, "prev_gap": min(gap, 60.0), "prev_dist": math.hypot(x - px, y - py),
+                        "prev_dy": abs(y - py),  # side-to-side movement since the last play: the closest public proxy for a pass across
                         "prev_x": px, "prev_angle_change": abs(math.degrees(math.atan2(y, NET_X - x)) - p_angle) if prev["type"] in UNBLOCKED else 0.0}
             rows.append(row)
         if e["x_norm"] is not None and e["is_home"] is not None:

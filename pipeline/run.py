@@ -34,7 +34,6 @@ def main() -> None:
 
 def update(season: int) -> dict:
     """Everything a new game needs, in order: fetch, build tables, rate shots, team and unit tables, site JSON."""
-    import pickle
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
@@ -52,7 +51,7 @@ def update(season: int) -> dict:
         out["availability"] = availability_update(season)
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
     shot_features.build(season)
-    out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
+    out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     refresh_saved(season)
     team_game.build(season)
     units.game_units(season)
@@ -81,16 +80,16 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 3  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 4  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
 # 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
+# 4 (2026-10-11): expected-goals model v2; earlier seasons' shots are rebuilt and re-rated
 
 
 def check_saved_shifts(season: int) -> dict:
     """Once per season (2026-10-11 data audit): fetch the HTML shift reports for saved games whose API shift chart
     disagrees with the play-by-play or boxscore. An earlier season with new reports gets its game tables rebuilt and
     shots re-rated here, and its team, unit and player tables rebuilt by refresh_saved."""
-    import pickle
 
     from pipeline.build import games, shot_features
     from pipeline.ingest import nhl
@@ -103,7 +102,7 @@ def check_saved_shifts(season: int) -> dict:
         if fetched and s != season:
             games.build_season(s)
             shot_features.build(s)
-            xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), s)
+            xg_model.score_season(xg_model.saved(), s)
             (TABLES / str(s) / "rules.json").unlink(missing_ok=True)
     return out
 
@@ -111,7 +110,8 @@ def check_saved_shifts(season: int) -> dict:
 def refresh_saved(season: int) -> list[int]:
     """Rebuild the team, unit and player tables of earlier seasons once after a rule change, so blends, priors and
     league baselines follow the same rules as the current season. A small marker file records the rules each was built with."""
-    from pipeline.metrics import player_game, team_game, units
+    from pipeline.build import shot_features
+    from pipeline.metrics import player_game, team_game, units, xg_model
 
     def stale(s: int) -> bool:
         d = TABLES / str(s)
@@ -119,7 +119,10 @@ def refresh_saved(season: int) -> list[int]:
         return (d / "events.parquet").exists() and not (marker.exists() and json.loads(marker.read_text()).get("rules", 0) >= TABLE_RULES)
 
     done = [s for s in range(FULL_SEASONS[0], season) if stale(s)]
-    for s in done:  # every team table first: player tables read league baselines pooled over all of them
+    for s in done:  # shots first (a rule may change the shot model), then every team table: player tables read league baselines pooled over all of them
+        shot_features.build(s)
+        xg_model.score_season(xg_model.saved(), s)
+    for s in done:
         team_game.build(s)
         units.game_units(s)
     for s in done:
@@ -131,7 +134,6 @@ def refresh_saved(season: int) -> list[int]:
 def publish(season: int) -> dict:
     """Recompute every table and number from data already saved, without fetching anything new: for publishing
     changes to the site or the maths between nightly runs. Run with LC_OFFLINE=1 so nothing can reach the network."""
-    import pickle
 
     from pipeline.build import games, shot_features
     from pipeline.export import site_json
@@ -139,7 +141,7 @@ def publish(season: int) -> dict:
 
     out = {"build": games.build_season(season)}
     shot_features.build(season)
-    out["shots_rated"] = xg_model.score_season(pickle.loads(xg_model.MODEL_PATH.read_bytes()), season)
+    out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     refresh_saved(season)
     team_game.build(season)
     units.game_units(season)

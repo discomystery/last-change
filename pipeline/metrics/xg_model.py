@@ -11,14 +11,22 @@ from sklearn.metrics import log_loss, roc_auc_score
 
 from pipeline.config import DATA, TABLES
 
-NUMERIC = ["dist", "angle", "x", "y_abs", "own_skaters", "opp_skaters", "score_diff", "period", "prev_gap", "prev_dist", "prev_x", "prev_angle_change"]
-FLAGS = ["empty_net", "prev_same_team", "is_home"]
+# v2 (2026-10-11): adds side-to-side movement since the last play, its speed, time since the faceoff, game time, the
+# rebound and penalty-shot flags, and trains every tree instead of stopping early (early stopping left the model too
+# timid: shots it rated 20-30% scored 26%, 60%+ scored 81%). Unseen-season log loss 0.21718 -> 0.2164 (2025-26).
+NUMERIC = ["dist", "angle", "x", "y_abs", "own_skaters", "opp_skaters", "score_diff", "period", "prev_gap", "prev_dist", "prev_x", "prev_angle_change",
+           "prev_dy", "prev_speed", "since_faceoff", "sec"]
+FLAGS = ["empty_net", "prev_same_team", "is_home", "rebound", "penalty_shot"]
 CATEGORICAL = ["shot_type", "prev_type"]
-MODEL_PATH = DATA / "models" / "xg_v1.pkl"
+MODEL_PATH = DATA / "models" / "xg_v2.pkl"
+TRAIN_SEASONS = [2023, 2024, 2025]
 
 
 def load(season: int) -> pl.DataFrame:
-    return pl.read_parquet(TABLES / str(season) / "shot_features.parquet").filter(pl.col("type") != "blocked-shot")
+    return pl.read_parquet(TABLES / str(season) / "shot_features.parquet").filter(pl.col("type") != "blocked-shot").with_columns(
+        prev_speed=pl.col("prev_dist") / pl.col("prev_gap").clip(1, 60),
+        rebound=(pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3),
+        sec=pl.col("sec").clip(0, 3900))
 
 
 def _design(df: pl.DataFrame, levels: dict[str, list[str]]) -> np.ndarray:
@@ -32,8 +40,8 @@ def _design(df: pl.DataFrame, levels: dict[str, list[str]]) -> np.ndarray:
 def fit(train: pl.DataFrame) -> dict:
     levels = {c: sorted(train[c].unique().to_list()) for c in CATEGORICAL}
     n = len(NUMERIC) + len(FLAGS)
-    model = HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, max_leaf_nodes=31, min_samples_leaf=200, l2_regularization=1.0,
-                                           categorical_features=list(range(n, n + len(CATEGORICAL))), random_state=7)
+    model = HistGradientBoostingClassifier(max_iter=600, learning_rate=0.03, max_leaf_nodes=31, min_samples_leaf=100, l2_regularization=1.0,
+                                           early_stopping=False, categorical_features=list(range(n, n + len(CATEGORICAL))), random_state=7)
     model.fit(_design(train, levels), train["goal"].to_numpy())
     return {"model": model, "levels": levels}
 
@@ -62,10 +70,22 @@ def evaluate(train_seasons: list[int], test_season: int) -> dict:
 
 
 def train_final(seasons: list[int]) -> dict:
+    from pipeline.build import shot_features
+
+    for s in seasons:  # shot tables saved before a feature was added are rebuilt first
+        if not set(NUMERIC + FLAGS) - {"prev_speed", "rebound"} <= set(pl.read_parquet_schema(TABLES / str(s) / "shot_features.parquet")):
+            shot_features.build(s)
     bundle = fit(pl.concat([load(s) for s in seasons]))
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     MODEL_PATH.write_bytes(pickle.dumps(bundle))
     return bundle
+
+
+def saved() -> dict:
+    """The site's model; trained from the saved seasons the first time a new version is needed (a few minutes)."""
+    if not MODEL_PATH.exists():
+        return train_final(TRAIN_SEASONS)
+    return pickle.loads(MODEL_PATH.read_bytes())
 
 
 def score_season(bundle: dict, season: int) -> int:
