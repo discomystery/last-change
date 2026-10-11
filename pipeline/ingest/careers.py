@@ -23,7 +23,9 @@ from pipeline.ingest.client import get
 DIR = RAW / "careers"
 BUDGET = 1200  # requests per run (about ten minutes at two a second)
 OWN_FROM = FULL_SEASONS[0]  # seasons from here on come from our own tables, not the NHL game log
-GAME_KEYS = ("gameId", "gameDate", "teamAbbrev", "opponentAbbrev", "goals", "points")
+GAME_KEYS = ("gameId", "gameDate", "teamAbbrev", "opponentAbbrev", "homeRoadFlag", "goals", "points",
+             "gamesStarted", "decision", "shotsAgainst", "goalsAgainst")  # the last four are goalies' only
+VERSION = 2  # 2: home or road and goalie decisions, for records in a building; older saves are fetched again
 
 
 def _path(pid: int):
@@ -62,7 +64,9 @@ def _priority(season: int) -> list[int]:
     pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet")
     goalies = pl.read_parquet(TABLES / str(season) / "players.parquet").filter(pl.col("pos") == "G").select("player_id").unique()
     sec = pg.group_by("player_id").agg(pl.col("sec").sum()).sort("sec", descending=True)["player_id"].to_list()
-    return sec + [g for g in goalies["player_id"].to_list() if g not in set(sec)]
+    g_ids = set(goalies["player_id"].to_list())
+    # goalies first: their records in each building feed the preview storylines
+    return [p for p in sec if p in g_ids] + sorted(g for g in g_ids if g not in set(sec)) + [p for p in sec if p not in g_ids]
 
 
 def update(season: int = CURRENT_SEASON, budget: int = BUDGET) -> dict:
@@ -72,13 +76,15 @@ def update(season: int = CURRENT_SEASON, budget: int = BUDGET) -> dict:
     failed = []
     for pid in _priority(season):
         have = read(pid) or {}
+        if have.get("version", 1) < VERSION:
+            have = {k: v for k, v in have.items() if k != "logs"} | {"logs": {}, "complete": False, "version": VERSION}
         if have.get("complete"):
             continue
         if used >= budget:
             break
         try:
             if "landing" not in have:
-                have = {"fetched": date.today().isoformat(), "complete": False, "logs": {},
+                have = {"fetched": date.today().isoformat(), "complete": False, "logs": {}, "version": VERSION,
                         "landing": _trim_landing(get(f"{NHL_WEB}/v1/player/{pid}/landing").json())}
                 used += 1
             for s in _past_seasons(have["landing"]):

@@ -6,6 +6,7 @@ import polars as pl
 
 from pipeline.build import join_xg, validate
 from pipeline.build.stints import penalty_shot
+from pipeline.export import wording
 from pipeline.config import OFFLINE, SITE_DATA, TABLES
 from pipeline.metrics.lines import game_units
 
@@ -199,9 +200,13 @@ def export_lines(season: int) -> int:
     for s_ in (season - 1, season):
         for r in pl.read_parquet(TABLES / str(s_) / "players.parquet").iter_rows(named=True):
             names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
+    names |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
     now = units.special_usage(season)
-    before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum())
+    before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum(),
+                                                                     teams_last=pl.col("team_id").unique())
     usage = now.join(before, on="player_id", how="left", suffix="_last")
+    # a player who changed clubs: last season's share was of another team's time, so say so
+    usage = usage.with_columns(moved=~pl.col("teams_last").list.contains(pl.col("team_id")).fill_null(True))
     words = {"pk": ("killing penalties", "shorthanded"), "pp": ("playing on the power play", "power-play")}
     from pipeline.metrics import patterns
 
@@ -264,10 +269,10 @@ def export_lines(season: int) -> int:
                 doing, label = words[kind]
                 if cur >= started and old < 0.08:
                     notes.append({"player": names[r["player_id"]], "kind": kind, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
-                                  "text": f'{names[r["player_id"]]} has started {doing}: on the ice for {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, up from {round(100 * old)}% last season.'})
+                                  "text": f'{names[r["player_id"]]} has started {doing}: on the ice for {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, up from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
                 elif old >= stopped and cur < 0.05:
                     notes.append({"player": names[r["player_id"]], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
-                                  "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% last season.'})
+                                  "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
         for n in missing.get(tid, []):
             rk = n.get("rank")
             if rk is None or rk > (9 if n["kind"] == "F" else 4):

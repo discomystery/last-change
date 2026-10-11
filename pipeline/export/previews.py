@@ -218,6 +218,11 @@ def _and(xs: list[str]) -> str:
     return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
+def _games(a: int, b: int) -> str:
+    """How many games this season each side's figures include, for a call's citation."""
+    return "no games yet this season" if a == b == 0 else f"{a} and {b} games this season"
+
+
 def _cap(t: str) -> str:
     return t[0].upper() + t[1:]
 
@@ -268,7 +273,7 @@ def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
                     "body": _fmt(_pick([b.lstrip("*") for b in CLASH_WORDS[off][1] if o["rank"] <= TOP or not b.startswith("*")], gid, off, x, "body"), **words),
                     "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
                     "gist": _fmt(CLASH_GIST[off], **words),
-                    "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                    "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
                     "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(o["v"], 4),
                               "league": round(league, 4) if league else None, "direction": "above",
                               "rule": "held if tonight's figure is at or above the team's usual level; partly if between the league average and that level; otherwise didn't happen"},
@@ -304,7 +309,7 @@ def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[
                 "body": _fmt(body, **words), "call": call,
                 "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
                 "gist": _fmt("It’s strength against strength: {X} for " + oname + ", {Y} at " + dname + ".", **words),
-                "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
                 "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(lo, 4), "usual": round(o["v"], 4),
                           "league": round(lo, 4), "direction": "above" if side == "offense" else "below",
                           "rule": "held if tonight's figure lands on the predicted side of the league average; otherwise didn't happen"},
@@ -472,9 +477,10 @@ def _goalie_history() -> "object | None":
         return None
 
 
-def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, places: dict) -> list[dict]:
-    """A goalie (his team's busiest this season) whose record against tonight's opponent is far from his usual.
-    `hist` holds only starts before the game (see `call_extras`)."""
+def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, places: dict, likely: dict | None = None) -> list[dict]:
+    """A goalie (the likely starter, else his team's busiest this season) whose record against tonight's opponent is
+    far from his usual. `hist` holds only starts before the game (see `call_extras`); `likely` is starters.upcoming's
+    entry for the game."""
     if hist is None:
         return []
     import polars as pl
@@ -483,7 +489,8 @@ def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, pla
         roster = goalies_site.get("teams", {}).get(t) or []
         if not roster:
             continue
-        g = max(roster, key=lambda x: ((x.get("season") or {}).get("starts", 0), (x.get("blend") or {}).get("starts", 0)))
+        first = ((likely or {}).get(t) or [(None, 0)])[0][0]
+        g = next((x for x in roster if x["id"] == first), None) or max(roster, key=lambda x: ((x.get("season") or {}).get("starts", 0), (x.get("blend") or {}).get("starts", 0)))
         mine = hist.filter(pl.col("goalie_id") == g["id"])
         if mine.is_empty():
             continue
@@ -560,6 +567,9 @@ EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, 
 EDGE_BODIES = ["{top} are {wt} for {name}, at the {hi} end; {bot} are {wb}, at the {lo} end. Expect that gap to show.",
                "On {name}, {topc} is {wt} and {botc} is {wb}. That’s about as far apart as two teams get."]
 EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
+# A filler edge (the widest gap, but not a hot one) is told plainly: the two teams are not at opposite ends of anything.
+EDGE_MILD_HEADS = ["{topp} edge in {name}", "Where {top} have the edge: {name}"]
+EDGE_MILD_BODY = "{top} are {wt} for {name}, and {bot} are {wb}. It’s the widest gap between these two."
 
 
 def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
@@ -593,6 +603,7 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
     k = max(keys, key=gap)
     name, lo, hi = EDGE[k][:3]
     a, h = fp[away]["dims"][k]["blend"], fp[home]["dims"][k]["blend"]
+    hot = gap(k) >= EDGE_GAP and max(a["pct"], h["pct"]) >= 100 - EDGE_END and min(a["pct"], h["pct"]) <= EDGE_END
     top, bot = (away, home) if a["pct"] >= h["pct"] else (home, away)
     rt, rb = (a, h) if top == away else (h, a)
     tw, bw = team_words(top, places, "top"), team_words(bot, places, "bot")
@@ -600,12 +611,12 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
          "wt": standing(rt["rank"]), "wb": standing(rb["rank"])}
     return {
         "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
-        "head": _fmt(_pick(EDGE_HEADS[k], gid, k), **w),
-        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body"), **w),
+        "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
+        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body") if hot else EDGE_MILD_BODY, **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
-        "gist": _fmt("{top} and {bot} sit at opposite ends for " + name + ".", **w),
+        "gist": _fmt(("{top} and {bot} sit at opposite ends for {name}." if hot else "{top} have the edge over {bot} on {name}."), **w),
         "call": _fmt(EDGE_CALL[k], **w),
-        "cite": f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season",
+        "cite": f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}",
         "check": edge_check(k, top, bot, fp),
     }
 
@@ -615,7 +626,7 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     bar is the faster (or slower) of the two teams' usual, not their average: two fast teams playing a fast game is the
     obvious read, so the call says this one runs faster than either usually does."""
     out = []
-    cite = f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season"
+    cite = f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}"
     a, h = fp[away]["dims"]["pace"]["blend"], fp[home]["dims"]["pace"]["blend"]
     w = {**team_words(away, places, "A"), **team_words(home, places, "H")}
     for kind, both, direction in (("fast", a["pct"] >= BOTH and h["pct"] >= BOTH, "above"), ("slow", a["pct"] <= 100 - BOTH and h["pct"] <= 100 - BOTH, "below")):
@@ -666,7 +677,7 @@ def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, e
     mc = matchup_claim(gid, away, home, lines, places, extra.get("pts"), (extra.get("coaches") or {}).get(home))
     if mc:
         cands.append(mc)
-    cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places)
+    cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places, extra.get("likely"))
     cands += clash_claims(gid, away, home, fp, places)
     cands += tempo_claims(gid, away, home, fp, places)
     ec = edge_claim(gid, away, home, fp, places, set(), hot_only=True)
@@ -733,20 +744,25 @@ def call_extras(site: dict, before: str) -> dict:
             "pts": _points(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
 
 
-def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None, **extra) -> dict:
-    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number."""
+def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
+             likely: dict | None = None, **extra) -> dict:
+    """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
+    `likely` is each team's likely starting goalies (starters.upcoming); only their order is saved."""
     away, home = g["away"], g["home"]
     fp = site["fingerprints"]["teams"]
-    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, call_extras(site, g["start"]))
+    if likely is None:
+        likely = _likely([g], g["date"]).get(g["id"]) or {}
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, {**call_extras(site, g["start"]), "likely": likely})
     out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
-           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"]))}
+           "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),
+           "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)}}
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
-        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"])
+        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out
@@ -760,6 +776,16 @@ def write_index(out_dir) -> int:
                       "rebuilt": bool(s.get("rebuilt"))})
     (out_dir / "index.json").write_text(json.dumps(index, separators=(",", ":")))
     return len(index)
+
+
+def _likely(games: list[dict], before: str | None = None) -> dict[int, dict]:
+    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them."""
+    try:
+        from pipeline.metrics import starters
+        return starters.upcoming(games, before=before)
+    except Exception as e:
+        print(f"likely starters unavailable: {e!r}")
+        return {}
 
 
 def _chances(games: list[dict]) -> dict[int, dict]:
@@ -793,9 +819,9 @@ def run(now: datetime | None = None) -> dict:
             continue
         if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
             todo.append(g)
-    chances = _chances(todo)
+    chances, likely = _chances(todo), _likely(todo)
     for g in todo:
-        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]))
+        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]), likely.get(g["id"]) or {})
         (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
         written += 1
     return {"written": written, "frozen": frozen, "indexed": write_index(out_dir)}

@@ -16,6 +16,7 @@ from datetime import date
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, REGULAR, SITE_DATA, TABLES
+from pipeline.ingest import history
 from pipeline.metrics import adjust
 
 HISTORY = 4  # seasons of team history to describe (we hold full tables from 2022-23)
@@ -70,6 +71,11 @@ def _poss(t: dict) -> str:
     if t["place"].startswith("NY "):
         return f"the {_nick(t)}\u2019"
     return f"{t['place']}'s"
+
+
+def _for(t: dict) -> str:
+    """"for Columbus", but "for the Rangers" for the two New York clubs."""
+    return _the(t) if t["place"].startswith("NY ") else t["place"]
 
 
 def _in(t: dict) -> str:
@@ -245,17 +251,24 @@ def _run_streak(recent: list[dict]) -> tuple[int, bool]:
 # Voice (user, 2026-10-10: the first drafts read "stiff"): written the way a fan would tell a friend about a team.
 # Lead with a verdict that ties the past to the present, then whether the play backs up the record, then how they
 # play, then special teams. Vary the openings; no two sentences start the same way.
-def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict]) -> dict:
+def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict], full: list[dict] | None = None) -> dict:
+    """`full` is the franchise's NHL history since 1997-98 (ingest/history.py); droughts and playoff runs are counted
+    over it when it is there, so a ten-year drought is not told as four."""
     X, nick = _the(t), _nick(t)
     key = (abbr,)
     past = sorted(hist, key=lambda h: h["season"])[-HISTORY:]
     last = past[-1] if past else None
     made = sum(1 for h in past if h["playoffs"])
-    dry = 0
-    for h in reversed(past):
+    longer = sorted(full, key=lambda h: h["season"]) if full and len(full) >= len(past) else past
+    dry = running = 0
+    for h in reversed(longer):
         if h["playoffs"]:
             break
         dry += 1
+    for h in reversed(longer):
+        if not h["playoffs"]:
+            break
+        running += 1
     gp, x = t["gp"], xg.get(abbr)
     pts_pct = t["pts"] / (2 * gp) if gp else 0.5
     rec = "good" if pts_pct >= 0.6 else "bad" if pts_pct < 0.45 else "even"
@@ -286,7 +299,7 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
     elif made == len(past) and past:
         hook = {"good": _pick([f"Same old {nick}: {record}, and in the mix again.", f"{_cap(X)} are {record}, which is what we've come to expect."], *key),
                 "even": f"{_cap(X)}, playoff regulars, are {record} so far.",
-                "bad": f"{_cap(X)} have made the playoffs {_num(len(past))} years running, but they're {record} this time."}[rec]
+                "bad": f"{_cap(X)} have made the playoffs {_num(max(running, len(past)))} years running, but they're {record} this time."}[rec]
     else:
         hook = f"{_cap(X)} are {record} so far."
     if run >= 3 and gp:
@@ -388,7 +401,7 @@ def _role(p: dict, teams: dict) -> str | None:
     if not bits:
         return None
     if not line:  # no settled line yet: say what he is first
-        bits.insert(0, f"is a {POS_NOUN.get(p['pos'], 'player')} for {teams.get(p['team'], {'place': p['team']})['place']} who")
+        bits.insert(0, f"is a {POS_NOUN.get(p['pos'], 'player')} for {_for(teams.get(p['team'], {'place': p['team']}))} who")
         s = "He " + bits[0] + " " + _and(bits[1:])
     else:
         s = "He " + _and(bits)
@@ -467,14 +480,14 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     # 2. Role, in one sentence (it becomes the opener if there was no hook).
     role = _role(p, teams)
     if out[0] is None:
-        out = [role.replace("He ", f"{last} ", 1) if role else f"{last} is a {POS_NOUN.get(p['pos'], 'player')} for {team['place']}."]
+        out = [role.replace("He ", f"{last} ", 1) if role else f"{last} is a {POS_NOUN.get(p['pos'], 'player')} for {_for(team)}."]
     elif role:
         out.append(role)
 
     # 3. What sets him apart.
     sk = _skills(p)
     if sk:
-        out.append(_pick(["What sets him apart: he {s}.", "At his best, he {s}.", "His calling card? He {s}."], *key, "sk").format(s=_and(sk)))
+        out.append(_pick(["What sets him apart: he {s}.", "At his best, he {s}.", "His calling card? He {s}.", "Where he shines: he {s}.", "Watch for it: he {s}."], *key, "sk").format(s=_and(sk)))
 
     # 4. Track record.
     if full:
@@ -631,7 +644,7 @@ def run(today: str | None = None) -> dict:
         if not g["final"] and g["date"] >= today:
             for t, o in ((g["home"], g["away"]), (g["away"], g["home"])):
                 nxt.setdefault(t, {"date": g["date"], "opp": o, "id": g["id"], "home": t == g["home"]})
-    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts())
+    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts(), history.franchise_history(a))
                 for a in teams if a in fp}
 
     careers = _careers()

@@ -303,7 +303,7 @@ def explain(m: LogisticRegression, row: dict) -> list[dict]:
     Steps are taken in a fixed order (home ice, chances, who has been playing, rest, then the change in tonight's
     lineup if the row has one), so they add up to the final figure: the morning figure is the sum before the
     lineup step."""
-    names = {"home": "Home ice", "xgd": "Recent chances", "roster": "Who's been playing", "b2b": "Back-to-back",
+    names = {"home": "Home ice", "xgd": "Recent chances", "roster": "Who’s been playing", "b2b": "Back-to-back",
              "lineup": "Tonight's lineup"}
     coef = dict(zip(FEATURES, m.coef_[0]))
     roster = row.get("roster") or 0.0

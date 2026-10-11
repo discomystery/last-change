@@ -30,10 +30,12 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
+from pipeline.export import wording
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 PERIODS = {1: "first", 2: "second", 3: "third"}
+LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
 
 
@@ -88,7 +90,8 @@ def book() -> tuple[pl.DataFrame, pl.DataFrame, dict[int, str]]:
                        pts=pl.col("g") + pl.col("a1") + pl.col("a2"))
          .drop("home", "away", "home_id").sort("date", "game_id"))
     N = pl.concat(names).sort("game_id").group_by("player_id").agg(pl.col("first").last(), pl.col("last").last())
-    return G, P, {r["player_id"]: f"{r['first']} {r['last']}" for r in N.iter_rows(named=True)}
+    # two teammates with the same name (Vancouver's Elias Petterssons) get their numbers
+    return G, P, {r["player_id"]: f"{r['first']} {r['last']}" for r in N.iter_rows(named=True)} | wording.number_clashes(CURRENT_SEASON, wording.full)
 
 
 def results(G: pl.DataFrame, team: str, season: int) -> list[dict]:
@@ -152,12 +155,20 @@ class Words:
 
 # --- preview -------------------------------------------------------------------------------------------------------
 
+def _short(pid: int, P: pl.DataFrame, N: dict[int, str], season: int) -> str:
+    """His last name, or his full name when a teammate this season shares it (the Tkachuks, the two Elias Petterssons)."""
+    surname = lambda p: N.get(p, "").split(" (#")[0].split(" ", 1)[-1]
+    teams = P.filter((pl.col("season") == season) & (pl.col("player_id") == pid))["team"].unique().to_list()
+    mates = P.filter((pl.col("season") == season) & pl.col("team").is_in(teams) & (pl.col("player_id") != pid))["player_id"].unique().to_list()
+    return N.get(pid, "") if any(surname(m) == surname(pid) for m in mates) else surname(pid)
+
+
 def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
     rows = P.filter(pl.col("season") == season).group_by("player_id").agg(pl.col("team").last())
     return dict(zip(rows["player_id"], rows["team"]))
 
 
-def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON) -> dict:
+def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
     """Everything the preview story can say, from games before `before` (a date)."""
     G, P, N = book()
     G, P = G.filter(pl.col("date") < before[:10]), P.filter(pl.col("date") < before[:10])
@@ -218,7 +229,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         cands.sort(key=lambda c: -c["score"])
         items += cands[:1]
         if cands and cands[0].get("streak", 0) >= 7:
-            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{N[cands[0]['pid']].split(' ', 1)[-1]}’s favourite opponent"))
+            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{_short(cands[0]['pid'], P, N, season)}’s favourite opponent"))
         # old teams: the club he played for before this one
         olds = []
         for pid, g in mine.sort("date").group_by("player_id", maintain_order=True):
@@ -236,7 +247,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         olds.sort(reverse=True)
         if olds:
             n_old, pid, first = olds[0]
-            lastname = N[pid].split(" ", 1)[-1]
+            lastname = _short(pid, P, N, season)
             if first and n_old >= 40:
                 text = f"{N[pid]} faces {W.place(o)} for the first time since leaving."
                 where = W.place(o)
@@ -262,7 +273,28 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                         when = "latest game" if missed == 1 else f"last {num(missed)} games"
                         items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
                                       "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
+    item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
+    if item:
+        items.append(item)
     return out
+
+
+def _goalie_on_the_road(away: str, home: str, before: str, W: Words, N: dict[int, str], likely: list | None) -> dict | None:
+    """The visitors' likely starting goalie (pipeline/metrics/starters.py, when it gives him LIKELY or better) and his
+    record on tonight's ice, when it makes a story: never won there, a long winless run there, or a run of wins."""
+    from pipeline.metrics import venues
+    if not likely or likely[0][1] < LIKELY:
+        return None
+    pid = likely[0][0]
+    if not N.get(pid):
+        return None
+    try:
+        where = f"on {W.poss(home)} ice" if W.places[home].startswith("NY ") else f"in {W.place(home)}"
+        story = venues.storyline(pid, N[pid], home, where, before)
+    except Exception as e:  # no saved boxscores or career files: no goalie storyline
+        print(f"goalie records unavailable: {e!r}")
+        return None
+    return {"tag": "In net", "pid": pid, **story} if story else None
 
 
 def _still_out(notes: list[str], team: str, N: dict[int, str], season: int) -> list[dict]:
@@ -298,10 +330,10 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
 
 
 def preview_story(gid: int, away: str, home: str, start: str, places: dict, claims: list[dict],
-                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON) -> dict:
+                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
     """The story for one preview, from data before the game and the calls already chosen for it."""
     W = Words(places)
-    facts = preview_facts(away, home, start, W, season)
+    facts = preview_facts(away, home, start, W, season, likely)
     _, _, N = book()
     sents = []
     # the last meeting(s)
@@ -433,7 +465,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     ws, ls = r["score"][winner], r["score"][loser]
     end = r.get("end", "REG")
     side = lambda g: home if g["home"] else away
-    last = lambda pid: N.get(pid, "").split(" ", 1)[-1]
+    last = lambda pid: _short(pid, P, N, season)
     said: set[int] = set()
 
     def name(pid: int) -> str:
@@ -653,7 +685,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         n = len(held)
         text = (("The preview’s call held." if h else "The preview’s call didn’t hold.") if n == 1 else
                 ("Both of the preview’s calls held." if n == 2 else f"All {num(n)} of the preview’s calls held.") if h == n else
-                f"{_cap(num(h))} of the preview’s {num(n)} calls held." if h else f"None of the preview’s {num(n)} calls held.")
+                f"{_cap(num(h))} of the preview’s {num(n)} calls held." if h else ("Neither of the preview’s calls held." if n == 2 else f"None of the preview’s {num(n)} calls held."))
         items.append({"tag": "The preview", "text": text, "score": 20})
     items.sort(key=lambda i: -i["score"])
     picked, per = [], {}
