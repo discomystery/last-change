@@ -139,6 +139,13 @@ def box_extras(season: int) -> dict[tuple[int, int], dict]:
     return dict(out)
 
 
+def _signed(x: float) -> str:
+    """+0.4, −1.3, and +0.0 rather than "-0.0" for a small negative that rounds away."""
+    out = f"{x:+.1f}"
+    return "+0.0" if out == "-0.0" else out
+
+
+NUM_WORDS = {1: "one", 2: "two", 3: "three"}
 RARE_GOAL = 0.2  # a goal counts as a good night only for a player who scores in fewer than one game in five
 ROUGH_SHARE, ROUGH_XGA = 0.3, 0.8  # no points while the other team had 70%+ of the 5-on-5 chances, and plenty of them
 
@@ -153,7 +160,7 @@ def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> 
     bits = []
     if goals:
         kinds = [(box.get("sh", 0), "shorthanded"), (box.get("pp", 0), "on the power play"), (box.get("ev", 0), "at even strength")]
-        split = [("both" if n == 2 else "all") + f" {w}" if n == goals else f"{n} {w}" if n > 1 else f"one {w}" for n, w in kinds if n]
+        split = [("both" if n == 2 else "all") + f" {w}" if n == goals else f"{NUM_WORDS.get(n, n)} {w}" for n, w in kinds if n]
         if goals == 1:
             bits.append("a shorthanded goal" if box.get("sh") else "a power-play goal" if box.get("pp") else "a goal")
         else:
@@ -203,11 +210,13 @@ def binom_median(n: int, p: float) -> int:
     return k
 
 
-def goalie_scoresheet(sa: int, ga: int, gsax: float, sec: float, started: bool) -> tuple[str | None, str | None]:
+def goalie_scoresheet(sa: int, ga: int, gsax: float, sec: float, started: bool,
+                      relieved: bool = False) -> tuple[str | None, str | None]:
     """huge: a shutout on 25+ shots or 3+ goals saved above expected. big: any other shutout of 20+ minutes or 1.5+
-    saved above expected. rough: 2+ goals worse than expected, or pulled early after three or more."""
-    why = f"{sa - ga} saves on {sa} shots, {gsax:+.1f} goals saved above expected".replace("-", "−")
-    pulled = started and sec < 2400 and ga >= 3
+    saved above expected. rough: 2+ goals worse than expected, or pulled early after three or more. Pulled needs a
+    teammate goalie who then played (relieved), so an empty net for an extra attacker never counts."""
+    why = f"{sa - ga} saves on {sa} shots, {_signed(gsax)} goals saved above expected".replace("-", "−")
+    pulled = started and relieved and sec < 2400 and ga >= 3
     if (ga == 0 and sa >= 25) or gsax >= 3:
         return "huge", ("A shutout, " if ga == 0 else "") + why
     if (ga == 0 and sec >= 1200 and sa >= 10) or gsax >= 1.5:
@@ -228,6 +237,8 @@ def goalie_cards(season: int, game_ids: set[int]):
     cols = ["goalie_id", "date_s", "sec", "sa", "ga", "xga", "sa_high", "ga_high", "sa_low", "ga_low", "sa_medium", "ga_medium", "started"]
     hist = pl.concat([last.select(cols), now.select(cols)])
     by = {gid: g for (gid,), g in hist.group_by("goalie_id")}
+    # Teams whose starter was replaced: a goalie who did not start played some of that game.
+    relieved = {(g, t) for g, t, st, sec in now.select("game_id", "team_id", "started", "sec").iter_rows() if not st and sec > 0}
     for r in now.filter(pl.col("game_id").is_in(list(game_ids))).iter_rows(named=True):
         if r["sec"] < G_MIN_SEC and r["sa"] < G_MIN_SHOTS:
             continue
@@ -242,9 +253,9 @@ def goalie_cards(season: int, game_ids: set[int]):
         if r["sa"] < G_MIN_SHOTS:
             job |= {"verdict": "na", "text": f"Faced only {r['sa']} shots, too few to judge."}
         else:
-            job |= {"verdict": grade(gsax, usual, 0.0), "tonight": f"{gsax:+.1f}", "usual": f"{usual:+.1f}", "bench": "+0.0", "bench_is": "Average",
-                    "text": f"Allowed {r['ga']} on shots worth {r['xga']:.1f} expected goals: {gsax:+.1f} saved above expected. "
-                            f"Typical start for him: {usual:+.1f}. An average goalie: 0."}
+            job |= {"verdict": grade(gsax, usual, 0.0), "tonight": _signed(gsax), "usual": _signed(usual), "bench": "+0.0", "bench_is": "Average",
+                    "text": f"Allowed {r['ga']} on shots worth {r['xga']:.1f} expected goals: {_signed(gsax)} saved above expected. "
+                            f"Typical start for him: {_signed(usual)}. An average goalie: 0."}
         jobs.append(job)
         for key, n, a, pn, pa in (("high", r["sa_high"], r["ga_high"], before["sa_high"].sum(), before["ga_high"].sum()),
                                   ("routine", r["sa_low"] + r["sa_medium"], r["ga_low"] + r["ga_medium"],
@@ -252,14 +263,15 @@ def goalie_cards(season: int, game_ids: set[int]):
             p_usual = shrink(pn, 1 - pa / pn if pn else league[key], G_K[key], league[key])
             job = {"key": key, "label": G_LABEL[key], "why": "core", "pct": None, "unit": G_UNIT[key]}
             if n < 3:
-                job |= {"verdict": "na", "text": f"Faced only {n} {'shot' if n == 1 else 'shots'} like this."}
+                job |= {"verdict": "na", "text": (f"Faced only {n} {'shot' if n == 1 else 'shots'} like this." if n else "Faced no shots like this.")}
             else:
                 saves, typ_u, typ_a = n - a, binom_median(n, p_usual), binom_median(n, league[key])
                 job |= {"verdict": grade(saves, typ_u, typ_a), "tonight": f"{saves} of {n}", "usual": f"{typ_u} of {n}", "bench": str(typ_a), "bench_is": "Average",
                         "text": f"Saved {saves} of {n} {'dangerous' if key == 'high' else 'routine'} shots. Typical for him: {typ_u}. "
                                 f"Average goalie: {typ_a}. He usually stops {100 * p_usual:.0f}% of these."}
             jobs.append(job)
-        night, why = goalie_scoresheet(r["sa"], r["ga"], gsax, r["sec"], r["started"])
+        night, why = goalie_scoresheet(r["sa"], r["ga"], gsax, r["sec"], r["started"],
+                                       (r["game_id"], r["team_id"]) in relieved)
         summ = summary([(j["key"], j["verdict"]) for j in jobs])
         yield r["game_id"], {"id": r["goalie_id"], "team_id": r["team_id"], "pos": "G", "toi_sec": round(r["sec"]),
                              "toi": clock(r["sec"]), "toi5": clock(r["sec"]), "toi_pp": "", "toi_pk": "",
@@ -476,7 +488,7 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
         if role or (pct >= STRONG and experienced):
             job = {"key": "faceoffs", "label": LABEL["faceoffs"], "why": "strength" if pct >= STRONG and experienced else "role", "pct": round(pct) if experienced else None, "vs": peer}
             if draws < MIN_DRAWS:
-                job |= {"verdict": "na", "text": f"Took only {draws} {'draw' if draws == 1 else 'draws'}, too few to judge."}
+                job |= {"verdict": "na", "text": (f"Took only {draws} {'draw' if draws == 1 else 'draws'}, too few to judge." if draws else "Took no draws.")}
             else:
                 bench = max(avg, 50.0)
                 job |= {"verdict": grade(100 * won / draws, usual, bench), "tonight": f"{won} of {draws}", "usual": f"{usual:.0f}%", "bench": f"{bench:.0f}%", "bench_is": "Even",

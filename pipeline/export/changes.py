@@ -18,6 +18,7 @@ from datetime import date as Date, timedelta
 import polars as pl
 
 from pipeline.config import REGULAR, TABLES
+from pipeline.export import wording
 from pipeline.metrics import patterns
 
 STATUS_WORDS = {
@@ -160,6 +161,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         if f.exists():
             for r in pl.read_parquet(f).select("player_id", "first", "last").unique("player_id").iter_rows(named=True):
                 names[r["player_id"]] = _name(r)
+    names |= wording.number_clashes(season, wording.initials)  # "A. Johansson (#47)" when two teammates match
     moves = pl.read_parquet(moves_path) if moves_path.exists() else None
     since = (Date.fromisoformat(day) - timedelta(days=NEW_DAYS)).isoformat()
 

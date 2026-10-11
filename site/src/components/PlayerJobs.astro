@@ -5,6 +5,7 @@ import Gloss from './Gloss.astro';
 // written by pipeline/export/jobs.py from games before this one only, so a card never changes after the game.
 import Section from './Section.astro';
 import PLink from './PLink.astro';
+import { peerOf } from '../lib/players';
 
 type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
@@ -30,7 +31,7 @@ const whyTip = (j: Job) => {
   if (j.key === 'pk') return `He has averaged ${j.per_game} a game killing penalties coming into this game.`;
   if (j.why === 'role') return 'He takes plenty of faceoffs for his team.';
   const base = j.key === 'offImpact' || j.key === 'defImpact' ? 'over the two seasons before this one, after allowing for linemates and opponents' : 'going into this game, this season blended with last';
-  return `Better than ${j.pct}% of ${peer[j.vs ?? 'F']} ${base}.`;
+  return `Better than ${j.pct}% of ${peerOf(j.key, j.vs ?? 'F')} ${base}.`;
 };
 // When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.
 const nightNote = (c: Card) => {

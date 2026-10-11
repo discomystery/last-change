@@ -9,6 +9,9 @@ import GameTrail from '../../components/GameTrail.astro';
 import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
 import GameSwing from '../../components/GameSwing.astro';
+import GameFlow from '../../components/GameFlow.astro';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
 import Gloss from '../../components/Gloss.astro';
@@ -146,8 +149,10 @@ const hasGoalieCards = !!jobs?.players.some((c) => c.pos === 'G');
 const scoreFiles = import.meta.glob<{ default: { game_id: number; players: unknown[] } }>('../../../public/data/scores/2*.json', { eager: true });
 const hasImpact = !!Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default.players.length;
 const story = r.story;
+// How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
+const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ['preview', 'The preview'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it went']] : []), ['preview', 'The preview'],
   ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
@@ -207,6 +212,12 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
       </div>
     )}
   </section>
+
+  {hasFlow && (
+    <Section id="flow" title="How it unfolded" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
+      <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
+    </Section>
+  )}
 
   <Section id="preview" title="What the preview said" placeholder={false} takeaway={takeaway}>
     {rv && order.map((a) => (

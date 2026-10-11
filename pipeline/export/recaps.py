@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
-from pipeline.export import previews
+from pipeline.export import previews, wording
 from pipeline.export import surprises as surprise_rules
 from pipeline.metrics import adjust, goalies, replays, team_style
 
@@ -60,6 +60,7 @@ class Season:
         players = pl.read_parquet(d / "players.parquet")
         self.pos = {(r["game_id"], r["player_id"]): r["pos"] for r in players.select("game_id", "player_id", "pos").iter_rows(named=True)}
         self.name = {r["player_id"]: f"{r['first'][0]}. {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
+        self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
@@ -114,6 +115,14 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if league is not None:
             out["league"] = fmt(league)
         return out
+    if m == "rest":
+        r = S.rows.get((gid, tid))
+        if r is None or r["xgf_adj"] + r["xga_adj"] <= 0:
+            return {"verdict": "na", "happened": "The numbers for this game aren’t available."}
+        v = r["xgf_adj"] / (r["xgf_adj"] + r["xga_adj"])
+        return {"verdict": grade(v, base, None, "above"),
+                "happened": f"{team} had {100 * v:.1f}% of the 5-on-5 expected goals (adjusted for score and venue), against their usual {100 * base:.1f}%.",
+                "usual": f"{100 * base:.1f}%", "tonight": f"{100 * v:.1f}%", "league": "50.0%"}
     g = S.games[gid]
     rows = [S.rows.get((gid, g["away_id"])), S.rows.get((gid, g["home_id"]))]
     if any(r is None for r in rows):
@@ -302,7 +311,7 @@ def replay_block(row: dict, away: str, home: str) -> dict:
 
 def run(season: int = CURRENT_SEASON) -> dict:
     teams = json.loads((SITE_DATA / "teams.json").read_text())
-    places = {t["abbr"]: t["place"] for t in teams}
+    places = wording.places({t["abbr"]: t["place"] for t in teams})  # for sentences: "the Rangers", not "NY Rangers"
     fp = json.loads((SITE_DATA / "fingerprints.json").read_text())["teams"]
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     usual_lines = {t: [u["ids"] for u in v["units"] if u["label"][0] == "L"] for t, v in lines.items()}
@@ -345,6 +354,10 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
         surp, beyond = surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
+        for c in calls:  # heads and bodies are the frozen preview's own words
+            c["happened"] = wording.tidy(c.get("happened"))
+        for x in surp + list(beyond.values()):
+            x["head"], x["body"] = wording.tidy(x.get("head")), wording.tidy(x.get("body"))
         for c in calls:
             if c["id"] in beyond:
                 c["beyond"] = beyond[c["id"]]["body"]

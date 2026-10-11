@@ -11,11 +11,16 @@ import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
+import PlayerLoad from '../../components/PlayerLoad.astro';
+import PlayerReport from '../../components/PlayerReport.astro';
+import { cardsFor } from '../../lib/reportCards';
+import Intro from '../../components/Intro.astro';
+import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
 import { teamColour } from '../../lib/teams';
-import { TRAITS, EDGE, GROUPS, groupWord, peerWord, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
+import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import '../../styles/blocks.css';
 
@@ -31,6 +36,8 @@ const known = new Set(index.map((x) => x.id));
 const rankHref = (key: string, vs?: string) => `${base}players/rankings/?t=${key}&g=${vs ?? p.group}&p=${p.id}`;
 const href = (id: number) => (known.has(id) ? `${base}player/${id}/` : undefined);
 const team = teams.find((t) => t.abbr === p.team);
+const intro = playerIntro(p.id);
+const introNext = nextGame(intro?.game, base);
 const modes: [Mode, string][] = [['blend', 'this season and last'], ['season', 'this season']];
 // A rank tag is glued to the label's last word so it never drops onto a line of its own.
 const headOf = (label: string) => label.slice(0, label.lastIndexOf(' ') + 1);
@@ -90,7 +97,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -119,6 +126,7 @@ const statRow = (x: any) => (isG ? null : x);
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} />
 
     {!isG && role && (
@@ -188,6 +196,9 @@ const statRow = (x: any) => (isG ? null : x);
           )}
         </Section>
 
+        <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
+        <PlayerReport p={p} place={team?.place ?? p.team} />
+
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
@@ -233,15 +244,15 @@ const statRow = (x: any) => (isG ? null : x);
                   const e = s.traits[k];
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season.ok }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e[m].vs)} data-tip={rankTip(e[m].rank, e[m].of, t.label, peerWord[e[m].vs ?? s.group])}>{tag}</a>; })}</span></span></span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const tag = rankTag(e[m].rank, e[m].ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e[m].vs)} data-tip={rankTip(e[m].rank, e[m].of, t.label, peerOf(k, e[m].vs ?? s.group))}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${e.season.pct};--clo:${e.season.lo};--chi:${e.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
                         <p class={`fpc-line m-${m}`}>
                           {e[m].raw === undefined
-                            ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} /></>
-                            : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerWord[e[m].vs ?? s.group])} class='a-adj' />
-                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerWord[e[m].vs ?? s.group])} class='a-raw' /></>}
+                            ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} /></>
+                            : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} class='a-adj' />
+                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerOf(k, e[m].vs ?? s.group))} class='a-raw' /></>}
                         </p>
                       ))}
                     </li>
@@ -422,6 +433,14 @@ const statRow = (x: any) => (isG ? null : x);
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
+  /* The intro is the name card's second half: joined below the stats, the story on the left and the next game on the right. */
+  .phead:has(+ :global(.pstory)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  :global(.pstory) { max-width: none !important; margin: -1px 0 0 !important; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; }
+  :global(.pstory:not(.with-next)) { grid-template-columns: minmax(0, 1fr); }
+  :global(.pstory .intro-next) { margin-top: 0 !important; background: var(--ice) !important; }
+  @media (max-width: 719px) {
+    :global(.pstory) { grid-template-columns: 1fr !important; gap: 14px; padding: 16px; }
+  }
   .rec a { color: inherit; }
   .pstats { border-collapse: collapse; font: 400 14px var(--ui); }
   .pstats th:first-child { padding-left: 0; }

@@ -35,7 +35,7 @@ type Claim = { id: string; kind: string; head: string; body: string; call?: stri
 // still be shown unchanged after the game. Previews for games played before snapshots began are made from the data before
 // each game and shown exactly like the rest.
 type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]>; projected?: Record<string, { id: number; from: 'nhl' | 'model' }> };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
@@ -113,8 +113,16 @@ const gSay: Record<string, (g: GMode) => string> = {
   gaps: (g) => `a typical wait of ${g.gap} seconds between shots`,
   steady: (g) => `a quality start ${g.qs}% of the time`,
 };
-// Most starts this season first, so each menu opens on the goalie who has played most lately.
-const goaliesOf = (a: string) => [...(G[a] ?? [])].sort((x, y) => y.season.starts - x.season.starts || y.blend.starts - x.blend.starts);
+// The likely starter first (saved with the preview, from who has started lately), then most starts this season.
+const likelyRank = (a: string, id: number) => { const i = snap.starters?.[a]?.indexOf(id) ?? -1; return i < 0 ? 99 : i; };
+const goaliesOf = (a: string) => [...(G[a] ?? [])].sort((x, y) => likelyRank(a, x.id) - likelyRank(a, y.id) || y.season.starts - x.season.starts || y.blend.starts - x.blend.starts);
+const guessed = [away, home].some((t) => (snap.starters?.[t]?.length ?? 0) > 0);
+// The goalie each team is expected to start: NHL.com's projection once its game-day preview is up, else our own guess when it is fairly sure.
+const projected = [away, home].flatMap((t) => {
+  const p = snap.projected?.[t];
+  const g = p && (G[t] ?? []).find((x) => x.id === p.id);
+  return p && g ? [{ team: t, name: g.name, from: p.from }] : [];
+});
 
 // Goal sources
 type Src = { n: number; share: number | null };
@@ -340,6 +348,14 @@ const _ = ordinal;
       <span>against</span>
       <select id="g-home" aria-label={`${place(home)} goalie`}>{goaliesOf(home).map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
     </div>
+    {projected.length > 0 && (
+      <p class="projected">
+        <span class="lbl">Projected starters</span>
+        {projected.map((p, i) => (
+          <span class={`t-${side(p.team)}`}>{i > 0 && ' · '}<i></i><b>{p.name}</b> <span class="term" tabindex="0" data-tip={p.from === 'nhl' ? 'From NHL.com’s game-day preview. Its projected starter has started about 9 times in 10 this season.' : 'Our guess from who has started lately and whether it is the second night of a back-to-back. Right about 3 times in 4 when we are this sure; NHL.com’s projection replaces it once its game-day preview is up.'}>{p.from === 'nhl' ? 'NHL.com' : 'likely'}</span></span>
+        ))}
+      </p>
+    )}
     {gModes.map(([mode, words]) => (
       <div class={`gmode m-${mode}`}>
         <div class="g3">
@@ -400,7 +416,7 @@ const _ = ordinal;
         </details>
       </div>
     ))}
-    <p class="note">The menus list every goalie on each team, busiest this season first; the site does not yet know who will start. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
+    <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start: NHL.com’s projected starter once its game-day preview is up (right about 9 times in 10 this season), otherwise our own guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons).' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
   </Section>
 
   <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
@@ -477,6 +493,11 @@ const _ = ordinal;
   .tpill { display: inline-block; background: color-mix(in oklab, var(--team) 16%, transparent); color: var(--ink); padding: 1px 9px; border-radius: 999px; font: 700 13px/1.6 var(--ui); text-decoration: none; margin-right: 2px; }
   .tpill:hover { background: color-mix(in oklab, var(--team) 28%, transparent); }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
+  .projected .lbl { font: 700 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin-right: 10px; }
+  .projected i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 6px; }
+  .projected .term { color: var(--ink-2); }
+  .projected > span:not(.lbl) { white-space: nowrap; }
   .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin: 14px 0 12px; }

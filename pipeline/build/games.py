@@ -23,6 +23,16 @@ PLAYER_FIELDS = {
 }
 
 
+def _goalie_in_net(code: str | None, home: bool, from_shifts: int | None, last: int | None, faced: int | None) -> int | None:
+    """The goalie in one net at an event. Shift charts come first, but where they have no goalie and the play-by-play
+    situation code (away goalie, away skaters, home skaters, home goalie) says one was in net, the code wins: a gap in
+    the shift chart must never read as a pulled goalie, or every shot in it is rated as one at an empty net. The goalie
+    named on the shot, else the side's last goalie from the shifts, fills the gap."""
+    if from_shifts is not None or not code or len(code) != 4 or code[3 if home else 0] != "1":
+        return from_shifts
+    return faced or last
+
+
 def build_game(season: int, game: dict) -> dict:
     gid = game["game_id"]
     pbp, box = (nhl.read_raw(season, k, gid) for k in ("pbp", "box"))
@@ -61,6 +71,7 @@ def build_game(season: int, game: dict) -> dict:
                        "n_home": len(hs), "n_away": len(as_), "flag": not (3 <= len(hs) <= 6 and 3 <= len(as_) <= 6)})
 
     events, hs_, as_ = [], 0, 0
+    last_goalie = {True: None, False: None}  # each side's goalie at its last event, from the shifts
     for p in sorted(pbp["plays"], key=lambda x: x["sortOrder"]):
         pd, typ, d = p["periodDescriptor"], p["typeDescKey"], p.get("details") or {}
         if pd["periodType"] == "SO":
@@ -76,6 +87,9 @@ def build_game(season: int, game: dict) -> dict:
         away_on = sorted(s.player_id for s in on if not s.home and not s.goalie)
         hg = next((s.player_id for s in on if s.home and s.goalie), None)
         ag = next((s.player_id for s in on if not s.home and s.goalie), None)
+        hg, ag = (_goalie_in_net(p.get("situationCode"), home, g, last_goalie[home], d.get("goalieInNetId") if is_home is (not home) else None)
+                  for home, g in ((True, hg), (False, ag)))
+        last_goalie[True], last_goalie[False] = hg or last_goalie[True], ag or last_goalie[False]
         x, y = d.get("xCoord"), d.get("yCoord")
         side = p.get("homeTeamDefendingSide")
         flip = None if (x is None or is_home is None or side is None) else (side == "right") == is_home

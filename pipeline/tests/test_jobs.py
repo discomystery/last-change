@@ -114,7 +114,9 @@ def test_goalie_scoresheet():
     assert goalie_scoresheet(35, 1, 3.2, 3600, True)[0] == "huge"
     assert goalie_scoresheet(30, 2, 1.6, 3600, True)[0] == "big"
     assert goalie_scoresheet(30, 5, -2.4, 3600, True)[0] == "rough"
-    assert goalie_scoresheet(15, 4, -1.0, 1500, True)[0] == "rough"  # pulled early
+    assert goalie_scoresheet(15, 4, -1.0, 1500, True, relieved=True)[0] == "rough"  # pulled early
+    # A short night with no other goalie playing is an empty net for an extra attacker, not a pull.
+    assert goalie_scoresheet(15, 4, -1.0, 1500, True) == (None, None)
     assert goalie_scoresheet(28, 3, -0.3, 3600, True) == (None, None)
 
 
