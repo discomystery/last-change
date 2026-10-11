@@ -919,7 +919,9 @@ def _chances(games: list[dict]) -> dict[int, dict]:
         return {}
 
 
-def run(now: datetime | None = None) -> dict:
+def run(now: datetime | None = None, within: timedelta | None = None) -> dict:
+    """Write a snapshot for every game in the next DAYS_AHEAD days that hasn't started, or only those starting within
+    `within` (the quick game-night pass, which refreshes tonight's lineups and starters)."""
     now = now or datetime.now(timezone.utc)
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
     places = {t["abbr"]: t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())}
@@ -933,7 +935,7 @@ def run(now: datetime | None = None) -> dict:
         if start <= now:
             frozen += (out_dir / f"{g['id']}.json").exists()
             continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
-        if g["final"] or start > now + timedelta(days=DAYS_AHEAD):
+        if g["final"] or start > now + (within or timedelta(days=DAYS_AHEAD)):
             continue
         if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
             todo.append(g)

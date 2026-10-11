@@ -12,6 +12,7 @@ import json
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import units as U
 
 OUT = SITE_DATA / "flow"
@@ -100,7 +101,8 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
 def run(season: int = CURRENT_SEASON) -> dict:
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
-    ids = games["game_id"].to_list()
+    ids = [g for g in games["game_id"].to_list() if g not in pending.games(season)]  # unfinished shift charts wait
+    games = games.filter(pl.col("game_id").is_in(ids))
     ev = pl.read_parquet(d / "events.parquet").filter(pl.col("game_id").is_in(ids))
     xg = pl.read_parquet(d / "shots_xg_own.parquet").filter(pl.col("game_id").is_in(ids))
     st = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(ids))
