@@ -1,4 +1,4 @@
-from pipeline.export.flow import merge, power_plays
+from pipeline.export.flow import merge, power_plays, strength
 
 
 def test_shifts_join_within_a_period_but_not_across():
@@ -11,3 +11,12 @@ def test_power_plays_need_both_goalies_and_a_real_edge():
     # 100-220: home 5 on 4 away -> away team on the power play (side 0). 300-305 is a blip; 400 is an empty net.
     assert power_plays(codes, 3600) == [[0, 100, 220]]
     assert power_plays([(0, "1551"), (3500, "1451")], 3600) == [[1, 3500, 3600]]
+
+
+def test_strength():
+    # situation code: away goalie, away skaters, home skaters, home goalie
+    assert strength("1451", 1) == 1 and strength("1451", 0) == -1
+    assert strength("1541", 0) == 1 and strength("1541", 1) == -1
+    assert strength("1551", 1) == 0 and strength("1441", 0) == 0
+    assert strength("0651", 1) == 0  # away net empty
+    assert strength("1010", 0) == 0  # penalty shot

@@ -29,7 +29,7 @@ const base = import.meta.env.BASE_URL;
 
     <section id="league">
       <h2 id="slate-h">Around the league</h2>
-      <ul class="games slate" id="slate"></ul>
+      <ul class="games slate" id="slate">{Array.from({ length: 4 }, () => <li class="skel skel-row" aria-hidden="true"></li>)}</ul>
       <p class="more-link"><a href={`${base}games/`}>Every game, day by day →</a></p>
       <h2 id="results-h" hidden>Latest results</h2>
       <ul class="games slate" id="results"></ul>
