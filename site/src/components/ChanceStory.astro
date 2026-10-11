@@ -1,0 +1,179 @@
+---
+// The post-game reveal of our hidden pre-game win chance, told as a scroll story: a gauge stays pinned while short
+// notes scroll past, and each note moves the needle by what that input was worth. "Show every step at once" swaps
+// the story for the full list with the longer explanations (also what shows without scripts or with reduced motion).
+export type Beat = { key: string; label: string; short: string; long?: string; pts: number; before: number; end: number; sum?: boolean };
+interface Props { team: string; teamCls: string; other: string; otherCls: string; chance: number; outcome: string; beats: Beat[] }
+const { team, teamCls, other, otherCls, chance, outcome, beats } = Astro.props;
+// Small tracks in the full list run from 20% to 80% so a few points still show; the big gauge runs 0 to 100.
+const at = (v: number) => Math.max(0, Math.min(100, ((v - 20) / 60) * 100));
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+const steps = beats.filter((b) => !b.sum && b.key !== 'start');
+---
+<div class="cs" data-team={team} data-other={other}>
+  <div class="cs-head">
+    <p class="mini-h">Our win chance, kept hidden until the final</p>
+    <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
+  </div>
+
+  <div class="cs-story" hidden>
+    <div class="cs-pin">
+      <div class="cs-gauge">
+        <p class="cs-step" aria-live="polite"><span class="cs-label">{beats[0].label}</span></p>
+        <p class="cs-num"><span class="cs-val">50</span>%<small>for {team} to win</small></p>
+        <div class={`cs-track ${otherCls}`}>
+          <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
+          <i class="cs-mid"></i>
+          <i class="cs-ghost" style="left:50%"></i>
+          <i class="cs-needle" style="left:50%"></i>
+        </div>
+        <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
+      </div>
+    </div>
+    <ol class="cs-beats">
+      {beats.map((b, i) => (
+        <li class:list={['cs-beat', { last: i === beats.length - 1 }]} data-i={i} data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts} data-label={b.label}>
+          <div class="cs-card">
+            {!b.sum && b.key !== 'start' && <p class="cs-pts">{signed(b.pts)} {Math.abs(b.pts) === 1 ? 'point' : 'points'}</p>}
+            <p class="cs-title">{b.label}</p>
+            <p>{b.short}</p>
+            {i === beats.length - 1 && <p class="cs-out">{outcome}</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  </div>
+
+  <div class="cs-list card">
+    <p class="cs-num static"><span>{chance}%</span><small>for {team} to win, the morning of the game</small></p>
+    <p class="cs-out">{outcome}</p>
+    <ol class="steps">
+      {beats.map((b) => (
+        <li class:list={['step', { sum: b.sum, start: b.key === 'start' }]}>
+          <div class="st-l"><b>{b.label}</b>{(b.long ?? (b.sum || b.key === 'start' ? '' : b.short)) && <span>{b.long ?? b.short}</span>}</div>
+          <div class="st-t" aria-hidden="true">
+            <i class="mid"></i>
+            {b.pts !== 0 && !b.sum && <span class={`seg ${b.pts > 0 ? teamCls : otherCls}`} style={`left:${Math.min(at(b.before), at(b.end)).toFixed(1)}%;width:${Math.abs(at(b.end) - at(b.before)).toFixed(1)}%`}></span>}
+            <i class="dot" style={`left:${at(b.end).toFixed(1)}%`}></i>
+          </div>
+          <div class="st-n">{!b.sum && b.key !== 'start' && signed(b.pts)}<b>{Math.round(b.end)}%</b></div>
+        </li>
+      ))}
+    </ol>
+    <p class="note small">Worked out the morning of the game, from earlier games only. The preview could hint at it in words but never showed the number.</p>
+  </div>
+</div>
+
+<script is:inline>
+  (() => {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('.cs:not([data-ready])').forEach((cs) => {
+      cs.dataset.ready = '1';
+      const story = cs.querySelector('.cs-story'), list = cs.querySelector('.cs-list'), btn = cs.querySelector('.cs-toggle');
+      const val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill'), needle = cs.querySelector('.cs-needle');
+      const ghost = cs.querySelector('.cs-ghost'), label = cs.querySelector('.cs-label');
+      const beats = [...cs.querySelectorAll('.cs-beat')];
+      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); };
+      btn.hidden = false;
+      btn.addEventListener('click', () => mode(story.hidden));
+      mode(!reduce);
+      let shown = 50, raf = 0, current = -1;
+      const tween = (to) => {
+        cancelAnimationFrame(raf);
+        const from = shown, t0 = performance.now(), dur = reduce ? 0 : 600;
+        const step = (t) => {
+          const k = dur ? Math.min(1, (t - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 3);
+          shown = from + (to - from) * e;
+          val.textContent = Math.round(shown);
+          if (k < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      };
+      const show = (i) => {
+        if (i === current) return;
+        current = i;
+        const b = beats[i], end = +b.dataset.end, before = +b.dataset.before, pts = +b.dataset.pts;
+        beats.forEach((x, j) => x.classList.toggle('on', j === i));
+        fill.style.width = `${end}%`;
+        needle.style.left = `${end}%`;
+        ghost.style.left = `${before}%`;
+        ghost.classList.toggle('seen', pts !== 0);
+        label.textContent = b.dataset.label;
+        tween(end);
+      };
+      // The beat whose card crosses the middle of the screen is the one shown.
+      const io = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) show(+e.target.dataset.i); });
+      }, { rootMargin: '-50% 0px -50% 0px' });
+      beats.forEach((b) => io.observe(b));
+      show(0);
+    });
+  })();
+</script>
+
+<style>
+  .cs { margin-top: 22px; }
+  .cs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+  .cs-toggle { font: 500 13px var(--ui); color: var(--ink-2); background: var(--track); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .cs-toggle:hover { color: var(--ink); background: var(--rule); }
+  .cs .to-story, .cs.as-story .to-list { display: none; }
+  .cs.as-story .to-story { display: inline; }
+
+  /* The story: a gauge pinned near the top while the notes scroll past it. */
+  .cs-story { position: relative; margin: 10px auto 0; max-width: 760px; }
+  .cs-pin { position: sticky; top: calc(var(--bar-h, 34px) + 12px); z-index: 2; padding: 8px 0 14px; background: var(--ice); }
+  .cs-gauge { background: var(--sheet); border-radius: 18px; padding: 18px 22px 16px; box-shadow: 0 0 0 1px var(--rule); }
+  .cs-step { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 0 0 2px; }
+  .cs-num { display: flex; align-items: baseline; gap: 2px; margin: 0 0 14px; font: 700 64px/0.95 var(--display); font-variant-numeric: tabular-nums; }
+  .cs-num small { font: 600 15px var(--ui); color: var(--ink-2); margin-left: 12px; }
+  .cs-track { position: relative; height: 14px; border-radius: 999px; background: color-mix(in oklab, var(--team) 35%, var(--track)); }
+  .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cs-mid { position: absolute; left: 50%; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--sheet); }
+  .cs-ghost { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink-3); opacity: 0; transition: left 0.6s, opacity 0.3s; }
+  .cs-ghost.seen { opacity: 0.6; }
+  .cs-needle { position: absolute; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--sheet);
+    transition: left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cs-ends { display: flex; justify-content: space-between; margin-top: 10px; font: 600 13px var(--ui); }
+  .cs-ends i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin: 0 6px; }
+
+  .cs-beats { list-style: none; padding: 0; margin: 0; }
+  .cs-beat { min-height: 52vh; display: flex; align-items: center; justify-content: center; }
+  .cs-beat:first-child { min-height: 34vh; align-items: flex-start; }
+  .cs-beat.last { min-height: 46vh; }
+  .cs-card { max-width: 460px; width: 100%; background: var(--sheet); border-radius: 16px; padding: 16px 20px; box-shadow: 0 0 0 1px var(--rule);
+    font: 400 17px/1.5 var(--body); opacity: 0.35; transform: translateY(8px); transition: opacity 0.35s, transform 0.35s; }
+  .cs-beat.on .cs-card { opacity: 1; transform: none; }
+  .cs-title { font: 600 20px/1.2 var(--display); margin: 0 0 4px; }
+  .cs-pts { font: 700 12px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 0 0 2px; }
+  .cs-out { font: 600 20px/1.25 var(--display); margin: 10px 0 0; }
+
+  /* Every step at once. */
+  .cs-list { margin-top: 12px; }
+  .cs-num.static { margin-top: 0; }
+  .cs-list > .cs-out { margin: -4px 0 16px; }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .step { display: grid; grid-template-columns: minmax(0, 1fr) 180px 74px; grid-template-areas: 'l t n'; gap: 6px 16px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--rule); font: 400 14px/1.45 var(--ui); }
+  .step:first-child { border-top: 0; }
+  .st-l { grid-area: l; }
+  .st-l b { display: block; font-weight: 600; }
+  .st-l span { display: block; color: var(--ink-2); font-size: 13.5px; }
+  .st-n { grid-area: n; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .st-n b { color: var(--ink); font-weight: 600; margin-left: 10px; }
+  .st-t { grid-area: t; position: relative; height: 8px; background: var(--track); border-radius: 999px; }
+  .st-t .mid { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.5; }
+  .st-t .seg { position: absolute; top: 0; bottom: 0; background: var(--team); border-radius: 999px; }
+  .st-t .dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
+  .step.sum { border-top-color: var(--ink-3); }
+  .step.sum .st-l b, .step.sum .st-n b { font-weight: 700; }
+
+  @media (max-width: 719px) {
+    .cs-pin { top: calc(var(--bar-h, 34px) + 58px); }
+    .cs-gauge { padding: 14px 16px 12px; }
+    .cs-num { font-size: 48px; margin-bottom: 10px; }
+    .cs-beat { min-height: 60vh; align-items: flex-start; padding-top: 6vh; }
+    .cs-card { font-size: 16px; }
+    .step { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'l n' 't t'; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost, .cs-card { transition: none; } }
+</style>
