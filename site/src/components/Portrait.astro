@@ -12,4 +12,6 @@ const src = photoOf(id);
 
 <style>
   .portrait { display: block; flex: none; object-fit: contain; object-position: 50% 100%; user-select: none; pointer-events: none; }
+  /* The NHL's studio shots read dark on the site, so lift them a little (user picked "A, Lighter" of three strengths). */
+  .portrait { filter: var(--portrait-filter, brightness(1.1) contrast(1.03)); }
 </style>
