@@ -14,9 +14,15 @@ from pipeline.config import DATA, TABLES
 # v2 (2026-10-11): adds side-to-side movement since the last play, its speed, time since the faceoff, game time, the
 # rebound and penalty-shot flags, and trains every tree instead of stopping early (early stopping left the model too
 # timid: shots it rated 20-30% scored 26%, 60%+ scored 81%). Unseen-season log loss 0.21718 -> 0.2164 (2025-26).
+# Then how long the defenders and shooters have been on the ice (from the stints, strictly before the shot; shots against
+# defenders 15 s into a shift scored about a fifth less than the model expected, 60 s+ a little more), and unusual moments:
+# a delayed penalty (goalie pulled for an extra attacker, scored ~45% above expectation), the shooter's own net empty,
+# seconds since the manpower changed and time left on the penalty. Log loss 2025 0.2166 -> 0.2159, 2024 0.2102 -> 0.2097,
+# 2023 0.2113 -> 0.2109. Tested and not kept: arena distance offsets (recording is now within about a foot everywhere) and
+# the play two back.
 NUMERIC = ["dist", "angle", "x", "y_abs", "own_skaters", "opp_skaters", "score_diff", "period", "prev_gap", "prev_dist", "prev_x", "prev_angle_change",
-           "prev_dy", "prev_speed", "since_faceoff", "sec"]
-FLAGS = ["empty_net", "prev_same_team", "is_home", "rebound", "penalty_shot"]
+           "prev_dy", "prev_speed", "since_faceoff", "sec", "def_shift_avg", "def_shift_max", "att_shift_avg", "state_since", "pen_left"]
+FLAGS = ["empty_net", "prev_same_team", "is_home", "rebound", "penalty_shot", "own_net_empty", "delayed_pen"]
 CATEGORICAL = ["shot_type", "prev_type"]
 MODEL_PATH = DATA / "models" / "xg_v2.pkl"
 TRAIN_SEASONS = [2023, 2024, 2025]
