@@ -218,6 +218,11 @@ def _and(xs: list[str]) -> str:
     return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
+def _games(a: int, b: int) -> str:
+    """How many games this season each side's figures include, for a call's citation."""
+    return "no games yet this season" if a == b == 0 else f"{a} and {b} games this season"
+
+
 def _cap(t: str) -> str:
     return t[0].upper() + t[1:]
 
@@ -268,7 +273,7 @@ def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
                     "body": _fmt(_pick([b.lstrip("*") for b in CLASH_WORDS[off][1] if o["rank"] <= TOP or not b.startswith("*")], gid, off, x, "body"), **words),
                     "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
                     "gist": _fmt(CLASH_GIST[off], **words),
-                    "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                    "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
                     "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(o["v"], 4),
                               "league": round(league, 4) if league else None, "direction": "above",
                               "rule": "held if tonight's figure is at or above the team's usual level; partly if between the league average and that level; otherwise didn't happen"},
@@ -304,7 +309,7 @@ def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[
                 "body": _fmt(body, **words), "call": call,
                 "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
                 "gist": _fmt("It’s strength against strength: {X} for " + oname + ", {Y} at " + dname + ".", **words),
-                "cite": f"Style fingerprint · this season blended with last · {fp[x]['games']} and {fp[y]['games']} games this season",
+                "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
                 "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(lo, 4), "usual": round(o["v"], 4),
                           "league": round(lo, 4), "direction": "above" if side == "offense" else "below",
                           "rule": "held if tonight's figure lands on the predicted side of the league average; otherwise didn't happen"},
@@ -560,6 +565,9 @@ EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, 
 EDGE_BODIES = ["{top} are {wt} for {name}, at the {hi} end; {bot} are {wb}, at the {lo} end. Expect that gap to show.",
                "On {name}, {topc} is {wt} and {botc} is {wb}. That’s about as far apart as two teams get."]
 EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
+# A filler edge (the widest gap, but not a hot one) is told plainly: the two teams are not at opposite ends of anything.
+EDGE_MILD_HEADS = ["{topp} edge in {name}", "Where {top} have the edge: {name}"]
+EDGE_MILD_BODY = "{top} are {wt} for {name}, and {bot} are {wb}. It’s the widest gap between these two."
 
 
 def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
@@ -593,6 +601,7 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
     k = max(keys, key=gap)
     name, lo, hi = EDGE[k][:3]
     a, h = fp[away]["dims"][k]["blend"], fp[home]["dims"][k]["blend"]
+    hot = gap(k) >= EDGE_GAP and max(a["pct"], h["pct"]) >= 100 - EDGE_END and min(a["pct"], h["pct"]) <= EDGE_END
     top, bot = (away, home) if a["pct"] >= h["pct"] else (home, away)
     rt, rb = (a, h) if top == away else (h, a)
     tw, bw = team_words(top, places, "top"), team_words(bot, places, "bot")
@@ -600,12 +609,12 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
          "wt": standing(rt["rank"]), "wb": standing(rb["rank"])}
     return {
         "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
-        "head": _fmt(_pick(EDGE_HEADS[k], gid, k), **w),
-        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body"), **w),
+        "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
+        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body") if hot else EDGE_MILD_BODY, **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
-        "gist": _fmt("{top} and {bot} sit at opposite ends for " + name + ".", **w),
+        "gist": _fmt(("{top} and {bot} sit at opposite ends for {name}." if hot else "{top} have the edge over {bot} on {name}."), **w),
         "call": _fmt(EDGE_CALL[k], **w),
-        "cite": f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season",
+        "cite": f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}",
         "check": edge_check(k, top, bot, fp),
     }
 
@@ -615,7 +624,7 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     bar is the faster (or slower) of the two teams' usual, not their average: two fast teams playing a fast game is the
     obvious read, so the call says this one runs faster than either usually does."""
     out = []
-    cite = f"Style fingerprint · this season blended with last · {fp[away]['games']} and {fp[home]['games']} games this season"
+    cite = f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}"
     a, h = fp[away]["dims"]["pace"]["blend"], fp[home]["dims"]["pace"]["blend"]
     w = {**team_words(away, places, "A"), **team_words(home, places, "H")}
     for kind, both, direction in (("fast", a["pct"] >= BOTH and h["pct"] >= BOTH, "above"), ("slow", a["pct"] <= 100 - BOTH and h["pct"] <= 100 - BOTH, "below")):

@@ -72,6 +72,11 @@ def _poss(t: dict) -> str:
     return f"{t['place']}'s"
 
 
+def _for(t: dict) -> str:
+    """"for Columbus", but "for the Rangers" for the two New York clubs."""
+    return _the(t) if t["place"].startswith("NY ") else t["place"]
+
+
 def _in(t: dict) -> str:
     """"in Columbus", but "on the Rangers" for the two New York clubs."""
     return f"on the {_nick(t)}" if t["place"].startswith("NY ") else f"in {t['place']}"
@@ -388,7 +393,7 @@ def _role(p: dict, teams: dict) -> str | None:
     if not bits:
         return None
     if not line:  # no settled line yet: say what he is first
-        bits.insert(0, f"is a {POS_NOUN.get(p['pos'], 'player')} for {teams.get(p['team'], {'place': p['team']})['place']} who")
+        bits.insert(0, f"is a {POS_NOUN.get(p['pos'], 'player')} for {_for(teams.get(p['team'], {'place': p['team']}))} who")
         s = "He " + bits[0] + " " + _and(bits[1:])
     else:
         s = "He " + _and(bits)
@@ -467,14 +472,14 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     # 2. Role, in one sentence (it becomes the opener if there was no hook).
     role = _role(p, teams)
     if out[0] is None:
-        out = [role.replace("He ", f"{last} ", 1) if role else f"{last} is a {POS_NOUN.get(p['pos'], 'player')} for {team['place']}."]
+        out = [role.replace("He ", f"{last} ", 1) if role else f"{last} is a {POS_NOUN.get(p['pos'], 'player')} for {_for(team)}."]
     elif role:
         out.append(role)
 
     # 3. What sets him apart.
     sk = _skills(p)
     if sk:
-        out.append(_pick(["What sets him apart: he {s}.", "At his best, he {s}.", "His calling card? He {s}."], *key, "sk").format(s=_and(sk)))
+        out.append(_pick(["What sets him apart: he {s}.", "At his best, he {s}.", "His calling card? He {s}.", "Where he shines: he {s}.", "Watch for it: he {s}."], *key, "sk").format(s=_and(sk)))
 
     # 4. Track record.
     if full:

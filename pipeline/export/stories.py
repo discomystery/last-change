@@ -152,6 +152,15 @@ class Words:
 
 # --- preview -------------------------------------------------------------------------------------------------------
 
+def _short(pid: int, P: pl.DataFrame, N: dict[int, str], season: int) -> str:
+    """His last name, or his full name when a teammate this season shares it (the Tkachuks, the two Elias Petterssons)."""
+    full = N.get(pid, "")
+    last = full.split(" ", 1)[-1]
+    teams = P.filter((pl.col("season") == season) & (pl.col("player_id") == pid))["team"].unique().to_list()
+    mates = P.filter((pl.col("season") == season) & pl.col("team").is_in(teams) & (pl.col("player_id") != pid))["player_id"].unique().to_list()
+    return full if any(N.get(m, "").split(" ", 1)[-1] == last for m in mates) else last
+
+
 def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
     rows = P.filter(pl.col("season") == season).group_by("player_id").agg(pl.col("team").last())
     return dict(zip(rows["player_id"], rows["team"]))
@@ -218,7 +227,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         cands.sort(key=lambda c: -c["score"])
         items += cands[:1]
         if cands and cands[0].get("streak", 0) >= 7:
-            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{N[cands[0]['pid']].split(' ', 1)[-1]}’s favourite opponent"))
+            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{_short(cands[0]['pid'], P, N, season)}’s favourite opponent"))
         # old teams: the club he played for before this one
         olds = []
         for pid, g in mine.sort("date").group_by("player_id", maintain_order=True):
@@ -236,7 +245,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         olds.sort(reverse=True)
         if olds:
             n_old, pid, first = olds[0]
-            lastname = N[pid].split(" ", 1)[-1]
+            lastname = _short(pid, P, N, season)
             if first and n_old >= 40:
                 text = f"{N[pid]} faces {W.place(o)} for the first time since leaving."
                 where = W.place(o)
@@ -433,7 +442,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     ws, ls = r["score"][winner], r["score"][loser]
     end = r.get("end", "REG")
     side = lambda g: home if g["home"] else away
-    last = lambda pid: N.get(pid, "").split(" ", 1)[-1]
+    last = lambda pid: _short(pid, P, N, season)
     said: set[int] = set()
 
     def name(pid: int) -> str:
@@ -653,7 +662,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         n = len(held)
         text = (("The preview’s call held." if h else "The preview’s call didn’t hold.") if n == 1 else
                 ("Both of the preview’s calls held." if n == 2 else f"All {num(n)} of the preview’s calls held.") if h == n else
-                f"{_cap(num(h))} of the preview’s {num(n)} calls held." if h else f"None of the preview’s {num(n)} calls held.")
+                f"{_cap(num(h))} of the preview’s {num(n)} calls held." if h else ("Neither of the preview’s calls held." if n == 2 else f"None of the preview’s {num(n)} calls held."))
         items.append({"tag": "The preview", "text": text, "score": 20})
     items.sort(key=lambda i: -i["score"])
     picked, per = [], {}

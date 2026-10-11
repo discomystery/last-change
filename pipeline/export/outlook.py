@@ -15,6 +15,7 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import FULL_SEASONS, TABLES
+from pipeline.export import wording
 from pipeline.metrics import win_model
 
 # (upper bound on the team's chance, headline, caveat). Bands are for wording only and are never published.
@@ -29,7 +30,7 @@ BANDS = [
     (0.52, ["Too close to call", "A genuine toss-up", "Nothing to separate these two"],
      ["{T} can tip it {how}.", "For {T}, the difference could be {how_bare}."]),
     (0.58, ["{T} has a slight edge", "Leaning {T}’s way", "{T} starts a half-step ahead"],
-     ["Not by much, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
+     ["It’s still close, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
     (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} has a lot going for them"],
      ["{O} can make it interesting {how_o}.", "{O}’s way back in is {how_o_bare}."]),
     (1.01, ["{T} has nearly everything going for them", "A big edge for {T}", "This one sets up well for {T}"],
@@ -130,6 +131,11 @@ def _with_rosters(df: pl.DataFrame, done: pl.DataFrame, upcoming: dict[int, floa
                                             dtype=pl.Float64))
 
 
+def _a(pct: int) -> str:
+    """"a 72%", but "an 83%", "an 18%", "an 8%"."""
+    return f"{'an' if pct in (8, 11, 18) or 80 <= pct <= 89 else 'a'} {pct}%"
+
+
 def _pick(pool: list[str], *key) -> str:
     return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
 
@@ -200,6 +206,7 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
     """After the game: the chance we gave each team that morning and at puck drop (with tonight's lineup), how each
     input moved it, and a sentence for each team's side."""
     ids = team_ids(season)
+    say = wording.places(places)
     m = model()
     df = win_model.pregame(win_model.team_games(FULL_SEASONS + [season])).filter(pl.col("season") == season)
     try:
@@ -220,16 +227,17 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
         home_won = g["hs"] > g["as"]
         sides = {}
         for team, opp, p, won in ((g["home"], g["away"], ph, home_won), (g["away"], g["home"], 1 - ph, not home_won)):
-            pct, T, O = round(100 * p), places[team], places[opp]
+            pct, T, O = round(100 * p), say[team], say[opp]
+            # bands on the shown figure, so "60%" is never also "close to even"
             if won:
-                head = (f"We gave {T} a {pct}% chance, and {T} proved us wrong." if p < 0.4 else
-                        f"We gave {T} a {pct}% chance, and {T} delivered." if p >= 0.6 else
+                head = (f"We gave {T} {_a(pct)} chance, and {T} proved us wrong." if pct < 40 else
+                        f"We gave {T} {_a(pct)} chance, and {T} delivered." if pct >= 60 else
                         f"We had this close to even ({pct}% for {T}), and {T} came through.")
             else:
-                head = (f"We gave {T} a {pct}% chance, but {O} had other ideas." if p >= 0.6 else
-                        f"We gave {T} only a {pct}% chance, and it went the way we feared." if p < 0.4 else
+                head = (f"We gave {T} {_a(pct)} chance, but {O} had other ideas." if pct >= 60 else
+                        f"We gave {T} only {_a(pct)} chance, and it went the way we feared." if pct < 40 else
                         f"We had this close to even ({pct}% for {T}), and it went {O}’s way.")
-            sides[team] = {"head": head, "chance": pct}
+            sides[team] = {"head": wording.tidy(head), "chance": pct}
         out[g["id"]] = {"p_home": round(ph, 4), "p_home_puck": round(float(puck[g["id"]]), 4) if has_lineup else None,
                         "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides}
     return out
