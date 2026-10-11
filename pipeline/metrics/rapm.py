@@ -10,6 +10,15 @@ average (zero), harder the less he has played, so small samples cannot produce e
 
 Defense is reported so that positive is good (expected goals per 60 taken away from the opponent).
 Likely ranges come from the ridge posterior: the diagonal of sigma^2 (X'WX + lambda I)^-1.
+
+Ratings that remember (`chained`, 2026-10-11): instead of starting every player at zero from a two-season window,
+each season is fitted starting from the player's rating at the end of the season before (the ridge pulls toward
+that rating instead of toward zero), chained back to 2023-24. A player who misses a season keeps his last rating.
+Tested on play the ratings had not seen (weighted error of each 5v5 stretch's chances): predicting the second half
+of 2025-26 from everything before it, the chained ratings explained 13% more than the two-season window (90% range
+6-18%); predicting this season's first games from last season's ratings, 20% more (range 1-37%). With only one
+earlier season (second half of 2024-25) they did 4% worse, so they pay off once two seasons are chained. The
+penalty (80,000 s) and no decay between seasons were picked from a grid (40-240k, decay 0.7-1).
 """
 from functools import lru_cache
 
@@ -22,6 +31,8 @@ from pipeline.config import REGULAR, TABLES
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 Z80 = 1.2816
+FIRST_SEASON = 2023  # event timing was recorded differently before 2023-24, so the chain starts there
+CHAIN_LAMBDA = 80000.0
 
 
 @lru_cache(maxsize=8)
@@ -94,8 +105,9 @@ def design(stints: pl.DataFrame, weights: np.ndarray | None = None):
     return X, np.array(y), np.array(w), players, extra
 
 
-def fit(X, y, w, lam: float, n_players: int, *, intervals: bool = True) -> dict:
-    """Weighted ridge with an unpenalized intercept and unpenalized context columns."""
+def fit(X, y, w, lam: float, n_players: int, *, intervals: bool = True, prior: np.ndarray | None = None) -> dict:
+    """Weighted ridge with an unpenalized intercept and unpenalized context columns. With `prior` (one value per
+    offense and defense column, 2 x n_players), player columns are pulled toward it instead of toward zero."""
     mean = np.average(y, weights=w)
     yc = y - mean
     W = sparse.diags(w)
@@ -104,7 +116,10 @@ def fit(X, y, w, lam: float, n_players: int, *, intervals: bool = True) -> dict:
     pen = np.zeros(A.shape[0])
     pen[: 2 * n_players] = lam
     A[np.diag_indices_from(A)] += pen + 1e-9
-    b = np.linalg.solve(A, XtW @ yc)
+    rhs = XtW @ yc
+    if prior is not None:
+        rhs[: 2 * n_players] += lam * prior
+    b = np.linalg.solve(A, rhs)
     out = {"beta": b, "mean": mean}
     if intervals:
         resid = yc - X @ b
@@ -151,6 +166,49 @@ def run(seasons: list[int], lam: float, weights: dict[int, float] | None = None)
         "off": m["beta"][:n], "off_sd": m["sd"][:n],
         "def": -m["beta"][n: 2 * n], "def_sd": m["sd"][n: 2 * n],  # positive = fewer chances against
     })
+
+
+@lru_cache(maxsize=8)
+def _chain(through: int) -> dict[int, tuple[float, float, float, float]]:
+    """Each player's (offense, defense column, their sds) after chaining full seasons FIRST_SEASON..through."""
+    if through < FIRST_SEASON or not (TABLES / str(through) / "stints.parquet").exists():
+        return {}
+    prior = _chain(through - 1)
+    return {**prior, **_fit_from(stretches(through), prior)}
+
+
+def _fit_from(st: pl.DataFrame, prior: dict[int, tuple[float, float, float, float]]) -> dict[int, tuple[float, float, float, float]]:
+    if st.is_empty():
+        return {}
+    X, y, w, players, _ = design(st)
+    n = len(players)
+    mu = np.array([prior.get(p, (0.0, 0.0))[0] for p in players] + [prior.get(p, (0.0, 0.0))[1] for p in players])
+    m = fit(X, y, w, CHAIN_LAMBDA, n, prior=mu)
+    b, sd = m["beta"], m["sd"]
+    return {p: (float(b[i]), float(b[n + i]), float(sd[i]), float(sd[n + i])) for i, p in enumerate(players)}
+
+
+def chained(season: int, before: str | None = None) -> pl.DataFrame:
+    """Ratings that remember: everything up to the end of last season carried forward, updated with this season's
+    5-on-5 play (only games before `before` if given). Same columns as `run`; sec5 is this season's 5v5 seconds."""
+    prior = _chain(season - 1)
+    st = stretches(season) if (TABLES / str(season) / "stints.parquet").exists() else pl.DataFrame()
+    if before is not None and not st.is_empty():
+        keep = pl.read_parquet(TABLES / str(season) / "games.parquet").filter(pl.col("date") < before)["game_id"]
+        st = st.filter(pl.col("game_id").is_in(keep))
+    rated = {**prior, **_fit_from(st, prior)}
+    secs: dict[int, float] = {}
+    if not st.is_empty():
+        for col in ("home_skaters", "away_skaters"):
+            for lst, d_ in zip(st[col].to_list(), st["duration"].to_list()):
+                for p in lst:
+                    secs[p] = secs.get(p, 0) + d_
+    ids = sorted(rated)
+    return pl.DataFrame({
+        "player_id": ids, "sec5": [secs.get(p, 0) for p in ids],
+        "off": [rated[p][0] for p in ids], "off_sd": [rated[p][2] for p in ids],
+        "def": [-rated[p][1] for p in ids], "def_sd": [rated[p][3] for p in ids],
+    }, schema={"player_id": pl.Int64, "sec5": pl.Float64, "off": pl.Float64, "off_sd": pl.Float64, "def": pl.Float64, "def_sd": pl.Float64})
 
 
 def competition(seasons: list[int], ratings: pl.DataFrame) -> dict[int, dict[str, float | None]]:

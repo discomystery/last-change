@@ -30,7 +30,7 @@ const whyTip = (j: Job) => {
   if (j.key === 'pp') return `He has averaged ${j.per_game} a game on the power play coming into this game.`;
   if (j.key === 'pk') return `He has averaged ${j.per_game} a game killing penalties coming into this game.`;
   if (j.why === 'role') return 'He takes plenty of faceoffs for his team.';
-  const base = j.key === 'offImpact' || j.key === 'defImpact' ? 'over the two seasons before this one, after allowing for linemates and opponents' : 'going into this game, this season blended with last';
+  const base = j.key === 'offImpact' || j.key === 'defImpact' ? 'over every season before this one since 2023-24, after allowing for linemates and opponents' : 'going into this game, this season blended with last';
   return `Better than ${j.pct}% of ${peerOf(j.key, j.vs ?? 'F')} ${base}.`;
 };
 // When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.

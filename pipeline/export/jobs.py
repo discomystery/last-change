@@ -7,7 +7,7 @@ cards on team pages:
   game as a centre);
 - better than most at: his own numbers (shot attempts, chances, hits, blocks, takeaways, faceoffs) at the 75th
   percentile or better among last season's regulars at his position, or driving / preventing chances at 5-on-5 at
-  the 75th percentile or better over the two previous seasons' isolated ratings (rapm.py).
+  the 75th percentile or better on the isolated ratings as they stood at the end of last season (rapm.chained).
 
 Each job is graded the way preview calls are: "held" means he reached a typical night for himself in the ice time he
 got, "partly" means he beat a benchmark (an average player at his position, the league, or his own team with him off
@@ -361,10 +361,10 @@ class Reference:
 
 
 def impact_pcts(season: int) -> dict[int, dict[str, float]]:
-    """Percentiles of each skater's isolated 5-on-5 offense and defense over the two seasons before this one."""
+    """Percentiles of each skater's isolated 5-on-5 offense and defense as they stood at the end of last season."""
     from pipeline.metrics import rapm
 
-    fit = rapm.run([season - 2, season - 1], P.RAPM_LAMBDA)
+    fit = rapm.chained(season - 1)  # everything up to the end of last season
     gp = pl.concat([P.load(s).select("player_id", "pos") for s in (season - 2, season - 1)])
     info = {r["player_id"]: (r["n"], P.GROUP[r["pos"]]) for r in gp.group_by("player_id").agg(pl.len().alias("n"), pl.col("pos").mode().first()).iter_rows(named=True)}
     out = {}
@@ -542,7 +542,7 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
                 outs.append({"key": t, "label": LABEL[t], "p": round(p, 4),
                              "text": f"{n} {one if n == 1 else many}{where} in {clock(time_)}, when his usual pace would give about {exp_u * mult:.1f}{' in this arena' if t in RAW_COL else ''}."})
 
-    # Driving and preventing chances at 5-on-5, for players rated for it over the two previous seasons.
+    # Driving and preventing chances at 5-on-5, for players rated for it going into this season.
     for key, col, team_col, higher in (("offImpact", "on_xgf_adj", "t_xgf_adj", True), ("defImpact", "on_xga_adj", "t_xga_adj", False)):
         pct = imp.get(key)
         if pct is None or pct < STRONG:

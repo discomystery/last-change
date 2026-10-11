@@ -226,7 +226,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                     out[pid]["traits"].setdefault(t, {})[mode] = rec
 
     # Isolated 5-on-5 impact (offense and defense) and the competition each player faces, from rapm.py.
-    fits = {"blend": rapm.run([season - 1, season], RAPM_LAMBDA), "season": rapm.run([season], RAPM_LAMBDA)}
+    fits = {"blend": rapm.chained(season), "season": rapm.run([season], RAPM_LAMBDA)}
     ratings = fits["blend"]
     comp = {"blend": rapm.competition([season - 1, season], ratings), "season": rapm.competition([season], ratings)}
     for mode, fit_ in fits.items():
