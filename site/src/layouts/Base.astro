@@ -211,6 +211,33 @@ const teamList = teams as { abbr: string; name: string }[];
         new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((node) => node.nodeType === 1 && scan(node)))).observe(main, { childList: true, subtree: true });
       })();
     </script>
+    <script is:inline>
+      // Season switch: on screen, the scales' dots glide to their new spots a card at a time, each leaving a fading
+      // ring where it was (styles/motion.css). Off screen they simply change.
+      document.addEventListener('prefs', (e) => {
+        const root = document.documentElement;
+        if (e.detail.key !== 'mode' || !root.classList.contains('motion')) return;
+        const vh = window.innerHeight;
+        const lanes = [...document.querySelectorAll('.lane')].filter((l) => {
+          if (!l.querySelector('.dot') || !l.offsetParent) return false;
+          const r = l.getBoundingClientRect();
+          return r.bottom > -40 && r.top < vh + 40;
+        }).slice(0, 240);
+        const groups = [...new Set(lanes.map((l) => l.closest('.card') || l.parentElement))];
+        lanes.forEach((l) => l.style.setProperty('--sd', Math.min(groups.indexOf(l.closest('.card') || l.parentElement), 12) * 45 + 'ms'));
+        lanes.forEach((l) => {
+          const dot = l.querySelector('.dot');
+          const g = document.createElement('i');
+          g.className = 'dot-ghost';
+          g.style.left = getComputedStyle(dot).left;
+          l.appendChild(g);
+          setTimeout(() => g.remove(), 2000);
+        });
+        root.classList.add('mode-switch');
+        clearTimeout(window.lcModeT);
+        window.lcModeT = setTimeout(() => root.classList.remove('mode-switch'), 700);
+      });
+    </script>
   </body>
 </html>
 
