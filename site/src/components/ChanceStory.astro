@@ -1,6 +1,7 @@
 ---
-// The post-game reveal of our hidden pre-game win chance, told as a scroll story: a gauge stays pinned while short
-// notes scroll past, and each note moves the needle by what that input was worth. "Show every step at once" swaps
+// The post-game reveal of our hidden pre-game win chance, told as a scroll story: the gauge and one line of text stay
+// still on screen while scrolling fades each step's note in and out in place, and each step moves the needle by what
+// that input was worth. "Show every step at once" swaps
 // the story for the full list with the longer explanations (also what shows without scripts or with reduced motion).
 export type Beat = { key: string; label: string; short: string; long?: string; pts: number; before: number; end: number; sum?: boolean };
 interface Props { team: string; teamCls: string; other: string; otherCls: string; chance: number; outcome: string; beats: Beat[] }
@@ -16,10 +17,9 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
     <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
   </div>
 
-  <div class="cs-story" hidden>
-    <div class="cs-pin">
+  <div class="cs-story" hidden style={`--n:${beats.length}`}>
+    <div class="cs-stage">
       <div class="cs-gauge">
-        <p class="cs-step" aria-live="polite"><span class="cs-label">{beats[0].label}</span></p>
         <p class="cs-num"><span class="cs-val">50</span>%<small>for {team} to win</small></p>
         <div class={`cs-track ${otherCls}`}>
           <span class={`cs-fill ${teamCls}`} style="width:50%"></span>
@@ -29,19 +29,17 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
         </div>
         <div class="cs-ends"><span class={teamCls}><i></i>{team}</span><span class={otherCls}>{other}<i></i></span></div>
       </div>
-    </div>
-    <ol class="cs-beats">
-      {beats.map((b, i) => (
-        <li class:list={['cs-beat', { last: i === beats.length - 1 }]} data-i={i} data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts} data-label={b.label}>
-          <div class="cs-card">
-            {!b.sum && b.key !== 'start' && <p class="cs-pts">{signed(b.pts)} {Math.abs(b.pts) === 1 ? 'point' : 'points'}</p>}
-            <p class="cs-title">{b.label}</p>
-            <p>{b.short}</p>
+      <ol class="cs-texts">
+        {beats.map((b, i) => (
+          <li class="cs-text" data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts} style={i ? 'opacity:0' : ''} aria-hidden={i ? 'true' : 'false'}>
+            <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts">{signed(b.pts)}</span>}</p>
+            <p class="cs-line">{b.short}</p>
             {i === beats.length - 1 && <p class="cs-out">{outcome}</p>}
-          </div>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ol>
+      <div class="cs-foot"><ol class="cs-pips" aria-hidden="true">{beats.map(() => <li></li>)}</ol><button type="button" class="cs-skip">Skip to every step</button></div>
+    </div>
   </div>
 
   <div class="cs-list card">
@@ -70,43 +68,64 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
     document.querySelectorAll('.cs:not([data-ready])').forEach((cs) => {
       cs.dataset.ready = '1';
       const story = cs.querySelector('.cs-story'), list = cs.querySelector('.cs-list'), btn = cs.querySelector('.cs-toggle');
-      const val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill'), needle = cs.querySelector('.cs-needle');
-      const ghost = cs.querySelector('.cs-ghost'), label = cs.querySelector('.cs-label');
-      const beats = [...cs.querySelectorAll('.cs-beat')];
-      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); };
-      btn.hidden = false;
-      btn.addEventListener('click', () => mode(story.hidden));
-      mode(!reduce);
-      let shown = 50, raf = 0, current = -1;
+      const stage = cs.querySelector('.cs-stage'), val = cs.querySelector('.cs-val'), fill = cs.querySelector('.cs-fill');
+      const needle = cs.querySelector('.cs-needle'), ghost = cs.querySelector('.cs-ghost');
+      const texts = [...cs.querySelectorAll('.cs-text')], pips = [...cs.querySelectorAll('.cs-pips li')], n = texts.length;
+      let shown = 50, raf = 0, current = -1, ticking = false;
       const tween = (to) => {
         cancelAnimationFrame(raf);
-        const from = shown, t0 = performance.now(), dur = reduce ? 0 : 600;
+        const from = shown, t0 = performance.now(), dur = 650;
         const step = (t) => {
-          const k = dur ? Math.min(1, (t - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 3);
+          const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
           shown = from + (to - from) * e;
           val.textContent = Math.round(shown);
           if (k < 1) raf = requestAnimationFrame(step);
         };
         raf = requestAnimationFrame(step);
       };
-      const show = (i) => {
+      // The needle moves once per step, when that step's note takes over.
+      const setStep = (i) => {
         if (i === current) return;
         current = i;
-        const b = beats[i], end = +b.dataset.end, before = +b.dataset.before, pts = +b.dataset.pts;
-        beats.forEach((x, j) => x.classList.toggle('on', j === i));
+        const t = texts[i], end = +t.dataset.end, before = +t.dataset.before, pts = +t.dataset.pts;
         fill.style.width = `${end}%`;
         needle.style.left = `${end}%`;
         ghost.style.left = `${before}%`;
         ghost.classList.toggle('seen', pts !== 0);
-        label.textContent = b.dataset.label;
+        pips.forEach((p, j) => p.classList.toggle('on', j <= i));
+        texts.forEach((x, j) => x.setAttribute('aria-hidden', j === i ? 'false' : 'true'));
         tween(end);
       };
-      // The beat whose card crosses the middle of the screen is the one shown.
-      const io = new IntersectionObserver((es) => {
-        es.forEach((e) => { if (e.isIntersecting) show(+e.target.dataset.i); });
-      }, { rootMargin: '-50% 0px -50% 0px' });
-      beats.forEach((b) => io.observe(b));
-      show(0);
+      // Each step owns an equal slice of the scroll. Inside its slice a note fades and drifts in, holds, then fades and
+      // drifts out as the next one arrives (the first starts shown, the last stays).
+      const frame = () => {
+        ticking = false;
+        if (story.hidden) return;
+        // Progress runs from the moment the stage pins (story top reaches the stage's sticky top) to when it unpins.
+        const r = story.getBoundingClientRect(), run = r.height - stage.offsetHeight, pin = parseFloat(getComputedStyle(stage).top) || 0;
+        const p = Math.max(0, Math.min(1, (pin - r.top) / Math.max(1, run)));
+        const f = p * n, i = Math.min(n - 1, Math.floor(f)), local = f - i;
+        texts.forEach((t, j) => {
+          let o = 0, y = 0;
+          if (j === i) {
+            const fadeIn = j === 0 ? 1 : Math.min(1, local / 0.22);
+            const fadeOut = j === n - 1 ? 1 : Math.min(1, (1 - local) / 0.22);
+            o = Math.min(fadeIn, fadeOut);
+            y = j > 0 && local < 0.22 ? (1 - fadeIn) * 18 : j < n - 1 && local > 0.78 ? -(1 - fadeOut) * 18 : 0;
+          }
+          t.style.opacity = o.toFixed(3);
+          t.style.transform = `translateY(${y.toFixed(1)}px)`;
+        });
+        setStep(i);
+      };
+      const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
+      const mode = (asStory) => { story.hidden = !asStory; list.hidden = asStory; cs.classList.toggle('as-story', asStory); if (asStory) frame(); };
+      btn.hidden = false;
+      btn.addEventListener('click', () => mode(story.hidden));
+      cs.querySelector('.cs-skip').addEventListener('click', () => { mode(false); cs.scrollIntoView({ block: 'start' }); scrollBy(0, -90); });
+      addEventListener('scroll', onScroll, { passive: true });
+      addEventListener('resize', onScroll);
+      mode(!reduce);
     });
   })();
 </script>
@@ -119,33 +138,38 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
   .cs .to-story, .cs.as-story .to-list { display: none; }
   .cs.as-story .to-story { display: inline; }
 
-  /* The story: a gauge pinned near the top while the notes scroll past it. */
-  .cs-story { position: relative; margin: 10px auto 0; max-width: 760px; }
-  .cs-pin { position: sticky; top: calc(var(--bar-h, 34px) + 12px); z-index: 2; padding: 8px 0 14px; background: var(--ice); }
+  /* The story: one still frame (gauge, then the current note) pinned while the page scrolls under it. Each step gets
+     a slice of scroll; the container is tall enough to give every step one. */
+  .cs-story { position: relative; margin: 10px auto 0; max-width: 760px; height: calc(var(--n) * 48vh + 100vh); }
+  .cs-stage { position: sticky; top: calc(var(--bar-h, 34px) + 12px); height: calc(100vh - var(--bar-h, 34px) - 24px);
+    display: flex; flex-direction: column; }
   .cs-gauge { background: var(--sheet); border-radius: 18px; padding: 18px 22px 16px; box-shadow: 0 0 0 1px var(--rule); }
-  .cs-step { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 0 0 2px; }
   .cs-num { display: flex; align-items: baseline; gap: 2px; margin: 0 0 14px; font: 700 64px/0.95 var(--display); font-variant-numeric: tabular-nums; }
   .cs-num small { font: 600 15px var(--ui); color: var(--ink-2); margin-left: 12px; }
   .cs-track { position: relative; height: 14px; border-radius: 999px; background: color-mix(in oklab, var(--team) 35%, var(--track)); }
-  .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); transition: width 0.65s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .cs-mid { position: absolute; left: 50%; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--sheet); }
-  .cs-ghost { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink-3); opacity: 0; transition: left 0.6s, opacity 0.3s; }
+  .cs-ghost { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink-3); opacity: 0; transition: left 0.65s, opacity 0.3s; }
   .cs-ghost.seen { opacity: 0.6; }
   .cs-needle { position: absolute; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--sheet);
-    transition: left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    transition: left 0.65s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .cs-ends { display: flex; justify-content: space-between; margin-top: 10px; font: 600 13px var(--ui); }
   .cs-ends i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin: 0 6px; }
 
-  .cs-beats { list-style: none; padding: 0; margin: 0; }
-  .cs-beat { min-height: 52vh; display: flex; align-items: center; justify-content: center; }
-  .cs-beat:first-child { min-height: 34vh; align-items: flex-start; }
-  .cs-beat.last { min-height: 46vh; }
-  .cs-card { max-width: 460px; width: 100%; background: var(--sheet); border-radius: 16px; padding: 16px 20px; box-shadow: 0 0 0 1px var(--rule);
-    font: 400 17px/1.5 var(--body); opacity: 0.35; transform: translateY(8px); transition: opacity 0.35s, transform 0.35s; }
-  .cs-beat.on .cs-card { opacity: 1; transform: none; }
-  .cs-title { font: 600 20px/1.2 var(--display); margin: 0 0 4px; }
-  .cs-pts { font: 700 12px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 0 0 2px; }
-  .cs-out { font: 600 20px/1.25 var(--display); margin: 10px 0 0; }
+  /* Every note sits in the same spot; only the current one is visible. */
+  .cs-texts { list-style: none; padding: 0; margin: 0; position: relative; flex: 1; min-height: 220px; }
+  .cs-text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    padding: 0 12px; will-change: opacity, transform; }
+  .cs-title { font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
+  .cs-pts { font: 700 12px var(--ui); color: var(--ink); background: var(--track); border-radius: 999px; padding: 2px 9px; letter-spacing: 0.02em; }
+  .cs-line { font: 600 30px/1.22 var(--display); max-width: 22ch; margin: 0; text-wrap: balance; }
+  .cs-out { font: 400 20px/1.4 var(--body); color: var(--ink-2); margin: 14px 0 0; }
+  .cs-foot { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .cs-skip { font: 500 12.5px var(--ui); color: var(--ink-3); background: none; border: 0; padding: 4px 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--rule); }
+  .cs-skip:hover { color: var(--ink); }
+  .cs-pips { list-style: none; padding: 0; margin: 0; display: flex; justify-content: center; gap: 7px; }
+  .cs-pips li { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); transition: background 0.3s; }
+  .cs-pips li.on { background: var(--ink-3); }
 
   /* Every step at once. */
   .cs-list { margin-top: 12px; }
@@ -168,12 +192,13 @@ const steps = beats.filter((b) => !b.sum && b.key !== 'start');
   .step.sum .st-l b, .step.sum .st-n b { font-weight: 700; }
 
   @media (max-width: 719px) {
-    .cs-pin { top: calc(var(--bar-h, 34px) + 58px); }
+    .cs-story { height: calc(var(--n) * 55vh + 100vh); }
+    .cs-stage { top: calc(var(--bar-h, 34px) + 58px); height: calc(100vh - var(--bar-h, 34px) - 58px - 76px); }
     .cs-gauge { padding: 14px 16px 12px; }
     .cs-num { font-size: 48px; margin-bottom: 10px; }
-    .cs-beat { min-height: 60vh; align-items: flex-start; padding-top: 6vh; }
-    .cs-card { font-size: 16px; }
+    .cs-line { font-size: 25px; }
+    .cs-out { font-size: 18px; }
     .step { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'l n' 't t'; }
   }
-  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost, .cs-card { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .cs-fill, .cs-needle, .cs-ghost { transition: none; } }
 </style>
