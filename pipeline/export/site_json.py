@@ -128,11 +128,10 @@ def export_fingerprints(season: int, idle: bool = False) -> int:
 
 def export_xg_check(season: int) -> int:
     """For each team's most recent game: every goal and the best chances, with our rating beside MoneyPuck's."""
-    import pickle
 
     from pipeline.metrics import xg_model
 
-    bundle = pickle.loads(xg_model.MODEL_PATH.read_bytes())
+    bundle = xg_model.saved()
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").sort("game_id")
     feats = pl.read_parquet(d / "shot_features.parquet").filter(pl.col("type") != "blocked-shot")
