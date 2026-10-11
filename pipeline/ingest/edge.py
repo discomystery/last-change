@@ -61,10 +61,14 @@ def fetch(season: int, players: dict[int, tuple[int, bool]]) -> dict:
 
 
 def update(season: int = CURRENT_SEASON) -> list[dict]:
-    """This season for everyone who has played, and last season for the same players (fetched once)."""
+    """This season for everyone who has played, and last season for the same players plus anyone a club holds who has
+    not played yet (injured, in the minors: their pages lean on last season), fetched once."""
+    from pipeline.metrics import availability
+
     now = _games_played(season)
     before = _games_played(season - 1)
-    return [fetch(season, now), fetch(season - 1, {p: before[p] for p in now if p in before})]
+    want = set(now) | availability.held(season)
+    return [fetch(season, now), fetch(season - 1, {p: before[p] for p in want if p in before})]
 
 
 if __name__ == "__main__":

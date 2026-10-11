@@ -352,7 +352,9 @@ def export_goalies(season: int) -> int:
         gid = pt.pop("id")
         pt["name"], pt["team"] = names.get(gid, "?"), last_team.get(gid)
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "min_starts": out["min_starts"], "league": out["league"],
-               "teams": {abbr[tid]: [{"id": gid, "name": names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()}}
+               "teams": {abbr[tid]: [{"id": gid, "name": names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()},
+               # Last season's goalies with no games yet this season (injured, in the minors): only their player pages read these.
+               "idle": {str(gid): {"id": gid, "name": names.get(gid, "?"), **m} for gid, m in out["idle"].items()}}
     (SITE_DATA / "goalies.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(payload["teams"])
 

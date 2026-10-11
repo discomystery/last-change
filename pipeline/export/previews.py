@@ -815,7 +815,7 @@ def records(sched: list[dict], before: str) -> dict[str, str]:
 def bundle(away: str, home: str, site: dict, record: dict) -> dict:
     """The slice of every data file the preview page reads, for these two teams, as it stood when the preview was made.
     Saved inside the snapshot so the page can still be shown, unchanged, after the game."""
-    two = lambda d: {**{k: v for k, v in d.items() if k != "teams"}, "teams": {t: d["teams"][t] for t in (away, home) if t in d["teams"]}}
+    two = lambda d: {**{k: v for k, v in d.items() if k not in ("teams", "idle")}, "teams": {t: d["teams"][t] for t in (away, home) if t in d["teams"]}}
     return {"fingerprints": two(site["fingerprints"]), "lines": two(site["lines"]), "goalies": two(site["goalies"]),
             "goal_sources": two(site["goal_sources"]), "records": {t: record.get(t, "0-0-0") for t in (away, home)}}
 

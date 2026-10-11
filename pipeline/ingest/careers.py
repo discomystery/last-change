@@ -60,13 +60,16 @@ def _past_seasons(landing: dict) -> list[int]:
 
 
 def _priority(season: int) -> list[int]:
-    """Everyone who has dressed this season, the busiest first."""
+    """Everyone who has dressed this season, the busiest first, then players a club holds who have not dressed yet."""
     pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet")
     goalies = pl.read_parquet(TABLES / str(season) / "players.parquet").filter(pl.col("pos") == "G").select("player_id").unique()
     sec = pg.group_by("player_id").agg(pl.col("sec").sum()).sort("sec", descending=True)["player_id"].to_list()
     g_ids = set(goalies["player_id"].to_list())
     # goalies first: their records in each building feed the preview storylines
-    return [p for p in sec if p in g_ids] + sorted(g for g in g_ids if g not in set(sec)) + [p for p in sec if p not in g_ids]
+    from pipeline.metrics import availability
+
+    first = [p for p in sec if p in g_ids] + sorted(g for g in g_ids if g not in set(sec)) + [p for p in sec if p not in g_ids]
+    return first + sorted(availability.held(season) - set(first))
 
 
 def update(season: int = CURRENT_SEASON, budget: int = BUDGET) -> dict:
