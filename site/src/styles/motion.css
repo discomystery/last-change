@@ -64,6 +64,14 @@ html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezi
   html.motion .card.go:hover { translate: 0 -2px; box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--ink) 45%, transparent); }
 }
 
+/* Season switch: each dot glides to its new spot, cards a beat apart (`--sd`, set by the script in Base.astro),
+   leaving a faint ring where it was that fades as it arrives. The sentences under the scales fade across. */
+html.motion .lane .dot { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
+html.motion .lane .whisk { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms), width 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
+.dot-ghost { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--team); opacity: 0; pointer-events: none; animation: lc-ghost 1.3s ease-out var(--sd, 0ms) both; }
+html.mode-switch .m-blend, html.mode-switch .m-season { animation: lc-fade 0.5s ease; }
+@keyframes lc-ghost { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+
 @keyframes lc-fade { from { opacity: 0; } }
 @keyframes lc-dot { from { left: 50%; opacity: 0; } }
 @keyframes lc-wipe { from { clip-path: inset(0 50% 0 50%); } }
