@@ -54,3 +54,34 @@ def test_penalty_shot_codes():
     from pipeline.build.stints import penalty_shot
     assert penalty_shot("1010") and penalty_shot("0101")  # one shooter against one goalie, home or away shooting
     assert not penalty_shot("1551") and not penalty_shot("0651") and not penalty_shot(None)
+
+
+def _pbp(end_clock: str, period: int = 3) -> dict:
+    return {"homeTeam": {"id": 1}, "awayTeam": {"id": 2},
+            "plays": [{"periodDescriptor": {"number": period, "periodType": "REG"}, "timeInPeriod": end_clock}]}
+
+
+def _shift(team: int, period: int, start: str, end: str) -> dict:
+    return {"typeCode": 517, "teamId": team, "period": period, "startTime": start, "endTime": end}
+
+
+def test_unfinished_shift_chart_is_caught():
+    from pipeline.ingest.nhl import shifts_cover
+
+    full = [_shift(1, 3, "00:00", "20:00"), _shift(2, 3, "00:00", "20:00")]
+    assert shifts_cover(full, _pbp("20:00"))
+    # CAR at CHI, 2026-10-10: the chart saved after the game stopped at 13:05 of the third.
+    assert not shifts_cover([_shift(1, 3, "00:00", "13:05"), _shift(2, 3, "00:00", "20:00")], _pbp("20:00"))
+    assert not shifts_cover([], _pbp("20:00"))
+
+
+def test_shift_gap_never_reads_as_empty_net():
+    from pipeline.build.games import _goalie_in_net
+
+    # Situation code says both goalies are in, the shift chart has none: the goalie on the shot fills the gap.
+    assert _goalie_in_net("1551", True, None, 30, 31) == 31
+    assert _goalie_in_net("1551", False, None, 40, None) == 40
+    # A real pulled goalie (home net empty, six home skaters) stays empty.
+    assert _goalie_in_net("1560", True, None, 30, None) is None
+    # The shift chart wins when it names a goalie.
+    assert _goalie_in_net("1551", True, 33, 30, 31) == 33
