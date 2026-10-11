@@ -1,4 +1,7 @@
 # Nightly update: fetch new games, rebuild every table and number, rebuild the site, publish it.
+# Also runs whenever a change to the pipeline, site or these workflows is merged into main, so merged changes go
+# live without anyone pressing Run workflow. A full update rather than the offline publish, on purpose: runs share
+# one queue and a newer queued run replaces an older one, so a merge must never knock out a scheduled data update.
 # Data lives on the `data` branch between runs (restored at the start, saved at the end). Preview calls already
 # frozen at puck drop come back with it, so they are never rewritten.
 name: Nightly update
@@ -9,6 +12,14 @@ on:
     - cron: "0 16 * * *"  # 16:00 UTC: refresh before the day's games, so previews freeze on fresh numbers
     - cron: "30 20 * * *"  # 20:30 UTC: pick up NHL.com's projected starting goalies (its previews go up 16:00-19:00 UTC)
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/**"
+      - "site/**"
+      - "content/**"
+      - ".github/workflows/nightly.yml"
+      - ".github/workflows/deploy-pages.yml"
 
 permissions:
   contents: write
