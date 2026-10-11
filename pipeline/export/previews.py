@@ -19,15 +19,16 @@ Reads the site JSON the other exports have just written (fingerprints, lines), s
 import json
 import zlib
 from functools import lru_cache
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 5  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 6  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
+# 6: the rest edge (one team on the second night of a back-to-back)
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -187,7 +188,7 @@ HISTORY_BODIES = [
     "Since 2023-24, {G} has been {how} against {O}, {cmp} his usual. Fans love a pattern like this, "
     "but we checked three seasons of them and they predicted nothing. Expect the usual {G}.",
 ]
-PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
+PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "rest": 3, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
 MAX_CALLS, MIN_CALLS, MAX_PER_KIND = 4, 2, 2
 
 
@@ -663,6 +664,93 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
     return out
 
 
+# Rest edge: one team played last night, the other did not. Over 2023-24 to 2025-26 (809 such team-games), the tired team
+# won 41%, took a share of 5-on-5 expected goals 2.0 points below its usual (+/- 0.4), and allowed 2.2 more shot attempts
+# per 60. The call: the rested team gets a bigger share of the 5-on-5 chances than it usually does (held 59% of the
+# time, against 50% for any team). Both teams on a back-to-back made no difference, and neither did time zones crossed
+# or the first home game after a long road trip.
+REST_HEADS = ["{T} played last night", "Fresh legs against tired ones", "Second night of a back-to-back for {T}", "{R} come in rested"]
+REST_BODIES = [
+    "{T} played in {where} last night and get no rest before this one. Teams in that spot usually get the worse of the chances, so we expect {R} to control more of the play than they usually do.",
+    "It’s {Tp} second game in two nights, after last night in {where}. Teams on the back end of those usually spend more time defending, so we think {R} get more of the play than usual.",
+]
+REST_SAMPLE = 20  # games' weight given to last season when working out a team's usual share of the chances
+
+
+def rest_days(sched: list[dict], g: dict) -> dict[str, dict]:
+    """For each team in `g`: days off before it ("0" = played yesterday) and where it played last, from the schedule."""
+    def day_of(x: dict) -> str:
+        return x.get("date") or x["start"][:10]
+    out = {}
+    today = day_of(g)
+    for t in (g["away"], g["home"]):
+        prev = max((x for x in sched if day_of(x) < today and t in (x["away"], x["home"])), key=day_of, default=None)
+        if prev:
+            out[t] = {"days": (date.fromisoformat(today) - date.fromisoformat(day_of(prev))).days - 1, "at": prev["home"], "home": prev["home"] == t}
+    return out
+
+
+@lru_cache(maxsize=4)
+def _xg_by_game(season: int):
+    """Score-and-venue adjusted 5-on-5 expected goals for and against, per team-game, with dates."""
+    from pipeline.metrics import adjust, team_style
+    try:
+        pg = team_style.per_game(season, adjust.weights())
+    except FileNotFoundError:
+        return None
+    return pg.select("team_id", "date", "xgf_adj", "xga_adj")
+
+
+def usual_share(team: str, before: str, season: int | None = None) -> float | None:
+    """A team's usual share of 5-on-5 expected goals before a date: this season, with last season worth REST_SAMPLE games."""
+    import polars as pl
+    from pipeline.config import CURRENT_SEASON, TABLES
+    season = season or CURRENT_SEASON
+    f, a = 0.0, 0.0
+    for s, weight in ((season, None), (season - 1, REST_SAMPLE)):
+        t = _xg_by_game(s)
+        p = TABLES / str(s) / "games.parquet"
+        if t is None or not p.exists():
+            continue
+        g = pl.read_parquet(p)
+        ids = set(g.filter(pl.col("home") == team)["home_id"].to_list()) | set(g.filter(pl.col("away") == team)["away_id"].to_list())
+        t = t.filter(pl.col("team_id").is_in(list(ids)) & (pl.col("date") < before[:10]))
+        if t.is_empty():
+            continue
+        sf, sa = float(t["xgf_adj"].sum()), float(t["xga_adj"].sum())
+        if weight:
+            sf, sa = sf * weight / t.height, sa * weight / t.height
+        f, a = f + sf, a + sa
+    return f / (f + a) if f + a > 0 else None
+
+
+def rest_claim(gid: int, away: str, home: str, places: dict, rest: dict, usual: float | None) -> dict | None:
+    """The rest edge, when one team played yesterday and the other has had at least a day off."""
+    tired = [t for t in (away, home) if rest.get(t, {}).get("days") == 0]
+    if len(tired) != 1 or usual is None:
+        return None
+    t = tired[0]
+    r = home if t == away else away
+    if rest.get(r, {}).get("days", 0) < 1:
+        return None
+    w = {**team_words(t, places, "T"), **team_words(r, places, "R")}
+    w["where"] = places.get(rest[t]["at"], rest[t]["at"])
+    days = rest[r]["days"]
+    return {
+        "kind": "rest", "gap": 50, "metric": "rest", "team": r, "opp": t,
+        "head": _fmt(_pick(REST_HEADS, gid, "rest"), **w),
+        "body": _fmt(_pick(REST_BODIES, gid, "rest", "body"), **w),
+        "call": _fmt("{R} get a bigger share of the 5-on-5 chances than they usually do.", **w),
+        "nums": f"{places[t]} played yesterday · {places[r]} {'had a day' if days == 1 else f'had {days} days'} off · "
+                f"{places[r]}’s usual share of 5-on-5 expected goals: {100 * usual:.1f}%",
+        "gist": _fmt("{T} played last night; {R} are rested.", **w),
+        "cite": "Schedule · back-to-backs over 2023-24 to 2025-26 (809 games)",
+        "check": {"metric": "rest", "measure": "share of 5-on-5 expected goals, adjusted for score and venue", "team": r,
+                  "baseline": round(usual, 4), "league": 0.5, "direction": "above",
+                  "rule": "held if the rested team's share of 5-on-5 expected goals is at or above its usual share; otherwise didn't happen"},
+    }
+
+
 def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, extra: dict | None = None) -> list[dict]:
     """The two to four "What to watch" calls for one game, from fingerprints and lines as they stood before it.
 
@@ -678,6 +766,9 @@ def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, e
     if mc:
         cands.append(mc)
     cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places, extra.get("likely"))
+    rc = rest_claim(gid, away, home, places, extra.get("rest") or {}, extra.get("rest_usual"))
+    if rc:
+        cands.append(rc)
     cands += clash_claims(gid, away, home, fp, places)
     cands += tempo_claims(gid, away, home, fp, places)
     ec = edge_claim(gid, away, home, fp, places, set(), hot_only=True)
@@ -744,6 +835,28 @@ def call_extras(site: dict, before: str) -> dict:
             "pts": _points(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
 
 
+SHOW_LIKELY = 0.6  # our own guess is shown as "likely" only from here (right about three times in four)
+
+
+def projected_starters(g: dict, likely: dict, rebuilt: bool = False) -> dict[str, dict]:
+    """The goalie each team is expected to start, for the page: NHL.com's projection when its preview is up ("nhl"),
+    else our own guess when it is fairly sure ("model"). Never the chance itself."""
+    from pipeline.config import CURRENT_SEASON
+    from pipeline.ingest import nhl_previews
+    nhl = nhl_previews.projected(CURRENT_SEASON, g["id"], g["date"] if rebuilt else None)
+    out = {}
+    for t in (g["away"], g["home"]):
+        ranked = likely.get(t) or []
+        if not ranked:
+            continue
+        pid, q = ranked[0]
+        if nhl.get(t) == pid:
+            out[t] = {"id": pid, "from": "nhl"}
+        elif q >= SHOW_LIKELY:
+            out[t] = {"id": pid, "from": "model"}
+    return out
+
+
 def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
              likely: dict | None = None, **extra) -> dict:
     """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
@@ -752,11 +865,16 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     fp = site["fingerprints"]["teams"]
     if likely is None:
         likely = _likely([g], g["date"]).get(g["id"]) or {}
-    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places, {**call_extras(site, g["start"]), "likely": likely})
+    rest = rest_days(sched, g)
+    rested = [t for t in (away, home) if rest.get(t, {}).get("days", 0) >= 1 and any(rest.get(o, {}).get("days") == 0 for o in (away, home) if o != t)]
+    rest_usual = usual_share(rested[0], g["start"]) if rested else None
+    claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
+                   {**call_extras(site, g["start"]), "likely": likely, "rest": rest, "rest_usual": rest_usual})
     out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),
-           "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)}}
+           "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)},
+           "projected": projected_starters(g, likely, bool(extra.get("rebuilt")))}
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)

@@ -115,6 +115,14 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if league is not None:
             out["league"] = fmt(league)
         return out
+    if m == "rest":
+        r = S.rows.get((gid, tid))
+        if r is None or r["xgf_adj"] + r["xga_adj"] <= 0:
+            return {"verdict": "na", "happened": "The numbers for this game aren’t available."}
+        v = r["xgf_adj"] / (r["xgf_adj"] + r["xga_adj"])
+        return {"verdict": grade(v, base, None, "above"),
+                "happened": f"{team} had {100 * v:.1f}% of the 5-on-5 expected goals (adjusted for score and venue), against their usual {100 * base:.1f}%.",
+                "usual": f"{100 * base:.1f}%", "tonight": f"{100 * v:.1f}%", "league": "50.0%"}
     g = S.games[gid]
     rows = [S.rows.get((gid, g["away_id"])), S.rows.get((gid, g["home_id"]))]
     if any(r is None for r in rows):

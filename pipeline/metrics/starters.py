@@ -14,6 +14,10 @@ does most of the work. A pick the model gives 70%+ was right about three times i
 Goalies the availability table has out (injured, suspended, personal, off the roster) or no longer with the club are
 dropped before scaling. Games further ahead are chained: the likeliest starter of each earlier unplayed game is taken
 as its starter. Never shown as a number; it only decides which goalie a preview talks about first.
+
+On game day NHL.com's own preview names a projected starter (pipeline/ingest/nhl_previews.py). It was right 91% of the
+time over the first 141 team-games of 2026-27, so when it is in, its goalie goes first with NHL_CHANCE and the model's
+others share the rest.
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ from pipeline.config import CURRENT_SEASON, FULL_SEASONS
 
 POOL = 40  # team starts looked back over for candidates
 FEATURES = ["last", "streak", "sh5", "sh10", "shs", "b2b", "last_b2b", "hot", "last_hot", "rest", "ncur"]
+NHL_CHANCE = 0.9  # how often NHL.com's projected starter started, 2026-27 to Oct. 10
 OUT = {"injured", "suspended", "personal", "no_club", "not_listed", "off_roster"}
 
 
@@ -125,10 +130,31 @@ def _unavailable(season: int, team: str, day: str) -> tuple[set[int], set[int]] 
     return set(t.filter(pl.col("status").is_in(list(OUT)))["player_id"].to_list()), set(t["player_id"].to_list())
 
 
-def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None = None) -> dict[int, dict[str, list[tuple[int, float]]]]:
+def _promote(ranked: list[tuple[int, float]], pick: int) -> list[tuple[int, float]]:
+    """NHL.com's projected starter first with NHL_CHANCE, the model's other goalies sharing the rest in their order."""
+    rest = [(p, q) for p, q in ranked if p != pick]
+    total = sum(q for _, q in rest)
+    return [(pick, NHL_CHANCE)] + [(p, round((1 - NHL_CHANCE) * (q / total if total else 1 / len(rest)), 3)) for p, q in rest]
+
+
+def nhl_picks(games: list[dict], season: int = CURRENT_SEASON, before: str | None = None) -> dict[int, dict[str, int]]:
+    """NHL.com's projected starters for these games, where its preview was found (before `before`, an ISO time)."""
+    from pipeline.ingest import nhl_previews
+    out = {}
+    for g in games:
+        got = nhl_previews.projected(season, g["id"], before)
+        if got:
+            out[g["id"]] = got
+    return out
+
+
+def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None = None,
+             nhl: dict[int, dict[str, int]] | None = None) -> dict[int, dict[str, list[tuple[int, float]]]]:
     """Likely starters for unplayed games: {game_id: {team: [(player_id, chance), ...]}}, likeliest first. `games`
     are schedule entries (id, date, home, away); starts on or after `before` (a date) are ignored, so a past day can be
-    replayed. Later games of a team chain on the likeliest starter of its earlier ones."""
+    replayed. Later games of a team chain on the likeliest starter of its earlier ones. `nhl` holds NHL.com's projected
+    starters ({game_id: {team: player_id}}, see `nhl_picks`); a goalie it names goes first unless he is out."""
+    nhl = nhl_picks(games, season, before) if nhl is None else nhl
     st = history()
     if before:
         st = st.filter(pl.col("date") < before[:10])
@@ -146,6 +172,9 @@ def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None
                 out_now, listed = got
                 drop = out_now | {c for c in {x[2] for x in team[t][-POOL:]} if c not in listed}
             ranked = _score(_rows(team[t], gl, g["date"], season), drop)
+            pick = (nhl.get(g["id"]) or {}).get(t)
+            if pick and pick not in drop:
+                ranked = _promote(ranked, pick)
             out[g["id"]][t] = ranked
             if ranked:  # the next game of this team assumes tonight's likeliest starter played
                 team[t].append((g["date"], season, ranked[0][0]))

@@ -18,6 +18,8 @@ Narratives found (preview):
   slow start    a regular scorer last season with no goals yet
   missing       a regular who sat out the team's latest game or games ("has missed", never "injured")
   still out     a regular from last season who hasn't played this season (the lines' absence note)
+  milestone     a skater who dressed last game and is close to a round number: his 500th, 600th... NHL game next,
+                or within two of 100, 200... goals, 200+ assists or 300+ points (complete NHL careers only)
 History starts in 2023-24, so records against a team say "since 2023-24".
 
 Everything a preview story reads is from before the game's date, so a rebuilt preview tells it as a live one would.
@@ -273,9 +275,67 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                         when = "latest game" if missed == 1 else f"last {num(missed)} games"
                         items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
                                       "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
+        if res:
+            items += _milestones(t, res[-1], P, N, before)
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
     if item:
         items.append(item)
+    return out
+
+
+MILESTONE_NEAR = 2  # goals, assists or points away from a round hundred
+
+
+@lru_cache(maxsize=1)
+def _careers() -> dict[int, list[tuple[str, int, int]]]:
+    """Every skater with a complete NHL career on file: his regular-season games as (date, goals, points), oldest first."""
+    from pipeline.ingest import careers
+    out = {}
+    for pid, c in careers.load_all().items():
+        if (c.get("landing") or {}).get("position") == "G":
+            continue
+        out[pid] = sorted((x["gameDate"], int(x.get("goals") or 0), int(x.get("points") or 0)) for log in c["logs"].values() for x in log)
+    return out
+
+
+def milestone(games: list[tuple[str, int, int]], before: str) -> tuple[float, str] | None:
+    """(score, phrase) for the round number a skater is closest to, from his games before `before`, e.g. "is one goal
+    from 400" or "is set to play his 800th NHL game"; None if nothing is close."""
+    past = [x for x in games if x[0] < before[:10]]
+    gp, g, p = len(past), sum(x[1] for x in past), sum(x[2] for x in past)
+    found = []
+    if gp + 1 >= 500 and (gp + 1) % 100 == 0:
+        found.append((72 + (gp + 1) / 200, f"is set to play his {gp + 1:,}th NHL game"))
+    for what, have, low, base in (("goal", g, 100, 72), ("assist", p - g, 200, 66), ("point", p, 300, 70)):
+        nxt = (have // 100 + 1) * 100
+        away = nxt - have
+        if nxt >= low and away <= MILESTONE_NEAR:
+            unit = what if away == 1 else what + "s"
+            found.append((base + nxt / 200 - away, f"is {num(away)} {unit} from {nxt:,}"))
+    return max(found) if found else None
+
+
+def _games_between(t: str, after: str, before: str) -> int:
+    """How many of a team's scheduled games fall after one date (local) and start before a time (UTC, as in `start`)."""
+    p = SITE_DATA / "schedule.json"
+    if not p.exists():
+        return 0
+    return sum(1 for g in json.loads(p.read_text())["games"]
+               if t in (g["home"], g["away"]) and (g.get("date") or g["start"][:10]) > after and g["start"] < before)
+
+
+def _milestones(t: str, last: dict, P: pl.DataFrame, N: dict[int, str], before: str) -> list[dict]:
+    """One item per skater who dressed in the team's last game and is close to a milestone. Only for the team's next
+    game: a game further ahead would count from a total another game may change."""
+    if _games_between(t, last["date"], before):
+        return []
+    last_game = last["game_id"]
+    out = []
+    car = _careers()
+    for pid in P.filter((pl.col("game_id") == last_game) & (pl.col("team") == t))["player_id"].to_list():
+        got = milestone(car[pid], before) if pid in car and pid in N else None
+        if got:
+            out.append({"tag": "Milestone", "text": f"{N[pid]} {got[1]}.", "score": got[0], "pid": pid})
     return out
 
 
