@@ -61,8 +61,10 @@ def team_games(seasons: list[int]) -> pl.DataFrame:
     for s in seasons:
         d = TABLES / str(s)
         g = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(FINAL_STATES))
-        tg = (pl.read_parquet(d / "team_game.parquet").filter(pl.col("strength") != "EN")
-              .group_by("game_id", "team_id").agg((pl.col("xgf") - pl.col("xga")).sum().alias("xgd")))
+        # Empty-net shots are filed under "EN" for the shooting team and "EA" (extra attacker) for the team that
+        # pulled its goalie, so both sides of them are left out: a team chasing a game is not charged for them.
+        tg = (pl.read_parquet(d / "team_game.parquet").group_by("game_id", "team_id")
+              .agg((pl.col("xgf").filter(pl.col("strength") != "EN").sum() - pl.col("xga").filter(pl.col("strength") != "EA").sum()).alias("xgd")))
         out.append(g.select("game_id", "season", "date", "home_id", "away_id", "home_score", "away_score").join(
             tg.rename({"team_id": "home_id", "xgd": "h_xgd"}), on=["game_id", "home_id"]).join(
             tg.rename({"team_id": "away_id", "xgd": "a_xgd"}), on=["game_id", "away_id"]))
