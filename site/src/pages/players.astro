@@ -13,7 +13,7 @@ const base = import.meta.env.BASE_URL;
 <Base section="players" title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
   <header class="page-top"><h1>Players</h1></header>
   <p class="lede">Everyone who has dressed this season. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
-  <nav class="ptabs" aria-label="Players"><a href={`${base}players/`} aria-current="page">Find a player</a><a href={`${base}players/rankings/`}>Rankings</a></nav>
+  <nav class="ptabs" aria-label="Players"><a class="ptab" href={`${base}players/`} aria-current="page">Find a player</a><a class="ptab" href={`${base}players/rankings/`}>Rankings</a></nav>
   <div class="find">
     <label class="search">
       <span class="sr">Find a player by name</span>
