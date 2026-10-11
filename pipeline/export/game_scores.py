@@ -28,6 +28,7 @@ import polars as pl
 
 from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rapm
 from pipeline.metrics import units as U
@@ -168,14 +169,17 @@ def league_rates(season: int) -> dict[str, float]:
             "pp_g": g["pp_gf"] / t["sec_pp"], "sh_g": g["pp_ga"] / t["sec_pp"]}
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
+    """Swing for every finished game, or only the games in `only` (the quick game-night pass). Games whose shift
+    chart the NHL is still filling in get none yet."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
     league = league_rates(season - 1)
-    now = table(season, _ratings([season - 2, season - 1]), league).filter(pl.col("game_id").is_in(list(info)))
+    wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
+    now = table(season, _ratings([season - 2, season - 1]), league).filter(pl.col("game_id").is_in(list(wanted)))
     ref = table(season - 1, _ratings([season - 3, season - 2]), league_rates(season - 2))
     pools = {g: np.sort(ref.filter(pl.col("grp") == g)["score"].to_numpy()) for g in ("F", "D", "G")}
     pct = lambda g, v: int(max(1, min(99, round(100 * np.searchsorted(pools[g], v, side="right") / len(pools[g]))))) if len(pools[g]) else None
@@ -194,7 +198,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         return out
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in OUT.glob("*.json"):
+    for old in OUT.glob("*.json") if only is None else ():
         old.unlink()
     for (gid,), rows in now.group_by("game_id"):
         g = info[gid]

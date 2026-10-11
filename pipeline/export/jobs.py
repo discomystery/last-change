@@ -28,6 +28,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rink_bias
 
@@ -377,10 +378,14 @@ def impact_pcts(season: int) -> dict[int, dict[str, float]]:
     return out
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
+    """Report cards for every finished game, or only for the games in `only` (the quick game-night pass: cards are
+    judged from earlier games alone, so one game's cards come out the same either way). Games whose shift chart the
+    NHL is still filling in get no cards yet."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
+    wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
@@ -417,6 +422,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             while j > 0 and ex[j - 1]["date"] == e["date"]:  # only games on earlier days count as "before"
                 j -= 1
             before_sp = {c: prev_sp[c] + cum_sp[j][k] for k, c in enumerate(special_cols)}
+            if e["game_id"] not in wanted:
+                continue
             card = player_card(e, grp.get(pid, P.GROUP.get(e["pos"], "F")), sub.get(pid, P.SUB.get(e["pos"], "W")), prev, cum[j], m[i], n_prev + j, before_sp,
                                ref, impact.get(pid, {}), fac, hr, league, typical)
             if card:
@@ -429,11 +436,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)
 
-    for gid, card in goalie_cards(season, set(info)):
+    for gid, card in goalie_cards(season, wanted):
         cards[gid].append(card)
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in OUT.glob("*.json"):
+    for old in OUT.glob("*.json") if only is None else ():
         old.unlink()
     for gid, cs in cards.items():
         g = info[gid]

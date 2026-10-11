@@ -152,7 +152,9 @@ def parse(page: dict, day: str, known: dict[str, int] | None = None) -> list[dic
         for i, s in enumerate(sents):
             fs = _fold(s)
             for n, pid in names.items():
-                if pid in seen or not re.search(rf"(?<![a-z]){re.escape(n)}(?![a-z])", fs):
+                # The plain substring test first: the pattern only ever matches where it does, and compiling one per
+                # known name for every sentence took most of a minute a run.
+                if pid in seen or n not in fs or not re.search(rf"(?<![a-z]){re.escape(n)}(?![a-z])", fs):
                     continue
                 # Read the sentence that names him; if it says nothing about availability, the next one about him may.
                 last = n.split()[-1]

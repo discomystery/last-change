@@ -2,16 +2,26 @@
 # Also runs whenever a change to the pipeline, site or these workflows is merged into main, so merged changes go
 # live without anyone pressing Run workflow. A full update rather than the offline publish, on purpose: runs share
 # one queue and a newer queued run replaces an older one, so a merge must never knock out a scheduled data update.
+# On game nights the watcher (gamenight.yml) starts this workflow in "quick" mode: tonight's lineups before puck drop
+# and each post-game page minutes after the horn, in about a minute of work. A quick request becomes a full update
+# whenever one is owed (new code since the last full update, or a scheduled slot below has passed), so a quick run
+# that replaced a waiting full one in the queue does the full one's job (`python -m pipeline.run mode`).
 # Data lives on the `data` branch between runs (restored at the start, saved at the end). Preview calls already
 # frozen at puck drop come back with it, so they are never rewritten.
 name: Nightly update
 
 on:
-  schedule:
+  schedule:  # keep in step with FULL_SLOTS in pipeline/run.py
     - cron: "0 10 * * *"  # 10:00 UTC: after the last West Coast games are final
     - cron: "0 16 * * *"  # 16:00 UTC: refresh before the day's games, so previews freeze on fresh numbers
     - cron: "30 20 * * *"  # 20:30 UTC: pick up NHL.com's projected starting goalies (its previews go up 16:00-19:00 UTC)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full: everything. quick: only tonight's previews and new post-game pages (becomes full when one is owed)."
+        type: choice
+        options: [full, quick]
+        default: full
   push:
     branches: [main]
     paths:
@@ -55,17 +65,33 @@ jobs:
           git fetch --depth=1 origin data
           mkdir -p data
           git archive FETCH_HEAD | tar -x -C data
-          if [ -d data/site_data/previews ]; then
-            mkdir -p site/public/data
+
+      - name: Decide between a quick and a full update
+        id: mode
+        run: echo "mode=$(uv run --project pipeline python -m pipeline.run mode --requested '${{ inputs.mode || 'full' }}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the published numbers
+        run: |
+          # A full update rewrites every file but the previews frozen at puck drop; a quick one keeps the rest as well.
+          mkdir -p site/public/data
+          if [ "${{ steps.mode.outputs.mode }}" = quick ] && [ -d data/site_data ]; then
+            cp -R data/site_data/. site/public/data/
+          elif [ -d data/site_data/previews ]; then
             rm -rf site/public/data/previews
             cp -R data/site_data/previews site/public/data/previews
           fi
           rm -rf data/site_data
 
       - name: Fetch new games and rebuild everything
+        if: steps.mode.outputs.mode == 'full'
         run: uv run --project pipeline python -m pipeline.run update
 
+      - name: Quick game-night pass (tonight's previews, new post-game pages)
+        if: steps.mode.outputs.mode == 'quick'
+        run: uv run --project pipeline python -m pipeline.run quick
+
       - name: Run the pipeline tests
+        if: steps.mode.outputs.mode == 'full'
         run: uv run --project pipeline pytest -q pipeline/tests
 
       - name: Build the site
@@ -75,7 +101,7 @@ jobs:
 
       - name: Save data to the data branch
         run: |
-          pipeline/save_data.sh "Data cache, nightly run $(date -u +%Y-%m-%dT%H:%MZ)"
+          pipeline/save_data.sh "Data cache, ${{ steps.mode.outputs.mode }} run $(date -u +%Y-%m-%dT%H:%MZ)"
 
       - name: Hand the built site to the deploy job
         uses: actions/upload-pages-artifact@v3

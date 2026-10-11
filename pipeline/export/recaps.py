@@ -12,9 +12,12 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
-from pipeline.export import previews, wording
+from pipeline.export import pending, previews, wording
 from pipeline.export import surprises as surprise_rules
 from pipeline.metrics import adjust, goalies, replays, team_style
+
+# A call on a game whose shift chart the NHL is still filling in: graded on a later run (see pending.py).
+PENDING = {"verdict": "pending", "happened": "Checked once the NHL finishes filling in who was on the ice."}
 
 PP_STRENGTHS = {"5v4", "5v3", "4v3"}
 MIN_PP_SEC = 60  # less power-play time than this and a power-play call can't be judged
@@ -345,15 +348,20 @@ def run(season: int = CURRENT_SEASON) -> dict:
         fp_pre = {**fp, **pre.get("fingerprints", {}).get("teams", {})}
         lines_pre = {**usual_lines, **{t: [u["ids"] for u in v["units"] if u["label"][0] == "L"] for t, v in pre.get("lines", {}).get("teams", {}).items()}}
         rb = replay_block(meter[gid], g["away"], g["home"]) if gid in meter else None
+        waiting = gid in pending.games(season)  # shift chart not finished: grade nothing that needs who was on the ice
+        if waiting:
+            for t in nums:
+                nums[t]["cf5"] = None
         calls, graded_claims = [], []
         for c in (snap or {}).get("claims", []):
-            res = measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre)
+            res = (PENDING if waiting else
+                   measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre))
             graded_claims.append({**c, "verdict": res.get("verdict")})
             calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "nums": c.get("nums"), "cite": c["cite"], **res})
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
-        surp, beyond = surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
+        surp, beyond = ([], {}) if waiting else surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
         for c in calls:  # heads and bodies are the frozen preview's own words
             c["happened"] = wording.tidy(c.get("happened"))
         for x in surp + list(beyond.values()):
@@ -365,7 +373,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
                "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
-               "replays": rb}
+               "replays": rb, **({"pending": True} if waiting else {})}
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
         index.append({"id": gid, "date": g["date"], "away": g["away"], "home": g["home"], "score": rec["score"], "end": g["last_period"],

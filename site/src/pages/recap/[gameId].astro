@@ -21,11 +21,11 @@ import { matchupColours } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
 
-type Call = { id: string; kind: string; head: string; body: string; call?: string | null; nums?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
-type Nums = { shots: number; xg: number; cf5: number; pp_goals: number; pp_opps: number };
+type Call = { id: string; kind: string; head: string; body: string; call?: string | null; nums?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | 'pending' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
+type Nums = { shots: number; xg: number; cf5: number | null; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story;
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }>;
     inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }> } | null };
 
@@ -99,12 +99,14 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(r.start));
 const endWord = r.end === 'OT' ? 'Final in overtime' : r.end === 'SO' ? 'Final in a shootout' : 'Final';
-const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge' } as const;
-const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
-const graded = r.calls.filter((c) => c.verdict && c.verdict !== 'na');
+const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;
+const mark = { held: '✓', partly: '≈', missed: '✕', na: '–', pending: '…' } as const;
+const graded = r.calls.filter((c) => c.verdict && c.verdict !== 'na' && c.verdict !== 'pending');
 const count = (v: string) => graded.filter((c) => c.verdict === v).length;
 const sayCount = (n: number, one: string) => `${n} ${one}`;
-const takeaway = graded.length
+const takeaway = r.pending && r.calls.length
+  ? 'The calls are checked once the NHL finishes filling in who was on the ice.'
+  : graded.length
   ? `Of the ${graded.length} calls the preview made, ${count('held')} held up, ${count('partly')} partly did, and ${count('missed')} didn’t happen.`
   : r.preview ? 'None of the preview’s calls could be judged from this game.' : 'No preview was saved for this game.';
 const season = recapIndex.tally as Record<string, number>;
@@ -114,7 +116,7 @@ const sgn = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toF
 const rows: [string, string, (n: Nums) => string, (n: Nums) => number][] = [
   ['Shots on goal', 'Every shot that reached the net, including goals. The bar splits them between the teams.', (n) => String(n.shots), (n) => n.shots],
   ['Expected goals', 'How many goals the chances were worth, by this site’s model. Empty nets left out. The bar splits them between the teams.', (n) => n.xg.toFixed(1), (n) => n.xg],
-  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked. The bar splits them between the teams.', (n) => String(n.cf5), (n) => n.cf5],
+  ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked. The bar splits them between the teams.', (n) => (n.cf5 === null ? '…' : String(n.cf5)), (n) => n.cf5 ?? 0],
   ['Power plays', 'Power-play goals, out of times on the power play. The bar splits the times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`, (n) => n.pp_opps],
 ];
 // Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
@@ -169,6 +171,12 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <SectionNav items={nav as [string, string][]} />
 
   <section class="sec top" id="story" aria-label="Overview">
+    {r.pending && (
+      <div class="card pending" role="status">
+        <p class="mini-h">Still coming in</p>
+        <p>The score, goals, shots and goalies are final. The NHL is still filling in who was on the ice, so the checked calls, Swing, report cards and the shift-by-shift replay will appear here once it has, usually later tonight.</p>
+      </div>
+    )}
     {story ? (
       <GameStory story={story} kicker={false}>
         <div class="tug">
@@ -413,7 +421,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .flipped { font-style: italic; color: var(--ink-2); margin-bottom: 6px; }
   .verdict { display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; margin-bottom: 8px; }
   .verdict.held { background: var(--ink); color: var(--sheet); }
-  .verdict.missed, .verdict.na, .verdict.note-only { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .verdict.missed, .verdict.na, .verdict.pending, .verdict.note-only { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
   .compare { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
@@ -436,6 +444,8 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .surp .mild .h { font-size: 19px; }
   .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
+  .pending { margin-bottom: 20px; }
+  .pending p:last-child { margin: 0; }
   .meter { margin-top: 20px; scroll-margin-top: 80px; }
   .meter .mini-h { margin-bottom: 4px; }
   .rp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; max-width: 520px; }

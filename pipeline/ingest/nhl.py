@@ -134,6 +134,19 @@ def shifts_cover(rows: list[dict], pbp: dict, *, slack: int = 5) -> bool:
     return True
 
 
+def shifts_complete(season: int, game_id: int) -> bool:
+    """True when the saved API chart or HTML report covers the whole game. Right after the horn the NHL is often still
+    filling its shift charts in, and until it has, who was on the ice (strength, 5-on-5 play, lines) is unknown for
+    the missing stretch."""
+    if not raw_path(season, "pbp", game_id).exists():
+        return False
+    pbp = read_raw(season, "pbp", game_id)
+    for kind in ("shifts", "shifts_html"):
+        if raw_path(season, kind, game_id).exists() and shifts_cover(_game_rows(read_raw(season, kind, game_id).get("data") or [], pbp), pbp):
+            return True
+    return False
+
+
 def _unfinished(season: int, game_id: int) -> bool:
     rows = read_raw(season, "shifts", game_id).get("data") or []
     return bool(rows) and not shifts_cover(rows, read_raw(season, "pbp", game_id))
