@@ -14,8 +14,7 @@ const base = import.meta.env.BASE_URL;
 
     <section id="mine" hidden>
       <p class="mine-meta" id="mine-eyebrow"></p>
-      <div id="next"></div>
-      <div id="latest"></div>
+      <div class="tickets" id="tickets"></div>
       <div class="cols">
         <div>
           <h2>Coming up</h2>
@@ -52,7 +51,6 @@ const base = import.meta.env.BASE_URL;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const finals = new Set(sched.games.filter((g) => g.final).map((g) => g.id));
     const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
 
@@ -101,43 +99,20 @@ const base = import.meta.env.BASE_URL;
         const link = el('a', null, `${t.name} team page`);
         link.href = `${base}team/${me}/`;
         eb.replaceChildren(`${t.w}-${t.l}-${t.otl} · `, link);
-        const box = document.getElementById('next');
-        box.replaceChildren();
+        // Next game and latest post-game as two ticket stubs, each one opening its preview or post-game page.
+        const tickets = [];
         if (next) {
-          const rink = el('div', 'nrink');
-          rink.dataset.drop = '';
-          ['rl goal l', 'rl blue l', 'rl red', 'rl blue r', 'rl goal r'].forEach((c) => rink.append(el('span', c)));
-          rink.append(el('span', 'circle', 'at'));
-          [next.away, next.home].forEach((a, i) => {
-            const side = el('div', 'side' + (i ? ' home' : ''));
-            if (colourOf(a, next)) side.style.setProperty('--team', colourOf(a, next));
-            const ab = el('p', 'abbr' + (a === me ? ' me' : ''));
-            const l = el('a', 'tlink', a); l.href = `${base}team/${a}/`; ab.append(l);
-            side.append(ab, el('p', 'full', byAbbr[a]?.name ?? a));
-            if (i) side.append(el('p', 'lc', 'Has last change'));
-            rink.append(side);
-          });
-          const when = el('div', 'next-when');
-          const at = el('p'); at.append(el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`);
-          when.append(el('p', 'when-day', longDay.format(next.t)), at);
-          if (PREVIEWS[next.id]) { const a = el('a', 'pill', 'Preview ›'); a.href = `${base}preview/${next.id}/`; when.append(a); }
-          else when.append(el('span', 'pill none', 'Preview opens a week before the game'));
-          box.append(rink, when);
+          const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+          if (!PREVIEWS[next.id]) when.push(el('br'), 'Preview opens a week before the game');
+          tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: PREVIEWS[next.id] ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
         }
         const last = [...mine].reverse().find((g) => g.final && RECAPS.has(g.id));
-        const lbox = document.getElementById('latest');
-        lbox.replaceChildren();
         if (last) {
-          const info = rc.games.find((x) => x.id === last.id);
           const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
           const opp = last.home === me ? last.away : last.home;
-          const c = el('a', 'card latest go');
-          c.href = `${base}recap/${last.id}/`;
-          c.append(el('span', 'eyebrow', `Latest post-game · ${day.format(last.t)}`),
-                   el('span', 'l-score', `${ms > ts ? 'Won' : 'Lost'} ${ms}–${ts}${last.end && last.end !== 'REG' ? ` (${last.end})` : ''} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`),
-                   el('span', 'l-sub', info && info.calls ? `How the preview held up: ${info.held} of ${info.calls} calls held, ${info.partly} partly` : 'The numbers, the surprises and the goalies'));
-          lbox.append(c);
+          tickets.push(window.lcTicket(last, { eyebrow: 'Latest post-game', href: `${base}recap/${last.id}/`, sub: [`${ms > ts ? 'Won' : 'Lost'} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`], colour: colourOf }));
         }
+        document.getElementById('tickets').replaceChildren(...tickets);
         document.getElementById('upcoming').replaceChildren(...mine.filter((g) => !g.final && g !== next).slice(0, 5).map((g) => row(g, me)));
         document.getElementById('recent').replaceChildren(...mine.filter((g) => g.final).slice(-5).reverse().map((g) => row(g, me)));
       }
@@ -165,9 +140,6 @@ const base = import.meta.env.BASE_URL;
 <style is:global>
   /* Same look as a section heading on every other page. */
   #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 56px 0 16px; }
-  #home .latest { display: grid; gap: 4px; margin-top: 14px; padding: 16px 18px; text-decoration: none; color: var(--ink); }
-  #home .l-score { font: 600 22px/1.2 var(--display); }
-  #home .l-sub { font: 400 14px var(--ui); color: var(--ink-2); }
   #home .more-link { margin-top: 12px; font: 600 14px var(--ui); }
   #home .mine-meta { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
   .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }

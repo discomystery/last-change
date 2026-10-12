@@ -40,6 +40,7 @@ const { abbr } = Astro.params;
 const base = import.meta.env.BASE_URL;
 const team = teams.find((t) => t.abbr === abbr)!;
 const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
+const places = Object.fromEntries(teams.map((t) => [t.abbr, t.place]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const finals = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
 const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === abbr).map((g) => g.id);
@@ -138,7 +139,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
   <SectionNav items={nav as [string, string][]} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
-    <div id="next-card"></div>
+    <div class="tickets" id="tickets"></div>
   </section>
 
   <Section id="form" title="Results and schedule" placeholder={false}>
@@ -450,6 +451,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
   <script type="application/json" id="team-games" set:html={JSON.stringify(games)}></script>
   <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
   <script type="application/json" id="team-names" set:html={JSON.stringify(names)}></script>
+  <script type="application/json" id="team-places" set:html={JSON.stringify(places)}></script>
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>
   <script type="application/json" id="team-recaps" set:html={JSON.stringify(recapIds)}></script>
 </Base>
@@ -465,35 +467,26 @@ const tiText = teamIntro(abbr)?.text ?? [];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const RECAPS = new Set(JSON.parse(document.getElementById('team-recaps').textContent));
     const PREVIEWS = Object.fromEntries(JSON.parse(document.getElementById('team-previews').textContent).map((id) => [id, 'Preview']));
     const now = new Date();
     const next = games.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
-    const box = document.getElementById('next-card');
+    // Next game and latest post-game as two ticket stubs, each one opening its preview or post-game page (same as home).
+    const places = JSON.parse(document.getElementById('team-places').textContent);
+    const tickets = [];
     if (next) {
-      const rink = el('div', 'nrink');
-      rink.dataset.drop = '';
-      ['rl goal l', 'rl blue l', 'rl red', 'rl blue r', 'rl goal r'].forEach((c) => rink.append(el('span', c)));
-      rink.append(el('span', 'circle', 'at'));
-      [next.away, next.home].forEach((a, i) => {
-        const side = el('div', 'side' + (i ? ' home' : ''));
-        if (colourOf(a, next)) side.style.setProperty('--team', colourOf(a, next));
-        const ab = el('p', 'abbr' + (a === me ? ' me' : ''));
-        if (a === me) ab.textContent = a; else { const l = el('a', 'tlink', a); l.href = `${base}team/${a}/`; ab.append(l); }
-        side.append(ab, el('p', 'full', names[a] ?? a));
-        if (i) side.append(el('p', 'lc', 'Has last change'));
-        rink.append(side);
-      });
-      const when = el('div', 'next-when');
-      const at = el('p'); at.append(el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`);
-      when.append(el('p', 'when-day', longDay.format(next.t)), at);
-      if (PREVIEWS[next.id]) { const a = el('a', 'pill', 'Preview ›'); a.href = `${base}preview/${next.id}/`; when.append(a); }
-      else when.append(el('span', 'pill none', 'Preview opens a week before the game'));
-      box.append(rink, when);
-    } else {
-      box.append(el('p', 'next-meta', 'No upcoming games on the schedule.'));
+      const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+      if (!PREVIEWS[next.id]) when.push(el('br'), 'Preview opens a week before the game');
+      tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: PREVIEWS[next.id] ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
     }
+    const last = [...games].reverse().find((g) => g.final && RECAPS.has(g.id));
+    if (last) {
+      const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
+      const opp = last.home === me ? last.away : last.home;
+      tickets.push(window.lcTicket(last, { eyebrow: 'Latest post-game', href: `${base}recap/${last.id}/`, sub: [`${ms > ts ? 'Won' : 'Lost'} ${last.home === me ? 'against' : 'at'} ${places[opp] ?? opp}`], colour: colourOf }));
+    }
+    if (tickets.length) document.getElementById('tickets').replaceChildren(...tickets);
+    else document.getElementById('tickets').replaceWith(el('p', 'next-meta', 'No upcoming games on the schedule.'));
     // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
     const row = (g) => {
       const li = el('li', 'card row game go');

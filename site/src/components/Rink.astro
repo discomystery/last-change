@@ -26,7 +26,9 @@ const scored = list.some((s) => s.score !== undefined);
 </div>
 
 <style>
-  .rink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 2px solid var(--ink); border-radius: 56px; overflow: hidden; min-height: 220px; }
+  /* Faint boards, lighter than the cards and lines around the header (halfway between the label grey and the ice). */
+  .rink { --boards: color-mix(in oklab, var(--ink-3) 55%, var(--sheet)); }
+  .rink { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--sheet); border: 1.5px solid var(--boards); border-radius: 56px; overflow: hidden; min-height: 220px; }
   .rl { position: absolute; top: 0; bottom: 0; }
   .rl.red { left: 50%; width: 5px; margin-left: -2.5px; background: var(--line-red); }
   .rl.blue { width: 5px; background: var(--line-blue); }
@@ -39,7 +41,7 @@ const scored = list.some((s) => s.score !== undefined);
   .dot-circle { border-color: transparent; }
   /* The boards, drawn by the script below once it knows the rink's size; until then the plain border shows. */
   .rk-boards { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  .rk-boards rect { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .rk-boards rect { fill: none; stroke: var(--boards); stroke-width: 1.5; }
   .rk-boards :global(.rk-crease) { fill: var(--line-blue); fill-opacity: 0.45; stroke: var(--line-red); stroke-width: 1; }
   .run .rk-boards :global(.rk-crease) { animation: rk-fade 0.5s ease 0.6s backwards; }
   .rink.boards { border-color: transparent; background-clip: padding-box; }
@@ -83,5 +85,4 @@ const scored = list.some((s) => s.score !== undefined);
   @keyframes rk-in-r { from { opacity: 0; transform: translateX(46px); } }
 </style>
 
-<!-- The boards, creases and the puck drop are run by the rink script in Base.astro, which also serves the next-game
-     rinks that home and team pages build in the browser. -->
+<!-- The boards, creases and the puck drop are run by the rink script in Base.astro. -->
