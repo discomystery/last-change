@@ -306,6 +306,108 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
     return {"head": head, "lede": lede, "history_text": hist.replace("'", "’") if hist else None, "notes": notes, "changed": changed}
 
 
+# ---------------------------------------------------------------- around the same time
+
+NEAR = (6, 10)  # games before and after a change date that count as "around the same time"
+REGULAR_OF = (12, 15)  # dressed in 12 of the team's previous 15 games...
+REGULAR_TOI = 10 * 60  # ...at 10:00+ of 5-on-5 a game
+GONE = 8  # a regular who misses this many straight games (or the rest of the season) is news
+BREAK_DAYS = 8
+
+
+def lineup_table(seasons: list[int]) -> pl.DataFrame:
+    """Every player-game in these seasons: who dressed for whom and their 5-on-5 time, with names and club abbreviations."""
+    out = []
+    for s in seasons:
+        d = TABLES / str(s)
+        g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+        ab = pl.concat([g.select("game_id", pl.col("home_id").alias("team_id"), pl.col("home").alias("club")),
+                        g.select("game_id", pl.col("away_id").alias("team_id"), pl.col("away").alias("club"))])
+        nm = pl.read_parquet(d / "players.parquet").select("player_id", "first", "last").unique("player_id")
+        out.append(pl.read_parquet(d / "player_game.parquet").select("game_id", "player_id", "team_id", "pos", "sec5")
+                   .join(ab, on=["game_id", "team_id"]).join(g.select("game_id", "date"), on="game_id").join(nm, on="player_id", how="left"))
+    return pl.concat(out).sort("game_id")
+
+
+def around(abbr: str, mine: pl.DataFrame, brk: dict | None, lineups: pl.DataFrame, teams: dict, coaches: pl.DataFrame | None) -> list[dict]:
+    """What happened near the change date, as plain facts: breaks in the schedule, regulars who played their last game
+    for the club, regulars who missed a long stretch, new regulars, and coaching changes. Never why, never "because"."""
+    if not brk:
+        return []
+    place = teams.get(abbr, {}).get("place", abbr)
+    ids = mine["game_id"].to_list()
+    dates = mine["date"].to_list()
+    seasons = mine["season"].to_list()
+    n, k = len(ids), brk["k"]
+    lo, hi = max(1, k - NEAR[0]), min(n - 1, k + NEAR[1])
+    pos = {gid: i for i, gid in enumerate(ids)}
+    own = lineups.filter(pl.col("club") == abbr)
+    played: dict[int, dict] = {}
+    for r in own.iter_rows(named=True):
+        i = pos.get(r["game_id"])
+        if i is None:
+            continue
+        p = played.setdefault(r["player_id"], {"name": f"{r['first']} {r['last']}", "pos": r["pos"], "games": {}})
+        p["games"][i] = r["sec5"] or 0
+    elsewhere = lineups.filter(pl.col("club") != abbr).group_by("player_id").agg(pl.col("date").min().alias("first_other"),
+                                                                                 pl.col("date").max().alias("last_other"),
+                                                                                 pl.col("club").last())
+    other = {r["player_id"]: r for r in elsewhere.iter_rows(named=True)}
+
+    def regular(p: dict, j: int) -> bool:
+        prev = [i for i in range(max(0, j - REGULAR_OF[1]), j) if seasons[i] == seasons[j - 1]]
+        g = [p["games"][i] for i in prev if i in p["games"]]
+        return len(prev) >= REGULAR_OF[1] - 2 and len(g) >= REGULAR_OF[0] and sum(g) / len(g) >= REGULAR_TOI
+
+    events: dict[int, list[str]] = {}
+    add = lambda j, text: events.setdefault(j, []).append(text)
+    for j in range(lo, hi + 1):
+        gap = (datetime.fromisoformat(dates[j]) - datetime.fromisoformat(dates[j - 1])).days
+        if seasons[j] == seasons[j - 1] and gap >= BREAK_DAYS:
+            add(j, f"{'Olympic break: no' if gap >= 14 and dates[j][5:7] == '02' else 'No'} games for {gap - 1} days")
+    left, out_, new = {}, {}, {}
+    for pid, p in played.items():
+        for j in range(lo, hi + 1):
+            if j in p["games"] or (j - 1) not in p["games"] or not regular(p, j):
+                continue
+            later = [i for i in p["games"] if i > j and seasons[i] == seasons[j]]
+            o = other.get(pid)
+            if seasons[j] != seasons[j - 1]:
+                if not later and o and o["first_other"] >= dates[j - 1]:
+                    left.setdefault(j, []).append((p["name"], teams.get(o["club"], {}).get("place")))
+                continue
+            if not later and o and o["first_other"] > dates[j - 1]:
+                left.setdefault(j, []).append((p["name"], teams.get(o["club"], {}).get("place")))
+            else:
+                back = min(later) if later else None
+                miss = (back if back is not None else (n if seasons[-1] == seasons[j] else seasons.index(seasons[j] + 1) if seasons[j] + 1 in seasons else n)) - j
+                if miss >= GONE:
+                    out_.setdefault(j, []).append((p["name"], miss, back is None))
+    for pid, p in played.items():
+        first = min(p["games"])
+        if lo <= first <= hi and seasons[first] == seasons[k]:
+            nxt = [i for i in range(first, min(n, first + 10)) if seasons[i] == seasons[first]]
+            if len(nxt) >= 5 and sum(i in p["games"] for i in nxt) >= 0.8 * len(nxt):
+                new.setdefault(first, []).append(p["name"])
+    for j, who in left.items():
+        names = [f"{nm} (now with {pl_})" if pl_ else nm for nm, pl_ in who]
+        add(j, f"Not back this season: {_and(names)}" if seasons[j] != seasons[j - 1]
+            else f"Played {'their' if len(names) > 1 else 'his'} last game for {place}: {_and(names)}")
+    for j, who in out_.items():
+        for nm, miss, rest in who:
+            add(j, f"{nm} out of the lineup for {'the last ' if rest else ''}{miss} games")
+    for j, who in new.items():
+        add(j, f"New in the lineup: {_and(who)}")
+    if coaches is not None:
+        c = coaches.filter(pl.col("team") == abbr).sort("date", "game_id")
+        by_game = dict(zip(c["game_id"].to_list(), c["coach"].to_list()))
+        for j in range(lo, hi + 1):
+            a, b = by_game.get(ids[j - 1]), by_game.get(ids[j])
+            if a and b and a != b:
+                add(j, f"{b} takes over behind the bench")
+    return [{"i": j, "date": dates[j], "text": [t.replace("'", "’") for t in v]} for j, v in sorted(events.items())]
+
+
 # ---------------------------------------------------------------- run
 
 def run(season: int = CURRENT_SEASON) -> dict:
@@ -315,6 +417,10 @@ def run(season: int = CURRENT_SEASON) -> dict:
     g = pl.concat([games(season - 1), games(season)])
     then = last_season_traits(season - 1)
     band = bounce_band()
+    lineups = lineup_table([season - 1, season])
+    cpath = TABLES / str(season) / "coaches.parquet"
+    coaches = pl.concat([pl.read_parquet(p) for p in (TABLES / str(season - 1) / "coaches.parquet", cpath) if p.exists()]) \
+        if cpath.exists() else None
     out = {}
     for abbr, t in teams.items():
         mine = g.filter(pl.col("team") == abbr).sort("game_id")
@@ -331,6 +437,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             "games": [[r["date"], r["opp"], int(r["home"]), r["gf"], r["ga"], r["end"], round(r["xgf_adj"], 3), round(r["xga_adj"], 3), r["season"]]
                       for r in mine.iter_rows(named=True)],
             "change": brk,
+            # Around the same time as the change: [{i: game index, date, text: [facts]}]
+            "around": around(abbr, mine, brk, lineups, teams, coaches),
             "traits": [{"key": r["key"], "tag": r["tag"], "then": r["then"], "now": r["now"]} for r in traits],
             **story(abbr, t, mine, brk, traits, full),
         }

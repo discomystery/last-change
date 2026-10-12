@@ -9,6 +9,8 @@ import { fpInfo, ordinal } from '../data/mock';
 interface Props { abbr: string; colour: string; place: string; t: any; window: number; band: [number, number]; season: number }
 const { abbr, colour, place, t, window: win, band, season } = Astro.props;
 const sn = (s: number) => `${s}-${String(s + 1).slice(-2)}`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const day = (d: string) => `${MONTHS[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
 const ROUND = ['Missed the playoffs', 'Out in the first round', 'Out in the second round', 'Out in the conference final', 'Lost in the Final', 'Won the Stanley Cup'];
 // Every season since 1997-98, with the lockout year left empty so the gap shows.
 type H = [number, number | null, number];
@@ -36,7 +38,18 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       <span class="k-line">Last {win} games</span><span class="k-dot">Each game</span><span class="k-band">What bounces alone do</span><span class="k-avg">Even</span>
       <span class="k-ref">{t.change ? 'Before and after the change' : 'Each season so far'}</span>
     </p>
-    <script type="application/json" id="tr-data" set:html={JSON.stringify({ games: t.games, change: t.change, notes: t.notes, window: win, band, season })}></script>
+    {(t.around ?? []).length > 0 && (
+      <div class="tr-around">
+        <p class="mini-h">Around the same time</p>
+        <ol>
+          {(t.around as { i: number; date: string; text: string[] }[]).map((e, n) => (
+            <li><span class="tr-pin">{n + 1}</span><span class="tr-when">{day(e.date)}</span><span>{e.text.join('. ')}.</span></li>
+          ))}
+        </ol>
+        <p class="tr-caveat">Things that happened near the change date. The numbers can’t say which of them, if any, moved the play.</p>
+      </div>
+    )}
+    <script type="application/json" id="tr-data" set:html={JSON.stringify({ games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
   </div>
 
   {traits.length > 0 && <>
@@ -158,6 +171,21 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     const pts: string[] = [];
     for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
     if (pts.length > 1) o += `<polyline class="tr-line" pathLength="1" points="${pts.join(' ')}"/>`;
+    // Numbered pins for what happened around the change, matching the list under the chart.
+    (d.around || []).forEach((e: any, j: number) => {
+      const px = x(e.i) - (x(1) - x(0)) / 2;
+      o += `<line class="tr-pinl" x1="${px}" x2="${px}" y1="${T}" y2="${H - B}"/>`;
+    });
+    let pins = '';
+    const placed: [number, number][] = [];
+    (d.around || []).forEach((e: any, j: number) => {
+      const px = x(e.i) - (x(1) - x(0)) / 2;
+      let stack = 0; // pins close together stack downward, each on the first free level
+      while (placed.some(([q, l]) => l === stack && Math.abs(q - px) < 20)) stack++;
+      placed.push([px, stack]);
+      const py = T + 10 + stack * 21;
+      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${px}" cy="${py}" r="9"/><text x="${px}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
+    });
     // One tall hover target per game, read by the site's tooltip.
     const step = (W - L - R) / n;
     g.forEach((r, i) => {
@@ -165,6 +193,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const tip = `${day(r[0])} ${r[2] ? 'vs' : 'at'} ${r[1]}, ${res} ${r[3]}-${r[4]}: ${t ? Math.round((100 * r[6]) / t) : 50}% of the chances${i >= win - 1 ? `; ${Math.round(share(i - win + 1, i + 1))}% over the last ${win}` : ''}`;
       o += `<rect class="tr-hit" x="${(L + step * i).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${H - T - B}" data-tip="${tip}"/>`;
     });
+    o += pins;
     svg.innerHTML = o;
   }
   draw();
@@ -220,6 +249,17 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-line { fill: none; stroke: var(--team); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
   .tr-ref { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 1.5 5; stroke-linecap: round; }
   .tr-hit { fill: transparent; }
+  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.3; stroke-width: 1; }
+  .tr-pinm circle { fill: var(--ink); }
+  .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
+  .tr-pinm { cursor: default; }
+  .tr-around { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .tr-around .mini-h { margin: 0 0 10px; }
+  .tr-around ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tr-around li { display: grid; grid-template-columns: 22px 58px 1fr; gap: 0 8px; align-items: baseline; font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
+  .tr-pin { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 11px var(--ui); transform: translateY(3px); }
+  .tr-when { font-weight: 600; color: var(--ink); }
+  .tr-caveat { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
   .tr-hit:hover { fill: color-mix(in oklab, var(--ink) 6%, transparent); }
   html.motion .seen .tr-line { stroke-dasharray: 1; animation: tr-draw 1.2s cubic-bezier(0.3, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
   @keyframes tr-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
