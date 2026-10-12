@@ -172,24 +172,28 @@ const _ = ordinal;
     {story && <GameStory story={story} sides={sides} />}
     {!story && snap.outlook && (
       <div class="card outlook">
-        {order.filter((a) => snap.outlook![a]).map((a) => (
+        {order.filter((a) => snap.outlook![a]).map((a, i) => (
           <div class={`pov pov-${side(a)}`}>
-            <p class="mini-h">How it looks for {place(a)}</p>
+            <p class="mini-h">How it looks for {place(a)}{i === 0 && <button type="button" class="xp-q" aria-expanded="false" aria-controls="outlook-xp" aria-label="Where this comes from">?</button>}</p>
             <h3>{snap.outlook![a].head}</h3>
             <p>{snap.outlook![a].body}</p>
           </div>
         ))}
-        <p class="cite">From this site’s win model, which rates each team on how well they have controlled the chances lately, who is in their lineup (including the league’s injury news), home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
+        <div class="xp" id="outlook-xp" hidden>
+          <p class="cite">From this site’s win model, which rates each team on how well they have controlled the chances lately, who is in their lineup (including the league’s injury news), home ice and rest. We don’t publish the number before the game; the post-game page shows it and what went into it.</p>
+        </div>
       </div>
     )}
     <ol class="watch">
-      {snap.claims.map((c) => (
+      {snap.claims.map((c, i) => (
         <li class="card">
-          <h3>{c.head}</h3>
+          <h3>{c.head}<button type="button" class="xp-q" aria-expanded="false" aria-controls={`call-${i}-xp`} aria-label="Where this call comes from">?</button></h3>
           <p>{c.body}</p>
           {c.call && <p class="call"><span>The call</span> {c.call}</p>}
-          {c.nums && <p class="cite nums">{c.nums}</p>}
-          <p class="cite">{c.cite}</p>
+          <div class="xp" id={`call-${i}-xp`} hidden>
+            {c.nums && <p class="cite nums">{c.nums}</p>}
+            <p class="cite">{c.cite}</p>
+          </div>
         </li>
       ))}
     </ol>
@@ -503,6 +507,9 @@ const _ = ordinal;
   .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
+  .watch h3 .xp-q { margin-left: 10px; width: 20px; height: 20px; font-size: 11px; }
+  .watch .xp .cite:first-child { margin-top: 0; }
+  .mini-h .xp-q { margin-left: 8px; width: 18px; height: 18px; font-size: 10px; text-transform: none; letter-spacing: 0; }
   .watch + .worth { margin-top: 16px; }
   .lines-worth { margin: 20px 0 8px; }
   .tpill { display: inline-block; background: color-mix(in oklab, var(--team) 16%, transparent); color: var(--ink); padding: 1px 9px; border-radius: 999px; font: 700 13px/1.6 var(--ui); text-decoration: none; margin-right: 2px; }
