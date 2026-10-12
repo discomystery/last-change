@@ -20,7 +20,7 @@ import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
-import { teamColour } from '../../lib/teams';
+import { teamPaint } from '../../lib/teams';
 import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import rosterData from '../../../public/data/roster.json';
@@ -112,7 +112,7 @@ const statRow = (x: any) => (isG ? null : x);
 ---
 <Base section="players" title={`${p.name} · ${p.team}`} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
-  <div class="player" style={`--team:${teamColour(p.team)}`}>
+  <div class="player" style={`--team:${teamPaint(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
     <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats', unplayed && 'unplayed']}>
@@ -134,7 +134,7 @@ const statRow = (x: any) => (isG ? null : x);
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamPaint(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} pinned />
 
     {!isG && !s.traits && (

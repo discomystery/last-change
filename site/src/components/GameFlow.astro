@@ -23,7 +23,6 @@ const base = import.meta.env.BASE_URL;
 
 <style is:global>
   .gflow { --c0: var(--away); --c1: var(--home); }
-  @media (prefers-color-scheme: dark) { .gflow { --c0: color-mix(in oklab, var(--away) 55%, white); --c1: color-mix(in oklab, var(--home) 55%, white); } }
   .gflow .gf-pick { margin-top: 0; }
   .gf-wait { font: 500 14px var(--ui); color: var(--ink-3); padding: 40px 0; text-align: center; }
   .gf-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }

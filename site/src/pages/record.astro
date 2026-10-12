@@ -5,7 +5,7 @@ import Section from '../components/Section.astro';
 import SectionNav from '../components/SectionNav.astro';
 import '../styles/blocks.css';
 import track from '../../public/data/track.json';
-import { teamColour } from '../lib/teams';
+import { teamPaint } from '../lib/teams';
 
 type Count = { held: number; partly: number; missed: number };
 type Latest = { game_id: number; date: string; away: string; home: string; kind: string; head: string; call: string | null; verdict: keyof Count; usual: string | null; tonight: string | null };
@@ -162,9 +162,9 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
                 <li class="card gcard">
                   <header class="g-head">
                     <p class="g-teams">
-                      <a class="tlink" href={`${base}team/${g.away}/`}><i class="tdot" style={`--tc:${teamColour(g.away)}`}></i>{g.away}</a>
+                      <a class="tlink" href={`${base}team/${g.away}/`}><i class="tdot" style={`--tc:${teamPaint(g.away)}`}></i>{g.away}</a>
                       <span class="at">at</span>
-                      <a class="tlink" href={`${base}team/${g.home}/`}><i class="tdot" style={`--tc:${teamColour(g.home)}`}></i>{g.home}</a>
+                      <a class="tlink" href={`${base}team/${g.home}/`}><i class="tdot" style={`--tc:${teamPaint(g.home)}`}></i>{g.home}</a>
                       <span class="g-day">{day(g.date, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                     </p>
                     <a class="g-link" href={`${base}recap/${g.game_id}/`}>Post-game <span aria-hidden="true">›</span></a>
@@ -394,9 +394,6 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   .calib .note { margin-top: 14px; }
   .foot { margin-top: 14px; }
 
-  @media (prefers-color-scheme: dark) {
-    .tdot { background: color-mix(in oklab, var(--tc) 55%, white); }
-  }
 
   @media (max-width: 719px) {
     .weeks { display: none; }
