@@ -40,8 +40,14 @@ DIMS = {
     # The same two traits exactly as recorded, with no arena correction (shown when the visitor picks "Raw").
     "physical_raw": (["hits_close"], ["close_sec"], 3600, True),
     "forecheck_raw": (["fc_raw"], ["sec5"], 3600, True),
+    # Shot rates weighted for score and venue are no longer counts anyone made, so they are shown as a score too
+    # (Sora, 2026-10-12); these are the same rates as recorded, for "Raw".
+    "volume_raw": (["cf5"], ["sec5"], 3600, True),
+    "suppression_raw": (["ca5"], ["sec5"], 3600, False),
+    "pace_raw": (["ff5", "fa5"], ["sec5"], 3600, True),
 }
-INDEXED = {"physical": "physical_raw", "forecheck": "forecheck_raw"}  # shown as a score against league average
+INDEXED = {"physical": "physical_raw", "forecheck": "forecheck_raw",  # shown as a score against league average
+           "volume": "volume_raw", "suppression": "suppression_raw", "pace": "pace_raw"}
 COLS = sorted({c for num, den, _, _ in DIMS.values() for c in num + den})
 BOOTSTRAPS = 300
 MAX_K = 400.0
@@ -88,7 +94,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     return t.group_by("game_id", "team_id", "date").agg(
         tot("sec", s5).alias("sec5"), tot("cf_adj", s5).alias("cf_adj"), tot("ca_adj", s5).alias("ca_adj"),
         tot("ff_adj", s5).alias("ff_adj"), tot("fa_adj", s5).alias("fa_adj"), tot("xgf_adj", s5).alias("xgf_adj"), tot("xga_adj", s5).alias("xga_adj"),
-        tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("reb_xgf", s5).alias("reb_xgf"),
+        tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("ca", s5).alias("ca5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("d_cf", s5).alias("d_cf"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
         tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"), tot("ca", s5).alias("ca5"),

@@ -14,7 +14,7 @@ import fpData from '../../public/data/fingerprints.json';
 import linesData from '../../public/data/lines.json';
 import goalieData from '../../public/data/goalies.json';
 import howData from '../../public/data/goal_sources.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../data/mock';
 import { clock, compared } from '../lib/format';
 import '../styles/blocks.css';
 
@@ -28,7 +28,6 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
 const fp = fpData.teams as Record<string, { games: number; dims: Record<string, Record<Mode, Est>> }>;
 const stab = fpData.stabilization as Record<string, { r: number; k_games: number }>;
-const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 const rawPct = (rank: number) => Math.round(((32 - rank) / 31) * 100);
 const traits = fpData.ready.map((key) => ({ key, ...fpInfo[key] }));
 const settle = (key: string) => {
@@ -44,10 +43,10 @@ const gamesRange = (() => { const g = Object.values(fp).map((t) => t.games); ret
 const f1 = (v: number) => v.toFixed(1), f2 = (v: number) => v.toFixed(2);
 const signed = (v: number, d: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
 const numFmt: Record<string, [(v: number) => string, string]> = {
-  volume: [f1, 'attempts per 60'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
-  turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], shotsThrough: [(v) => `${f1(v)}%`, 'of attempts through'], blocking: [(v) => `${f1(v)}%`, 'of attempts blocked'], suppression: [f1, 'allowed per 60'],
+  volume: [(v) => String(Math.round(v)), 'score, 100 is average'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
+  turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], shotsThrough: [(v) => `${f1(v)}%`, 'of attempts through'], blocking: [(v) => `${f1(v)}%`, 'of attempts blocked'], suppression: [(v) => String(Math.round(v)), 'score, 100 is average'],
   qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], longShifts: [(v) => `${f1(v)}%`, 'of shots against'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
-  pace: [f1, 'shots per 60, both teams'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
+  pace: [(v) => String(Math.round(v)), 'score, 100 is average'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
   depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
   discipline: [(v) => signed(v, 2), 'drawn minus taken per 60'],
 };
@@ -56,11 +55,11 @@ type Cell = { r: number; p: number; n: string; t: string };
 const cellData = Object.fromEntries(teams.map((tm) => [tm.abbr, Object.fromEntries(gTraits.flatMap((t) => {
   const d = fp[tm.abbr]?.dims[t.key];
   if (!d) return [];
-  const one = (m: Mode): Cell => ({ r: d[m].rank, p: d[m].pct, n: numFmt[t.key][0](d[m].raw === undefined ? d[m].v : d[m].index), t: `${tm.name}: ${t.say(d[m].raw === undefined ? d[m].v : d[m].index)}, ${ordinal(d[m].rank)} of 32` });
+  const one = (m: Mode): Cell => ({ r: d[m].rank, p: d[m].pct, n: numFmt[t.key][0](d[m].raw === undefined && !scoreTraits.has(t.key) ? d[m].v : d[m].index), t: `${tm.name}: ${t.say(d[m].raw === undefined && !scoreTraits.has(t.key) ? d[m].v : d[m].index)}, ${ordinal(d[m].rank)} of 32` });
   const raw = (m: Mode): Cell => ({ r: d[m].raw_rank!, p: rawPct(d[m].raw_rank!), n: f1(d[m].raw!), t: `${tm.name}: ${d[m].raw!.toFixed(1)} ${rawWords[t.key]}, ${ordinal(d[m].raw_rank!)} of 32` });
   return [[t.key, d.blend.raw === undefined ? { b: one('blend'), s: one('season') } : { b: one('blend'), s: one('season'), br: raw('blend'), sr: raw('season') }]];
 }))]));
-const rawUnit: Record<string, string> = { physical: 'hits per 60 as recorded', forecheck: 'plays per 60 as recorded' };
+const rawUnit: Record<string, string> = { physical: 'hits per 60 as recorded', forecheck: 'plays per 60 as recorded', volume: 'attempts per 60 as recorded', suppression: 'allowed per 60 as recorded', pace: 'shots per 60 as recorded' };
 const confs = [...new Set(teams.map((t) => t.conference))].sort();
 const divsOf = (c: string) => [...new Set(teams.filter((t) => t.conference === c).map((t) => t.division))].sort();
 
@@ -188,13 +187,13 @@ const _ = ordinal;
                 <TeamLink abbr={tm.abbr} class="rname"><span class="full">{tm.name}</span><span class="ab">{tm.abbr}</span></TeamLink>
                 <div class="lanes"><div class="lane"><span class="whisk"></span><span class="dot"></span></div></div>
                 <span class="say">
-                  {modes.map((m) => <span class={`m-${m}`}>{raw ? <><span class="a-adj">{t.say(d[m].index)}</span><span class="a-raw">{d[m].raw!.toFixed(1)} {rawWords[t.key]}</span></> : t.say(d[m].v)}</span>)}
+                  {modes.map((m) => <span class={`m-${m}`}>{raw ? <><span class="a-adj">{t.say(d[m].index)}</span><span class="a-raw">{d[m].raw!.toFixed(1)} {rawWords[t.key]}</span></> : t.say(scoreTraits.has(t.key) ? d[m].index : d[m].v)}</span>)}
                 </span>
               </li>
             );
           })}
         </ol>
-        <p class="note">{settle(t.key)}{rawWords[t.key] && <> This trait is an arena-adjusted score; switch “Hits and takeaways” to Raw in the settings to rank teams by the numbers as recorded.</>}</p>
+        <p class="note">{settle(t.key)}{rawWords[t.key] && <> This trait is shown as a score where 100 is league average; switch “Adjusted stats” to Raw in the settings to rank teams by the numbers as recorded.</>}</p>
       </div>
     ))}
   </Section>
