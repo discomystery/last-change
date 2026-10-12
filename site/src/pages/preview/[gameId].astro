@@ -144,7 +144,7 @@ const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') =>
 
 const story = snap.story;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
-const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
+const nav = [['watch', 'Short version'], ['style', 'Style fingerprints'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Where goals come from'], ['notes', 'Data notes']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
@@ -349,7 +349,7 @@ const _ = ordinal;
     })}
   </Section>
 
-  <Section id="goalies" title="Goaltending" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
+  <Section id="goalies" title="Goalies" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
     <Fragment slot="explain">
       <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start: NHL.com’s projected starter once its game-day preview is up (right about 9 times in 10 this season), otherwise our own guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons).' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
     </Fragment>

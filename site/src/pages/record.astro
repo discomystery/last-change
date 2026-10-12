@@ -70,7 +70,7 @@ const shown = (v: string | null | undefined) => v && v !== '–';
 // Calibration scale: the favourite's chance runs from 50% up, results can fall below it.
 const LO = 30, HI = 100;
 const x = (p: number) => `${((100 * p - LO) / (HI - LO)) * 100}%`;
-const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
+const nav: [string, string][] = [['calls', 'How the calls are doing'], ['kinds', 'By kind of call'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
 ---
 <Base section="record" title="Track record" description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
   <header class="team-top"><h1>Track record</h1></header>

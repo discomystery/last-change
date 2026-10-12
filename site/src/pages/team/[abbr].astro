@@ -119,7 +119,7 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   const list = (a: string[]) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0]);
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['next', 'Next and latest'], ['form', 'Results and schedule'], ['style', 'Style fingerprint'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Who plays whom'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Where goals come from']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 ---
