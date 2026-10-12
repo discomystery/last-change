@@ -1,0 +1,126 @@
+---
+// Career: every NHL regular season, club by club, newest first, with the basic box score (skaters GP G A P; goalies
+// GP W L OT SV% GAA). A season split between clubs shows its total with one quieter row per club under it. Career
+// highs are bold. Long careers show the latest seasons with the rest behind a fold. Data: `career` in his player JSON
+// (pipeline/export/career.py).
+import Section from './Section.astro';
+import teams from '../../public/data/teams.json';
+
+interface Props { p: any }
+const { p } = Astro.props;
+const c = p.career;
+const base = import.meta.env.BASE_URL;
+const isG = p.group === 'G';
+const SHOWN = 6;
+const current = new Set(teams.map((t) => t.abbr));
+const rows = c ? [...c.seasons].reverse() : [];
+const highs: Record<string, number[]> = c?.highs ?? {};
+const nowSeason = p.season as number;
+const seasonName = (s: number) => `${s}-${String(s + 1).slice(2)}`;
+const shortSeason = (s: number) => `${String(s).slice(2)}-${String(s + 1).slice(2)}`;
+const yrs = (b: any) => (b.from === b.to ? seasonName(b.from) : `${seasonName(b.from)} to ${seasonName(b.to)}`);
+const svp = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(3).replace(/^0/, ''));
+const num = (v: number | null | undefined) => (v == null ? '–' : String(v));
+const cols: [string, string, string][] = isG
+  ? [['gp', 'GP', 'Games played'], ['w', 'W', 'Wins'], ['l', 'L', 'Losses in regulation'], ['ot', 'OT', 'Overtime and shootout losses'], ['sv', 'SV%', 'Save percentage'], ['gaa', 'GAA', 'Goals against per 60 minutes']]
+  : [['gp', 'GP', 'Games played'], ['g', 'G', 'Goals'], ['a', 'A', 'Assists'], ['p', 'P', 'Points']];
+const cell = (r: any, k: string) => (k === 'sv' ? svp(r.sv) : k === 'gaa' ? (r.gaa == null ? '–' : r.gaa.toFixed(2)) : num(r[k]));
+const isHigh = (s: number, k: string) => (highs[k] ?? []).includes(s);
+const lead = isG ? 'Every NHL regular season, club by club: games, record, save percentage and goals-against average.' : 'Every NHL regular season, club by club: games, goals, assists and points.';
+const anyHigh = Object.keys(highs).length > 0;
+---
+{c && (
+  <Section id="career" title="Career" placeholder={false} takeaway={lead}>
+    <Fragment slot="explain">
+      <p class="note">A season split between clubs shows its total first, then each club on its own line. {isG ? 'Career highs in wins, and in save percentage over seasons of 20 or more games, are in bold.' : 'Career highs in goals and points are in bold.'} Seasons from 2023-24 on are counted from the NHL’s own game files; earlier seasons are the NHL’s career totals.</p>
+    </Fragment>
+    {rows.length > 0 && (
+      <div class="card career">
+        <table class:list={['ctab', isG && 'ctab-g']}>
+          <thead>
+            <tr><th>Season</th><th>Team</th>{cols.map(([, short, tip]) => <th><abbr title={tip}>{short}</abbr></th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((r: any, i: number) => {
+              const old = rows.length > SHOWN + 1 && i >= SHOWN;
+              const team = (t: any) => (
+                <>
+                  {current.has(t.team) ? <a class="tlink" href={`${base}team/${t.team}/`}><span class="full">{t.name}</span><span class="short">{t.team}</span></a>
+                    : <span title={t.name}><span class="full">{t.name}</span><span class="short">{t.team}</span></span>}
+                </>
+              );
+              return (
+                <>
+                  <tr class:list={[old && 'old', r.teams && 'split']}>
+                    <th scope="row"><span class="full">{seasonName(r.s)}</span><span class="short">{shortSeason(r.s)}</span>{r.s === nowSeason && <span class="so-far">so far</span>}</th>
+                    <td class="tm">{r.teams ? <span class="n">{r.teams.length} teams</span> : team(r)}</td>
+                    {cols.map(([k]) => isHigh(r.s, k) ? <td><strong class="hi" title="Career high">{cell(r, k)}</strong></td> : <td>{cell(r, k)}</td>)}
+                  </tr>
+                  {r.teams?.map((t: any) => (
+                    <tr class:list={['part', old && 'old']}>
+                      <th scope="row"></th>
+                      <td class="tm">{team(t)}</td>
+                      {cols.map(([k]) => <td>{cell(t, k)}</td>)}
+                    </tr>
+                  ))}
+                </>
+              );
+            })}
+          </tbody>
+          {c.career && rows.length > 1 && (
+            <tfoot>
+              <tr><th scope="row">Career</th><td class="tm n">{rows.length} seasons</td>{cols.map(([k]) => <td>{cell(c.career, k)}</td>)}</tr>
+            </tfoot>
+          )}
+        </table>
+        {rows.length > SHOWN + 1 && (
+          <details class="fold car-more">
+            <summary><span class="closed">Show all {rows.length} seasons</span><span class="opened">Show the latest {SHOWN}</span></summary>
+          </details>
+        )}
+      </div>
+    )}
+    {(c.before || c.pending || anyHigh) && (
+      <p class="n car-note">
+        {anyHigh && <>Bold is a career high. </>}
+        {c.before && <>{rows.length ? 'Before the NHL' : 'Most recently'}: {c.before.team} ({c.before.league}), {yrs(c.before)}. </>}
+        {c.pending && <>Seasons before 2023-24 are still being collected and will appear after an overnight update.</>}
+      </p>
+    )}
+  </Section>
+)}
+
+<style>
+  .career { padding: 6px 22px 14px; max-width: 760px; }
+  .ctab { width: 100%; border-collapse: collapse; font: 400 14px var(--ui); font-variant-numeric: tabular-nums; }
+  .ctab th, .ctab td { padding: 9px 10px; text-align: right; white-space: nowrap; }
+  .ctab th:first-child { padding-left: 0; text-align: left; }
+  .ctab td:last-child, .ctab th:last-child { padding-right: 0; }
+  .ctab .tm { text-align: left; width: 100%; }
+  .ctab thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding-top: 12px; }
+  .ctab thead th:nth-child(2) { text-align: left; }
+  .ctab abbr { text-decoration: none; cursor: help; }
+  .ctab tbody th { font-weight: 600; }
+  .ctab tbody tr { border-top: 1px solid var(--rule); }
+  .ctab tbody tr.part { border-top: 0; color: var(--ink-3); }
+  .ctab tr.part td, .ctab tr.part th { padding-top: 0; }
+  .ctab tr.part .tm { padding-left: 14px; }
+  .ctab tfoot tr { border-top: 1.5px solid var(--ink-3); }
+  .ctab tfoot th, .ctab tfoot td { font-weight: 600; }
+  .ctab .hi { font-weight: 700; }
+  .ctab .so-far { margin-left: 6px; font: 500 11px var(--ui); color: var(--ink-3); }
+  .ctab .short { display: none; }
+  .ctab tr.old { display: none; }
+  .career:has(.car-more[open]) tr.old { display: table-row; }
+  .car-more { margin-top: 10px; }
+  .car-note { margin-top: 12px; }
+  @media (max-width: 719px) {
+    .career { padding: 4px 14px 12px; }
+    .ctab { font-size: 13px; }
+    .ctab th, .ctab td { padding: 8px 5px; }
+    .ctab tr.part .tm { padding-left: 10px; }
+    .ctab .full { display: none; }
+    .ctab .short { display: inline; }
+    .ctab .so-far { display: block; margin: 1px 0 0; font-size: 10px; }
+  }
+</style>
