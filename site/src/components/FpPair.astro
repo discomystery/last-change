@@ -1,13 +1,12 @@
 ---
 // One fingerprint trait for a real two-team matchup: a dot per team on one scale, then each team's stat in words.
 // `c` carries the trait's label, tip, scale ends and `say`, plus each team's blended and season-only estimates keyed by abbreviation.
-import { ordinal } from '../data/mock';
+import { ordinal, rawWords, scoreTraits } from '../data/mock';
 interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
 const { c, sides } = Astro.props;
-const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 ---
 <li class="card fpc fpp">
-  <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
+  <div class="fpc-top"><span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>{scoreTraits.has(c.key) && <span class="corner">100 is average</span>}</div>
   <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
   <div class="lanes">
     {sides.map((s) => {
@@ -28,7 +27,7 @@ const rawWords: Record<string, string> = { physical: 'hits recorded per 60', for
               {e.v === null || (e.raw !== undefined && e.index === null)
                 ? <span><b>{s.place}:</b> nothing to show yet this season</span>
                 : e.raw === undefined
-                ? <><span><b>{s.place}:</b> {c.say(e.v)}</span><em>{ordinal(e.rank)} of 32</em></>
+                ? <><span><b>{s.place}:</b> {c.say(scoreTraits.has(c.key) ? e.index : e.v)}</span><em>{ordinal(e.rank)} of 32</em></>
                 : <>
                     <span class="a-adj"><b>{s.place}:</b> {c.say(e.index)}</span><em class="a-adj">{ordinal(e.rank)} of 32</em>
                     <span class="a-raw"><b>{s.place}:</b> {e.raw.toFixed(1)} {rawWords[c.key]}</span><em class="a-raw">{ordinal(e.raw_rank)} of 32</em>

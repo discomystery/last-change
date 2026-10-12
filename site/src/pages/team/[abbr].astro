@@ -32,7 +32,7 @@ import UnitToi from '../../components/UnitToi.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../data/mock';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -48,7 +48,6 @@ const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === ab
 const previewIds = previewIndex.filter((p) => !finals.has(p.id) && (p.home === abbr || p.away === abbr)).map((p) => p.id);
 const last = lines.teams.find((t) => t.team === abbr);
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
-const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
 type Unit = { label: string; players: string[]; gp?: number; new?: boolean; minutes: number; seconds: number; toi_sec: number | null; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
@@ -155,7 +154,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
     <Fragment slot="explain">
       <p class="note m-blend">Real numbers through {asOf}: {mine.games} games this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">Real numbers through {asOf}, from this season’s {mine.games} games only. Expect these to swing a lot this early, which is why the likely ranges are so wide.</p>
-      <p class="note">Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+      <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
     <div class="key"><span class="one"><i></i>{team.name}</span><span class="avg">League average</span><span class="rng">Likely range</span></div>
     {fpGroups.map((g) => fp.some((c) => c.group === g) && (
@@ -164,13 +163,13 @@ const tiText = teamIntro(abbr)?.text ?? [];
         <ul class="fpgrid">
           {fp.filter((c) => c.group === g).map((c) => (
             <li class="card fpc">
-              <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
+              <div class="fpc-top"><span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>{scoreTraits.has(c.key) && <span class="corner">100 is average</span>}</div>
               <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
               <div class="lanes"><div class="lane" style={`--b:${c.blend.pct};--blo:${c.blend.lo};--bhi:${c.blend.hi};--c:${c.season.pct};--clo:${c.season.lo};--chi:${c.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
               {(['blend', 'season'] as const).map((mode) => (
                 <p class={`fpc-line m-${mode}`}>
                   {c[mode].raw === undefined
-                    ? <><span>{c.say(c[mode].v)}</span><em>{ordinal(c[mode].rank)} of 32</em></>
+                    ? <><span>{c.say(scoreTraits.has(c.key) ? c[mode].index : c[mode].v)}</span><em>{ordinal(c[mode].rank)} of 32</em></>
                     : <>
                         <span class="a-adj">{c.say(c[mode].index)}</span><em class="a-adj">{ordinal(c[mode].rank)} of 32</em>
                         <span class="a-raw">{c[mode].raw!.toFixed(1)} {rawWords[c.key]}</span><em class="a-raw">{ordinal(c[mode].raw_rank!)} of 32</em>

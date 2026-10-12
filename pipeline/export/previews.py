@@ -24,11 +24,12 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 6  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 7  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
 # 6: the rest edge (one team on the second night of a back-to-back)
+# 7: shot volume, shots against and pace quoted as scores, with what they look like as recorded (`see`); ranks as chips
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -40,6 +41,59 @@ def a_pct(v: float) -> str:
     """A chance written with its article: "a 6.3%", "an 8.1%", "an 11.0%"."""
     s = f"{100 * v:.1f}%"
     return ("an " if s[0] == "8" or s.split(".")[0] in ("11", "18") else "a ") + s
+
+
+# Shot rates as scores (Sora, 2026-10-12). A team's shot rate weighted for score and venue is no longer a count anyone
+# made, so the calls quote it as a score where 100 is the league average, like the arena-scored hits, and then say what
+# that looks like as recorded: shot attempts in a game, and shots on goal on the scoreboard. Grading is unchanged (the
+# checks still store the rates); only the words are.
+SCORES = {"volume": "shot volume score", "suppression": "shots-against score", "pace": "pace score"}
+GAME_MIN = 48.7  # minutes of 5-on-5 in a typical game, 2023-24 to 2025-26 (empty-net time aside)
+
+
+def score(v: float, league: float) -> int:
+    return round(100 * v / league)
+
+
+def per_game(rate: float) -> int:
+    """A rate per 60 minutes of 5-on-5 as a count in a typical game."""
+    return round(rate * GAME_MIN / 60)
+
+
+def sog_one(attempts: float) -> int:
+    """Shots on goal on the scoreboard (every situation) a team usually has with this many 5-on-5 shot attempts
+    (fitted on 2023-24 to 2025-26 team-games, r 0.63; power plays, blocks and misses make it rough)."""
+    return round(9.3 + 0.397 * attempts)
+
+
+def sog_both(shots: float) -> int:
+    """Shots on goal on the scoreboard, both teams, with this many 5-on-5 shots between them (blocked ones aside)."""
+    return round(22.4 + 0.488 * shots)
+
+
+# Rank chips under a call: (short name, how a team's figure reads in the chip's tooltip).
+CHIP = {
+    "volume": ("shot volume", lambda e: f"shot volume score {e['index']}"),
+    "suppression": ("shots against", lambda e: f"shots-against score {e['index']}"),
+    "pace": ("pace", lambda e: f"pace score {e['index']}"),
+    "quality": ("shot quality", lambda e: f"{a_pct(e['v'])} chance of scoring on the average shot"),
+    "qualityAllowed": ("dangerous shots allowed", lambda e: f"{a_pct(e['v'])} chance of scoring on the average shot against"),
+    "turnover": ("chances off turnovers", lambda e: f"{e['v']:.1f}% of chances right after winning the puck"),
+    "breakdowns": ("avoiding breakdowns", lambda e: f"{e['v']:.2f} defensive breakdowns per 60"),
+    "pp": ("power play", lambda e: f"{e['v']:.1f} expected goals per 60 on the power play"),
+    "pk": ("penalty kill", lambda e: f"{e['v']:.1f} expected goals allowed per 60 shorthanded"),
+    "physical": ("physicality", lambda e: f"hit score {e['index']}"),
+    "forecheck": ("forecheck", lambda e: f"forecheck score {e['index']}"),
+    "dShots": ("shots from defensemen", lambda e: f"{e['v']:.0f}% of shot attempts from defensemen"),
+    "inClose": ("shots from in close", lambda e: f"{e['v']:.0f}% of shots from within 20 feet"),
+    "depth": ("depth", lambda e: f"{e['v']:.0f}% of forward ice time to the bottom six"),
+}
+
+
+def chip(t: str, k: str, e: dict, places: dict, cite: str, text: str | None = None, when: str = "") -> dict:
+    """One rank chip: the team's abbreviation and rank, with the figure and the source in its tooltip."""
+    return {"team": t, "text": text or f"{_ordinal(e['rank'])} {CHIP[k][0]}",
+            "tip": f"{places.get(t, t)}: {CHIP[k][1](e)}, {_ordinal(e['rank'])} of 32{when}. {cite.replace(' · ', ', ')}."}
 
 
 STRONG, WEAK = 70, 35  # league percentiles (higher is better) for a "meets a soft spot" call
@@ -267,16 +321,26 @@ def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
                          "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"]),
                          "xw": standing(o["rank"]), "yw": standing(d["rank"])}
                 league = o["v"] * 100 / o["index"] if o.get("index") else None
+                cite = f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}"
+                sc = off in SCORES and league
+                if sc:
+                    n = per_game(o["v"])
+                    words["xv"] = f"score {o['index']}"
+                    call = f"{_cap(words['Xp'])} {SCORES[off]} is at least their usual {o['index']}."
+                    see = f"About {n} shot attempts at 5-on-5, usually around {sog_one(n)} shots on goal on the scoreboard."
+                else:
+                    call, see = _cap(CLASH_CALL[off](words, o["v"])), None
                 out.append({
                     "kind": "clash", "gap": o["pct"] - d["pct"], "metric": off, "team": x, "opp": y,
                     "head": _fmt(_pick(CLASH_WORDS[off][0], gid, off, x), **words),
-                    "call": _cap(CLASH_CALL[off](words, o["v"])),
+                    "call": call, **({"see": see} if see else {}),
                     "body": _fmt(_pick([b.lstrip("*") for b in CLASH_WORDS[off][1] if o["rank"] <= TOP or not b.startswith("*")], gid, off, x, "body"), **words),
                     "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
+                    "chips": [chip(t_, k_, e_, places, cite) for t_, k_, e_ in ((x, off, o), (y, dfn, d)) if k_ in CHIP],
                     "gist": _fmt(CLASH_GIST[off], **words),
-                    "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
+                    "cite": cite,
                     "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(o["v"], 4),
-                              "league": round(league, 4) if league else None, "direction": "above",
+                              "league": round(league, 4) if league else None, "direction": "above", **({"scale": "score"} if sc else {}),
                               "rule": "held if tonight's figure is at or above the team's usual level; partly if between the league average and that level; otherwise didn't happen"},
                 })
     out.sort(key=lambda c: -c["gap"])
@@ -303,16 +367,29 @@ def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[
                      "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"])}
             lean_txt = _pick((DUEL_LEAN_PP if off == "pp" else DUEL_LEAN)[side], gid, off, x, "lean")
             body = "{X} are " + standing(o["rank"]) + " for " + oname + ", and {Y} are " + standing(d["rank"]) + " at " + dname + ". " + lean_txt
-            call = _cap(DUEL_CALL[off][side](words, lo))
+            cite = f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}"
+            sc = off in SCORES
+            see = None
+            if sc:
+                n = per_game(lo)
+                words["xv"] = f"score {o['index']}"
+                call = (f"{_cap(words['Xp'])} {SCORES[off]} is above 100, the league average, against {words['Y']}." if side == "offense"
+                        else f"{_cap(words['Y'])} keep {words['Xp']} {SCORES[off]} under 100, the league average.")
+                see = (f"More than {n} shot attempts for {words['X']} at 5-on-5, which usually means {sog_one(n)} or more shots on goal on the scoreboard."
+                       if side == "offense" else
+                       f"Fewer than {n} shot attempts for {words['X']} at 5-on-5, which usually means {sog_one(n)} or fewer shots on goal on the scoreboard.")
+            else:
+                call = _cap(DUEL_CALL[off][side](words, lo))
             out.append({
                 "kind": "duel", "gap": min(o["pct"], d["pct"]), "metric": off, "team": x, "opp": y, "lean": side,
                 "head": _fmt(_pick(DUEL_HEADS, gid, off, x), **words),
-                "body": _fmt(body, **words), "call": call,
+                "body": _fmt(body, **words), "call": call, **({"see": see} if see else {}),
                 "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
+                "chips": [chip(t_, k_, e_, places, cite) for t_, k_, e_ in ((x, off, o), (y, dfn, d)) if k_ in CHIP],
                 "gist": _fmt("It’s strength against strength: {X} for " + oname + ", {Y} at " + dname + ".", **words),
-                "cite": f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}",
+                "cite": cite,
                 "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(lo, 4), "usual": round(o["v"], 4),
-                          "league": round(lo, 4), "direction": "above" if side == "offense" else "below",
+                          "league": round(lo, 4), "direction": "above" if side == "offense" else "below", **({"scale": "score"} if sc else {}),
                           "rule": "held if tonight's figure lands on the predicted side of the league average; otherwise didn't happen"},
             })
     out.sort(key=lambda c: -c["gap"])
@@ -345,24 +422,35 @@ def changed_claims(gid: int, away: str, home: str, fp: dict, places: dict, stab:
             up = s["pct"] > b["pct"]  # better than the blend (percentiles are oriented so higher is better)
             higher = DIMS[k][3]
             words = {**team_words(t, places, "X"), "name": name, "thing": thing}
-            show = EDGE[k][4] if k in EDGE else (lambda v: f"{v:.1f}")
-            sv, bv = (s["index"], b["index"]) if k in INDEX_TRAITS else (s["v"], b["v"])
+            sc = k in SCORES
+            show = (lambda v: f"score {v:.0f}") if sc else EDGE[k][4] if k in EDGE else (lambda v: f"{v:.1f}")
+            sv, bv = (s["index"], b["index"]) if k in INDEX_TRAITS or sc else (s["v"], b["v"])
             body = (f"Over this season and last, {words['X']} have been {standing(b['rank'])} for {name}. This season alone they’ve been "
                     f"{standing(s['rank'])}, {better if up else worse}. "
                     f"We think tonight looks more like this season than the old {words['Xn']}.")
             # "above" the blend means a bigger figure; for traits where lower is better, better means below
             direction = "above" if up == higher else "below"
+            cite = f"Style fingerprint · blended and this season only · {games} games this season"
+            if sc:
+                call = f"{_cap(words['Xp'])} {SCORES[k]} is {direction} their blended level of {bv:.0f}."
+                what = "shot attempts" if k == "volume" else "shot attempts against"
+                see = f"About {per_game(s['v'])} {what} at 5-on-5 the way they’ve played this season, against {per_game(b['v'])} at their blended level."
+            else:
+                call = (f"{_cap(words['X'])} hit {'more' if up else 'less'} than their blended level ({show(bv)})." if k == "physical" else
+                        f"{_cap(words['Xp'])} {thing} is {'better' if up else 'worse'} than their blended level of {show(bv)}.")
+                see = None
             out.append({
                 "kind": "changed", "gap": abs(s["pct"] - b["pct"]), "metric": k, "team": t, "opp": o,
                 "head": _fmt(_pick((CHANGED_HEADS_PHYSICAL if k == "physical" else CHANGED_HEADS)["better" if up else "worse"], gid, k, t), **words),
                 "body": _cap(body),
                 "nums": f"{_cap(name)}: {_ordinal(b['rank'])} over two seasons ({show(bv)}), {_ordinal(s['rank'])} this season ({show(sv)})",
                 "gist": f"{_cap(words['X'])} aren’t the team you remember for {name}.",
-                "call": (f"{_cap(words['X'])} hit {'more' if up else 'less'} than their blended level ({show(bv)})." if k == "physical" else
-                         f"{_cap(words['Xp'])} {thing} is {'better' if up else 'worse'} than their blended level of {show(bv)}."),
-                "cite": f"Style fingerprint · blended and this season only · {games} games this season",
+                "call": call, **({"see": see} if see else {}),
+                "chips": [chip(t, k, b, places, cite, f"{_ordinal(b['rank'])} over two seasons", " over this season and last"),
+                          chip(t, k, s, places, cite, f"{_ordinal(s['rank'])} this season", " this season")] if k in CHIP else [],
+                "cite": cite,
                 "check": {"metric": k, "team": t, "baseline": round(b["v"], 4), "season": round(s["v"], 4), "index_traits": k in INDEX_TRAITS,
-                          "league": round(b["v"] * 100 / b["index"], 4) if b.get("index") else None, "direction": direction,
+                          "league": round(b["v"] * 100 / b["index"], 4) if b.get("index") else None, "direction": direction, **({"scale": "score"} if sc else {}),
                           "rule": "held if tonight's figure lands on this season's side of the blended level; otherwise didn't happen"},
             })
     out.sort(key=lambda c: -c["gap"])
@@ -551,6 +639,9 @@ EDGE_CALL = {  # the prediction in plain words: {top} comes out ahead of {bot} o
     "physical": "{top} hit more than {bot} in the close stretches of the game.", "depth": "{top} spread their forward ice time deeper down the lineup than {bot}.",
     "pp": "{topp} power play creates more per 60 than {botp}.", "pk": "{topp} penalty kill allows less per 60 than {botp}.",
 }
+EDGE_SCORE_CALL = {"volume": "{topp} shot volume score is higher than {botp}.", "suppression": "{topp} shots-against score is lower than {botp}."}
+EDGE_SEE = {"volume": "{top} out-attempting {bot} at 5-on-5, usually by about {d}.",
+            "suppression": "{top} allowing fewer shot attempts at 5-on-5 than {bot}, usually about {d} fewer."}
 EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, {bot} the other
     "volume": ["{top} will outshoot {bot}", "Volume against patience"],
     "quality": ["{top} hunt better looks than {bot}", "Good looks against hopeful ones"],
@@ -608,6 +699,11 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
     top, bot = (away, home) if a["pct"] >= h["pct"] else (home, away)
     rt, rb = (a, h) if top == away else (h, a)
     tw, bw = team_words(top, places, "top"), team_words(bot, places, "bot")
+    cite = f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}"
+    chk = edge_check(k, top, bot, fp)
+    sc = k in SCORES
+    if sc:
+        chk["scale"] = "score"
     w = {"name": ("the " + name) if k in ("pp", "pk") else name, **tw, **bw, "rt": _ordinal(rt["rank"]), "rb": _ordinal(rb["rank"]), "hi": hi, "lo": lo,
          "wt": standing(rt["rank"]), "wb": standing(rb["rank"])}
     return {
@@ -615,10 +711,12 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
         "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
         "body": _fmt(_pick(EDGE_BODIES, gid, k, "body") if hot else EDGE_MILD_BODY, **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
+        "chips": [chip(top, k, rt, places, cite), chip(bot, k, rb, places, cite)] if k in CHIP else [],
         "gist": _fmt(("{top} and {bot} sit at opposite ends for {name}." if hot else "{top} have the edge over {bot} on {name}."), **w),
-        "call": _fmt(EDGE_CALL[k], **w),
-        "cite": f"Style fingerprint · this season blended with last · {_games(fp[away]['games'], fp[home]['games'])}",
-        "check": edge_check(k, top, bot, fp),
+        "call": _fmt(EDGE_SCORE_CALL[k] if sc else EDGE_CALL[k], **w),
+        **({"see": _fmt(EDGE_SEE[k], d=per_game(abs(rt["v"] - rb["v"])), **w)} if sc else {}),
+        "cite": cite,
+        "check": chk,
     }
 
 
@@ -635,16 +733,22 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
             heads, body = PACE_WORDS[kind]
             league = a["v"] * 100 / a["index"]
             bar = max(a["v"], h["v"]) if kind == "fast" else min(a["v"], h["v"])
+            fast = kind == "fast"
+            n = per_game(bar)
             out.append({
-                "kind": "pace", "gap": min(a["pct"], h["pct"]) if kind == "fast" else 100 - max(a["pct"], h["pct"]), "metric": "pace", "team": away, "opp": home,
+                "kind": "pace", "gap": min(a["pct"], h["pct"]) if fast else 100 - max(a["pct"], h["pct"]), "metric": "pace", "team": away, "opp": home,
                 "head": _pick(heads, gid, "pace"),
-                "call": f"The game runs at {'more' if kind == 'fast' else 'fewer'} than {bar:.1f} shots per 60 at 5-on-5, {'faster' if kind == 'fast' else 'slower'} than either team’s usual.",
+                "call": f"The game’s pace score is {'above' if fast else 'below'} {score(bar, league)}, {'faster' if fast else 'slower'} than either team’s usual.",
+                "see": (f"{'More' if fast else 'Fewer'} than {n} shots between them at 5-on-5, on goal or wide, which usually means "
+                        f"{sog_both(n)} or {'more' if fast else 'fewer'} shots on goal on the scoreboard."),
                 "body": _fmt(body, **w),
-                "nums": f"Pace (shots per 60 at 5-on-5, both teams): {places[away]} {_ordinal(a['rank'])} ({a['v']:.1f}), {places[home]} {_ordinal(h['rank'])} ({h['v']:.1f})",
+                "nums": f"Pace score (100 is league average): {places[away]} {_ordinal(a['rank'])} ({a['index']}), {places[home]} {_ordinal(h['rank'])} ({h['index']})",
+                "chips": [chip(away, "pace", a, places, cite), chip(home, "pace", h, places, cite)],
                 "gist": "Both teams like a fast game." if kind == "fast" else "Both teams play slow, low-event hockey.",
                 "cite": cite,
                 "check": {"metric": "pace", "measure": "shots per 60 at 5-on-5 (blocked shots left out), both teams combined, adjusted for score and venue",
                           "team": None, "baseline": round(bar, 2), "average": round((a["v"] + h["v"]) / 2, 2), "league": round(league, 2), "direction": direction,
+                          "scale": "score", "bar_team": away if bar == a["v"] else home,
                           "rule": f"held if tonight's pace is {direction} the {'faster' if kind == 'fast' else 'slower'} team's usual; partly if {direction} the league average; otherwise didn't happen"},
             })
     a, h = fp[away]["dims"]["physical"]["blend"], fp[home]["dims"]["physical"]["blend"]
@@ -655,6 +759,7 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
             "call": f"The two teams’ combined hit score reaches their usual {(a['index'] + h['index']) / 2:.0f}.",
             "body": _fmt("{A} and {H} are both among the league’s heaviest hitters, even after adjusting for each arena’s scorer. Keep your head up.", **w),
             "nums": f"Hit score (100 is league average): {places[away]} {a['index']} ({_ordinal(a['rank'])}), {places[home]} {h['index']} ({_ordinal(h['rank'])})",
+            "chips": [chip(away, "physical", a, places, cite), chip(home, "physical", h, places, cite)],
             "gist": "Expect plenty of hitting.",
             "cite": cite,
             "check": {"metric": "physical", "measure": "hits per 60 in close games, both teams, as a score against league average (arena-adjusted)",

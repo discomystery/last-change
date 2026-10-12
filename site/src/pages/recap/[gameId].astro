@@ -13,6 +13,7 @@ import GameFlow from '../../components/GameFlow.astro';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
+import CallCard from '../../components/CallCard.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
 import Explain from '../../components/Explain.astro';
 import Gloss from '../../components/Gloss.astro';
@@ -294,37 +295,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
     {r.calls.length > 0 ? (
       <ol class="claims">
-        {r.calls.map((c) => (
-          <li class="card claim">
-            <div class="claim-said">
-              <h3>{c.head}</h3>
-              <p class="detail">{c.body}</p>
-              {c.call && <p class="call"><span>The call</span> {c.call}</p>}
-              {c.nums && <p class="nums">{c.nums}</p>}
-            </div>
-            <div class="claim-did">
-              {c.verdict === null ? (
-                <>
-                  <p class="verdict na">– Can’t judge</p>
-                  <p class="detail">This call has no rule to check it by.</p>
-                </>
-              ) : (
-                <>
-                  <p class:list={['verdict', c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span> {label[c.verdict]}</p>
-                  <p>{c.happened}</p>
-                  {c.beyond && <p class="beyond"><strong>Called it, and then some.</strong> {c.beyond}</p>}
-                  {c.tonight && c.tonight !== '–' && (
-                    <dl class="compare">
-                      <div><dd>{c.usual}</dd><span>Coming in</span></div>
-                      <div><dd>{c.tonight}</dd><span>In this game</span></div>
-                      {c.league && <div><dd>{c.league}</dd><span>{c.kind === 'matchup' ? 'With no line matching' : 'League average'}</span></div>}
-                    </dl>
-                  )}
-                </>
-              )}
-            </div>
-          </li>
-        ))}
+        {r.calls.map((c) => <CallCard c={c as any} side={side} graded />)}
       </ol>
     ) : (
       <p class="note">No preview was saved for this game, so there were no calls to check.</p>
@@ -447,8 +418,6 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .sub { font: 600 22px/1.2 var(--display); margin: 40px 0 0; }
   .hero { margin-top: 0; }
   .claims { display: grid; gap: 16px; margin-top: 22px; }
-  .claim { display: grid; gap: 16px; }
-  @media (min-width: 760px) { .claim { grid-template-columns: 1fr 1fr; gap: 28px; } .claim-did { border-left: 1px solid var(--rule); padding-left: 24px; } }
   .eyebrow { margin-bottom: 4px; }
   .claim h3, .h { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
   .detail { color: var(--ink-2); font-size: 15px; }

@@ -149,7 +149,9 @@ def shot_share(rows: dict, a: str, h: str, fp: dict, places: dict) -> dict | Non
             "muted": f"{T} held their own on shots", "unusual": f"{T} dominated the shot count"}[cls]
     expect = (f"From how these two usually play, {T} would expect about {e[t]:.0f}%." if cls != "unusual"
               else "These two usually split the shots about evenly.")
-    body = f"{T} took {x[t]:.0f}% of the 5-on-5 shot attempts (adjusted for score and venue). {expect} {rarity('share', dev)}"
+    # The real count reads better than a weighted share here: the weighting barely moves a share (Sora, 2026-10-12).
+    took, all_ = int(rows[t]["cf5"]), int(rows[t]["cf5"] + rows[o]["cf5"])
+    body = f"{T} took {took} of the {all_} shot attempts at 5-on-5. {expect} {rarity('share', dev)}"
     return _item("shots", z * SHOT_WEIGHT, cls, head, body, ("shots", t, True))
 
 

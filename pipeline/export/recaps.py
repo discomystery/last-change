@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
-from pipeline.export import pending, previews, wording
+from pipeline.export import grades, pending, previews, wording
 from pipeline.export import surprises as surprise_rules
 from pipeline.metrics import adjust, goalies, replays, team_style
 
@@ -113,8 +113,8 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             usual = chk.get("usual", base)
             what = {"volume": "5-on-5 shot attempts", "quality": "chance quality", "pp": "the power play", "turnover": "chances off turnovers"}[m]
             txt = f"On {what}, {team} had {fmt(v)}. The league average is {fmt(base)}, and they came in at {fmt(usual)}."
-            return {"verdict": grade(v, base, None, chk["direction"]), "happened": txt, "usual": fmt(usual), "tonight": fmt(v), "league": fmt(base)}
-        out = {"verdict": grade(v, base, league, chk["direction"]), "happened": txt, "usual": fmt(base), "tonight": fmt(v)}
+            return {"verdict": grade(v, base, None, chk["direction"]), "happened": txt, "usual": fmt(usual), "tonight": fmt(v), "league": fmt(base), "_v": v}
+        out = {"verdict": grade(v, base, league, chk["direction"]), "happened": txt, "usual": fmt(base), "tonight": fmt(v), "_v": v}
         if league is not None:
             out["league"] = fmt(league)
         return out
@@ -125,7 +125,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         v = r["xgf_adj"] / (r["xgf_adj"] + r["xga_adj"])
         return {"verdict": grade(v, base, None, "above"),
                 "happened": f"{team} had {100 * v:.1f}% of the 5-on-5 expected goals (adjusted for score and venue), against their usual {100 * base:.1f}%.",
-                "usual": f"{100 * base:.1f}%", "tonight": f"{100 * v:.1f}%", "league": "50.0%"}
+                "usual": f"{100 * base:.1f}%", "tonight": f"{100 * v:.1f}%", "league": "50.0%", "_v": v}
     g = S.games[gid]
     rows = [S.rows.get((gid, g["away_id"])), S.rows.get((gid, g["home_id"]))]
     if any(r is None for r in rows):
@@ -137,7 +137,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
                  else f"the two teams’ usual {base:.1f}")  # rules 3 set the bar at the faster (or slower) team's usual
         return {"verdict": grade(v, base, league, chk["direction"]),
                 "happened": f"The game ran at {v:.1f} shots per 60 at 5-on-5, both teams combined, against {usual} and a league average of {league:.1f}.",
-                "usual": f"{base:.1f} per 60", "tonight": f"{v:.1f} per 60", "league": f"{league:.1f} per 60"}
+                "usual": f"{base:.1f} per 60", "tonight": f"{v:.1f} per 60", "league": f"{league:.1f} per 60", "_v": v}
     if m == "physical":
         if min(r["close_sec"] for r in rows) < MIN_CLOSE_SEC:
             return {"verdict": "na", "happened": "The game was rarely close, and hit rates are only counted in close games, so this one can’t be judged.", "usual": f"hit score {base:.0f}", "tonight": "–"}
@@ -146,7 +146,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         v = sum(r["hits_adj"] / r["close_sec"] * 3600 for r in rows) / 2 / league_rate * 100
         return {"verdict": grade(v, base, 100, "above"),
                 "happened": f"The two teams’ combined hit score was {v:.0f}, against their usual {base:.0f} (100 is league average, after adjusting for the arena’s scorer).",
-                "usual": f"hit score {base:.0f}", "tonight": f"hit score {v:.0f}", "league": "hit score 100"}
+                "usual": f"hit score {base:.0f}", "tonight": f"hit score {v:.0f}", "league": "hit score 100", "_v": v}
     if m == "matchup_share":
         if "opp_lines" not in chk:
             return {"verdict": "na", "happened": "This call was saved before the site recorded the visitors’ lines, so it can’t be checked."}
@@ -161,7 +161,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         return {"verdict": grade(v, base, chk["threshold"], "above"),
                 "happened": f"{team}’s {chk['unit']} ({names}) spent {v}% of its 5-on-5 time against {opp_place}’s {chk['opp_line']} "
                             f"({clock(sec.get(chk['opp_line'], 0))} of {clock(total)}), against a home habit of {base}% and about {chk['threshold']}% with no line matching.",
-                "usual": f"{base}%", "tonight": f"{v}%", "league": f"{chk['threshold']}%"}
+                "usual": f"{base}%", "tonight": f"{v}%", "league": f"{chk['threshold']}%", "_v": v}
     return {"verdict": "na"}
 
 
@@ -198,7 +198,7 @@ def measure_edge(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> di
     ut, ub = chk["baseline"][top], chk["baseline"][bot]
     return {"verdict": verdict,
             "happened": f"On {chk['measure']}, {T} had {fmt(tv)} and {B} {fmt(bv)}. Coming in, {T} was at {fmt(ut)} and {B} at {fmt(ub)}.",
-            "usual": f"{top} {fmt(ut)} · {bot} {fmt(ub)}", "tonight": f"{top} {fmt(tv)} · {bot} {fmt(bv)}"}
+            "usual": f"{top} {fmt(ut)} · {bot} {fmt(ub)}", "tonight": f"{top} {fmt(tv)} · {bot} {fmt(bv)}", "_v": d, "_chk": chk, "_tb": (tv, bv)}
 
 
 def measure_changed(S: Season, gid: int, claim: dict, places: dict) -> dict:
@@ -222,7 +222,7 @@ def measure_changed(S: Season, gid: int, claim: dict, places: dict) -> dict:
     verdict = "held" if beyond(v, base) else "missed"
     return {"verdict": verdict,
             "happened": f"On {previews.EDGE[k][3]}, {T} had {show(v)}, against {show(base)} over this season and last and {show(season)} this season alone.",
-            "usual": show(base), "tonight": show(v)}
+            "usual": show(base), "tonight": show(v), "_v": v}
 
 
 def measure_history(claim: dict, glines: list) -> dict:
@@ -236,7 +236,7 @@ def measure_history(claim: dict, glines: list) -> dict:
     verdict = "held" if abs(sv - chk["baseline"]) < abs(sv - chk["record"]) else "missed"
     return {"verdict": verdict,
             "happened": f"{g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
-            "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None}
+            "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None, "_v": sv, "_name": g["name"]}
 
 
 def matchup_seconds(S: Season, gid: int, chk: dict) -> dict[str, float]:
@@ -359,16 +359,20 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 nums[t]["cf5"] = None
         calls, graded_claims = [], []
         for c in (snap or {}).get("claims", []):
-            res = (PENDING if waiting else
-                   measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre))
+            res = dict(PENDING if waiting else
+                       measure_history(c, glines) if c["kind"] == "history" else measure(S, gid, c, places, fp_pre))
+            res = grades.present(S, gid, c, res, places, fp_pre)
             graded_claims.append({**c, "verdict": res.get("verdict")})
-            calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "nums": c.get("nums"), "cite": c["cite"], **res})
+            calls.append({"id": c["id"], "kind": c["kind"], "head": c["head"], "body": c["body"], "call": c.get("call"), "nums": c.get("nums"), "cite": c["cite"],
+                          **{k: c[k] for k in ("see", "chips") if c.get(k)}, **res})
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
         surp, beyond = ([], {}) if waiting else surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
         for c in calls:  # heads and bodies are the frozen preview's own words
-            c["happened"] = wording.tidy(c.get("happened"))
+            for k in ("happened", "title", "plain", "saw"):
+                if c.get(k):
+                    c[k] = wording.tidy(c[k])
         for x in surp + list(beyond.values()):
             x["head"], x["body"] = wording.tidy(x.get("head")), wording.tidy(x.get("body"))
         for c in calls:
