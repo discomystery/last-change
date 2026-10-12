@@ -34,6 +34,96 @@ const teamList = teams as { abbr: string; name: string }[];
       }
     </script>
     <script is:inline>
+      // Spelling and units: pages are written in American spelling with imperial units, and readers can pick Canadian in
+      // the footer (Canadian spelling, metric units; remembered in this browser; with nothing saved, a browser set to
+      // Canadian English or French starts on Canadian). Text is changed as the page is read in, before it is first drawn,
+      // so the other version never flashes, and again whenever the page adds text. Each changed text keeps its original,
+      // so switching back restores it exactly. Spellings are mapped both ways, so older text written the other way reads
+      // right too.
+      (() => {
+        const PAIRS = [
+          ['defense', 'defence'], ['defenses', 'defences'], ['defenseman', 'defenceman'], ['defensemen', 'defencemen'],
+          ['offense', 'offence'], ['offenses', 'offences'],
+          ['center', 'centre'], ['centers', 'centres'], ['centered', 'centred'],
+          ['color', 'colour'], ['colors', 'colours'], ['colored', 'coloured'],
+          ['favor', 'favour'], ['favors', 'favours'], ['favored', 'favoured'], ['favorite', 'favourite'], ['favorites', 'favourites'], ['favorable', 'favourable'],
+          ['behavior', 'behaviour'], ['behaviors', 'behaviours'], ['gray', 'grey'], ['grayed', 'greyed'], ['judgment', 'judgement'],
+          ['canceled', 'cancelled'], ['traveled', 'travelled'], ['traveling', 'travelling'], ['labeled', 'labelled'], ['modeled', 'modelled'],
+        ];
+        const TO = { us: {}, ca: {} };
+        PAIRS.forEach(([us, ca]) => { TO.us[ca] = us; TO.ca[us] = ca; });
+        const RE = new RegExp('\\b(' + PAIRS.flat().join('|') + ')\\b', 'gi');
+        const CAP = /^[A-Z]/;
+        // Imperial to metric, Canadian only: a number with its unit keeps the number of decimals it had (feet get one).
+        const KM = 1.609344, M = 0.3048;
+        const num = (s) => parseFloat(s.replace(/,/g, ''));
+        const dec = (s) => (s.split('.')[1] || '').length;
+        const fmt = (v, d) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+        const metric = (s) => s
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)mph\b/g, (_, n, sp) => fmt(num(n) * KM, dec(n)) + sp + 'km/h')
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)miles?\b/g, (_, n, sp) => fmt(num(n) * KM, dec(n)) + sp + 'km')
+          .replace(/\bmiles\b/g, 'kilometres')
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)(feet|foot|ft)\b/g, (_, n, sp, u) => fmt(num(n) * M, Math.max(1, dec(n))).replace(/\.0$/, '') + sp + (u === 'ft' ? 'm' : 'metres'));
+        const ATTRS = ['title', 'data-tip', 'aria-label', 'placeholder', 'alt'];
+        const SKIP = 'script,style,textarea,input,code,a.plink,[data-nospell]';
+        let target = 'us';
+        try { target = localStorage.getItem('lc-spell') || ''; } catch {}
+        if (target !== 'us' && target !== 'ca') target = (navigator.languages || [navigator.language]).some((l) => /^(en|fr)-CA$/i.test(l)) ? 'ca' : 'us';
+        const spell = (s) => s.replace(RE, (w, _, i) => {
+          const to = TO[target][w.toLowerCase()];
+          if (!to) return w;
+          if (w === w.toUpperCase()) return to.toUpperCase();
+          if (CAP.test(w)) {
+            // A capitalized word beside another capitalized word is part of a name ("Bell Centre", "United Center"): left as is.
+            const before = s.slice(0, i).match(/(\S+)\s+$/), after = s.slice(i + w.length).match(/^\s+(\S+)/);
+            if ((before && CAP.test(before[1]) && !/[.:·!?]$/.test(before[1])) || (after && CAP.test(after[1]))) return w;
+            return to[0].toUpperCase() + to.slice(1);
+          }
+          return to;
+        });
+        const convert = (s) => { const t = spell(s); return target === 'ca' ? metric(t) : t; };
+        // Original and changed text, per text node and per element attribute, so a switch can start again from the original.
+        const was = new WeakMap();
+        const redo = (key, cur, write) => {
+          const o = was.get(key);
+          const src = o && cur === o.out ? o.src : cur;
+          if (!o && !/[a-z]{2}/i.test(src)) return;
+          const out = convert(src);
+          if (out === src) was.delete(key); else was.set(key, { src, out });
+          if (cur !== out) write(out);
+        };
+        const skip = (el) => el && el.closest && el.closest(SKIP);
+        const fixText = (t) => { if (!skip(t.parentElement)) redo(t, t.data, (v) => { t.data = v; }); };
+        const fixAttrs = (el) => {
+          if (skip(el)) return;
+          ATTRS.forEach((a) => {
+            const v = el.getAttribute(a);
+            if (v == null) return;
+            let m = was.get(el);
+            if (!m) { m = {}; was.set(el, m); }
+            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src);
+            m[a] = out === src ? undefined : { src, out };
+            if (v !== out) el.setAttribute(a, out);
+          });
+        };
+        const fix = (node) => {
+          if (node.nodeType === 3) return fixText(node);
+          if (node.nodeType !== 1) return;
+          fixAttrs(node);
+          const w = document.createTreeWalker(node, 5);
+          for (let n = w.nextNode(); n; n = w.nextNode()) n.nodeType === 3 ? fixText(n) : fixAttrs(n);
+        };
+        const root = document.documentElement;
+        new MutationObserver((list) => list.forEach((m) => {
+          if (m.type === 'childList') m.addedNodes.forEach(fix);
+          else if (m.type === 'characterData') fixText(m.target);
+          else fixAttrs(m.target);
+        })).observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+        root.dataset.spell = target;
+        window.lcSpell = { get: () => target, set: (v) => { if (v === target) return; target = v; root.dataset.spell = v; fix(root); } };
+      })();
+    </script>
+    <script is:inline>
       // The two ticket stubs (styles above) for home and team pages: next game and latest post-game, each a link.
       // g: a schedule game with t (Date); final games carry as/hs and end. colour(abbr, g) gives a team's matchup colour.
       window.lcTicket = (g, { eyebrow, href, sub, colour }) => {
@@ -118,17 +208,22 @@ const teamList = teams as { abbr: string; name: string }[];
     <footer class="site-foot">
       <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
       <p>A fan project, in beta: pages and numbers may still change. Not affiliated with the NHL or any of its teams.</p>
+      <p class="foot-spell" role="group" aria-label="Spelling and units">
+        <span class="term" tabindex="0" data-nospell data-tip="American: defense, center, feet and mph. Canadian: defence, centre, metres and km/h.">Spelling and units</span>
+        <button type="button" data-pref="spell" data-value="us" data-nospell>American</button><span aria-hidden="true">·</span><button type="button" data-pref="spell" data-value="ca" data-nospell>Canadian</button>
+      </p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline>
       // Visitor settings: remembered in this browser only, applied before anything else runs.
       (() => {
-        const defaults = { team: '', mode: 'blend', arena: 'adjusted' };
+        const defaults = { team: '', mode: 'blend', arena: 'adjusted', spell: window.lcSpell.get() };
         const read = (k) => { try { return localStorage.getItem('lc-' + k) || defaults[k]; } catch { return defaults[k]; } };
         const root = document.documentElement;
         const apply = (k, v) => {
           root.dataset[k] = v;
           document.querySelectorAll(`[data-pref="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
+          if (k === 'spell') window.lcSpell.set(v);
           if (k === 'team') document.getElementById('team-pick').value = v;
           if (k === 'team') {
             ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
@@ -491,6 +586,11 @@ const teamList = teams as { abbr: string; name: string }[];
   .brand-name { display: inline-flex; align-items: center; gap: 8px; }
   .beta { font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); background: var(--track); border-radius: 999px; padding: 4px 8px; cursor: help; }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
+  .foot-spell { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 2px; }
+  .foot-spell .term { margin-right: 2px; }
+  .foot-spell button { font: inherit; color: var(--ink-3); background: none; border: 0; padding: 0; cursor: pointer; }
+  .foot-spell button:hover { color: var(--ink); }
+  .foot-spell button[aria-pressed='true'] { color: var(--ink); font-weight: 600; cursor: default; }
 
   /* Page titles: one size and spacing on every page, with an optional intro line under them. */
   main h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; }

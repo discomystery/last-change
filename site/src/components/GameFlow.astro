@@ -268,7 +268,7 @@ const base = import.meta.env.BASE_URL;
 
       const keyEl = $('gf-key'); keyEl.replaceChildren();
       const item = (cls: string, label: string, c?: string) => { const sp = document.createElement('span'); if (c) sp.style.setProperty('--c', c); sp.innerHTML = `<i${cls ? ` class="${cls}"` : ''}></i>`; sp.append(label); keyEl.append(sp); };
-      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal, ringed in the scoring team’s colour'); item('hollow', 'Shot at an empty net');
+      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal, ringed in the scoring team’s color'); item('hollow', 'Shot at an empty net');
       for (const s of ['Bigger dot = better chance', 'Shaded = power play']) { const sp = document.createElement('span'); sp.textContent = s; keyEl.append(sp); }
 
       const board = (t: number) => {

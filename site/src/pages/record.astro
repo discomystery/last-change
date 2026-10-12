@@ -96,7 +96,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
     ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others. Greyed rates rest on too few calls to judge.">
+  <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others. Grayed rates rest on too few calls to judge.">
     {n > 0 ? (
       <ol class="kinds">
         {kindRows(calls).map(({ label, rule, c }) => {
@@ -212,7 +212,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             <div class="card tile">
               <p class="eyebrow">This season</p>
               <p class="big">{win.season.picked}<span> of {win.season.games}</span></p>
-              <p class="sub">games won by the team we favoured ({Math.round(100 * win.season.hit_rate)}%)</p>
+              <p class="sub">games won by the team we favored ({Math.round(100 * win.season.hit_rate)}%)</p>
             </div>
           )}
           {win.season && (
@@ -226,7 +226,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             <div class="card tile">
               <p class="eyebrow">{seasonsLabel(win.past.seasons)}</p>
               <p class="big">{Math.round(100 * win.past.hit_rate)}%<span> vs {Math.round(100 * win.past.home_rate)}%</span></p>
-              <p class="sub">favourite against home team, {win.past.games.toLocaleString('en-US')} games</p>
+              <p class="sub">favorite against home team, {win.past.games.toLocaleString('en-US')} games</p>
             </div>
           )}
         </div>
