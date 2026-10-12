@@ -12,7 +12,6 @@ const c = data.checks;
   <ul class="checks">
     <li><strong>{c.games}</strong> games this season processed</li>
     <li><strong>{c.toi_within_5s_pct}%</strong> of players’ ice time matches the official boxscore within 5 seconds</li>
-    <li><strong>{c.xg_match_rate_pct}%</strong> of {c.xg_shots.toLocaleString('en-US')} of MoneyPuck’s shots matched to NHL events (we compare our expected goals with theirs as a check)</li>
   </ul>
   <nav class="jump" aria-label="Teams">{data.teams.map((t) => <a class="jump-a" href={`#${t.team}`}>{t.team}</a>)}</nav>
   {data.teams.map((t) => (
