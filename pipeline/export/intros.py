@@ -171,6 +171,8 @@ STYLE = {
     "breakdowns": ("rarely get burned after losing the puck", "get caught after turnovers too often"),
     "longShifts": ("rarely get stuck out on long shifts", "get pinned in their own end on long shifts"),
     "blocking": ("get in front of a lot of shots", "rarely block shots"),
+    "pointAllowed": ("collapse around the net and give up the point", "push out to take away the point shot"),
+    "icing": (None, "ice the puck a lot to get out of trouble"),
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
