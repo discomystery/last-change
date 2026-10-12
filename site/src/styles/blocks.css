@@ -42,6 +42,41 @@
   .fpc-line em, .fpc-line .rank-link { font-style: normal; color: var(--ink-3); white-space: nowrap; }
   .fpc-line .rank-link { text-decoration: underline 1px var(--rule); text-underline-offset: 4px; }
   .fpc-line .rank-link:hover { color: var(--ink); text-decoration-color: var(--ink); }
+  /* Compact fingerprint rows (FpRow): name and rank, then the scale with its end words at either side; tap for the stat in words. */
+  .fpr-hint { margin: -6px 0 12px; }
+  .fold .fpr-hint { margin: 18px 0 12px; }
+  .fpr-groups { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 470px), 1fr)); align-items: start; }
+  .fpr-grp { padding: 16px 22px 8px; }
+  .fpr-grp > h3 { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 2px; }
+  .fpr { border-top: 1px solid var(--rule); }
+  .fpr:first-of-type { border-top: 0; }
+  .fpr > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: baseline; padding: 13px 0; }
+  .fpr > summary::-webkit-details-marker { display: none; }
+  .fpr-name { font: 600 15px/1.25 var(--ui); }
+  .fpr > summary:hover .fpr-name { text-decoration: underline 1px var(--rule); text-underline-offset: 4px; }
+  .fpr-rk { display: flex; gap: 10px; font: 500 14px var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .fpr-rk > span { display: inline-flex; align-items: center; gap: 5px; }
+  .fpr-rk > span:is(.t-away, .t-home)::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--team); }
+  .fpr .r-s { display: none; }
+  html[data-mode='season'] .fpr .r-s { display: inline; }
+  html[data-mode='season'] .fpr .r-b { display: none; }
+  .fpr-scale { grid-column: 1 / -1; display: grid; grid-template-columns: 6.2em minmax(0, 1fr) 6.2em; gap: 0 10px; align-items: center; }
+  .fpr-lo, .fpr-hi { font: italic 400 13px/1.2 var(--body); color: var(--ink-2); }
+  .fpr-lo { text-align: right; }
+  .fpr .lanes { display: grid; gap: 5px; padding: 3px 7px; }
+  .fpr .lane { display: block; }
+  .fpr-say { display: grid; gap: 6px; padding: 0 0 14px; }
+  .fpr-side { display: grid; gap: 2px; }
+  .fpr-side:has(> i) { grid-template-columns: 10px 1fr; gap: 2px 8px; align-items: baseline; }
+  .fpr-side > i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .fpr-side:has(> i) .fpc-line { grid-column: 2; }
+  .fpr-tip { font: 400 13px/1.45 var(--ui); color: var(--ink-3); }
+  html[data-mode='season'] .fpr .no-season :is(.dot, .whisk) { visibility: hidden; }
+  @media (max-width: 560px) {
+    .fpr-grp { padding: 14px 16px 6px; }
+    .fpr-scale { grid-template-columns: 5.4em minmax(0, 1fr) 5.4em; gap: 0 6px; }
+    .fpr-lo, .fpr-hi { font-size: 12px; }
+  }
   .units2 { align-items: start; }
   .gmode.m-season { display: none; }
   html[data-mode='season'] .gmode.m-season { display: block; }

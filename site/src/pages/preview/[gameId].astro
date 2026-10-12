@@ -22,6 +22,7 @@ import Marker from '../../components/Marker.astro';
 import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
+import FpRow from '../../components/FpRow.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import { matchupColours } from '../../lib/teams';
 import '../../styles/blocks.css';
@@ -208,12 +209,15 @@ const _ = ordinal;
     <ul class="fpgrid">{biggest.map((c) => <FpPair c={c} sides={fpSides} />)}</ul>
     <details class="fold">
       <summary><span class="closed">Show all {traits.length} traits</span><span class="opened">Hide the full set</span></summary>
-      {fpGroups.map((g) => traits.some((c) => c.group === g) && (
-        <>
-          <h3 class="sub">{g}</h3>
-          <ul class="fpgrid">{traits.filter((c) => c.group === g).map((c) => <FpPair c={c} sides={fpSides} />)}</ul>
-        </>
-      ))}
+      <p class="note fpr-hint">Tap a trait for the numbers behind it.</p>
+      <div class="fpr-groups">
+        {fpGroups.map((g) => traits.some((c) => c.group === g) && (
+          <div class="card fpr-grp">
+            <h3>{g}</h3>
+            {traits.filter((c) => c.group === g).map((c) => <FpRow c={c} sides={fpSides} />)}
+          </div>
+        ))}
+      </div>
     </details>
   </Section>
 
