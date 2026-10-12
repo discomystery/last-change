@@ -55,3 +55,23 @@ def as_of(season: int, before: str) -> dict[str, str]:
         return {}
     t = pl.read_parquet(path(season)).filter(pl.col("date") < before[:10]).sort("date", "game_id")
     return {r["team"]: r["coach"] for r in t.iter_rows(named=True)}
+
+
+def current(season: int) -> dict[str, dict]:
+    """Each club's head coach now: the one behind its bench in its latest finished game, with `since` (that coach's
+    first game this season) when he took over partway through, so an interim or new coach reads as such. A club that
+    has not played yet keeps last season's last coach. Empty if nothing is saved."""
+    out: dict[str, dict] = {}
+    for s_ in (season - 1, season):
+        if not path(s_).exists():
+            continue
+        t = pl.read_parquet(path(s_)).sort("date", "game_id")
+        for team, g in t.group_by("team"):
+            team = team[0]
+            now = g["coach"][-1]
+            since = None
+            if s_ == season and g["coach"].n_unique() > 1:  # changed this season: his first game in the job
+                changed = g.with_row_index().filter(pl.col("coach") != now)["index"].max()
+                since = g["date"][changed + 1]
+            out[team] = {"coach": now, "since": since}
+    return out
