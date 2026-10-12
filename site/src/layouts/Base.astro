@@ -34,10 +34,12 @@ const teamList = teams as { abbr: string; name: string }[];
       }
     </script>
     <script is:inline>
-      // Spelling: pages are written in American spelling, and readers can pick Canadian in the footer (remembered in this
-      // browser; with nothing saved, a browser set to Canadian English or French starts on Canadian). Words are swapped as
-      // the page is read in, before it is first drawn, so the other spelling never flashes, and again whenever the page
-      // adds text. Both spellings are mapped either way, so older saved text written the other way reads right too.
+      // Spelling and units: pages are written in American spelling with imperial units, and readers can pick Canadian in
+      // the footer (Canadian spelling, metric units; remembered in this browser; with nothing saved, a browser set to
+      // Canadian English or French starts on Canadian). Text is changed as the page is read in, before it is first drawn,
+      // so the other version never flashes, and again whenever the page adds text. Each changed text keeps its original,
+      // so switching back restores it exactly. Spellings are mapped both ways, so older text written the other way reads
+      // right too.
       (() => {
         const PAIRS = [
           ['defense', 'defence'], ['defenses', 'defences'], ['defenseman', 'defenceman'], ['defensemen', 'defencemen'],
@@ -52,12 +54,22 @@ const teamList = teams as { abbr: string; name: string }[];
         PAIRS.forEach(([us, ca]) => { TO.us[ca] = us; TO.ca[us] = ca; });
         const RE = new RegExp('\\b(' + PAIRS.flat().join('|') + ')\\b', 'gi');
         const CAP = /^[A-Z]/;
+        // Imperial to metric, Canadian only: a number with its unit keeps the number of decimals it had (feet get one).
+        const KM = 1.609344, M = 0.3048;
+        const num = (s) => parseFloat(s.replace(/,/g, ''));
+        const dec = (s) => (s.split('.')[1] || '').length;
+        const fmt = (v, d) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+        const metric = (s) => s
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)mph\b/g, (_, n, sp) => fmt(num(n) * KM, dec(n)) + sp + 'km/h')
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)miles?\b/g, (_, n, sp) => fmt(num(n) * KM, dec(n)) + sp + 'km')
+          .replace(/\bmiles\b/g, 'kilometres')
+          .replace(/\b(\d[\d,]*(?:\.\d+)?)(\s*)(feet|foot|ft)\b/g, (_, n, sp, u) => fmt(num(n) * M, Math.max(1, dec(n))).replace(/\.0$/, '') + sp + (u === 'ft' ? 'm' : 'metres'));
         const ATTRS = ['title', 'data-tip', 'aria-label', 'placeholder', 'alt'];
         const SKIP = 'script,style,textarea,input,code,a.plink,[data-nospell]';
         let target = 'us';
         try { target = localStorage.getItem('lc-spell') || ''; } catch {}
         if (target !== 'us' && target !== 'ca') target = (navigator.languages || [navigator.language]).some((l) => /^(en|fr)-CA$/i.test(l)) ? 'ca' : 'us';
-        const swap = (s) => s.replace(RE, (w, _, i) => {
+        const spell = (s) => s.replace(RE, (w, _, i) => {
           const to = TO[target][w.toLowerCase()];
           if (!to) return w;
           if (w === w.toUpperCase()) return to.toUpperCase();
@@ -69,9 +81,31 @@ const teamList = teams as { abbr: string; name: string }[];
           }
           return to;
         });
+        const convert = (s) => { const t = spell(s); return target === 'ca' ? metric(t) : t; };
+        // Original and changed text, per text node and per element attribute, so a switch can start again from the original.
+        const was = new WeakMap();
+        const redo = (key, cur, write) => {
+          const o = was.get(key);
+          const src = o && cur === o.out ? o.src : cur;
+          if (!o && !/[a-z]{2}/i.test(src)) return;
+          const out = convert(src);
+          if (out === src) was.delete(key); else was.set(key, { src, out });
+          if (cur !== out) write(out);
+        };
         const skip = (el) => el && el.closest && el.closest(SKIP);
-        const fixText = (t) => { const v = t.data; if (!/[a-z]{5}/i.test(v) || skip(t.parentElement)) return; const n = swap(v); if (n !== v) t.data = n; };
-        const fixAttrs = (el) => { if (skip(el)) return; ATTRS.forEach((a) => { const v = el.getAttribute(a); if (v) { const n = swap(v); if (n !== v) el.setAttribute(a, n); } }); };
+        const fixText = (t) => { if (!skip(t.parentElement)) redo(t, t.data, (v) => { t.data = v; }); };
+        const fixAttrs = (el) => {
+          if (skip(el)) return;
+          ATTRS.forEach((a) => {
+            const v = el.getAttribute(a);
+            if (v == null) return;
+            let m = was.get(el);
+            if (!m) { m = {}; was.set(el, m); }
+            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src);
+            m[a] = out === src ? undefined : { src, out };
+            if (v !== out) el.setAttribute(a, out);
+          });
+        };
         const fix = (node) => {
           if (node.nodeType === 3) return fixText(node);
           if (node.nodeType !== 1) return;
@@ -174,13 +208,10 @@ const teamList = teams as { abbr: string; name: string }[];
     <footer class="site-foot">
       <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
       <p>A fan project, in beta: pages and numbers may still change. Not affiliated with the NHL or any of its teams.</p>
-      <div class="pref foot-spell">
-        <span>Spelling</span>
-        <div class="mode" role="group" aria-label="American or Canadian spelling">
-          <button type="button" data-pref="spell" data-value="us" data-nospell>American <span class="eg">(defense)</span></button>
-          <button type="button" data-pref="spell" data-value="ca" data-nospell>Canadian <span class="eg">(defence)</span></button>
-        </div>
-      </div>
+      <p class="foot-spell" role="group" aria-label="Spelling and units">
+        <span class="term" tabindex="0" data-nospell data-tip="American: defense, center, feet and mph. Canadian: defence, centre, metres and km/h.">Spelling and units</span>
+        <button type="button" data-pref="spell" data-value="us" data-nospell>American</button><span aria-hidden="true">·</span><button type="button" data-pref="spell" data-value="ca" data-nospell>Canadian</button>
+      </p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline>
@@ -555,8 +586,11 @@ const teamList = teams as { abbr: string; name: string }[];
   .brand-name { display: inline-flex; align-items: center; gap: 8px; }
   .beta { font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); background: var(--track); border-radius: 999px; padding: 4px 8px; cursor: help; }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
-  .foot-spell { margin-top: 10px; justify-self: start; }
-  .foot-spell .eg { font-weight: 400; opacity: 0.75; }
+  .foot-spell { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 2px; }
+  .foot-spell .term { margin-right: 2px; }
+  .foot-spell button { font: inherit; color: var(--ink-3); background: none; border: 0; padding: 0; cursor: pointer; }
+  .foot-spell button:hover { color: var(--ink); }
+  .foot-spell button[aria-pressed='true'] { color: var(--ink); font-weight: 600; cursor: default; }
 
   /* Page titles: one size and spacing on every page, with an optional intro line under them. */
   main h1 { font: 700 clamp(34px, 7vw, 52px) / 1.05 var(--display); letter-spacing: -0.02em; }
