@@ -20,6 +20,7 @@ Narratives found (preview):
   still out     a regular from last season who hasn't played this season (the lines' absence note)
   milestone     a skater who dressed last game and is close to a round number: his 500th, 600th... NHL game next,
                 or within two of 100, 200... goals, 200+ assists or 300+ points (complete NHL careers only)
+  bad blood     the last meeting this season had a line brawl, a big scrum, two or more fights, an ejection or a fight
 History starts in 2023-24, so records against a team say "since 2023-24".
 
 Everything a preview story reads is from before the game's date, so a rebuilt preview tells it as a live one would.
@@ -32,7 +33,7 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
-from pipeline.export import wording
+from pipeline.export import penalties, wording
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
@@ -442,7 +443,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
             look.append(c["gist"])
             kinds.add(c["kind"])
-    items = sorted(facts["items"] + _still_out([n["text"] for n in lines.get(away, {}).get("notes", [])], away, N, season)
+    blood = penalties.bad_blood(m[-1]["game_id"], season, N) if m else None
+    items = sorted(facts["items"] + ([blood] if blood else []) + _still_out([n["text"] for n in lines.get(away, {}).get("notes", [])], away, N, season)
                    + _still_out([n["text"] for n in lines.get(home, {}).get("notes", [])], home, N, season), key=lambda i: -i["score"])
     picked, per, seen = [], {}, set()
     for i in items:
@@ -699,6 +701,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 tail = f", and it had a hand in {'both' if line_goals == 2 else num(line_goals)} of their goals" if line_goals >= 2 else ""
                 s2.append(f"{_cap(W.the(team))} tried a line they hadn’t used before: {_and(trio)}{tail}.")
             break
+    # paragraph three: the penalty sheet, only when something stood out (a fight, a brawl, an ejection, a strange count)
+    s3 = penalties.recap_notes(gid, season, {home_id: home, row["away_id"][0]: away}, W, name)
     # what it means
     items = []
     for t in (winner, loser):
@@ -757,7 +761,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if len(picked) < MIN_ITEMS:
         res = results(G.filter(pl.col("date") <= r["date"]), winner, season)
         picked.append({"tag": "Record", "text": f"{_cap(W.the(winner))} are now {record(res)}."})
-    return {"kicker": "What happened", "head": head, "paras": [p for p in (" ".join(s1), " ".join(s2)) if p],
+    return {"kicker": "What happened", "head": head, "paras": [p for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p],
             "list_head": "What it means", "items": picked}
 
 

@@ -3,6 +3,7 @@ import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
+import Explain from '../../components/Explain.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
@@ -165,6 +166,9 @@ const _ = ordinal;
   <SectionNav items={nav as [string, string][]} pinned />
 
   <Section id="watch" title="The short version" placeholder={false}>
+    <Fragment slot="explain">
+      <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+    </Fragment>
     {story && <GameStory story={story} sides={sides} />}
     {!story && snap.outlook && (
       <div class="card outlook">
@@ -195,17 +199,19 @@ const _ = ordinal;
         <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
-    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
   </Section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
+    <Fragment slot="explain">
+      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
+      <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
+      <p class="note">Forecheck pressure and physicality are arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+    </Fragment>
     <div class="key">
       {order.map((a) => <span class={`t-${side(a)}`}><i></i>{full(a)}</span>)}
       <span class="avg">League average</span>
       <span class="rng">Likely range</span>
     </div>
-    <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
-    <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
     <h3 class="sub">The biggest differences</h3>
     <ul class="fpgrid">{biggest.map((c) => <FpPair c={c} sides={fpSides} />)}</ul>
     <details class="fold">
@@ -217,15 +223,16 @@ const _ = ordinal;
         </>
       ))}
     </details>
-    <p class="note">Forecheck pressure and physicality are arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
   </Section>
 
   <Section id="lines" title="Lines and deployment" placeholder={false} takeaway={`${place(home)} is at home, so their coach changes last and chooses who plays against whom.`}>
+    <Fragment slot="explain">
+      <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far), with each older game counting half as much as the one after it, so the latest combinations come first. With so few games, each group’s results are pulled toward the average for its line number.</p>
+    </Fragment>
     <div class="key">
       <span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same line or pair on other teams</span>
       <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
     </div>
-    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games ({LN[away]?.games ?? 0} and {LN[home]?.games ?? 0} so far), with each older game counting half as much as the one after it, so the latest combinations come first. With so few games, each group’s results are pulled toward the average for its line number.</p>
     <div class="two">
       {order.map((a) => (
         <div class={`t-${side(a)}`}>
@@ -258,10 +265,12 @@ const _ = ordinal;
       </div>
     )}
 
-    <h3 class="sub">Who {place(home)} is likely to send against whom</h3>
+    <Explain id="pv-mu" title={`Who ${place(home)} is likely to send against whom`}>
+      <p class="xp-lead">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
+      {homeMu && homeMu.games > 0 && <p class="note">Based on {homeMu.games} {place(home)} home {homeMu.games === 1 ? 'game' : 'games'} this season, so treat it as a habit forming, not a certainty. Faded rows have under ten minutes. <strong>With no line matching</strong>, each group would face an opposing line about as often as that line is on the ice; a number well above that means the coach is sending that group out against it on purpose.</p>}
+    </Explain>
     {homeMu && homeMu.games > 0 ? (
       <>
-        <p class="takeaway">Each strip shows how one {place(home)} group’s 5-on-5 time at home has been split across opponents’ four forward lines. Tonight those lines are {place(away)}’s, named in each box.</p>
         {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing their forward lines, so the four named here (from their latest games) may not be the ones they send out tonight.</p>}
         <div class="card stripcard">
           <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
@@ -287,12 +296,14 @@ const _ = ordinal;
             </>
           ))}
         </div>
-        <p class="note">Based on {homeMu.games} {place(home)} home {homeMu.games === 1 ? 'game' : 'games'} this season, so treat it as a habit forming, not a certainty. Faded rows have under ten minutes. <strong>With no line matching</strong>, each group would face an opposing line about as often as that line is on the ice; a number well above that means the coach is sending that group out against it on purpose.</p>
       </>
     ) : <p class="note">{place(home)} has not played at home yet this season, so there is no matching habit to show.</p>}
   </Section>
 
   <Section id="special" title="Special teams" placeholder={false} takeaway="Each power play set against the penalty killers it will face.">
+    <Fragment slot="explain">
+      <p class="note">Units and penalty-kill roles use each team’s last {linesData.window} games; power-play role tags use this season and last, counting only games with the player’s current team; the map shows the last 140 power-play shots. Point at a power-play name to see his shots on the map.</p>
+    </Fragment>
     <div class="stpick">
       <span>Show</span>
       <select id="st-team" aria-label="Team">{order.map((a) => <option value={a} data-abbr={a}>{place(a)}</option>)}</select>
@@ -338,10 +349,12 @@ const _ = ordinal;
         </div>
       );
     })}
-    <p class="note">Units and penalty-kill roles use each team’s last {linesData.window} games; power-play role tags use this season and last, counting only games with the player’s current team; the map shows the last 140 power-play shots. Point at a power-play name to see his shots on the map.</p>
   </Section>
 
   <Section id="goalies" title="Goaltending" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
+    <Fragment slot="explain">
+      <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start: NHL.com’s projected starter once its game-day preview is up (right about 9 times in 10 this season), otherwise our own guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons).' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
+    </Fragment>
     <div class="stpick">
       <span>Show</span>
       <select id="g-away" aria-label={`${place(away)} goalie`}>{goaliesOf(away).map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
@@ -416,10 +429,13 @@ const _ = ordinal;
         </details>
       </div>
     ))}
-    <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start: NHL.com’s projected starter once its game-day preview is up (right about 9 times in 10 this season), otherwise our own guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons).' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
   </Section>
 
   <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
+    <Fragment slot="explain">
+      <p class="note">These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last. Each team page shows how much luck alone can move each row.</p>
+      <p class="note">Each row has its own scale, so a small source is not squeezed against the left edge.</p>
+    </Fragment>
     <div class="stpick">
       <span>Show goals</span>
       <select id="src-side" aria-label="Scored or allowed"><option value="for">scored</option><option value="against">allowed</option></select>
@@ -454,13 +470,12 @@ const _ = ordinal;
                   })}
                 </ul>
               </div>
-              <p class="note">{order.map((a, i) => `${got[i]?.goals ?? 0} ${place(a)} goals`).join(' and ')} {sd === 'for' ? 'scored' : 'allowed'} {words}. Each row has its own scale.</p>
+              <p class="note">{order.map((a, i) => `${got[i]?.goals ?? 0} ${place(a)} goals`).join(' and ')} {sd === 'for' ? 'scored' : 'allowed'} {words}.</p>
             </div>
           );
         })}
       </div>
     ))}
-    <p class="note">These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last. Each team page shows how much luck alone can move each row.</p>
   </Section>
 
   <Section id="notes" title="Data notes" placeholder={false}>
