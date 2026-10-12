@@ -32,3 +32,10 @@ def test_before_the_nhl_follows_his_last_club_back():
         {"season": 20222023, "leagueAbbrev": "WHL", "teamName": "Regina Pats", "gamesPlayed": 57},
         {"season": 20232024, "leagueAbbrev": "AHL", "teamName": "Farm", "gamesPlayed": 20}]}
     assert career._before_nhl(landing, 20232024) == {"team": "Regina Pats", "league": "WHL", "from": 2020, "to": 2022}
+
+
+def test_draft_details_and_undrafted():
+    land = {"draftDetails": {"year": 2003, "teamAbbrev": "ANA", "round": 1, "pickInRound": 28, "overallPick": 28}}
+    d = career._draft(land)
+    assert (d["year"], d["team"], d["round"], d["pick"]) == (2003, "ANA", 1, 28)
+    assert career._draft({}) == {"undrafted": True}

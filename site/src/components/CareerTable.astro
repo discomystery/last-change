@@ -29,6 +29,9 @@ const cell = (r: any, k: string) => (k === 'sv' ? svp(r.sv) : k === 'gaa' ? (r.g
 const isHigh = (s: number, k: string) => (highs[k] ?? []).includes(s);
 const lead = isG ? 'Every NHL regular season, club by club: games, record, save percentage and goals-against average.' : 'Every NHL regular season, club by club: games, goals, assists and points.';
 const anyHigh = Object.keys(highs).length > 0;
+const ord = (n: number) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+const draft = c?.draft;
+const draftLine = !draft ? null : draft.undrafted ? 'Never drafted.' : `Drafted ${ord(draft.pick)} overall by the ${draft.name} in ${draft.year} (${ord(draft.round)} round).`;
 // Four or more seasons: a column per season (points, or wins for goalies) coloured by club, with the table behind a fold.
 const chart = !plain && rows.length >= 4;
 const key = isG ? 'w' : 'p';
@@ -122,9 +125,10 @@ const say = (x: any) => (isG ? `${x.gp} games, ${num(x.w)} wins, ${svp(x.sv)} sa
         )}
       </div>
     )}
-    {(c.before || c.pending || anyHigh) && (
+    {(c.before || c.pending || anyHigh || draftLine) && (
       <p class="n car-note">
         {anyHigh && <>Bold is a career high. </>}
+        {draftLine && <>{draftLine} </>}
         {c.before && <>{rows.length ? 'Before the NHL' : 'Most recently'}: {c.before.team} ({c.before.league}), {yrs(c.before)}. </>}
         {c.pending && <>Seasons before 2023-24 are still being collected and will appear after an overnight update.</>}
       </p>

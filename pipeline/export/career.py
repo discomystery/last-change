@@ -198,7 +198,7 @@ def build(pid: int, goalie: bool) -> dict | None:
     before = _before_nhl(landing, min(seasons) * 10000 + min(seasons) + 1 if seasons else None) if landing else None
     if not out_rows and not before:
         return None
-    out: dict = {"seasons": out_rows, "before": before}
+    out: dict = {"seasons": out_rows, "before": before, "draft": _draft(landing) if landing else None}
     if not landing:  # no career file yet: his seasons before 2023-24 (if any) arrive with a later update, and the page says so
         out["pending"] = True
     if out_rows:
@@ -206,6 +206,15 @@ def build(pid: int, goalie: bool) -> dict | None:
         out["career"] = _rates(car) if goalie else car
         out["highs"] = _highs(out_rows, goalie)
     return out
+
+
+def _draft(landing: dict) -> dict:
+    """Where he was drafted ({year, team, name, round, pick}), or {"undrafted": True} when the NHL lists no draft."""
+    d = landing.get("draftDetails") or {}
+    if not d.get("year") or not d.get("overallPick"):
+        return {"undrafted": True}
+    team = d.get("teamAbbrev")
+    return {"year": d["year"], "team": team, "name": _team_names().get(team, team), "round": d.get("round"), "pick": d["overallPick"]}
 
 
 def _highs(rows: list[dict], goalie: bool) -> dict[str, list[int]]:
