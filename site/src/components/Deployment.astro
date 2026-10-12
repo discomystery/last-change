@@ -1,0 +1,50 @@
+---
+// "Who starts in attack": how much a coach sends his busiest forwards out for attacking-zone faceoffs and leaves the
+// defensive-zone draws to the bottom six. A habit, not good or bad, so it uses the neutral slider.
+import Marker from './Marker.astro';
+import { ordinal } from '../lib/players';
+
+interface Split { top: number; bottom: number; gap: number }
+export interface Deploy { top: number; bottom: number; gap: number; last: number | null; games: number; blend: number; rank: number; of: number; pct: number; median: number; home: Split | null; road: Split | null }
+interface Props { d: Deploy; title?: string; tonight?: 'home' | 'road'; cls?: string }
+const { d, title, tonight, cls = '' } = Astro.props;
+
+const pts = (n: number) => `${Math.abs(n)}-point`;
+const place = d.rank <= d.of / 2
+  ? (d.rank === 1 ? 'the biggest' : `the ${ordinal(d.rank)}-biggest`)
+  : (d.rank === d.of ? 'the smallest' : `the ${ordinal(d.of - d.rank + 1)}-smallest`);
+const lean = d.gap >= 2
+  ? `: a ${pts(d.gap)} lean toward the top forwards`
+  : d.gap <= -2
+    ? `. So far it is the other way round, by ${Math.abs(d.gap)} points`
+    : ': about even';
+const lastBit = d.last === null ? '' : ` (last season: ${d.last > 0 ? `${d.last} points toward them` : d.last < 0 ? `${-d.last} points the other way` : 'even'})`;
+const signed = (n: number) => (n < 0 ? `${-n} points the other way` : `${n} points`);
+const homeRoad = d.home && d.road
+  ? tonight === 'road'
+    ? `On the road, where the home coach has the last change: ${signed(d.road.gap)}. At home: ${signed(d.home.gap)}.`
+    : `At home, where they have the last change: ${signed(d.home.gap)}. On the road: ${signed(d.road.gap)}.`
+  : '';
+const tip = `Each game, the three forwards with the most 5-on-5 ice time count as the top forwards and the six with the least as the bottom six. Of the 5-on-5 faceoffs they are on the ice for in either end, this is the share in the attacking zone. The lean is the gap between the two groups. The league rank counts last season too, with this season weighing more as games are played.`;
+---
+<div class={`card deploy ${cls}`}>
+  <p class="mini-h">{title ?? 'Who starts in attack'}</p>
+  <p class="deploy-say">
+    This season the top three forwards each night have started <strong>{d.top}%</strong> of their 5-on-5 faceoffs at either end in the attacking zone, the bottom six <strong>{d.bottom}%</strong>{lean}{lastBit}.
+    {` Counting both seasons, that is ${place} lean in the league (a typical team: ${d.median} points). ${homeRoad}`}
+  </p>
+  <div class="deploy-scale">
+    <span class="lo">Spread out</span>
+    <Marker pct={d.pct} tip={`${d.pct > 55 ? `Sends the top forwards to the attacking end more than ${d.pct}% of teams` : d.pct < 45 ? `Spreads the attacking-zone draws more evenly than ${100 - d.pct}% of teams` : 'About as much as most teams'}. Not good or bad: a coaching choice.`} />
+    <span class="hi">Top line in attack</span>
+    <span class="term" tabindex="0" data-tip={tip}>How this is measured</span>
+  </div>
+</div>
+
+<style>
+  .deploy { margin-top: 18px; }
+  .deploy-say { margin: 6px 0 10px; font: 400 15px/1.5 var(--ui); }
+  .deploy-scale { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 400 12.5px/1.3 var(--ui); color: var(--ink-3); }
+  .deploy-scale .term { margin-left: auto; }
+  @media (max-width: 520px) { .deploy-scale .term { margin-left: 0; flex-basis: 100%; } }
+</style>

@@ -27,6 +27,7 @@ import Roster from '../../components/Roster.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
+import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
@@ -228,6 +229,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
             </ul>
           ))}
         </div>
+        {(ln as any).deploy && <Deployment d={(ln as any).deploy} />}
         <h3 class="sub">Last game</h3>
         {lastDiff.length === 0
           ? <p class="note">{ln.last.at_home ? 'Against' : 'At'} {names[ln.last.opponent]}, the team used the same lines and pairs as above.</p>

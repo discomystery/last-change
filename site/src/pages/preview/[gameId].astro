@@ -18,6 +18,7 @@ import GameStory, { type Story } from '../../components/GameStory.astro';
 import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
+import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import { clock as mmss, compared } from '../../lib/format';
@@ -261,6 +262,12 @@ const _ = ordinal;
       <div class="card worth lines-worth">
         <p class="mini-h">Worth knowing</p>
         <ul>{lineNotes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
+      </div>
+    )}
+
+    {((LN[away] as any)?.deploy || (LN[home] as any)?.deploy) && (
+      <div class="two deploy2">
+        {[away, home].map((a) => (LN[a] as any)?.deploy && <Deployment d={(LN[a] as any).deploy} title={`Who starts in attack: ${place(a)}`} tonight={a === home ? 'home' : 'road'} cls={`t-${side(a)}`} />)}
       </div>
     )}
 

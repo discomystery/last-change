@@ -250,6 +250,13 @@ def export_lines(season: int) -> int:
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
             "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] != "shuffle", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
+    pts = lambda x: None if x is None else round(100 * x)
+    for tid, v in units.deployment_blend(season).items():
+        if abbr.get(tid) in out:
+            split = lambda h: None if h is None else {"top": pts(h["top"]), "bottom": pts(h["bottom"]), "gap": pts(h["gap"])}
+            out[abbr[tid]]["deploy"] = {"top": pts(v["top"]), "bottom": pts(v["bottom"]), "gap": pts(v["gap"]), "last": pts(v["last"]), "games": v["games"],
+                                        "blend": pts(v["blend"]), "rank": v["blend_rank"], "of": len(usual), "pct": v["blend_pct"], "median": pts(v["blend_median"]),
+                                        "home": split(v["home"]), "road": split(v["road"])}
     for tid, m in units.matchups(season, usual).items():
         if abbr[tid] in out:
             out[abbr[tid]]["matchups"] = m
