@@ -1,3 +1,8 @@
+/* Chart marks (chart guide, 2026-10-12): one meaning each, everywhere. Solid 2px half-ink tick = league average;
+   tinted 4px whisker = where a team or player really is likely to be; hatched band = what luck alone could do (--luck);
+   dotted mark with a label = a named reference point; open ring = before, usual or what we said; filled dot = now or what
+   happened; a 6px bar between two marks = their difference, never a range (a lane with one leaves its whiskers off). */
+  :root { --luck: color-mix(in oklab, var(--ink) 24%, var(--sheet)); }
 /* Shared by team and preview pages: fingerprint cards, line cards, matchup strips, special teams, goalies, goal sources. */
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
   .crumbs + .team-top { margin-top: 0; }
@@ -35,6 +40,17 @@
   .whisk { position: absolute; top: 5px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, var(--track)); left: calc(min(var(--lo), var(--v)) * 1%); width: calc((max(var(--hi), var(--v)) - min(var(--lo), var(--v))) * 1%); transition: left 0.35s, width 0.35s; }
   .dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; transition: left 0.35s; }
   @media (prefers-reduced-motion: reduce) { .dot, .whisk { transition: none; } }
+  /* The gap: an open ring (before, usual) and the dot (now) on one lane, a 6px bar over the difference. */
+  .lane .gap { position: absolute; top: 4px; height: 6px; border-radius: 3px; left: calc(min(var(--a), var(--b)) * 1%); width: calc((max(var(--a), var(--b)) - min(var(--a), var(--b))) * 1%); background: color-mix(in oklab, var(--team) 50%, var(--track)); }
+  .lane .ring { position: absolute; top: 1px; left: calc(var(--v) * 1%); width: 12px; height: 12px; margin-left: -6px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--team); background: var(--sheet); z-index: 1; }
+  .lane:has(.gap) .dot { z-index: 2; }
+  /* Key swatches for the marks above. */
+  :is(.k-ring, .k-dot, .k-ref, .k-avg, .k-band)::before { content: ''; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+  .k-ring::before { width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--team, var(--ink)); }
+  .k-dot::before { width: 10px; height: 10px; border-radius: 50%; background: var(--team, var(--ink)); }
+  .k-ref::before { width: 0; height: 12px; border-left: 2px dotted var(--ink-3); }
+  .k-avg::before { width: 2px; height: 12px; background: var(--ink); opacity: 0.5; }
+  .k-band::before { width: 22px; height: 10px; border-radius: 5px; background: repeating-linear-gradient(135deg, var(--luck) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--luck); }
   .fpc-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; font: 400 14px/1.4 var(--ui); }
   .fpc-line.m-season { display: none; }
   html[data-mode='season'] .fpc-line.m-season { display: flex; }
@@ -100,7 +116,6 @@
   .gnight { margin-top: 14px; display: grid; gap: 16px; }
   .gnight { max-width: 520px; }
   .gh { margin-top: 14px; padding: 14px 16px 12px; background: var(--ice); border-radius: 12px; }
-  .gh .histo { max-width: none; }
   .chart-title { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
   .stripcard { margin-top: 16px; }
   .strips { display: grid; gap: 8px; margin-bottom: 20px; }
@@ -146,12 +161,12 @@
   .srow-name .n { font-weight: 400; }
   .sline { position: relative; height: 14px; margin-inline: 7px; outline-offset: 4px; }
   .sline::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
-  .sband { position: absolute; top: 2px; height: 10px; border-radius: 5px; background: color-mix(in oklab, var(--ink) 13%, var(--sheet)); }
+  .sband { position: absolute; top: 2px; height: 10px; border-radius: 5px; background: repeating-linear-gradient(135deg, var(--luck) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--luck); }
   .slg { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; }
   .sdot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
   .snums { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 8px; font: 400 13px var(--ui); white-space: nowrap; }
   .snums strong { font-weight: 600; font-size: 15px; }
-  .key .luck::before { content: ''; width: 26px; height: 10px; border-radius: 5px; background: color-mix(in oklab, var(--ink) 13%, var(--sheet)); display: inline-block; }
+  .key .luck::before { content: ''; width: 26px; height: 10px; border-radius: 5px; background: repeating-linear-gradient(135deg, var(--luck) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--luck); display: inline-block; }
   .src-say { font: 400 18px/1.45 var(--body); margin: 14px 0 12px; }
   .card.thin .srows { opacity: 0.55; }
   @media (max-width: 560px) { .srows li { grid-template-columns: 1fr auto; } .sline { grid-column: 1 / -1; order: 3; } }

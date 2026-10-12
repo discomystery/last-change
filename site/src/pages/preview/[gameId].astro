@@ -8,6 +8,7 @@ import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import CallCard from '../../components/CallCard.astro';
 import GameTrail from '../../components/GameTrail.astro';
+import AreaShapes from '../../components/AreaShapes.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
@@ -154,6 +155,7 @@ const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{-
 const _ = ordinal;
 ---
 <Base section="games" title={`${away} at ${home} preview`}>
+  <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
@@ -341,7 +343,7 @@ const _ = ordinal;
             </div>
             <div class="card mapcard ppmap">
               <p class="map-who" aria-live="polite">&nbsp;</p>
-              {P && P.shots.length > 0 && <ShotMap long team={side(pp)} shots={P.shots} title={`Where ${place(pp)}’s last ${P.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />}
+              {P && P.shots.length > 0 && <ShotMap long team={side(pp)} shots={P.shots} title={`Where ${place(pp)}’s last ${P.shots.length} power-play shots came from.`} />}
             </div>
             <div class:list={['card', `t-${side(pk)}`]}>
               <h4 class="st-h"><i></i>{place(pk)} penalty kill</h4>
@@ -423,7 +425,7 @@ const _ = ordinal;
           <div class="two gnights">
             {order.flatMap((a) => goaliesOf(a).map((g, gi) => (
               <div class:list={['card', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}>
-                <p class="mini-h">{g.name}, night to night: goals saved above expected in each start</p>
+                <p class="mini-h">{g.name}, night to night: rough, about expected and strong starts</p>
                 <Histogram wide team={side(a)} bins={g[mode].bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} />
               </div>
             )))}

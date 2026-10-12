@@ -33,8 +33,8 @@ html.motion .seen .pips i.on:nth-child(2) { animation-delay: calc(var(--rv-delay
 html.motion .seen .pips i.on:nth-child(3) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
 html.motion .seen .pips i.on:nth-child(4) { animation-delay: calc(var(--rv-delay, 0ms) + 380ms); }
 html.motion .seen .pips i.on:nth-child(5) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
-html.motion .seen .histo-bar { transform-box: fill-box; transform-origin: bottom; animation: lc-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
 html.motion .seen .q-pt, html.motion .seen .quad g[class^='t-'] { animation: lc-fade 0.6s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
+html.motion .seen .ns-bar span { animation: lc-grow 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--i, 0) * 120ms); }
 html.motion .seen .shot { transform-box: fill-box; transform-origin: center; animation: lc-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
 html.motion .seen .shot:nth-child(3n) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
 html.motion .seen .shot:nth-child(3n + 1) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
@@ -65,12 +65,16 @@ html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezi
 }
 
 /* Season switch: each dot glides to its new spot, cards a beat apart (`--sd`, set by the script in Base.astro),
-   leaving a faint ring where it was that fades as it arrives. The sentences under the scales fade across. */
+   leaving an open ring where it was and the gap's 6px bar over how far it moved; both hold a few seconds, then fade,
+   and the whisker steps aside meanwhile (a lane with a gap bar shows no likely range). The sentences fade across. */
 html.motion .lane .dot { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
-html.motion .lane .whisk { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms), width 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
-.dot-ghost { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--team); opacity: 0; pointer-events: none; animation: lc-ghost 1.3s ease-out var(--sd, 0ms) both; }
+.dot-ghost { position: absolute; top: 1px; width: 12px; height: 12px; margin-left: -6px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--team); background: var(--sheet); z-index: 1; pointer-events: none; animation: lc-ghost 4.2s ease both; }
+.sw-gap { position: absolute; top: 4px; height: 6px; border-radius: 3px; background: color-mix(in oklab, var(--team) 50%, var(--track)); pointer-events: none; animation: lc-gap 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms) backwards, lc-ghost 4.2s ease both; }
+html.motion .lane.gapping .whisk { opacity: 0; transition: opacity 0.3s; }
+html.motion .lane .whisk { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms), width 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms), opacity 0.4s; }
 html.mode-switch .m-blend, html.mode-switch .m-season { animation: lc-fade 0.5s ease; }
-@keyframes lc-ghost { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+@keyframes lc-ghost { 0%, 82% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lc-gap { from { transform: scaleX(0); } }
 
 @keyframes lc-fade { from { opacity: 0; } }
 @keyframes lc-dot { from { left: 50%; opacity: 0; } }
@@ -78,6 +82,6 @@ html.mode-switch .m-blend, html.mode-switch .m-season { animation: lc-fade 0.5s 
 @keyframes lc-fill { from { width: 0; } }
 @keyframes lc-slide { from { left: 0; opacity: 0; } }
 @keyframes lc-pop { from { opacity: 0; transform: scale(0.3); } }
-@keyframes lc-grow { from { transform: scaleY(0); } }
+@keyframes lc-grow { from { transform: scaleX(0); } }
 
 @media print { html.motion .rv:not(.seen) { opacity: 1; transform: none; } html.motion .sec-head::after { transform: none; } }

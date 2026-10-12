@@ -6,6 +6,7 @@ import Section from '../../components/Section.astro';
 import Portrait from '../../components/Portrait.astro';
 import AreaMap from '../../components/AreaMap.astro';
 import AreaShapes from '../../components/AreaShapes.astro';
+import { AREA_NAME } from '../../lib/areaShapes';
 import SectionNav from '../../components/SectionNav.astro';
 import Pips from '../../components/Pips.astro';
 import Marker from '../../components/Marker.astro';
@@ -60,11 +61,7 @@ const lastStats = (p as any).stats?.last as { gp: number; g: number; a: number; 
 const words = isG ? 'goalies' : groupWord[s.group];
 const posName = posWord[p.pos] ?? p.pos;
 const shoots = p.shoots === 'L' ? (isG ? 'Catches left' : 'Shoots left') : p.shoots === 'R' ? (isG ? 'Catches right' : 'Shoots right') : null;
-const areaName: Record<string, string> = {
-  crease: 'Crease', lowSlot: 'Low slot', netSideL: 'Left of the net', netSideR: 'Right of the net', highSlot: 'High slot', circleL: 'Left circle', circleR: 'Right circle',
-  behind: 'Behind the net', cornerL: 'Left corner', cornerR: 'Right corner', outerL: 'Left side, high', outerR: 'Right side, high', point: 'Middle of the blue line',
-  pointL: 'Left point', pointR: 'Right point', outside: 'Outside the zone',
-};
+const areaName = AREA_NAME;
 
 // ---- Skater role sentences ----
 const role = isG ? null : s.role;
@@ -334,14 +331,40 @@ const statRow = (x: any) => (isG ? null : x);
               <p class="chart-title">How his misses miss</p>
               {modes.map(([m]) => {
                 const x = s.misses[m];
-                const rows = x ? [['Wide left', x.left], ['Wide right', x.right], ['Over the net', x.high], ['Off the post or crossbar', x.post], ['Short or other', x.short + x.other]] as [string, number][] : [];
-                const top = Math.max(1, ...rows.map((r) => r[1]));
+                // The net frame, from his point of view: each kind of miss is a puck where it went (wide of either post,
+                // over the bar, off the iron, short), sized by count, flying in from his spot below the net. The inside
+                // of the net stays empty: the data never says where a goal or save went.
+                const fx = 120, fy = 50, fw = 120, fh = 80;
+                const spots = x ? [
+                  { k: 'Wide left', n: x.left, x: 60, y: 92, lab: 'below' },
+                  { k: 'Wide right', n: x.right, x: 300, y: 92, lab: 'below' },
+                  { k: 'Over the net', n: x.high, x: 180, y: 22, lab: 'left' },
+                  { k: 'Off the post or crossbar', n: x.post, x: fx + fw, y: fy, lab: 'right' },
+                  { k: 'Short or other', n: x.short + x.other, x: 180, y: 166, lab: 'below' },
+                ] : [];
+                const r = (n: number) => +(5 + Math.sqrt(n) * 2.6).toFixed(1);
                 return (
                   <div class={`gmode m-${m}`}>
-                    {x ? (
+                    {x && x.n > 0 ? (
                       <>
-                        <ul class="mbars">{rows.map(([label, n]) => <li><span>{label}</span><span class="mbar"><i style={`width:${(100 * n) / top}%`}></i></span><strong>{n}</strong></li>)}</ul>
-                        <p class="n">{x.n} missed shots. “Wide left” is from his point of view.</p>
+                        <svg class="netf" viewBox="0 0 360 206" role="img" aria-label={`${x.n} missed shots: ${spots.map((o) => `${o.k.toLowerCase()} ${o.n}`).join(', ')}`}>
+                          <line class="nf-goal" x1="16" x2="344" y1={fy + fh + 3} y2={fy + fh + 3} />
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => <line class="nf-mesh" x1={fx + i * 12} x2={fx + i * 12} y1={fy + 3} y2={fy + fh} />)}
+                          {[1, 2, 3, 4, 5, 6].map((i) => <line class="nf-mesh" x1={fx + 3} x2={fx + fw - 3} y1={fy + i * 12} y2={fy + i * 12} />)}
+                          <path class="nf-frame" d={`M${fx} ${fy + fh} V${fy} H${fx + fw} V${fy + fh}`} />
+                          {spots.map((o, i) => {
+                            const R = r(o.n);
+                            const L = o.lab === 'below' ? { x: o.x, y: o.y + R + 15, a: 'middle' } : o.lab === 'left' ? { x: o.x - R - 8, y: o.y + 4, a: 'end' } : { x: o.x + R + 8, y: o.y + 4, a: 'start' };
+                            return (
+                              <g class="nf-spot" tabindex="0" data-tip={`${o.k}: ${o.n} of his ${x.n} missed shots.`} style={`--i:${i};--dx:${180 - o.x}px;--dy:${200 - o.y}px`}>
+                                <circle class:list={['nf-puck', { none: o.n === 0 }]} cx={o.x} cy={o.y} r={R} />
+                                <text class:list={['nf-n', { small: R < 12 }]} x={o.x} y={o.y + (R < 12 ? 3.8 : 4.6)}>{o.n}</text>
+                                <text class="nf-lab" x={L.x} y={L.y} text-anchor={L.a}>{o.k === 'Off the post or crossbar' ? 'Off the iron' : o.k}</text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                        <p class="n">{x.n} missed shots, from his point of view: “wide left” is to his left. Pucks are sized by count.</p>
                       </>
                     ) : <p class="n">No missed shots yet.</p>}
                   </div>
@@ -414,7 +437,9 @@ const statRow = (x: any) => (isG ? null : x);
                     </dl>
                   </div>
                   <div class="card gmid">
-                    <div class="gh"><p class="mini-h">Night to night: goals saved above expected in each start</p><Histogram wide team="one" bins={x.bins.map((n, k) => ({ lo: k - 3, n }))} name={p.name} /></div>
+                    <p class="chart-title">Night to night</p>
+                    <p class="n gn-say">His starts by goals saved above expected: rough nights (more than a goal below), about what was expected, and strong nights (a goal or more above).</p>
+                    <Histogram wide team="one" bins={x.bins.map((n, k) => ({ lo: k - 3, n }))} name={p.name} />
                   </div>
                 </div>
                 <ul class="fpgrid gtraits">
@@ -586,11 +611,24 @@ const statRow = (x: any) => (isG ? null : x);
   @media (min-width: 820px) { .st2 { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
   .st2 .areamap { max-width: 460px; margin-inline: auto; }
   .mapcap { margin-top: 8px; text-align: center; }
-  .mbars { display: grid; gap: 10px; margin: 6px 0 12px; }
-  .mbars li { display: grid; grid-template-columns: minmax(120px, 190px) 1fr 32px; align-items: center; gap: 10px; font: 400 14px var(--ui); }
-  .mbars strong { text-align: right; }
-  .mbar { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; }
-  .mbar i { display: block; height: 100%; background: var(--ink); border-radius: 5px; }
+  .gn-say { margin: -4px 0 18px; }
+  .netf { display: block; width: 100%; max-width: 440px; height: auto; margin: 4px auto 10px; overflow: visible; }
+  .nf-goal { stroke: var(--line-red); stroke-width: 2; }
+  .nf-mesh { stroke: var(--rule); stroke-width: 0.8; }
+  .nf-frame { fill: none; stroke: var(--line-red); stroke-width: 6; stroke-linejoin: round; }
+  .nf-spot { cursor: help; outline: none; }
+  .nf-puck { fill: var(--ink); stroke: var(--sheet); stroke-width: 2; }
+  .nf-puck.none { fill: var(--sheet); stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 2 2; }
+  .nf-spot:is(:hover, :focus-visible) .nf-puck:not(.none) { fill: var(--ink-2); }
+  .nf-n { font: 700 13px var(--ui); fill: var(--sheet); text-anchor: middle; }
+  .nf-n.small { font-size: 10.5px; }
+  .nf-puck.none + .nf-n { fill: var(--ink-3); }
+  .nf-lab { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; fill: var(--ink-3); }
+  /* Each puck flies in from his spot below the middle of the net, one after another; its label follows. */
+  .nf-puck, .nf-n { transform-box: fill-box; transform-origin: center; }
+  :global(html.motion .seen) .nf-spot :is(.nf-puck, .nf-n) { animation: nf-shot 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--i) * 160ms); }
+  :global(html.motion .seen) .nf-lab { animation: lc-fade 0.4s ease-out backwards; animation-delay: calc(var(--rv-delay, 0ms) + 600ms + var(--i) * 160ms); }
+  @keyframes nf-shot { from { transform: translate(var(--dx), var(--dy)) scale(0.35); opacity: 0; } 15% { opacity: 1; } }
   .gtraits { margin-top: 18px; }
   .inl.m-blend { display: inline; }
   html[data-mode='season'] .inl.m-season { display: inline; }

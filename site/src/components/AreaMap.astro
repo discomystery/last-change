@@ -13,16 +13,8 @@ interface Props {
   shade: (a: AreaStat) => number; // 0..1
 }
 const { id, areas, shots = [], tip, label, shade } = Astro.props;
-import { sx, sy, polar, AREA_KEYS, shapeId, type Pt } from '../lib/areaShapes';
-// Where each area's number sits, as [distance from the net, degrees off straight out] for the left-hand areas.
-const spot: Record<string, [number, number]> = {
-  crease: [3.4, 0], behind: [6.5, 180], lowSlot: [15, 0], netSideL: [15, 60], cornerL: [30, 96], highSlot: [34, 0],
-  circleL: [34, 44], outerL: [53, 45], point: [55, 0], pointL: [65, 32],
-};
-const centre = (k: string): Pt => {
-  const [d, a] = spot[k] ?? spot[k.replace(/R$/, 'L')];
-  return polar(d, k.endsWith('R') ? -a : a);
-};
+import { sx, sy, AREA_KEYS, shapeId, areaCentre } from '../lib/areaShapes';
+const centre = areaCentre;
 const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
 ---
 <figure class="areamap" id={id}>

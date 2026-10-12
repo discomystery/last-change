@@ -1,15 +1,25 @@
 ---
 // Offensive zone seen from above, net at the top. Dot size grows with shot danger.
 // With `long`, wide screens get a taller drawing that carries on through the neutral zone to centre ice.
-interface Props { team: string; shots: { x: number; y: number; xg: number; p?: number; who?: string }[]; title: string; long?: boolean }
-const { team, shots, title, long = false } = Astro.props;
+// Past about 60 shots single dots pile into one blob in the slot, so the map shades the shot areas instead (the same
+// rings and wedges as the player pages, counts inside, one ink ramp); the dots stay underneath, hidden, and come back
+// for one player when his name is picked. Pages using it must include AreaShapes.astro once.
+import { AREA_KEYS, shapeId, areaOf, areaCentre, AREA_NAME } from '../lib/areaShapes';
+interface Props { team: string; shots: { x: number; y: number; xg: number; p?: number; who?: string }[]; title: string; long?: boolean; areasAbove?: number }
+const { team, shots, title, long = false, areasAbove = 60 } = Astro.props;
+const areas = shots.length > areasAbove;
+const count: Record<string, number> = {};
+for (const sh of shots) { const k = areaOf(sh.x, sh.y); count[k] = (count[k] ?? 0) + 1; }
+const top = Math.max(1, ...AREA_KEYS.map((k) => count[k] ?? 0));
+const shade = (k: string) => +((count[k] ?? 0) / top).toFixed(2);
+const share = (k: string) => Math.round((100 * (count[k] ?? 0)) / shots.length);
 // The drawing is from the shooter's point of view: positive y (his left, per the NHL's coordinates) is drawn on the left.
 const sx = (y: number) => 42.5 - y;
 const sy = (x: number) => 100 - x;
 const versions = long ? [{ h: 76, cls: 'zone' }, { h: 119, cls: 'full' }] : [{ h: 76, cls: '' }];
 const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
 ---
-<figure class:list={['shotmap', `t-${team}`, { long }]}>
+<figure class:list={['shotmap', `t-${team}`, { long, areas }]}>
   {versions.map((v) => (
     <svg class={v.cls} viewBox={`-1 -1 87 ${v.h + 2}`} role="img" aria-label={title}>
       {v.cls === 'full' && (
@@ -20,6 +30,14 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
       )}
       <g mask={v.cls === 'full' ? `url(#${fadeId}-m)` : undefined}>
         <path class="rk-board" d={`M0 ${v.h} V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V${v.h}`} />
+        {areas && (
+          <>
+            <clipPath id={`${fadeId}-c${v.cls}`}><path d="M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75 Z" /></clipPath>
+            <g class="am-areas" clip-path={`url(#${fadeId}-c${v.cls})`}>
+              {AREA_KEYS.map((k) => <g class="am-area" tabindex="0" data-tip={`${AREA_NAME[k]}: ${count[k] ?? 0} of these ${shots.length} shots (${share(k)}%).`} style={`--s:${shade(k)}`}><use href={`#${shapeId(k)}`} /></g>)}
+            </g>
+          </>
+        )}
         <line class="rk-blue" x1="0" x2="85" y1="75" y2="75" />
         <line class="rk-red" x1="4.2" x2="80.8" y1="11" y2="11" />
         <circle class="rk-thin" cx="20.5" cy="31" r="15" /><circle class="rk-thin" cx="64.5" cy="31" r="15" />
@@ -34,11 +52,16 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
             <circle class="rk-dot blue" cx="42.5" cy="100" r="1" />
           </>
         )}
+        {areas && (
+          <g class="am-labels">
+            {AREA_KEYS.map((k) => { const [x, y] = areaCentre(k); return (count[k] ?? 0) > 0 && <text x={+x.toFixed(1)} y={+(y + 1.3).toFixed(1)} class:list={{ dark: shade(k) > 0.55 }}>{count[k]}</text>; })}
+          </g>
+        )}
         {shots.map((s) => <circle class="shot" data-p={s.p} cx={sx(s.y)} cy={sy(s.x)} r={+(0.9 + Math.sqrt(s.xg) * 4.2).toFixed(2)} data-tip={`${s.who ? s.who + ': ' : 'Shot: '}${Math.round(s.xg * 100)}% chance`} />)}
       </g>
     </svg>
   ))}
-  <figcaption>{title}</figcaption>
+  <figcaption>{title} {areas ? 'Darker areas had more of them; point at a name to see his shots.' : 'Bigger dots are more dangerous.'}</figcaption>
 </figure>
 
 <style is:global>
@@ -50,6 +73,16 @@ const fadeId = `fade-${team}-${Math.round(shots[0]?.x ?? 0)}-${shots.length}`;
   .shotmap.picking .shot { fill-opacity: 0.08; stroke-opacity: 0; }
   .shotmap.picking .shot.hl { fill-opacity: 0.9; stroke-opacity: 1; }
   .shotmap .shot { transition: fill-opacity 0.15s; }
+  /* Areas mode: dots hidden until a name is picked, then only his show over the faded areas. */
+  .shotmap.areas .shot { fill-opacity: 0; stroke-opacity: 0; pointer-events: none; }
+  .shotmap.areas.picking .shot.hl { fill-opacity: 0.9; stroke-opacity: 1; }
+  .shotmap.areas.picking :is(.am-area use, .am-labels) { opacity: 0.35; }
+  .shotmap.areas :is(.am-area use, .am-labels) { transition: opacity 0.15s; }
+  .shotmap .am-area use { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.7; stroke-linejoin: round; }
+  .shotmap .am-area { cursor: help; outline: none; }
+  .shotmap .am-rings use { fill: none; stroke: var(--ink); stroke-width: 0.6; pointer-events: none; display: none; }
+  .shotmap .am-labels text { font: 600 3.4px var(--ui); fill: var(--ink); text-anchor: middle; pointer-events: none; }
+  .shotmap .am-labels text.dark { fill: var(--sheet); }
   .rk-dot { fill: var(--line-red); }
   .rk-dot.blue { fill: var(--line-blue); }
   .rk-centre { stroke: var(--line-red); stroke-width: 1.4; }

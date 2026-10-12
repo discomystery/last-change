@@ -1,19 +1,22 @@
 ---
+// Night to night as one split bar: his starts as rough nights (more than a goal below expected), about expected
+// (within a goal either way) and strong nights (a goal or more above), read left to right in deepening shades of the
+// team colour. The export keeps six goal-wide groups; the outer pairs make the rough and strong parts. Styles live in
+// Base.astro (`.nsplit`).
 interface Props { team: string; bins: { lo: number; n: number }[]; name: string; wide?: boolean }
-const { team, bins, name, wide = false } = Astro.props;
-const max = Math.max(...bins.map((b) => b.n), 1);
-// `wide` is a flatter drawing for full-width slots, so the labels stay small when it is stretched.
-const W = wide ? 420 : 180, H = 64, bw = W / bins.length;
-const sign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
+const { team, bins, name } = Astro.props;
+const sum = (f: (lo: number) => boolean) => bins.filter((b) => f(b.lo)).reduce((t, b) => t + b.n, 0);
+const parts = [
+  { k: 'rough', n: sum((lo) => lo < -1), word: 'rough', tip: 'more than a goal below expected' },
+  { k: 'even', n: sum((lo) => lo === -1 || lo === 0), word: 'about expected', tip: 'within a goal of expected, either way' },
+  { k: 'strong', n: sum((lo) => lo >= 1), word: 'strong', tip: 'a goal or more saved above expected' },
+];
+const total = parts.reduce((t, p) => t + p.n, 0);
+const starts = (n: number) => `${n} ${n === 1 ? 'start' : 'starts'}`;
 ---
-<svg class:list={['histo', `t-${team}`]} viewBox={`0 0 ${W} ${H + 16}`} role="img" aria-label={`${name}: goals saved above expected, game by game`}>
-  {bins.map((b, i) => {
-    const h = Math.max(1.5, (b.n / max) * (H - 4));
-    return <path class="histo-bar" d={`M${i * bw + 1} ${H} V${H - h + 3} a3 3 0 0 1 3 -3 H${(i + 1) * bw - 4} a3 3 0 0 1 3 3 V${H} Z`} data-tip={`${b.n} starts between ${sign(b.lo)} and ${sign(b.lo + 1)} goals saved above expected`} />;
-  })}
-  <line class="histo-axis" x1="0" x2={W} y1={H} y2={H} />
-  <line class="histo-zero" x1={W / 2} x2={W / 2} y1="0" y2={H + 3} />
-  <text x="1" y={H + 13}>−3 (bad night)</text>
-  <text x={W / 2} y={H + 13} text-anchor="middle">0</text>
-  <text x={W - 1} y={H + 13} text-anchor="end">+3 (stole it)</text>
-</svg>
+<div class:list={['nsplit', `t-${team}`]} role="img" aria-label={`${name}: ${parts.map((p) => `${p.n} ${p.word}`).join(', ')} of ${starts(total)}`}>
+  <div class="ns-bar">
+    {parts.map((p, i) => p.n > 0 && <span class={`ns-${p.k}`} style={`flex-grow:${p.n};--i:${i}`} tabindex="0" data-tip={`${starts(p.n)} ${p.tip}`}></span>)}
+  </div>
+  <p class="ns-lab">{parts.map((p) => <span><b>{p.n}</b> {p.word}</span>)}</p>
+</div>
