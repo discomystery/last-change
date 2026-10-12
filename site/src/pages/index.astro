@@ -1,6 +1,7 @@
 ---
 // Home: built in the browser from the real schedule, around whichever team the visitor has chosen.
 import Base from '../layouts/Base.astro';
+import { matchupTable } from '../lib/teams';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="home" title="Spare Line Change">
@@ -35,6 +36,7 @@ const base = import.meta.env.BASE_URL;
       <ul class="games slate" id="results"></ul>
     </section>
   </div>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
 </Base>
 
 <script is:inline>
@@ -45,6 +47,8 @@ const base = import.meta.env.BASE_URL;
     const RECAPS = new Set(rc.games.map((g) => g.id));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    const MC = JSON.parse(document.getElementById('mcol').textContent);
+    const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -106,6 +110,7 @@ const base = import.meta.env.BASE_URL;
           rink.append(el('span', 'circle', 'at'));
           [next.away, next.home].forEach((a, i) => {
             const side = el('div', 'side' + (i ? ' home' : ''));
+            if (colourOf(a, next)) side.style.setProperty('--team', colourOf(a, next));
             const ab = el('p', 'abbr' + (a === me ? ' me' : ''));
             const l = el('a', 'tlink', a); l.href = `${base}team/${a}/`; ab.append(l);
             side.append(ab, el('p', 'full', byAbbr[a]?.name ?? a));

@@ -35,7 +35,7 @@ const teamList = teams as { abbr: string; name: string }[];
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Young+Serif&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <header class="site-head">
@@ -409,8 +409,9 @@ const teamList = teams as { abbr: string; name: string }[];
   .nrink .circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
   .nrink .side { position: relative; padding: 26px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; min-width: 0; }
   .nrink .side.home { align-items: flex-end; text-align: right; }
-  .nrink .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--ink-3); }
-  .nrink .abbr.me { color: var(--ink); }
+  /* Both teams in their own colours, as on previews and post-game pages (the page sets --team on each side). */
+  .nrink .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--team, var(--ink)); }
+  @media (prefers-color-scheme: dark) { .nrink .side[style] .abbr { color: color-mix(in oklab, var(--team) 55%, white); } }
   .nrink .full { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
   .nrink .lc { font: 600 13px var(--ui); margin-top: 4px; color: var(--ink-2); }
   .nrink .rl.goal { width: 1px; background: var(--line-red); }
@@ -477,6 +478,8 @@ const teamList = teams as { abbr: string; name: string }[];
   .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   /* Small all-caps labels above a value or a card. */
   .eyebrow, .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  /* The one stronger label: the title of a side box ("Who to watch", "What it means", the intro's next game). */
+  .box-h { font: 700 12.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); }
   /* A team name that opens the team's page, in the surrounding text style. */
   .tlink { color: inherit; }
 
@@ -494,7 +497,7 @@ const teamList = teams as { abbr: string; name: string }[];
   .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
   .takeaway { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
-  .sub { font: 600 23px/1.15 var(--display); margin: 40px 0 12px; }
+  .sub { font: 600 22px/1.15 var(--display); margin: 40px 0 12px; }
   .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px; padding: 18px; }
   /* A card straight under a section heading or its explainer line gets the same breathing room everywhere. */
   .sec-head + .card { margin-top: 18px; }

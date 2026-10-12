@@ -191,13 +191,14 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
   .ptabs a { font: 600 14px var(--ui); color: var(--ink-2); padding: 7px 14px; border-radius: 999px; background: var(--track); text-decoration: none; }
   .ptabs a[aria-current] { background: var(--ink); color: var(--sheet); }
   .on-team[hidden] { display: none; }
-  .lb-group { margin-top: 26px; }
-  .lb-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 10px; }
+  .lb-group { margin-top: 40px; }
+  /* Group names use the same serif sub-heading as the player page's All ratings. */
+  .lb-h { font: 600 22px/1.15 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-bottom: 12px; }
   .lb-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
   .lb-card { display: block; color: inherit; text-decoration: none; padding: 14px 16px; }
   .lb-card[hidden] { display: none; }
   .lb-card:hover { box-shadow: 0 0 0 2px var(--ink) inset; }
-  .lb-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 600 17px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
+  .lb-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin-bottom: 8px; }
   .lb-more { font: 500 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
   .lb-card:hover .lb-more { color: var(--ink); }
   .lb-top { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1.4em 1fr auto; gap: 4px 8px; font: 400 14px var(--ui); }
