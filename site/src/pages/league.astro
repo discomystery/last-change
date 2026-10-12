@@ -44,7 +44,7 @@ const f1 = (v: number) => v.toFixed(1), f2 = (v: number) => v.toFixed(2);
 const signed = (v: number, d: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
 const numFmt: Record<string, [(v: number) => string, string]> = {
   volume: [(v) => String(Math.round(v)), 'score, 100 is average'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
-  turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], shotsThrough: [(v) => `${f1(v)}%`, 'of attempts through'], blocking: [(v) => `${f1(v)}%`, 'of attempts blocked'], suppression: [(v) => String(Math.round(v)), 'score, 100 is average'],
+  turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], shotsThrough: [(v) => `${f1(v)}%`, 'of attempts through'], pointAllowed: [(v) => `${f1(v)}%`, 'of attempts against from D'], icing: [f1, 'icings per 60'], blocking: [(v) => `${f1(v)}%`, 'of attempts blocked'], suppression: [(v) => String(Math.round(v)), 'score, 100 is average'],
   qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], longShifts: [(v) => `${f1(v)}%`, 'of shots against'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
   pace: [(v) => String(Math.round(v)), 'score, 100 is average'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
   depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
