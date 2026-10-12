@@ -550,9 +550,12 @@ const statRow = (x: any) => (isG ? null : x);
 <style>
   /* The header stands on a rule like a section heading's; his photo stands on the same rule at the right. */
   .phead { position: relative; overflow: hidden; margin-top: 22px; padding: 0 24px 0 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 16px; isolation: isolate; }
+  /* Everything else in the card sits on a layer above the number. Explicit, rather than a negative z-index on the
+     number, because Safari can lift the rolling digits (moving, clipped layers) above content when they sit below zero. */
+  .phead > :not(.pnum), .phead .team-top > * { position: relative; z-index: 1; }
   /* Painted under everything else in the card but above its background, big enough to fill the card's right side,
      its foot cut off by the card's bottom edge. */
-  .phead .pnum { position: absolute; z-index: -1; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
+  .phead .pnum { position: absolute; z-index: 0; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
   .phead .pmeta { grid-column: 1; grid-row: 2; }
   .pstats-in { grid-column: 1; grid-row: 3; margin: 22px 0 16px; }
