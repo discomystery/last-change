@@ -190,14 +190,15 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         g.sort(key=lambda f: lead[f[2]])
 
     def clauses(group: list, after: str | None) -> str:
+        many = lambda t: places[t].lower().startswith("the ")  # "the Rangers have", not "has"
         parts = []  # one phrase per team: "Edmonton has been ... lately and has home-ice advantage"
         for f in group:
             if parts and parts[-1][0] == f[2]:
-                parts[-1][1] += " and " + (f[4] if parts[-1][1].startswith("they ") else f[3])
+                parts[-1][1] += " and " + (f[4] if parts[-1][1].startswith("they ") or many(f[2]) else f[3])
             elif not parts and f[2] == after:
                 parts.append([f[2], "they " + f[4]])  # "..., but they are on the second night"
             else:
-                parts.append([f[2], f"{places[f[2]]} {f[3]}"])
+                parts.append([f[2], f"{places[f[2]]} {f[4] if many(f[2]) else f[3]}"])
         out = [p[1] for p in parts]
         if len(out) == 1:
             return out[0]
