@@ -43,6 +43,9 @@ const SW = 1.2; // Swing bar half-width, in Swing points
 ---
 {rows.length > 0 && (<>
 <Section id="counted" title={`What ${place} count on him for`} placeholder={false} takeaway="What his post-game report cards judge him on, why, and how often he has done it.">
+  <Fragment slot="explain">
+    <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position: better than 75% of {peer[p.sub === 'C' || p.sub === 'W' ? p.sub : p.group] ?? 'players'}, or a regular share of the power play, penalty kill or faceoffs. These are the others.</p>
+  </Fragment>
   <ul class="rp-duties">
     {duties.map((j) => { const v = record(j.key); return (
       <li class="card rp-duty">
@@ -67,11 +70,13 @@ const SW = 1.2; // Swing bar half-width, in Swing points
         </li>
       ); })}
     </ul>
-    <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position: better than 75% of {peer[p.sub === 'C' || p.sub === 'W' ? p.sub : p.group] ?? 'players'}, or a regular share of the power play, penalty kill or faceoffs. These are the others.</p>
   </div>
 </Section>
 
 <Section id="recent" title="Recent games" placeholder={false} takeaway={`His report card and Swing from his last ${Math.min(RECENT, rows.length)} ${rows.length === 1 ? 'game' : 'games'}, newest first.`}>
+  <Fragment slot="explain">
+    <p class="note">Swing is how much his night moved the game, from the post-game page. Tap a game for the full report.</p>
+  </Fragment>
   <div class="card rp-games">
     <div class="rp-head" aria-hidden="true"><span>Game</span><span>Report card <em class="rp-keys">{duties.map((j) => j.label.replace(' at 5-on-5', '').toLowerCase()).join(' · ')}</em></span><span>Swing</span></div>
     <ul>
@@ -94,7 +99,6 @@ const SW = 1.2; // Swing bar half-width, in Swing points
         </li>
       ); })}
     </ul>
-    <p class="note">Swing is how much his night moved the game, from the post-game page. Tap a game for the full report.</p>
   </div>
 </Section>
 </>)}
