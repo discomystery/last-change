@@ -111,7 +111,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   <Section id="swing" title="Swing" placeholder={false}
     takeaway="How far each player swung tonight’s result, for his team or against it.">
     <Fragment slot="explain">
-      <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The “card” beside it is a second opinion: his report card from “Did they do their job?” below; L1 to L4 and P1 to P3 are tonight’s lines and pairs.</p>
+      <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The label beside it is his report card from “Did they do their job?” below; L1 to L4 and P1 to P3 are tonight’s lines and pairs.</p>
       <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
       <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus actual goals for and against at half the weight of a chance. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: everything with him on the ice on the power play and penalty kill, chances and goals both ways (a shorthanded goal against counts against the power-play unit), compared with a league-average unit.</p>
       <p class="note"><strong>Company kept</strong> (counted inside 5-on-5): from every player’s 5-on-5 impact going into this season, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who swung this result, not who is better.</p>
@@ -149,7 +149,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
                     {layout(r).map((p) => <span class:list={['sw-piece', { neg: p.v < 0 }]} data-part={p.key} style={`left:${p.l.toFixed(1)}%;width:${p.w.toFixed(1)}%;--mix:${p.mix}%`}></span>)}
                   </span>
                   <strong class="sw-n">{one(r.score)}</strong>
-                  {pills.get(r.id) ? <span class={`sw-pill ${pillClass[pills.get(r.id)!]}`}><span class="sw-card">Card</span>{pillWord[pills.get(r.id)!].toLowerCase()}</span> : <span></span>}
+                  {pills.get(r.id) ? <span class={`sw-pill ${pillClass[pills.get(r.id)!]}`}>{pillWord[pills.get(r.id)!]}</span> : <span></span>}
                 </div>
                 <div class="sw-det" hidden>
                   <div class="sw-scs">
@@ -298,7 +298,6 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   /* Quiet text here; the full pill lives on the report cards below. */
   .sw-pill { justify-self: start; font: 600 13px var(--ui); color: var(--ink-3); white-space: nowrap; }
   .sw-pill.did, .sw-pill.huge { color: var(--ink); }
-  .sw-card { font: 600 10.5px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 6px; }
   .sw-n { font: 700 16px var(--ui); text-align: right; }
   @media (max-width: 600px) {
     .sw-row { grid-template-columns: minmax(0, 1fr) auto 3em; gap: 4px 10px; padding: 7px 8px; }

@@ -603,15 +603,14 @@ const teamList = teams as { abbr: string; name: string }[];
   .shot { fill: var(--team); fill-opacity: 0.5; stroke: var(--sheet); stroke-width: 0.35; }
 
   /* The start strip (components/Histogram.astro): one puck per start over a lane, the even mark in the middle. */
-  .sstrip { display: grid; gap: 0; }
-  .ss-cols { display: grid; grid-template-columns: repeat(6, 1fr); align-items: end; padding: 0 2px; }
-  .ss-col { display: flex; justify-content: center; padding-top: 4px; cursor: help; outline-offset: 2px; border-radius: 4px; }
-  .ss-col:not([data-tip]) { cursor: default; }
-  .ss-stack { display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 3px; width: calc(var(--per) * 13px - 3px); padding-bottom: 6px; }
-  .ss-stack i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  .ss-lane { position: relative; height: 4px; border-radius: 2px; background: var(--track); }
-  .ss-lane i { position: absolute; left: 50%; top: -8px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: 0.5; }
-  .ss-lab { display: flex; justify-content: space-between; margin-top: 8px; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .nbars { display: grid; gap: 0; }
+  .nb-cols { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; align-items: end; height: 84px; border-bottom: 1px solid var(--rule); }
+  .nb-col { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; height: 100%; cursor: help; outline-offset: 2px; }
+  .nb-col:not([data-tip]) { cursor: default; }
+  .nb-n { font: 600 12px var(--ui); color: var(--ink-2); text-align: center; height: 18px; }
+  .nb-bar { display: block; height: calc(var(--h) * 62px); min-height: 0; border-radius: 4px 4px 0 0; background: var(--team); transform-origin: bottom; }
+  .nb-even { position: absolute; left: 50%; bottom: -4px; width: 2px; height: 70px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: 0.5; }
+  .nb-lab { display: flex; justify-content: space-between; margin-top: 8px; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
   .quad text { font: 500 9px var(--ui); fill: var(--ink-3); }
 
   .quad { width: 100%; height: auto; display: block; }

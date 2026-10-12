@@ -28,20 +28,7 @@ const lane = (t: any) => {
   const max = Math.max(...t.mates.map((x: any) => x[1]), t.v, 1) * 1.08;
   const at = (v: number) => Math.round((1000 * v) / max) / 10;
   const next = t.mates.find((x: any) => !x[2]);
-  // Teammates who would touch stack upward instead of piling on one another: each takes the lowest row with room
-  // (a dot is about 3.5% of the narrowest tile), and his own dot holds its place on the track.
-  const rows: number[][] = [[]];
-  const me = t.mates.find((x: any) => x[2]);
-  if (me) rows[0].push(at(me[1]));
-  const row = new Map<string, number>();
-  [...t.mates].filter((x: any) => !x[2]).sort((a: any, b: any) => a[1] - b[1]).forEach((x: any) => {
-    const v = at(x[1]);
-    let r = rows.findIndex((taken, k) => taken.every((o) => Math.abs(o - v) >= (k === 0 && me && o === at(me[1]) ? 5 : 3.5)));
-    if (r < 0) { rows.push([]); r = rows.length - 1; }
-    rows[r].push(v);
-    row.set(x[0], r);
-  });
-  return { at, next, row, rows: rows.length - 1, tier: t.rank == null ? null : TIERS.find(([n]) => t.rank <= n)! };
+  return { at, next, tier: t.rank == null ? null : TIERS.find(([n]) => t.rank <= n)! };
 };
 const pct = (v: number) => `${Math.round(v)}%`;
 const last = (name: string) => name.split(' ').slice(-1)[0];
@@ -104,8 +91,8 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
               <p class="ld-h"><span class="term" tabindex="0" data-tip={info.tip(mw)}>{info.label}</span></p>
               <p class="ld-big">{pct(t.v)}{L.tier && <span class:list={['ld-verdict', L.tier[2]]} tabindex="0" data-tip={TIER_TIP}>{L.tier[1]}</span>}</p>
               {!L.tier ? <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · not a power-play regular</p> : <p class="ld-of">{t.num} of {t.den.toLocaleString('en-US')} · <span class="term" tabindex="0" data-tip={`Among ${t.of} skaters who have played at least ${m === 'blend' ? '20 games over the two seasons' : '3 games this season'}${t.key === 'pp' ? ' and are regulars on the power play' : ''}.`}>{ordinal(t.rank)} in NHL</span></p>}
-              <div class="ld-dots" role="img" aria-label={`${pct(t.v)}, against ${place} teammates`} style={`--rows:${L.rows}`}>
-                {t.mates.map(([name, v, me]: any) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%;--r:${L.row.get(name) ?? 0}`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
+              <div class="ld-dots" role="img" aria-label={`${pct(t.v)}, against ${place} teammates`}>
+                {t.mates.map(([name, v, me]: any) => me ? <b style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></b> : <i style={`left:${L.at(v)}%`} tabindex="0" data-tip={`${name}: ${v}%`}></i>)}
                 {L.next && <em style={`left:${Math.min(88, Math.max(12, L.at(L.next[1])))}%`}>{last(L.next[0])}</em>}
               </div>
             </li>
@@ -185,9 +172,10 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
   .ld-verdict.v2 { background: color-mix(in oklab, var(--team) 40%, var(--sheet)); color: var(--ink); }
   .ld-verdict.v3 { background: color-mix(in oklab, var(--team) 18%, var(--sheet)); color: var(--ink); }
   .ld-of { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
-  .ld-dots { position: relative; height: 40px; margin: calc(14px + var(--rows, 0) * 10px) 7px 0; }
+  .ld-dots { position: relative; height: 40px; margin: 14px 7px 0; }
   .ld-dots::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
-  .ld-dots i { position: absolute; top: calc(3px - var(--r, 0) * 10px); width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--ink-3); opacity: 0.45; }
+  /* Crowd lanes keep every dot on the line (Sora's preferred form): overlap reads as a crowd, never stacked. */
+  .ld-dots i { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.35; }
   .ld-dots b { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 1; }
   .ld-dots em { position: absolute; top: 18px; transform: translateX(-50%); font: 400 12px var(--ui); font-style: normal; color: var(--ink-3); white-space: nowrap; }
   .ld-jobs { margin-top: 14px; }

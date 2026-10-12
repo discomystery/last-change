@@ -1,25 +1,23 @@
 ---
-// The start strip: one puck per start, stacked over where his night landed on a goals-saved-above-expected scale from
-// a bad night to stealing one, the even mark in the middle. Starts are grouped a goal wide (the export keeps six
-// groups, the outer two taking everything past two goals either way). Pucks build from the bottom, so ten starts look
-// like ten starts. Styles live in Base.astro (`.sstrip`).
+// Night to night: one bar per goal-wide group of starts on a goals-saved-above-expected scale, from a bad night to
+// stealing one (the outer two groups take everything past two goals either way). Each bar carries its count, the
+// even mark sits between the middle bars, and the labels are in the sans. Styles live in Base.astro (`.nbars`).
 interface Props { team: string; bins: { lo: number; n: number }[]; name: string; wide?: boolean }
 const { team, bins, name } = Astro.props;
 const max = Math.max(...bins.map((b) => b.n), 1);
-// Pucks per row in a stack: enough that the tallest stack stays about six high.
-const per = Math.min(5, Math.max(2, Math.ceil(max / 6)));
 const sign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
 const range = (lo: number) => (lo <= -3 ? 'more than 2 goals below expected' : lo >= 2 ? '2 or more goals saved above expected' : `between ${sign(lo)} and ${sign(lo + 1)} goals saved above expected`);
 const total = bins.reduce((t, b) => t + b.n, 0);
 ---
-<div class:list={['sstrip', `t-${team}`]} role="img" aria-label={`${name}: ${total} starts by goals saved above expected`} style={`--per:${per}`}>
-  <div class="ss-cols">
+<div class:list={['nbars', `t-${team}`]} role="img" aria-label={`${name}: ${total} starts by goals saved above expected`}>
+  <div class="nb-cols">
     {bins.map((b, k) => (
-      <div class="ss-col" tabindex={b.n ? 0 : undefined} data-tip={b.n ? `${b.n} ${b.n === 1 ? 'start' : 'starts'} ${range(b.lo)}` : undefined}>
-        <div class="ss-stack">{Array.from({ length: b.n }, (_, i) => <i style={`--i:${k * 2 + i}`}></i>)}</div>
+      <div class="nb-col" tabindex={b.n ? 0 : undefined} data-tip={b.n ? `${b.n} ${b.n === 1 ? 'start' : 'starts'} ${range(b.lo)}` : undefined}>
+        <span class="nb-n">{b.n || ''}</span>
+        <span class="nb-bar" style={`--h:${(b.n / max).toFixed(3)};--i:${k}`}></span>
       </div>
     ))}
+    <i class="nb-even" aria-hidden="true"></i>
   </div>
-  <div class="ss-lane" aria-hidden="true"><i></i></div>
-  <p class="ss-lab" aria-hidden="true"><span>Bad night −3</span><span>0</span><span>+3 Stole it</span></p>
+  <p class="nb-lab" aria-hidden="true"><span>Bad night −3</span><span>0</span><span>+3 Stole it</span></p>
 </div>
