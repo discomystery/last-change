@@ -4,11 +4,12 @@ Everything uses shots faced while he was in net; empty-net shots are excluded. "
 last season (goalie samples are small); "season" is this season alone.
 """
 from collections import defaultdict
+from functools import lru_cache
 
 import numpy as np
 import polars as pl
 
-from pipeline.config import REGULAR, TABLES
+from pipeline.config import FULL_SEASONS, REGULAR, TABLES
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 TIERS = (("low", 0.0, 0.05), ("medium", 0.05, 0.15), ("high", 0.15, 9.9))
@@ -19,6 +20,35 @@ MIN_STARTS = {"blend": 10, "season": 2}
 # 2026-10-11 by predicting the rest of each 2023-24 to 2025-26 season from a goalie's first 5 / 10 / 20 starts (and
 # odd games from even): error per shot after 10 starts 1.65 raw, 0.67 at 1,000, 0.62 at 3,000, flat beyond.
 SHRINK_SHOTS = 3000
+# Rebound control: a save "gives a rebound" when the shooting team gets another unblocked shot within this many
+# seconds, with no other play in between. Judged against how often saves on that kind of shot from that spot do
+# (shot type x 10 ft distance band x 10 ft side band, 2023-24 to 2025-26). Tested 2026-10-12: a goalie's rate against
+# expected repeats (split-half r 0.21-0.26, year to year 0.33-0.40) but does not predict his goals against, so it is
+# a style card, not a quality one.
+REBOUND_SECONDS = 3
+
+
+def _rebound_cell() -> list[pl.Expr]:
+    return [pl.col("shot_type").fill_null("unknown"), (pl.col("dist") / 10).floor().clip(0, 6).alias("db"), (pl.col("y_abs") / 10).floor().clip(0, 3).alias("ab")]
+
+
+def _saves(season: int) -> pl.DataFrame:
+    """Every save (shot on goal, no goal) with whether the shooting team shot again within REBOUND_SECONDS."""
+    d = TABLES / str(season)
+    ev = pl.read_parquet(d / "events.parquet").filter(pl.col("period_type") != "SO").sort("game_id", "sort").with_columns(
+        t=pl.col("period") * 1200 + pl.col("sec"))
+    nxt = [pl.col(c).shift(-1).over("game_id").alias(f"n_{c}") for c in ("type", "team_id", "t")]
+    ev = ev.with_columns(nxt).filter((pl.col("type") == "shot-on-goal") & pl.col("goalie_id").is_not_null())
+    reb = pl.col("n_type").is_in(UNBLOCKED) & (pl.col("n_team_id") == pl.col("team_id")) & (pl.col("n_t") - pl.col("t") <= REBOUND_SECONDS)
+    f = pl.read_parquet(d / "shot_features.parquet").select("game_id", "event_id", "dist", "y_abs", "shot_type")
+    return ev.with_columns(rebound=reb.fill_null(False)).select("game_id", "event_id", "rebound").join(f, on=["game_id", "event_id"])
+
+
+@lru_cache(maxsize=1)
+def rebound_rates() -> pl.DataFrame:
+    """League rate of rebounds after a save, by shot type, distance and side band, over the full seasons."""
+    s = pl.concat([_saves(yr) for yr in FULL_SEASONS if (TABLES / str(yr) / "shot_features.parquet").exists()])
+    return s.group_by(_rebound_cell()).agg(rb_exp=pl.col("rebound").cast(pl.Float64).mean())
 
 
 def shots(season: int) -> pl.DataFrame:
@@ -28,6 +58,9 @@ def shots(season: int) -> pl.DataFrame:
     f = pl.read_parquet(d / "shot_features.parquet").select("game_id", "event_id", "empty_net", "prev_type", "prev_gap", "prev_x", "prev_same_team")
     xg = pl.read_parquet(d / "shots_xg_own.parquet")
     s = ev.join(f, on=["game_id", "event_id"]).join(xg, on=["game_id", "event_id"]).join(games, on="game_id").filter(~pl.col("empty_net"))
+    sv = _saves(season).with_columns(_rebound_cell()).join(rebound_rates(), on=["shot_type", "db", "ab"], how="left").select(
+        "game_id", "event_id", "rebound", pl.col("rb_exp").fill_null(0.0))
+    s = s.join(sv, on=["game_id", "event_id"], how="left").with_columns(pl.col("rebound").fill_null(False), pl.col("rb_exp").fill_null(0.0))
     turnover = (pl.col("prev_gap") <= 5) & (((pl.col("prev_type") == "giveaway") & ~pl.col("prev_same_team")) | ((pl.col("prev_type") == "takeaway") & pl.col("prev_same_team")))
     return s.with_columns(goal=pl.col("type") == "goal", on_goal=pl.col("type") != "missed-shot", breakdown=turnover & (pl.col("xg") >= 0.15), season=pl.lit(season))
 
@@ -41,6 +74,7 @@ def per_game(season: int) -> pl.DataFrame:
     gaps = og.group_by("game_id", "goalie_id").agg(pl.col("gap").alias("gaps"))
     agg = s.group_by("game_id", "goalie_id", "date").agg(
         pl.len().alias("fa"), pl.col("on_goal").sum().alias("sa"), pl.col("goal").sum().alias("ga"), pl.col("xg").sum().alias("xga"), pl.col("breakdown").sum().alias("bd"),
+        pl.col("rebound").sum().alias("rb"), pl.col("rb_exp").sum().alias("rb_exp"),
         *[((pl.col("xg") >= lo) & (pl.col("xg") < hi) & pl.col("on_goal")).sum().alias(f"sa_{name}") for name, lo, hi in TIERS],
         *[((pl.col("xg") >= lo) & (pl.col("xg") < hi) & pl.col("goal")).sum().alias(f"ga_{name}") for name, lo, hi in TIERS],
     )
@@ -70,13 +104,19 @@ def summarise(games: pl.DataFrame, league_sv: dict[int, float]) -> dict:
            "gap": round(float(np.median(all_gaps))) if len(all_gaps) else None, "long_wait": round(100 * float((all_gaps > LONG_WAIT).mean())) if len(all_gaps) else None,
            "qs": round(100 * quality / starts.height) if starts.height else None, "rbs": round(100 * bad / starts.height) if starts.height else None,
            "bins": bins, "tiers": {}}
+    saves = sa - ga
+    if saves:  # rebounds per 100 saves, his and what the same saves usually give; reb_ctrl is higher when he gives fewer
+        rb, rb_exp = float(g["rb"].sum()), float(g["rb_exp"].sum())
+        out.update(reb=round(100 * rb / saves, 1), reb_exp=round(100 * rb_exp / saves, 1), reb_ctrl=round(100 * (rb_exp - rb) / saves, 2))
+    else:
+        out.update(reb=None, reb_exp=None, reb_ctrl=None)
     for name, _, _ in TIERS:
         n, a = float(g[f"sa_{name}"].sum()), float(g[f"ga_{name}"].sum())
         out["tiers"][name] = {"shots": int(n), "sv": round((n - a) / n, 3) if n else None}
     return out
 
 
-TRAITS = {"gsax": ("gsax_est60", True), "busy": ("sa60", True), "danger": ("danger", True), "breakdowns": ("bd60", True), "gaps": ("gap", True), "steady": ("qs", True)}
+TRAITS = {"gsax": ("gsax_est60", True), "rebounds": ("reb_ctrl", True), "busy": ("sa60", True), "danger": ("danger", True), "breakdowns": ("bd60", True), "gaps": ("gap", True), "steady": ("qs", True)}
 
 
 def run(season: int) -> dict:

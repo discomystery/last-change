@@ -64,7 +64,7 @@ const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46
 const unitNames = (label: string) => ln.units.find((u) => u.label === label)?.players.join(', ') ?? '';
 const lastNames = (label: string) => (ln.units.find((u) => u.label === label)?.players ?? []).map((n) => n.split(' ').slice(1).join(' '));
 const standouts = (rows: MRow[]) => rows.filter((r) => r.minutes >= 15).flatMap((r) => r.share.map((v, j) => ({ r, j, v: v ?? 0, gap: (v ?? 0) - r.expected[j] }))).filter((x) => x.gap >= 10).sort((a, b) => b.gap - a.gap).slice(0, 3);
-type GMode = { starts: number; shots: number; gsax: number; gsax60: number | null; xga60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
+type GMode = { starts: number; shots: number; gsax: number; gsax60: number | null; xga60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; reb?: number | null; reb_exp?: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
 type Goalie = { id: number; name: string; blend: GMode; season: GMode };
 const goalies = ((goalieData.teams as Record<string, Goalie[]>)[abbr!] ?? []);
 const lg = goalieData.league as { x: number; y: number }[];
@@ -76,6 +76,7 @@ const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}
 const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 const gSay: Record<string, (g: GMode) => string> = {
   gsax: (g) => `${sgn(g.gsax)} goals saved above expected in ${g.starts} ${g.starts === 1 ? 'start' : 'starts'}`,
+  rebounds: (g) => (g.reb == null ? '–' : `a rebound after ${g.reb} of every 100 saves, where the same saves usually give ${g.reb_exp}`),
   busy: (g) => `${g.sa60} shots faced per 60`,
   danger: (g) => (g.danger ? `the average shot he faces has a ${(100 * g.danger).toFixed(1)}% chance of going in` : '–'),
   breakdowns: (g) => `${g.bd60} defensive breakdowns in front of him per 60`,
