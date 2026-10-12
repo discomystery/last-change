@@ -111,13 +111,10 @@ const teamList = teams as { abbr: string; name: string }[];
       <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
       <a href={`${base}methods/`}>Methods</a>
-      <a href={`${base}check/`}>Real lines check</a>
-      <a href={`${base}xg-check/`}>Chance check</a>
     </div>
     <footer class="site-foot">
-      <p>Game data: NHL. Expected goals: this site’s own model, checked against <a href="https://moneypuck.com">MoneyPuck.com</a>.</p>
+      <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
       <p>A fan project. Not affiliated with the NHL or any of its teams.</p>
-      <p class="checks">Behind the numbers: <a href={`${base}methods/`}>Methods</a> · <a href={`${base}check/`}>Real lines check</a> · <a href={`${base}xg-check/`}>Chance check</a></p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline>
@@ -407,7 +404,6 @@ const teamList = teams as { abbr: string; name: string }[];
   /* The team pill fills in on hover (like the Preview buttons) instead of picking up the tabs' underline colour on its bottom edge. */
   .site-nav .my-team:hover { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
   .tabbar, .more { display: none; }
-  .checks a { color: inherit; }
   @media (max-width: 719px) {
     .site-nav { display: none; }
     body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
