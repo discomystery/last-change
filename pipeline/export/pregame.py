@@ -26,6 +26,8 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, DATA, SITE_DATA, TABLES
 from pipeline.export import previews
 
+METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach rebuilt ones;
+# the rulebook (previews.RULES_VERSION) already redoes them on its own. Live snapshots are never redone either way.
 
 def cut_tables(season: int, day: str, root: Path) -> int:
     """A data folder under `root` whose `season` tables hold only games played before `day`; everything else is linked."""
@@ -88,11 +90,12 @@ def _stale(path: Path) -> bool:
     if not path.exists():
         return True
     snap = json.loads(path.read_text())
-    return bool(snap.get("rebuilt")) and snap.get("rules", 1) < previews.RULES_VERSION
+    return bool(snap.get("rebuilt")) and (snap.get("rules", 1) < previews.RULES_VERSION or snap.get("methods", 0) < METHODS)
 
 
 def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
-    """Rebuild a preview for every finished game that has none, and redo rebuilt ones written under an older rulebook.
+    """Rebuild a preview for every finished game that has none, and redo rebuilt ones written under an older rulebook
+    or older methods.
     Live snapshots (saved before puck drop) are never touched."""
     now = now or datetime.now(timezone.utc)
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
@@ -111,7 +114,8 @@ def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
         for g in todo[day]:
             if g["away"] not in site["fingerprints"]["teams"] or g["home"] not in site["fingerprints"]["teams"]:
                 continue
-            snap = previews.snapshot(g, site, places, sched, now, chances.get(g["id"]), rebuilt=True, games_before=n, data_through=through)
+            snap = previews.snapshot(g, site, places, sched, now, chances.get(g["id"]), rebuilt=True, games_before=n, data_through=through,
+                                     methods=METHODS)
             (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
             written += 1
     previews.write_index(out_dir)
