@@ -25,12 +25,13 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 7  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 8  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
 # 6: the rest edge (one team on the second night of a back-to-back)
 # 7: shot volume, shots against and pace quoted as scores, with what they look like as recorded (`see`); ranks as chips
+# 8: special-teams calls add what each side has been known for over five seasons of real goals; verb agreement fixed
 METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
@@ -304,6 +305,27 @@ def team_words(t: str, places: dict, prefix: str) -> dict[str, str]:
     place = places.get(t, t)
     city = the if place.startswith("NY ") else place  # "NY Rangers" reads badly as a place
     return {prefix: the, f"{prefix}p": _poss(the), f"{prefix}c": city, f"{prefix}n": nick}
+
+
+def special_teams_record(c: dict, places: dict, surprises) -> str | None:
+    """A sentence on what the two teams' special teams have been known for over five seasons of real goals, for a
+    power-play or penalty-kill call (Sora, 2026-10-12: a famous kill or a famously bad power play is part of the story,
+    not just this season's chances). Ends in "though" when the record cuts against the call."""
+    m, kind = c.get("metric"), c.get("kind")
+    chk = c.get("check") or {}
+    if m not in ("pp", "pk") or kind not in ("clash", "duel", "edge"):
+        return None
+    if kind == "edge":
+        top, bot = chk.get("team", c.get("team")), chk.get("opp", c.get("opp"))
+        roles = [(top, m, 1), (bot, m, -1)]  # the call says top is better than bot
+    else:
+        roles = [(c["team"], "pp", 1), (c["opp"], "pk", -1)]  # the call says this power play does well against that kill
+    found = [(k[0] * want, k[1]) for t, dim, want in roles if t and (k := surprises.known_for(t, dim, places))]
+    if not found:
+        return None
+    text = surprises._and([w for _, w in found])
+    against = all(s < 0 for s, _ in found)
+    return f"{text[0].upper()}{text[1:]}{', though' if against else ''}."
 
 
 def _fmt(text: str, **w) -> str:
@@ -977,6 +999,15 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     rest_usual = usual_share(rested[0], g["start"]) if rested else None
     claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
                    {**call_extras(site, g["start"]), "likely": likely, "rest": rest, "rest_usual": rest_usual})
+    from pipeline.export import surprises, wording
+    for c in claims:
+        rep = special_teams_record(c, wording.places(places), surprises)
+        if rep:
+            c["body"] = f"{c['body']} {rep}"
+    for c in claims:  # "the Islanders play", not "plays": templates are written for place names
+        for k in ("head", "body", "call", "see", "gist"):
+            if isinstance(c.get(k), str):
+                c[k] = wording.tidy(c[k])
     out = {"game_id": g["id"], "start": g["start"], "away": away, "home": home, "venue": g["venue"],
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),

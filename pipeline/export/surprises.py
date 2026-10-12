@@ -194,6 +194,21 @@ def _rep_words(ranks: list[int]) -> tuple[str, str] | None:
     return None
 
 
+def known_for(t: str, dim: str, places: dict, season: int = CURRENT_SEASON) -> tuple[int, str] | None:
+    """A team's five-season record in real power-play or penalty-kill conversion, when it is clear enough to be what
+    they are known for: (1 for good, -1 for bad, the clause), e.g. "Carolina has had one of the league’s best penalty
+    kills for years". Previews use it beside special-teams calls."""
+    ranks = reputation(season).get((t, dim))
+    rw = _rep_words(ranks) if ranks else None
+    if not rw or abs(_rep_z(ranks)) < EXTREME:
+        return None
+    top = rw[0] in ("first in the league", "in the top three", "in the top five", "in the top ten")
+    what = REP[dim]
+    if rw[0] in ("first in the league", "in the top three", "last in the league", "in the bottom three"):
+        return (1 if top else -1), f"{places[t]} has had one of the league’s {what[0 if top else 1]} for years"
+    return (1 if top else -1), f"{places[t]}’s {what[2]} has been near the {'top' if top else 'bottom'} of the league for years"
+
+
 def _pct(fp: dict, t: str, dim: str) -> float | None:
     b = fp.get(t, {}).get("dims", {}).get(dim, {}).get("blend") or {}
     return b.get("pct")
@@ -202,22 +217,22 @@ def _pct(fp: dict, t: str, dim: str) -> float | None:
 # How each figure leans: (this team's trait, the opponent's trait that pushes against it), and the words for a team known
 # for a trait (top or bottom 15% this season and last). Teams are "they".
 LEANS = {"pp": ("pp", "pk"), "quality": ("quality", "qualityAllowed"), "hits": ("physical", None), "depth": ("depth", None)}
-KNOWN = {"pp": ("have one of the league’s most dangerous power plays", "have one of the league’s least dangerous power plays"),
-         "pk": ("have one of the league’s stingiest penalty kills", "have one of the league’s leakiest penalty kills"),
-         "quality": ("usually get some of the league’s most dangerous shots", "usually get some of the league’s least dangerous shots"),
-         "qualityAllowed": ("are one of the league’s best at preventing dangerous shots", "usually give up some of the league’s most dangerous shots"),
-         "physical": ("are one of the league’s heaviest-hitting teams", "are one of the league’s lightest-hitting teams"),
-         "depth": ("lean on their bottom six more than most teams", "ride their top six more than most teams"),
-         "volume": ("throw more pucks at the net than almost anyone", "take fewer shots than almost anyone"),
-         "suppression": ("allow fewer shots than almost anyone", "allow more shots than almost anyone")}
-MILD = {"pp": ("have a better power play than most", "have a weaker power play than most"),
-        "pk": ("kill penalties better than most", "have a weaker penalty kill than most"),
-        "quality": ("usually get better looks than most teams", "usually get worse looks than most teams"),
-        "qualityAllowed": ("usually allow fewer dangerous shots than most teams", "usually allow more dangerous shots than most teams"),
-        "physical": ("usually hit more than most teams", "usually hit less than most teams"),
-        "depth": ("usually use their bottom six more than most teams", "usually use their bottom six less than most teams"),
-        "volume": ("usually shoot more than most teams", "usually shoot less than most teams"),
-        "suppression": ("usually allow fewer shots than most teams", "usually allow more shots than most teams")}
+KNOWN = {"pp": ("has one of the league’s most dangerous power plays", "has one of the league’s least dangerous power plays"),
+         "pk": ("has one of the league’s stingiest penalty kills", "has one of the league’s leakiest penalty kills"),
+         "quality": ("usually gets some of the league’s most dangerous shots", "usually gets some of the league’s least dangerous shots"),
+         "qualityAllowed": ("is one of the league’s best at preventing dangerous shots", "usually gives up some of the league’s most dangerous shots"),
+         "physical": ("is one of the league’s heaviest-hitting teams", "is one of the league’s lightest-hitting teams"),
+         "depth": ("leans on their bottom six more than most teams", "rides their top six more than most teams"),
+         "volume": ("throws more pucks at the net than almost anyone", "takes fewer shots than almost anyone"),
+         "suppression": ("allows fewer shots than almost anyone", "allows more shots than almost anyone")}
+MILD = {"pp": ("has a better power play than most", "has a weaker power play than most"),
+        "pk": ("kills penalties better than most", "has a weaker penalty kill than most"),
+        "quality": ("usually gets better looks than most teams", "usually gets worse looks than most teams"),
+        "qualityAllowed": ("usually allows fewer dangerous shots than most teams", "usually allows more dangerous shots than most teams"),
+        "physical": ("usually hits more than most teams", "usually hits less than most teams"),
+        "depth": ("usually uses their bottom six more than most teams", "usually uses their bottom six less than most teams"),
+        "volume": ("usually shoots more than most teams", "usually shoots less than most teams"),
+        "suppression": ("usually allows fewer shots than most teams", "usually allows more shots than most teams")}
 NEUTRAL = {"hits", "depth"}  # style, not quality: never "good to better" or "bad to worse"
 REP = {"pp": ("most effective power plays", "least effective power plays", "power play"),
        "pk": ("best penalty kills", "weakest penalty kills", "penalty kill")}
@@ -247,7 +262,7 @@ def _trait(fp: dict, t: str, dim: str, season: int, places: dict) -> tuple[float
             low = rw[0] in ("last in the league", "in the bottom three")
             what = REP[dim]
             if top or low:
-                words = f"{T} have had one of the league’s {what[0 if top else 1]} for years"
+                words = f"{T} has had one of the league’s {what[0 if top else 1]} for years"
             else:
                 words = f"{T}’s {what[2]} has been near the {'top' if rz > 0 else 'bottom'} of the league for years"
             known = True
@@ -340,7 +355,7 @@ def shot_share(rows: dict, a: str, h: str, fp: dict, places: dict, season: int =
         ps = {d: _pct(fp, k, d) for d in ("volume", "suppression")}
         hits = [d for d, p in ps.items() if p is not None and (p >= 85 or p <= 15) and sign * _z_pct(p) * (own + opp) > 0]
         if len(hits) == 2:
-            words = "control the shot count like almost no one else" if ps["volume"] >= 85 else "get outshot more than almost anyone"
+            words = "controls the shot count like almost no one else" if ps["volume"] >= 85 else "gets outshot more than almost anyone"
             why.append((abs(_z_pct(ps["volume"])) + abs(_z_pct(ps["suppression"])), f"{places[k]} {words}"))
         elif hits:
             why.append((abs(_z_pct(ps[hits[0]])), f"{places[k]} {KNOWN[hits[0]][0 if ps[hits[0]] >= 85 else 1]}"))

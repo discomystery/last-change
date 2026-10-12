@@ -6,7 +6,9 @@ stat lines ("NY Rangers 5th for power play") keep the place.
 """
 import re
 
-PLURAL = {"has": "have", "is": "are", "was": "were", "does": "do", "wins": "win", "faces": "face", "starts": "start"}
+PLURAL = {"has": "have", "is": "are", "was": "were", "does": "do", "wins": "win", "faces": "face", "starts": "start", "plays": "play",
+          "gets": "get", "gives": "give", "takes": "take", "throws": "throw", "allows": "allow", "leans": "lean", "rides": "ride",
+          "uses": "use", "hits": "hit", "shoots": "shoot", "kills": "kill", "controls": "control", "makes": "make", "turns": "turn"}
 _NY = r"(?:Rangers|Islanders)"
 
 
@@ -24,7 +26,7 @@ def tidy(text: str | None) -> str | None:
     if not text:
         return text
     text = re.sub(rf"\b(the {_NY})(’|')s\b", r"\1\2", text)
-    text = re.sub(rf"\b(the {_NY}) ({'|'.join(PLURAL)})\b", lambda m: f"{m[1]} {PLURAL[m[2]]}", text)
+    text = re.sub(rf"\b([Tt]he {_NY})( usually)? ({'|'.join(PLURAL)})\b", lambda m: f"{m[1]}{m[2] or ''} {PLURAL[m[3]]}", text)
     text = re.sub(rf"(^|[.!?]\s+)the ({_NY})\b", r"\1The \2", text)
     return text
 
