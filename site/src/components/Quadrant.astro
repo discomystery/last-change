@@ -4,20 +4,37 @@ interface Hi extends Pt { team: string; name: string; probable: boolean }
 interface Props { league: Pt[]; highlights: Hi[]; tall?: boolean; xDomain?: [number, number]; yDomain?: [number, number]; xMid?: number }
 const { league, highlights, tall = false, xDomain = [1.9, 3.25], yDomain = [-0.75, 0.75], xMid = 2.575 } = Astro.props;
 // `tall` draws a near-square chart for narrow, tall slots.
-const W = 360, H = tall ? 400 : 300, m = { l: 14, r: 14, t: 26, b: 34 };
+// The plot sits in a pale box with the quadrant names inside its corners; the vertical range gets extra room so dots
+// clear those names.
+const W = 360, H = tall ? 400 : 300, m = { l: 0, r: 0, t: 0, b: 26 };
+const yPad = (yDomain[1] - yDomain[0]) * 0.22;
+const yLo = yDomain[0] - yPad, yHi = yDomain[1] + yPad;
+const bh = H - m.b;
 // Rounded to a tenth of a unit (well under a pixel): full-precision coordinates were a large share of each page.
 const X = (v: number) => +(m.l + ((v - xDomain[0]) / (xDomain[1] - xDomain[0])) * (W - m.l - m.r)).toFixed(1);
-const Y = (v: number) => +(m.t + ((yDomain[1] - v) / (yDomain[1] - yDomain[0])) * (H - m.t - m.b)).toFixed(1);
+const Y = (v: number) => +(m.t + ((yHi - v) / (yHi - yLo)) * (bh - m.t)).toFixed(1);
 const cx = X(xMid), cy = Y(0);
+// Name labels: right of the dot unless near the right edge; a label that would overlap one already placed moves
+// above or below it (about 6.5 units a character at this size).
+const placed: { x0: number; x1: number; y: number }[] = [];
+const labels = highlights.map((p) => {
+  const x = X(p.x), y = Y(p.y), right = x < W - 110, w = p.name.length * 6.5;
+  const lx = x + (right ? 11 : -11), x0 = right ? lx : lx - w, x1 = right ? lx + w : lx;
+  let ly = y + 4;
+  for (const o of placed) if (x0 < o.x1 && x1 > o.x0 && Math.abs(ly - o.y) < 13) ly = ly <= o.y ? o.y - 13 : o.y + 13;
+  placed.push({ x0, x1, y: ly });
+  return { lx, ly: +ly.toFixed(1), anchor: right ? 'start' : 'end' };
+});
 ---
 <svg class="quad" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Goalie performance against the workload his team gives him">
-  <line class="q-axis" x1={m.l} x2={W - m.r} y1={cy} y2={cy} />
-  <line class="q-axis" x1={cx} x2={cx} y1={m.t} y2={H - m.b} />
-  <text class="q-corner" x={m.l} y="14">System and goalie both good</text>
-  <text class="q-corner" x={W - m.r} y="14" text-anchor="end">Goalie bailing them out</text>
-  <text class="q-corner" x={m.l} y={H - m.b + 14}>Goalie giving back what the system earns</text>
-  <text class="q-corner" x={W - m.r} y={H - m.b + 14} text-anchor="end">Trouble everywhere</text>
-  <text class="q-axis-label" x={W / 2} y={H - 3} text-anchor="middle">Team allows fewer chances ← → more chances</text>
+  <rect class="q-box" x="0" y="0" width={W} height={bh} rx="12" />
+  <line class="q-axis" x1="0" x2={W} y1={cy} y2={cy} />
+  <line class="q-axis" x1={cx} x2={cx} y1="0" y2={bh} />
+  <text class="q-corner" x="12" y="22"><tspan x="12">System and goalie</tspan><tspan x="12" dy="13">both good</tspan></text>
+  <text class="q-corner" x={W - 12} y="22" text-anchor="end"><tspan x={W - 12}>Goalie bailing</tspan><tspan x={W - 12} dy="13">them out</tspan></text>
+  <text class="q-corner" x="12" y={bh - 26}><tspan x="12">Goalie giving back</tspan><tspan x="12" dy="13">what the system earns</tspan></text>
+  <text class="q-corner" x={W - 12} y={bh - 26} text-anchor="end"><tspan x={W - 12}>Trouble</tspan><tspan x={W - 12} dy="13">everywhere</tspan></text>
+  <text class="q-axis-label" x={W / 2} y={H - 6} text-anchor="middle">Team allows fewer chances ← → more chances</text>
   {league.map((p) => (
     <g class="q-pt" data-tip={p.name ? `${p.name}${p.team ? ` (${p.team})` : ''}: ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per 60; his team allows ${p.x.toFixed(2)} expected goals per 60 in front of him.` : undefined}>
       <circle class="q-hit" cx={X(p.x)} cy={Y(p.y)} r="8" />
@@ -25,11 +42,11 @@ const cx = X(xMid), cy = Y(0);
     </g>
   ))}
   {highlights.map((p, i) => {
-    const right = X(p.x) < W - 110;
+    const l = labels[i];
     return (
       <g class={`t-${p.team}`} data-tip={`${p.name} (${p.team}): ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per 60; team allows ${p.x.toFixed(2)} expected goals per 60 in front of him`}>
         <circle class:list={['q-hi', { backup: !p.probable }]} cx={X(p.x)} cy={Y(p.y)} r="6.5" />
-        <text class="q-name" x={X(p.x) + (right ? 11 : -11)} y={Y(p.y) + 4} text-anchor={right ? 'start' : 'end'}>{p.name}</text>
+        <text class="q-name" x={l.lx} y={l.ly} text-anchor={l.anchor}>{p.name}</text>
       </g>
     );
   })}
