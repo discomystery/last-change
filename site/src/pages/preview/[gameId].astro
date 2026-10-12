@@ -395,7 +395,7 @@ const _ = ordinal;
                 <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                 <div class="lanes">
                   {order.flatMap((a) => goaliesOf(a).map((g, gi) => {
-                    const raw = g[mode].pct[t.key], p = raw === null ? null : t.at(raw);
+                    const p = g[mode].pct[t.key];
                     return p === null ? <div class:list={['lane', 'empty', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}></div> : <div class:list={['lane', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0} style={`--b:${p};--blo:${p};--bhi:${p};--c:${p};--clo:${p};--chi:${p}`}><span class="whisk"></span><span class="dot"></span></div>;
                   }))}
                 </div>

@@ -101,9 +101,7 @@ const goalieRows = (key: string) => {
   const order: Record<Mode, Map<number, number>> = { blend: new Map(), season: new Map() };
   for (const m of modes) {
     const rated = goalies.filter((g) => g[m].pct[key] !== null && g[m].pct[key] !== undefined);
-    // Rightmost (better for the goalie) first, so the list reads down the card from right to left.
-    const at = goalieTraitInfo.find((t) => t.key === key)!.at, dir = at(100) > at(0) ? 1 : -1;
-    rated.sort((a, b) => dir * (b[m].pct[key]! - a[m].pct[key]!) || dir * (gValue[key](b[m]) - gValue[key](a[m])));
+    rated.sort((a, b) => b[m].pct[key]! - a[m].pct[key]! || gValue[key](b[m]) - gValue[key](a[m]));
     rated.forEach((g, i) => order[m].set(g.id, i + 1));
   }
   return goalies.filter((g) => order.blend.has(g.id) || order.season.has(g.id)).map((g) => ({ g, ob: order.blend.get(g.id), os: order.season.get(g.id) }));
@@ -309,7 +307,7 @@ const _ = ordinal;
         <div class="rank-ends"><span></span><span></span><div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div></div>
         <ol class="ranks">
           {goalieRows(t.key).map(({ g, ob, os }) => (
-            <li data-t={g.team} class:list={{ nob: !ob, nos: !os }} style={`--ob:${ob ?? 999};--os:${os ?? 999};--b:${t.at(g.blend.pct[t.key] ?? 50)};--blo:${t.at(g.blend.pct[t.key] ?? 50)};--bhi:${t.at(g.blend.pct[t.key] ?? 50)};--c:${t.at(g.season.pct[t.key] ?? 50)};--clo:${t.at(g.season.pct[t.key] ?? 50)};--chi:${t.at(g.season.pct[t.key] ?? 50)}`}>
+            <li data-t={g.team} class:list={{ nob: !ob, nos: !os }} style={`--ob:${ob ?? 999};--os:${os ?? 999};--b:${g.blend.pct[t.key] ?? 50};--blo:${g.blend.pct[t.key] ?? 50};--bhi:${g.blend.pct[t.key] ?? 50};--c:${g.season.pct[t.key] ?? 50};--clo:${g.season.pct[t.key] ?? 50};--chi:${g.season.pct[t.key] ?? 50}`}>
               <span class="rk"><span class="m-blend">{ob}</span><span class="m-season">{os}</span></span>
               <span class="rname gwho"><PLink id={g.id} name={g.name} /> <TeamLink abbr={g.team} class="gteam">{g.team}</TeamLink></span>
               <div class="lanes"><div class="lane"><span class="whisk"></span><span class="dot"></span></div></div>

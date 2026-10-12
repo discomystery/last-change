@@ -450,9 +450,9 @@ const gsign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0
 type Goalie = (typeof goalies)['CAR'][number];
 export const goalieTraits = [
   { key: 'gsax', label: 'Stopping more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall', pct: (g: Goalie) => clamp(50 + g.gsax60 * 110), say: (g: Goalie) => `${gsign(g.gsax)} goals saved above expected in ${g.starts} starts` },
-  { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per 60.', lo: 'Under siege', hi: 'Quiet', flip: true, pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per 60` },
-  { key: 'danger', label: 'How dangerous the shots are', tip: 'How dangerous the shots against him are, on average.', lo: 'Exposed', hi: 'Sheltered', flip: true, pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
-  { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous chances he faces per 60 within seconds of his team losing the puck. A stand-in for chances faced alone.', lo: 'Constant', hi: 'Rare', flip: true, pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous chances off turnovers per 60` },
+  { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per 60.', lo: 'Quiet', hi: 'Under siege', pct: (g: Goalie) => clamp((gnum(g.workload[0].value) - 23) * 11), say: (g: Goalie) => `${g.workload[0].value} shots faced per 60` },
+  { key: 'danger', label: 'How dangerous the shots are', tip: 'How dangerous the shots against him are, on average.', lo: 'Sheltered', hi: 'Exposed', pct: (g: Goalie) => clamp((gnum(g.workload[1].value) - 0.062) * 3600), say: (g: Goalie) => `the average shot against is worth ${g.workload[1].value} expected goals` },
+  { key: 'breakdowns', label: 'Breakdowns in front of him', tip: 'Dangerous chances he faces per 60 within seconds of his team losing the puck. A stand-in for chances faced alone.', lo: 'Rare', hi: 'Constant', pct: (g: Goalie) => clamp((gnum(g.workload[2].value) - 1.8) * 45), say: (g: Goalie) => `${g.workload[2].value} dangerous chances off turnovers per 60` },
   { key: 'gaps', label: 'Waiting between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', lo: 'Steady work', hi: 'Long waits', pct: (g: Goalie) => clamp((gnum(g.workload[3].value) - 40) * 2.4), say: (g: Goalie) => `a typical wait of ${g.workload[3].value} between shots` },
   { key: 'steady', label: 'Night-to-night steadiness', tip: 'How often he gives his team a fair chance to win.', lo: 'Streaky', hi: 'Steady', pct: (g: Goalie) => clamp((g.consistency.qs - 40) * 3.6), say: (g: Goalie) => `a quality start ${g.consistency.qs}% of the time` },
 ];
@@ -461,6 +461,4 @@ export const goalieTraits = [
 export const fpInfo = Object.fromEntries(fingerprint.map((d) => [d.key, { label: d.label, tip: d.tip, ...fpMeta[d.key] }])) as Record<string, { label: string; tip: string } & FpMeta>;
 
 // Labels, tooltips and scale ends for goalie traits. Shared by real pages.
-// Better for the goalie sits on the right of every scale (Sora's rule), so workload traits, whose percentiles count
-// up with more shots or danger, are drawn mirrored: `at` turns a goalies.json percentile into a place on the card.
-export const goalieTraitInfo = goalieTraits.map((t) => ({ key: t.key, label: t.label, tip: t.tip, lo: t.lo, hi: t.hi, at: (pct: number) => ('flip' in t && t.flip ? 100 - pct : pct) }));
+export const goalieTraitInfo = goalieTraits.map((t) => ({ key: t.key, label: t.label, tip: t.tip, lo: t.lo, hi: t.hi }));
