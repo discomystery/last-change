@@ -310,7 +310,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     {r.surprises.length > 0 && (
       <>
         <Explain id="surprises" title="What it didn’t see coming">
-          <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of their usual habit. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: a usually average team, far from average. Each is measured against the teams’ numbers before the game.</p>
+          <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of their usual habit. <strong>Bad to worse</strong> and <strong>Good to better</strong>: a team known for a weakness or a strength (or facing one) went further even than that. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: two teams who usually land about average here, far from it. Each is measured against what both teams’ numbers before the game predicted, and special teams also against five seasons of real power-play and penalty-kill conversion.</p>
         </Explain>
         <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.flipped ? 'Flipped a call' : s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3>{s.flipped && <p class="flipped">The preview said “{s.flipped}.”</p>}<p>{s.body}</p></li>)}</ul>
       </>
