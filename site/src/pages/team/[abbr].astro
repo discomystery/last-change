@@ -358,7 +358,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
                         <li class="card fpc">
                           <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
                           <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
-                          <div class="lanes">{x.pct[t.key] !== null && <div class="lane" style={`--b:${x.pct[t.key]};--blo:${x.pct[t.key]};--bhi:${x.pct[t.key]};--c:${x.pct[t.key]};--clo:${x.pct[t.key]};--chi:${x.pct[t.key]}`}><span class="whisk"></span><span class="dot"></span></div>}{x.pct[t.key] === null && <div class="lane empty"></div>}</div>
+                          <div class="lanes">{x.pct[t.key] !== null && <div class="lane" style={`--b:${t.at(x.pct[t.key]!)};--blo:${t.at(x.pct[t.key]!)};--bhi:${t.at(x.pct[t.key]!)};--c:${t.at(x.pct[t.key]!)};--clo:${t.at(x.pct[t.key]!)};--chi:${t.at(x.pct[t.key]!)}`}><span class="whisk"></span><span class="dot"></span></div>}{x.pct[t.key] === null && <div class="lane empty"></div>}</div>
                           <p class="gline"><span>{gSay[t.key](x)}</span>{x.pct[t.key] === null && <em>too few starts to place him</em>}</p>
                         </li>
                       ))}
