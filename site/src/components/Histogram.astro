@@ -1,23 +1,22 @@
 ---
-// Night to night: one bar per goal-wide group of starts on a goals-saved-above-expected scale, from a bad night to
-// stealing one (the outer two groups take everything past two goals either way). Each bar carries its count, the
-// even mark sits between the middle bars, and the labels are in the sans. Styles live in Base.astro (`.nbars`).
+// Night to night as one split bar: his starts as rough nights (more than a goal below expected), about expected
+// (within a goal either way) and strong nights (a goal or more above), read left to right in deepening shades of the
+// team colour. The export keeps six goal-wide groups; the outer pairs make the rough and strong parts. Styles live in
+// Base.astro (`.nsplit`).
 interface Props { team: string; bins: { lo: number; n: number }[]; name: string; wide?: boolean }
 const { team, bins, name } = Astro.props;
-const max = Math.max(...bins.map((b) => b.n), 1);
-const sign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0');
-const range = (lo: number) => (lo <= -3 ? 'more than 2 goals below expected' : lo >= 2 ? '2 or more goals saved above expected' : `between ${sign(lo)} and ${sign(lo + 1)} goals saved above expected`);
-const total = bins.reduce((t, b) => t + b.n, 0);
+const sum = (f: (lo: number) => boolean) => bins.filter((b) => f(b.lo)).reduce((t, b) => t + b.n, 0);
+const parts = [
+  { k: 'rough', n: sum((lo) => lo < -1), word: 'rough', tip: 'more than a goal below expected' },
+  { k: 'even', n: sum((lo) => lo === -1 || lo === 0), word: 'about expected', tip: 'within a goal of expected, either way' },
+  { k: 'strong', n: sum((lo) => lo >= 1), word: 'strong', tip: 'a goal or more saved above expected' },
+];
+const total = parts.reduce((t, p) => t + p.n, 0);
+const starts = (n: number) => `${n} ${n === 1 ? 'start' : 'starts'}`;
 ---
-<div class:list={['nbars', `t-${team}`]} role="img" aria-label={`${name}: ${total} starts by goals saved above expected`}>
-  <div class="nb-cols">
-    {bins.map((b, k) => (
-      <div class="nb-col" tabindex={b.n ? 0 : undefined} data-tip={b.n ? `${b.n} ${b.n === 1 ? 'start' : 'starts'} ${range(b.lo)}` : undefined}>
-        <span class="nb-n">{b.n || ''}</span>
-        <span class="nb-bar" style={`--h:${(b.n / max).toFixed(3)};--i:${k}`}></span>
-      </div>
-    ))}
-    <i class="nb-even" aria-hidden="true"></i>
+<div class:list={['nsplit', `t-${team}`]} role="img" aria-label={`${name}: ${parts.map((p) => `${p.n} ${p.word}`).join(', ')} of ${starts(total)}`}>
+  <div class="ns-bar">
+    {parts.map((p, i) => p.n > 0 && <span class={`ns-${p.k}`} style={`flex-grow:${p.n};--i:${i}`} tabindex="0" data-tip={`${starts(p.n)} ${p.tip}`}></span>)}
   </div>
-  <p class="nb-lab" aria-hidden="true"><span>Bad night −3</span><span>0</span><span>+3 Stole it</span></p>
+  <p class="ns-lab">{parts.map((p) => <span><b>{p.n}</b> {p.word}</span>)}</p>
 </div>

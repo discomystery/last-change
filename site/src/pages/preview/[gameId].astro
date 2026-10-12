@@ -425,7 +425,7 @@ const _ = ordinal;
           <div class="two gnights">
             {order.flatMap((a) => goaliesOf(a).map((g, gi) => (
               <div class:list={['card', `t-${side(a)}`]} data-goalie={g.id} hidden={gi !== 0}>
-                <p class="mini-h">{g.name}, night to night: goals saved above expected in each start</p>
+                <p class="mini-h">{g.name}, night to night: rough, about expected and strong starts</p>
                 <Histogram wide team={side(a)} bins={g[mode].bins.map((n, k) => ({ lo: k - 3, n }))} name={g.name} />
               </div>
             )))}

@@ -134,6 +134,18 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             </div>
           ))}
         </div>
+        <div class="wrows">
+          <span class="half-r" aria-hidden="true"></span>
+          {calls.weeks.map((w, k) => (
+            <div class="wr" title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+              <p class="wr-l">{day(w.week)}<span>{plural(total(w), 'call')}</span></p>
+              <div class="wr-bar" role="img" aria-label={`Week of ${day(w.week)}: ${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`} style={`--w:${k}`}>
+                {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
+              </div>
+              <p class="wr-p">{pct(w.held, total(w))}%</p>
+            </div>
+          ))}
+        </div>
         <p class="wkey"><span><i class="held"></i>Held up</span><span><i class="partly"></i>Partly</span><span><i class="missed"></i>Didn’t happen</span></p>
       </div>
     ) : <p class="note">{emptyText}</p>}
@@ -314,6 +326,20 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   .wkey i { width: 12px; height: 12px; border-radius: 3px; }
   :global(html.motion .seen) .weeks .col { animation: rec-rise 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--w, 0) * 90ms); }
   @keyframes rec-rise { from { transform: scaleY(0); } }
+  /* Phones read the weeks as rows, newest at the bottom, so a long season grows down the page, not sideways. */
+  .wrows { display: none; position: relative; gap: 10px; }
+  .wr { display: grid; grid-template-columns: 68px minmax(0, 1fr) 40px; gap: 10px; align-items: center; }
+  .wr-l { font: 600 13px var(--ui); display: grid; white-space: nowrap; }
+  .wr-l span { font: 500 11px var(--ui); color: var(--ink-3); }
+  .wr-bar { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; transform-origin: left; }
+  .wr-bar span { flex-basis: 0; min-width: 3px; }
+  .wr-bar .held { background: var(--ink); }
+  .wr-bar .partly { background: color-mix(in oklab, var(--ink) 40%, var(--rule)); }
+  .wr-bar .missed { background: var(--track); }
+  .wr-p { font: 700 15px var(--ui); text-align: right; }
+  .half-r { position: absolute; top: -6px; bottom: -6px; left: calc(78px + (100% - 128px) / 2); border-left: 2px dotted var(--ink-3); opacity: 0.7; z-index: 1; pointer-events: none; }
+  :global(html.motion .seen) .wr-bar { animation: rec-row 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--w, 0) * 90ms); }
+  @keyframes rec-row { from { transform: scaleX(0); } }
 
   /* Latest calls: a card per game. */
   .gcards { display: grid; gap: 14px; }
@@ -373,6 +399,9 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   }
 
   @media (max-width: 719px) {
+    .weeks { display: none; }
+    .wrows { display: grid; }
+    .weeks-card { width: auto; }
     .score { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
     .hero { font-size: 72px; }
     .sc-grid { justify-self: start; gap: 5px; }
