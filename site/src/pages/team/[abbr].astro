@@ -35,6 +35,8 @@ import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../data/mock';
 import FpRow from '../../components/FpRow.astro';
+import SeasonTrend from '../../components/SeasonTrend.astro';
+import { trendFor } from '../../lib/trend';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -130,7 +132,8 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   const list = (a: string[]) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0]);
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const trend = trendFor(abbr!);
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 ---
@@ -160,6 +163,17 @@ const tiText = teamIntro(abbr)?.text ?? [];
       <div><h3 class="sub">Coming up</h3><ul class="games" id="upcoming"></ul></div>
     </div>
   </Section>
+
+  {trend && (
+    <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} have come from, and whether this season’s team is a new version of it.`}>
+      <Fragment slot="explain">
+        <p>The columns are every season since 1997-98 from the NHL’s records: how many of the available points the franchise took, and how far it went in the playoffs.</p>
+        <p>The chart below follows each game of last season and this one: the share of the 5-on-5 chances (expected goals, adjusted for the score and home ice), and a line through the last {trend.window}. The hatched band is how far a {trend.window}-game stretch drifts from a team’s level on bounces alone, measured by reshuffling the games of 2023-24 to 2025-26. A change is only marked when splitting the two seasons into a before and an after gives a gap that 19 of 20 reshuffles of the same games can’t match.</p>
+        <p>Then and now puts each style trait last season beside this season. A trait counts as new once the season has enough games to read it, the two are at least 25 percentile points apart, and last season sits outside this season’s likely range. Tested on 2024-25 and 2025-26, about three in four changes flagged seven games in were still there at the end of the season.</p>
+      </Fragment>
+      <SeasonTrend abbr={abbr!} colour={teamColour(abbr!)} place={team.place} t={trend.t} window={trend.window} band={trend.band} season={trend.season} />
+    </Section>
+  )}
 
   <Section id="style" title="Style fingerprint" placeholder={false} takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
     <Fragment slot="explain">
