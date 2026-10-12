@@ -1,10 +1,9 @@
-"""Write the JSON the website reads. Phase 2 exports a real-data check: each team's last-game lines."""
+"""Write the JSON the website reads, starting with each team's last-game lines (team pages)."""
 import json
 from datetime import datetime, timezone
 
 import polars as pl
 
-from pipeline.build import validate
 from pipeline.export import wording
 from pipeline.config import OFFLINE, SITE_DATA, TABLES
 from pipeline.metrics.lines import game_units
@@ -34,10 +33,7 @@ def run(season: int) -> dict:
         out.append({"team": abbr, "game_id": g["game_id"], "date": g["date"], "opponent": opp, "at_home": side == "home",
                     "score": [g[f"{side}_score"], g["away_score" if side == "home" else "home_score"]],
                     "five_on_five_seconds": units["five_on_five_seconds"], "lines": rows(3, 4), "pairs": rows(2, 3)})
-    checks = validate.run(season)
-    checks.pop("worst_toi_games", None)
-    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
-               "checks": checks, "teams": out}
+    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "teams": out}
     SITE_DATA.mkdir(parents=True, exist_ok=True)
     (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
     if OFFLINE:  # keep the saved standings and schedule
