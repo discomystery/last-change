@@ -97,7 +97,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("ca", s5).alias("ca5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("d_cf", s5).alias("d_cf"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
-        tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"), tot("ca", s5).alias("ca5"),
+        tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
