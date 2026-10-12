@@ -657,16 +657,53 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 s1.append(f"{_cap(W.the(winner))} won it in the shootout.")
     # A starter was pulled only if a teammate goalie then played: a short night on its own is usually the net left
     # empty for an extra attacker.
+    # "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as "pulled" only
+    # after 2+ goals and at an intermission or the stoppage for a goal against. A change in the middle of play is
+    # more often an injury (Sora, 2026-10-12: an injured goalie comes out at once), so it is told without "pulled",
+    # and never with a reason.
     in_net = r.get("goalies", [])
-    relieved = {x["team"] for x in in_net if not x.get("started") and _secs(x.get("toi")) > 0}
-    pulled = [x for x in in_net if x.get("started") and x["team"] in relieved and x.get("ga", 0) >= 3]
-    for x in pulled[:1]:
-        s1.append(f"{W.place(x['team'])} pulled {name(x['id']) or x['name']} after {num(x['ga'])} goals.")
+    changes = []
+    for t in (away, home):
+        first = next((x for x in in_net if x["team"] == t and x.get("started")), None)
+        relief = max((x for x in in_net if x["team"] == t and not x.get("started") and _secs(x.get("toi")) > 0),
+                     key=lambda x: _secs(x.get("toi")), default=None)
+        if first and relief:
+            how = (relief.get("came_in") or {}).get("how")
+            changes.append((t, first, relief, first.get("ga", 0) >= 2 and how != "mid" and not (relief.get("came_in") or {}).get("back")))
+
+    def who(x):
+        return name(x["id"]) or x["name"]
+
+    def goals_n(n):
+        return f"{num(n)} goal{'' if n == 1 else 's'}"
+
+    def period_of(x):
+        sec = (x.get("came_in") or {}).get("sec")
+        if sec is None:
+            return ""
+        p = sec // 1200 + 1
+        return " in " + ({1: "the first", 2: "the second", 3: "the third"}.get(p, "overtime"))
+    if len(changes) == 2 and all(c[3] for c in changes):
+        (t1, f1, r1, _), (t2, f2, r2, _) = changes
+        tail = f"after {num(f2['ga'])}" if f1["ga"] == f2["ga"] else f"after {goals_n(f2['ga'])}"
+        s1.append(f"Both teams pulled their starters: {W.place(t1)} went from {who(f1)} to {who(r1)} after {goals_n(f1['ga'])}, "
+                  f"and {W.place(t2)} from {who(f2)} to {who(r2)} {tail}.")
+    else:
+        for t, f, rl, pulled in changes:
+            if (rl.get("came_in") or {}).get("back"):
+                s1.append(f"{who(rl)} filled in for {who(f)} for {rl['toi']}{period_of(rl)} before {W.place(t)} went back to {who(f)}.")
+            elif pulled:
+                s1.append(f"{_cap(W.place(t))} pulled {who(f)} after {goals_n(f['ga'])} and turned to {who(rl)}.")
+            elif (rl.get("came_in") or {}).get("how") == "mid":
+                s1.append(f"{who(f)} left the game{period_of(rl)}, and {who(rl)} finished it in net for {W.place(t)}.")
+            else:
+                s1.append(f"{who(rl)} took over from {who(f)} in net for {W.place(t)}{period_of(rl)}.")
     # Pulling the goalie for an extra attacker and giving up an empty-net goal: name whoever was last in net.
     en = [g for g in goals if g.get("extra") and side(g) == winner]
     if en:
         mine = [x for x in in_net if x["team"] == loser]
-        pulled = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0), None) or next((x for x in mine if x.get("started")), None)
+        pulled = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0 and not (x.get("came_in") or {}).get("back")), None) \
+            or next((x for x in mine if x.get("started")), None)
         who = (name(pulled["id"]) or pulled["name"]) if pulled else "their goalie"
         into = "into the empty net" if len(en) == 1 else ("twice" if len(en) == 2 else f"{num(len(en))} times") + " into the empty net"
         s1.append(_pick([f"{_cap(W.place(loser))} pulled {who} for an extra attacker, and {W.the(winner)} made them pay {into}.",
