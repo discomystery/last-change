@@ -135,7 +135,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
     </div>
     <Intro text={tiText} colour={teamColour(abbr)} class="tstory" />
   </div>
-  <SectionNav items={nav as [string, string][]} />
+  <SectionNav items={nav as [string, string][]} pinned />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div id="next-card"></div>

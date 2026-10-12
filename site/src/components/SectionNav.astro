@@ -18,6 +18,7 @@ const { items, pinned = false } = Astro.props;
 <script is:inline>
   // Runs once the page has loaded: the sections it tracks come after this menu in the page.
   const secnavStart = () => {
+    const root = document.documentElement;
     const pills = [...document.querySelectorAll('.secnav-pills a')];
     const bar = document.querySelector('.secnav-bar');
     const pick = document.getElementById('secnav-pick');
