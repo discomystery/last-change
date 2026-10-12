@@ -10,9 +10,10 @@ says exactly what is predicted, and a `check` (metric, team, baseline, threshold
   edge      the trait where the two sit furthest apart: the team at the better end comes out ahead tonight
 
 Triggers and wording are fixed rules (no free text), picked deterministically from the game id, so a preview can be
-generated for any game from the numbers alone. RULES_VERSION goes up whenever the rulebook changes; previews rebuilt
-after the fact are regenerated under the new rules, while live previews stay exactly as saved at puck drop. A game's file is rewritten on every run until puck drop, then frozen: once the game has started the
-file is never touched again, so the recap grades exactly what the preview said.
+generated for any game from the numbers alone. A game's file is rewritten on every run until puck drop, then left alone
+here. Once the game is final, pregame.py rebuilds its preview from the games before it whenever RULES_VERSION or
+METHODS goes up (the user's decision, 2026-10-12, while the site is in testing), keeping the original saved before
+puck drop in raw/previews_live/.
 
 Reads the site JSON the other exports have just written (fingerprints, lines), so it must run after them.
 """
@@ -30,6 +31,7 @@ RULES_VERSION = 7  # 1: the first rulebook, with ungraded "contrast" notes; 2: e
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
 # 6: the rest edge (one team on the second night of a back-to-back)
 # 7: shot volume, shots against and pace quoted as scores, with what they look like as recorded (`see`); ranks as chips
+METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -1039,14 +1041,14 @@ def run(now: datetime | None = None, within: timedelta | None = None) -> dict:
         start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
         if start <= now:
             frozen += (out_dir / f"{g['id']}.json").exists()
-            continue  # started or finished: an existing snapshot stays exactly as it was at puck drop
+            continue  # started or finished: left as it was at puck drop (pregame.py rebuilds finished ones on a rules change)
         if g["final"] or start > now + (within or timedelta(days=DAYS_AHEAD)):
             continue
         if g["away"] in site["fingerprints"]["teams"] and g["home"] in site["fingerprints"]["teams"]:
             todo.append(g)
     chances, likely = _chances(todo), _likely(todo)
     for g in todo:
-        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]), likely.get(g["id"]) or {})
+        snap = snapshot(g, site, places, sched, now, chances.get(g["id"]), likely.get(g["id"]) or {}, methods=METHODS)
         (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
         written += 1
     return {"written": written, "frozen": frozen, "indexed": write_index(out_dir)}

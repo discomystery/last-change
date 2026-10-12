@@ -26,11 +26,30 @@ def test_cut_keeps_only_games_from_earlier_days(tmp_path, monkeypatch):
     assert (root / "tables" / "2025").is_symlink() and (root / "raw").is_symlink()
 
 
-def test_only_rebuilt_previews_under_older_rules_are_redone(tmp_path):
+def test_previews_under_older_rules_or_methods_are_redone(tmp_path):
     import json
 
     from pipeline.export import pregame, previews
-    for name, snap in {"live": {"rules": 1}, "old": {"rebuilt": True, "rules": 1}, "new": {"rebuilt": True, "rules": previews.RULES_VERSION},
+    now = {"rules": previews.RULES_VERSION, "methods": pregame.METHODS}
+    for name, snap in {"live": {"rules": 1}, "live_now": now, "old": {"rebuilt": True, "rules": 1, "methods": pregame.METHODS},
+                       "new": {"rebuilt": True, **now}, "old_methods": {"rebuilt": True, "rules": previews.RULES_VERSION, "methods": pregame.METHODS - 1},
                        "legacy": {"rebuilt": True}}.items():
         (tmp_path / f"{name}.json").write_text(json.dumps(snap))
-    assert [pregame._stale(tmp_path / f"{n}.json") for n in ("live", "old", "new", "legacy", "missing")] == [False, True, False, True, True]
+    names = ("live", "live_now", "old", "new", "old_methods", "legacy", "missing")
+    assert [pregame._stale(tmp_path / f"{n}.json") for n in names] == [True, False, True, False, True, True, True]
+
+
+def test_live_original_is_kept_once(tmp_path, monkeypatch):
+    import json
+
+    from pipeline.export import pregame
+    monkeypatch.setattr(pregame, "RAW", tmp_path / "raw")
+    live, rebuilt = tmp_path / "1.json", tmp_path / "2.json"
+    live.write_text(json.dumps({"claims": ["before puck drop"]}))
+    rebuilt.write_text(json.dumps({"rebuilt": True}))
+    pregame.keep_original(live, 2026)
+    live.write_text(json.dumps({"claims": ["changed"]}))
+    pregame.keep_original(live, 2026)  # a later run must not overwrite the first copy
+    pregame.keep_original(rebuilt, 2026)
+    kept = tmp_path / "raw" / "previews_live" / "2026"
+    assert json.loads((kept / "1.json").read_text())["claims"] == ["before puck drop"] and not (kept / "2.json").exists()
