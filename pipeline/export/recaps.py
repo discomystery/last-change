@@ -68,6 +68,30 @@ class Season:
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
+        ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period_type"])
+        self.goal_times = {}
+        for gid, t, sec in ev.filter((pl.col("type") == "goal") & (pl.col("period_type") != "SO")).select("game_id", "team_id", "sec").iter_rows():
+            self.goal_times.setdefault((gid, t), []).append(sec)
+
+    def came_in(self, gid: int, tid: int, goalie: int) -> dict | None:
+        """When a relief goalie first went in, and how: "intermission" (to start a period), "after_goal" (at the
+        stoppage for a goal against, within 10 s), or "mid" (anywhere else in play, which is more often an injury), and
+        whether a teammate goalie went back in after him."""
+        home = self.games[gid]["home_id"] == tid
+        col = "home_goalie" if home else "away_goalie"
+        st = self.stints.filter((pl.col("game_id") == gid) & (pl.col(col) == goalie))
+        if not st.height:
+            return None
+        at = int(st["start"].min())
+        opp = self.games[gid]["away_id" if home else "home_id"]
+        if at > 0 and at % 1200 == 0:
+            how = "intermission"
+        elif any(0 <= at - g <= 10 for g in self.goal_times.get((gid, opp), [])):
+            how = "after_goal"
+        else:
+            how = "mid"
+        other = self.stints.filter((pl.col("game_id") == gid) & (pl.col(col).is_not_null()) & (pl.col(col) != goalie) & (pl.col("start") > at))
+        return {"sec": at, "how": how, "back": bool(other.height)}  # back: the goalie he replaced (or another) went in again
 
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
@@ -276,6 +300,10 @@ def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
                     "toi": clock(r["sec"]), "shots": r["sa"], "saves": r["sa"] - r["ga"], "ga": r["ga"], "xga": round(r["xga"], 2),
                     "gsax": round(r["xga"] - r["ga"], 2), "sv": round(sv, 3) if sv is not None else None,
                     "high": {"shots": r["sa_high"], "goals": r["ga_high"]}})
+        if not r["started"] and r["sec"] > 0:
+            came = S.came_in(gid, r["team_id"], r["goalie_id"])
+            if came:
+                out[-1]["came_in"] = came
     return out
 
 
