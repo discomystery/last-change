@@ -118,13 +118,13 @@ const statRow = (x: any) => (isG ? null : x);
   <div class="player" style={`--team:${teamColour(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
-    <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats']}>
+    <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats', unplayed && 'unplayed']}>
       {p.number !== null && <span class="pnum" aria-hidden="true">{p.number}</span>}
       <header class="team-top">
         <h1>{p.name}</h1>
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
-      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
+      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
       {!isG && hasStats && (
         <div class="pstats-in">
           <table class="pstats">
@@ -454,45 +454,63 @@ const statRow = (x: any) => (isG ? null : x);
 
 <script is:inline>
   // Name card: his sweater number spins up like a scoreboard and lands, while the stats count up to their totals.
-  // Motion only; the number and stats are already on the page if this never runs, and the plain number is put
-  // back once it lands.
+  // Motion only; the number and stats are already on the page if this never runs. The real number stays where it is,
+  // hidden, while one rolling column sits exactly over each of its digits (same spot, same width, same baseline), so
+  // the number neither moves nor changes its spacing when the roll is swapped back for the plain text.
   (() => {
     const root = document.documentElement;
     const pn = document.querySelector('.phead .pnum');
     if (!root.classList.contains('motion') || !pn) return;
     const num = pn.textContent.trim();
-    if (!/^\d+$/.test(num)) return;
-    const roll = document.createElement('span');
-    roll.style.cssText = 'display:inline-flex;overflow:hidden;height:1em;line-height:1;vertical-align:top';
-    let longest = 0;
-    const cols = [...num].map((d, i) => {
-      const c = document.createElement('span');
-      c.style.cssText = 'display:flex;flex-direction:column;transition:transform 1.2s cubic-bezier(0.2, 0.75, 0.2, 1)';
-      const loops = 1 + i;
-      for (let l = 0; l <= loops; l++) for (let k = 0; k < 10; k++) { const s = document.createElement('span'); s.textContent = k; s.style.cssText = 'display:block;height:1em'; c.append(s); }
-      const dur = 1.1 + i * 0.35;
-      longest = Math.max(longest, dur);
-      c.style.transitionDuration = dur + 's';
-      c.dataset.to = String(loops * 10 + +d);
-      roll.append(c);
-      return c;
-    });
-    pn.replaceChildren(roll);
+    const text = pn.firstChild;
+    if (!/^\d+$/.test(num) || !text || text.nodeType !== 3) return;
     const cells = [...document.querySelectorAll('.phead .pstats tbody td')].filter((td) => /^\d+$/.test(td.textContent.trim()));
     const final = cells.map((td) => +td.textContent.trim());
+    pn.style.visibility = 'hidden';
     cells.forEach((td) => { td.textContent = '0'; });
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      cols.forEach((c) => { c.style.transform = `translateY(-${c.dataset.to}em)`; });
-      const t0 = performance.now();
-      const step = (t) => {
-        const k = Math.min(1, (t - t0) / 1300);
-        const e = 1 - Math.pow(1 - k, 3);
-        cells.forEach((td, i) => { td.textContent = String(Math.round(final[i] * e)); });
-        if (k < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-      setTimeout(() => { pn.textContent = num; }, longest * 1000 + 100);
-    }));
+    // Digits are measured once the display font is in, or the columns would sit where the fallback font put them.
+    // This script runs before the font has even been asked for, so ask for it by name rather than trusting fonts.ready.
+    // (The computed `font` shorthand comes back empty here because of the variation settings, so it is spelled out.)
+    const cs = getComputedStyle(pn);
+    const fonts = document.fonts ? document.fonts.load(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, num).then(() => document.fonts.ready) : Promise.resolve();
+    fonts.catch(() => {}).then(() => {
+      const box = pn.getBoundingClientRect();
+      const start = text.textContent.indexOf(num);
+      const range = document.createRange();
+      const at = [...num].map((_, i) => { range.setStart(text, start + i); range.setEnd(text, start + i + 1); return range.getBoundingClientRect(); });
+      const roll = document.createElement('span');
+      roll.style.cssText = 'position:absolute;inset:0;visibility:visible;letter-spacing:0';
+      let longest = 0;
+      const cols = [...num].map((d, i) => {
+        // A window one line tall over the digit, clipped top and bottom only, so wider digits rolling past are not cut.
+        const w = document.createElement('span');
+        w.style.cssText = `position:absolute;top:0;height:1em;left:${at[i].left - box.left}px;width:${at[i].width}px;clip-path:inset(0 -1em);line-height:1`;
+        const c = document.createElement('span');
+        c.style.cssText = 'display:block;transition:transform 1.2s cubic-bezier(0.2, 0.75, 0.2, 1)';
+        const loops = 1 + i;
+        for (let l = 0; l <= loops; l++) for (let k = 0; k < 10; k++) { const s = document.createElement('span'); s.textContent = k; s.style.cssText = 'display:block;height:1em;white-space:nowrap'; c.append(s); }
+        const dur = 1.1 + i * 0.35;
+        longest = Math.max(longest, dur);
+        c.style.transitionDuration = dur + 's';
+        c.dataset.to = String(loops * 10 + +d);
+        w.append(c);
+        roll.append(w);
+        return c;
+      });
+      pn.append(roll);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        cols.forEach((c) => { c.style.transform = `translateY(-${c.dataset.to}em)`; });
+        const t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 1300);
+          const e = 1 - Math.pow(1 - k, 3);
+          cells.forEach((td, i) => { td.textContent = String(Math.round(final[i] * e)); });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        setTimeout(() => { roll.remove(); pn.style.visibility = ''; }, longest * 1000 + 100);
+      }));
+    });
   })();
 </script>
 
@@ -507,30 +525,37 @@ const statRow = (x: any) => (isG ? null : x);
 <style>
   /* The header stands on a rule like a section heading's; his photo stands on the same rule at the right. */
   .phead { position: relative; overflow: hidden; margin-top: 22px; padding: 0 24px 0 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 16px; isolation: isolate; }
-  /* Painted under everything else in the card but above its background. */
-  .phead .pnum { position: absolute; z-index: -1; right: 34px; bottom: -58px; font: 700 280px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
+  /* Painted under everything else in the card but above its background, big enough to fill the card's right side,
+     its foot cut off by the card's bottom edge. */
+  .phead .pnum { position: absolute; z-index: -1; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
   .phead .pmeta { grid-column: 1; grid-row: 2; }
-  .pstats-in { grid-column: 1; grid-row: 3; margin: 18px 0 16px; }
+  .pstats-in { grid-column: 1; grid-row: 3; margin: 22px 0 16px; }
   .phead.no-stats .pmeta { padding-bottom: 26px; }
-  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 4; width: 230px; height: 230px; margin-right: 10px; }
-  .phead.no-stats :global(.phead-photo) { width: 170px; height: 170px; }
+  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 4; width: 290px; height: 290px; margin-right: 18px; }
+  .phead.no-stats :global(.phead-photo) { width: 210px; height: 210px; }
+  .phead.no-stats .pnum { font-size: 340px; bottom: -88px; }
   @media (max-width: 719px) {
     /* Phones: the name runs the full width over the number; the photo stands on the stats table's top line. */
-    .phead { padding: 0 16px; grid-template-rows: auto 1fr auto auto; } /* the photo's extra height goes above the team line */
-    .phead .pnum { font-size: 132px; top: -14px; right: 4px; bottom: auto; }
+    .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto; } /* the photo's extra height goes above the team line */
+    .phead .pnum { font-size: 240px; right: 6px; bottom: auto; top: -26px; }
     .phead .team-top { display: contents; }
     .phead h1 { grid-column: 1 / -1; grid-row: 1; margin-top: 20px; }
     .phead .rec { grid-column: 1; grid-row: 2; margin-top: 6px; align-self: end; }
-    .phead .pmeta { grid-row: 3; padding-bottom: 14px; }
+    .phead .pmeta { grid-row: 3; padding-bottom: 18px; }
     .phead :global(.phead-photo) { grid-row: 2 / 4; width: 112px; height: 112px; margin: 0 -6px 0 0; }
+    .phead.unplayed :global(.phead-photo) { width: 140px; height: 140px; } /* the status lines make room for a bigger photo */
     .pstats-in { grid-column: 1 / -1; grid-row: 4; margin-top: 0; border-top: 1px solid var(--rule); }
     .pstats { width: 100%; }
-    .phead.no-stats .pmeta { padding-bottom: 20px; }
+    .phead.no-stats .pmeta { padding-bottom: 22px; }
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
+    .phead.no-stats .pnum { font-size: 240px; bottom: auto; }
+    .pout-tag { display: table; margin: 10px 0 0 !important; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
-  .pout { display: inline-block; margin-top: 6px; color: var(--ink); }
+  .pout { display: inline-block; margin-top: 10px; color: var(--ink); }
+  /* The status pill gets room of its own: a little air beside the words and around its label. */
+  .pout-tag { margin-left: 8px; padding: 4px 11px; }
   /* No games this season: the season lane shows last season's dot, faded, with no range. */
   :global(html[data-mode='season']) .lane.noseason .dot { opacity: 0.35; }
   :global(html[data-mode='season']) .lane.noseason .whisk { display: none; }
