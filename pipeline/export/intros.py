@@ -176,6 +176,7 @@ STYLE = {
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
+    "rough": ("get into a lot of chippy games", "keep things calm after the whistle"),
     "depth": ("roll all four lines", "lean hard on their top players"),
 }
 # Two traits that read better as one thought: (trait, end, trait, end) -> phrase.
@@ -344,6 +345,10 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
     ext = team_extras(fp)
     if ext:
         cl = [EXTRA[k][0 if end == "hi" else 1] for k, end in ext]
+        if "rough" in used and fp["dims"]["rough"]["blend"]["pct"] >= 50 and ("discipline", "hi") in ext:
+            # "Chippy games" beside "they stay out of the box" reads like a contradiction (Sora, 2026-10-12): both are true
+            # because the other team usually goes to the box at the same whistle, which creates no power play.
+            cl[ext.index(("discipline", "hi"))] = "apart from the chippy stuff, they're good at staying out of the box"
         joint = " and " if len({end for _, end in ext}) == 1 else ", but "
         out.append(_cap(joint.join(cl)) + ".")
     return {"team": abbr, "name": t["name"], "text": out, "style": used + [k for k, _ in ext]}

@@ -30,6 +30,7 @@ DIMS = {
     "blocking": (["blk_n"], ["ca5"], 100, True),  # share of opponents' 5-on-5 shot attempts it blocks (score and arena adjusted)
     "pointAllowed": (["d_ca"], ["ca5"], 100, True),  # share of opponents' 5-on-5 shot attempts taken by their defensemen
     "icing": (["icing_n"], ["sec5"], 3600, False),  # 5-on-5 icings per 60 (score adjusted)
+    "rough": (["rough_n"], ["rough_sec"], 3600, True),  # roughing and other body-contact minors and majors taken per 60 of play
     "pp": (["pp_xgf"], ["pp_sec"], 3600, True),
     "pk": (["pk_xga"], ["pk_sec"], 3600, False),
     "powerKill": (["pk_xgf"], ["pk_sec"], 3600, True),
@@ -106,8 +107,9 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
     ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).join(
-        stops, on=["game_id", "team_id"], how="left").join(_icings_adjusted(season), on=["game_id", "team_id"], how="left").with_columns(
-        pl.col("thru_n", "blk_n", "icing_n").fill_null(0.0)).sort("team_id", "date", "game_id")
+        stops, on=["game_id", "team_id"], how="left").join(_icings_adjusted(season), on=["game_id", "team_id"], how="left").join(
+        _rough(season), on=["game_id", "team_id"], how="left").with_columns(
+        pl.col("thru_n", "blk_n", "icing_n", "rough_n", "rough_sec").fill_null(0.0)).sort("team_id", "date", "game_id")
 
 
 def _stops(season: int) -> pl.DataFrame:
@@ -158,6 +160,28 @@ def _icings_adjusted(season: int) -> pl.DataFrame:
     return (_icings(season).join(_icing_rates(), on="score_state", how="left")
             .with_columns(icing_n=pl.col("icings") - pl.col("sec") * (pl.col("r_ice") - pl.col("r_ice_all")))
             .group_by("game_id", "team_id").agg(pl.col("icing_n").sum()))
+
+
+# Rough stuff (Sora, 2026-10-12, thread "Penalties"): the body-contact calls, not fights (fighting majors and instigators
+# are left out) and not stick fouls or holding. Over 2023-26 these were the one kind of call that is a team habit: split
+# halves of a season agree at r 0.69 (all stick fouls 0.25, any single stick foul about 0). Most come with a call on the
+# other team at the same whistle (68% of roughing), so it reads as how chippy a team's games get, a style.
+ROUGH = ["roughing", "roughing-removing-opponents-helmet", "boarding", "elbowing", "illegal-check-to-head", "kneeing",
+         "charging", "clipping", "checking-from-behind"]
+
+
+def _rough(season: int) -> pl.DataFrame:
+    """Rough-stuff calls taken and seconds played per team and game. Left unadjusted for the score: these calls come
+    2.5 times as often in a three-goal game as in a tied one (2023-26: 0.36 per 60 tied, 0.47 at one goal, 0.56 at two,
+    0.86-0.94 at three or more), but weighting each call for it ranked teams the same (r 0.99 with the plain rate,
+    2025-26) and made the trait less repeatable (split halves r 0.63 against 0.68), so the plain rate is shown."""
+    d = TABLES / str(season)
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    p = (pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "period_type", "team_id", "pen_type", "pen_desc"])
+         .filter((pl.col("type") == "penalty") & (pl.col("period_type") != "SO") & pl.col("pen_type").is_in(["MIN", "MAJ", "MAT"]) & pl.col("pen_desc").is_in(ROUGH))
+         .join(g, on="game_id").group_by("game_id", "team_id").agg(rough_n=pl.len().cast(pl.Float64)))
+    t = pl.read_parquet(d / "team_game.parquet", columns=["game_id", "team_id", "sec"]).join(g, on="game_id").group_by("game_id", "team_id").agg(rough_sec=pl.col("sec").sum())
+    return t.join(p, on=["game_id", "team_id"], how="left").with_columns(pl.col("rough_n").fill_null(0.0))
 
 
 @lru_cache
