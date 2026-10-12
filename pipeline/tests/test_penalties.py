@@ -34,10 +34,10 @@ def test_a_fight_names_both_players(monkeypatch):
     assert len(out) == 1 and "P1 and P2" in out[0] and "midway through the first" in out[0]
 
 
-def test_line_brawl_names_every_pair(monkeypatch):
+def test_line_brawl_lists_everyone_without_pairing(monkeypatch):
     brawl = [_pen(2, i, 10 if i % 2 else 20, "MAJ", "fighting", 5) for i in range(1, 7)]
     out = _notes(monkeypatch, brawl + [_pen(2, i, 10, "MIS", "misconduct", 10) for i in (1, 3)] + [_pen(600, 9, 10, "MIN", "slashing", 2)] * 3)
-    assert out[0] == "A line brawl broke out early in the first, three fights at once, with two misconducts: P1 with P2, P3 with P4 and P5 with P6."
+    assert out[0] == "A line brawl broke out early in the first, three fights at once, with two misconducts: P1, P2, P3, P4, P5 and P6 all got five for fighting."
 
 
 def test_ejection_and_busy_player(monkeypatch):
@@ -62,3 +62,10 @@ def test_a_fight_is_always_told(monkeypatch):
     pens += [_pen(3000 + i, 30 + i, 20, "MIN", "holding", 2, period=3) for i in range(14)]
     out = _notes(monkeypatch, pens)
     assert any("P1 and P2" in o for o in out) and len(out) == 2
+
+
+def test_two_fights_at_once_are_not_paired(monkeypatch):
+    """The feed doesn't say who fought whom, so a double fight lists all four instead of guessing pairs."""
+    pens = [_pen(900, p, t, "MAJ", "fighting", 5) for p, t in ((1, 10), (2, 20), (3, 10), (4, 20))]
+    out = _notes(monkeypatch, pens + [_pen(60 * i, 30 + i, 10, "MIN", "tripping", 2) for i in range(4)])
+    assert out[0] == "Two fights broke out at once late in the first, and P1, P2, P3 and P4 all got five for fighting."
