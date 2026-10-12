@@ -1,15 +1,22 @@
-// Key players: the forwards and defensemen a team leans on most, what it leans on them for, and what they do better
-// than others at their position. Shared by team pages (and ready for previews).
+// Key players: the forwards and defensemen a team leans on most and the goalie who starts the most, what it leans on
+// them for, and what they do better than others at their position. Shared by team pages (and ready for previews).
 import { standouts, roleTip, type Skater, type Mode } from './players';
+import goalieData from '../../public/data/goalies.json';
+import rosterData from '../../public/data/roster.json';
+import schedule from '../../public/data/schedule.json';
+import { goalieTraitInfo } from '../data/mock';
+import { describe, type RosterPlayer } from './roster';
 
 const files = import.meta.glob('../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
 const skaters = Object.entries(files)
   .filter(([f]) => /\/\d+\.json$/.test(f))
   .map(([, p]) => p)
   .filter((p) => p.group === 'F' || p.group === 'D') as Skater[];
+const onClub = Object.fromEntries(Object.entries(files).filter(([f]) => /\/\d+\.json$/.test(f)).map(([, p]) => [p.id, p]));
+const previews = import.meta.glob('../../public/data/previews/*.json', { eager: true, import: 'default' }) as Record<string, any>;
 
 /** How many of each group make the list. */
-export const KEY_COUNT = { F: 4, D: 2 } as const;
+export const KEY_COUNT = { F: 3, D: 2, G: 1 } as const;
 
 export type Job = { text: string; tip: string };
 export type KeyPlayer = { p: Skater; jobs: Job[]; strengths: Record<Mode, ReturnType<typeof standouts>> };
@@ -55,6 +62,84 @@ export function keyPlayers(abbr: string, place: string): KeyPlayer[] {
     jobs: jobs(p, place),
     strengths: { blend: strengths(p, 'blend'), season: strengths(p, 'season') },
   }));
+}
+
+type GMode = { starts: number; shots: number; gsax: number; sv: number | null; pct: Record<string, number | null> };
+type GoalieRow = { id: number; name: string; blend: GMode; season: GMode | null };
+export type GoalieStrength = { key: string; label: string; tip: string; pct: number };
+export type KeyGoalie = {
+  id: number; name: string; number: number | null; starts: number; teamStarts: number;
+  season: GMode | null; jobs: Job[]; strengths: Record<Mode, { best: GoalieStrength[]; worst: GoalieStrength[]; few: boolean }>;
+};
+
+/** Goalie ratings that are his own doing. How busy he is, how dangerous the shots are, breakdowns and waits describe
+ *  what his team asks of him, so they never count as strengths or weak spots. */
+const OWN = ['gsax', 'rebounds', 'steady'];
+/** Starts needed before a rating shows on his card, in either mode: goalie ratings have no likely ranges, so a handful of
+ *  starts this season would show extremes that are mostly bounces. */
+const MIN_STARTS = (goalieData.min_starts as Record<Mode, number>).blend;
+
+function goalieStrengths(g: GMode | null) {
+  const out: GoalieStrength[] = [];
+  if (!g || g.starts < MIN_STARTS) return { best: out, worst: out, few: true };
+  for (const key of OWN) {
+    const pct = g.pct[key];
+    const info = goalieTraitInfo.find((t) => t.key === key);
+    if (pct == null || !info || (pct > 25 && pct < 75)) continue;
+    out.push({ key, label: info.label, tip: info.tip, pct });
+  }
+  return {
+    best: out.filter((x) => x.pct >= 75).sort((a, b) => b.pct - a.pct).slice(0, 3),
+    worst: out.filter((x) => x.pct <= 25).sort((a, b) => a.pct - b.pct).slice(0, 1),
+    few: false,
+  };
+}
+
+/** The goalie who has started the most of the team's games this season, among goalies the club has and who are not out
+ *  (injured, suspended, scratched, sent down). If the busiest is out, the busiest of the rest is shown with a tag saying
+ *  whom he is covering for. A tie goes to whoever played most recently, then to whoever started more over this season
+ *  and last. */
+export function keyGoalie(abbr: string, place: string): KeyGoalie | null {
+  const all = ((goalieData.teams as Record<string, GoalieRow[]>)[abbr] ?? []);
+  const roster = ((rosterData as any).teams?.[abbr] ?? []) as RosterPlayer[];
+  const rosterOf = (id: number) => roster.find((r) => r.id === id);
+  const starts = (g: GoalieRow) => g.season?.starts ?? 0;
+  const nameOf = (g: GoalieRow) => onClub[g.id]?.name ?? g.name;
+  const order = (a: GoalieRow, b: GoalieRow) => starts(b) - starts(a)
+    || (rosterOf(b.id)?.last ?? '').localeCompare(rosterOf(a.id)?.last ?? '')
+    || b.blend.starts - a.blend.starts;
+  // Still with the club: on its roster today (or, with no roster saved, his player page names this team).
+  const mine = all.filter((g) => starts(g) > 0 && (roster.length ? rosterOf(g.id) && rosterOf(g.id)!.status !== 'no_club' : (onClub[g.id]?.team ?? abbr) === abbr)).sort(order);
+  if (!mine.length) return null;
+  const isOut = (g: GoalieRow) => { const r = rosterOf(g.id); return r ? describe(r).out : false; };
+  const pick = mine.find((g) => !isOut(g)) ?? mine[0];
+  const teamStarts = all.reduce((n, g) => n + starts(g), 0);
+  const name = nameOf(pick);
+  const ahead = mine.filter((g) => g !== pick && isOut(g) && order(g, pick) < 0);
+  const tied = mine.filter((g) => g !== pick && !ahead.includes(g) && starts(g) === starts(pick));
+  const jobs: Job[] = [];
+  if (ahead.length) {
+    const g = ahead[0], r = rosterOf(g.id)!;
+    jobs.push({
+      text: `In for ${(onClub[g.id]?.last as string) ?? nameOf(g).split(' ').slice(1).join(' ')}`,
+      tip: `${nameOf(g)} has started the most, ${starts(g)} of ${place}’s ${teamStarts} games, but is out for now (${describe(r).tag[0].toLowerCase()}${describe(r).tag.slice(1)}). ${name} has started ${starts(pick)}.`,
+    });
+  } else jobs.push({
+    text: tied.length ? 'Shares the net' : 'Most starts',
+    tip: tied.length
+      ? `${starts(pick)} of ${place}’s ${teamStarts} starts so far, level with ${tied.map(nameOf).join(' and ')}. Shown here because ${(rosterOf(pick.id)?.last ?? '') > (rosterOf(tied[0].id)?.last ?? '') ? 'he played more recently' : 'he has more starts over this season and last'}.`
+      : `${starts(pick)} of ${place}’s ${teamStarts} starts so far, the most of any ${place} goalie.`,
+  });
+  // Next game's projected starter, from the saved preview: NHL.com's pick once its game-day preview is up, else ours.
+  const next = schedule.games.find((x) => !x.final && (x.home === abbr || x.away === abbr));
+  const proj = next && previews[`../../public/data/previews/${next.id}.json`]?.projected?.[abbr];
+  if (proj?.id === pick.id)
+    jobs.push({ text: proj.from === 'nhl' ? 'Projected to start next' : 'Likely to start next', tip: proj.from === 'nhl' ? 'NHL.com lists him as the projected starter for the next game.' : 'Our guess for the next game, from who has started lately and the schedule. Not confirmed.' });
+  return {
+    id: pick.id, name, number: onClub[pick.id]?.number ?? rosterOf(pick.id)?.number ?? null,
+    starts: starts(pick), teamStarts, season: pick.season, jobs,
+    strengths: { blend: goalieStrengths(pick.blend), season: goalieStrengths(pick.season) },
+  };
 }
 
 /** Competition faced, when it is notably tough: part of the job, at 5-on-5. */
