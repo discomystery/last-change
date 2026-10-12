@@ -237,7 +237,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         cands.sort(key=lambda c: -c["score"])
         items += cands[:1]
         if cands and cands[0].get("streak", 0) >= 7:
-            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{_short(cands[0]['pid'], P, N, season)}’s favourite opponent"))
+            out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{_short(cands[0]['pid'], P, N, season)}’s favorite opponent"))
         # old teams: the club he played for before this one
         olds = []
         for pid, g in mine.sort("date").group_by("player_id", maintain_order=True):
