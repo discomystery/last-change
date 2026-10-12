@@ -27,7 +27,10 @@ type Goalie = { id: number; name: string; team: string; started: boolean; toi: s
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
 type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }>;
-    inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }> } | null };
+    inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }>;
+    players?: Record<string, { missing: Named[]; out: Named[]; in: Named[] } | null> } | null };
+// A skater a lineup step was about, most valuable first; `big` marks the top tenth of absences.
+type Named = { id: number; name: string; xg: number; big: boolean };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Recap }>('../../../public/data/recaps/2*.json', { eager: true });
@@ -55,6 +58,17 @@ const ladder = (a: string) => {
     return { label: s.label, input: s.input, pts, before, end: run, after: Math.round(run) };
   });
 };
+// Who each lineup step was about: "Jordan Staal (a big loss), Seth Jarvis and Sean Walker".
+const names = (xs: Named[] | undefined, big = false) => {
+  const w = (xs ?? []).map((x) => (big && x.big ? `${x.name} (a big loss)` : x.name));
+  return w.length < 2 ? (w[0] ?? '') : `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
+};
+const named = (t: string, k: 'missing' | 'out' | 'in') => rv?.players?.[t]?.[k] ?? [];
+const without = (big: boolean) => [away, home].filter((t) => named(t, 'missing').length).map((t) => `${place(t)} were without ${names(named(t, 'missing'), big)}.`).join(' ');
+const late = () => [away, home].flatMap((t) => [
+  named(t, 'out').length ? `${names(named(t, 'out'))} sat out for ${place(t)}` : '',
+  named(t, 'in').length ? `${names(named(t, 'in'))} ${named(t, 'in').length > 1 ? 'were' : 'was'} in for ${place(t)}` : '',
+]).filter(Boolean);
 // What each step was for, in a sentence, told from team a's side.
 const other = (a: string) => (a === home ? away : home);
 const xgWord = (v: number) => `${Math.abs(v).toFixed(2)} expected goals a game`;
@@ -71,15 +85,24 @@ const why = (a: string, input: string, pts: number): { short: string; long: stri
       : `${place(gap > 0 ? a : o)} have been getting ${Math.abs(gap) >= 0.8 ? 'much ' : ''}better chances than their opponents lately.`;
     return { short, long: inp ? `Lately, ${recent(a, inp[a].xgd)}, and ${recent(o, inp[o].xgd)}. The latest games count most, and last season still counts a little.` : short };
   }
-  if (input === 'roster') return pts === 0
-    ? { short: 'Both teams played their usual players last time out.', long: 'We look at who each team dressed in their last game and compare those players with the ones who played in the games behind the rating above. Both teams’ last lineups were about as strong as usual.' }
-    : { short: `${loser} have been missing some of their usual players.`,
-        long: `We look at who each team dressed in their last game and compare those players with the ones who played in the games behind the rating above. ${loser}’s last lineup was weaker than usual (someone important out, or a call-up in), so their recent chances flatter them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
+  if (input === 'roster') {
+    const how = 'We look at who each team dressed in their last game, plus any injury news since, and compare those players with the ones who played in the games behind the rating above.';
+    const lost = named(pts > 0 ? o : a, 'missing');
+    if (pts === 0) return { short: without(false) || 'Both teams played their usual players last time out.',
+      long: `${how} ${without(true)} Both teams’ lineups were about as strong as usual, so this step changes nothing.`.replace('  ', ' ') };
+    return { short: lost.length ? `${loser} were without ${names(lost)}.` : `${gainer}’s lineup stacked up better against their usual than ${loser}’s did.`,
+      long: `${how} ${without(true) || `${loser}’s last lineup was weaker than usual (someone important out, or a call-up in).`} That leaves ${loser}’s recent chances flattering them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
+  }
   if (input === 'b2b') { const tired = inp ? [a, o].filter((t) => inp[t].b2b) : []; const t = tired.map(place).join(' and ');
     return tired.length ? { short: `${t} played last night, so tired legs.`, long: `${t} played the night before. Teams on the second night of a back-to-back win less often.` }
       : { short: 'Neither team played last night.', long: 'Neither team played the night before, so nothing changes here.' }; }
-  if (input === 'lineup') return { short: `When the lineups came out, ${gainer}’s was stronger than we expected that morning.`,
-    long: `The same check as “Who’s been playing”, done again with the players who actually dressed tonight. It only moves when someone came in or went out after the morning: here ${gainer} looked stronger, or ${loser} weaker, than we had expected.` };
+  if (input === 'lineup') {
+    const gIn = named(pts > 0 ? a : o, 'in'), lOut = named(pts > 0 ? o : a, 'out'), changes = late();
+    return { short: gIn.length ? `When the lineups came out, ${names(gIn)} ${gIn.length > 1 ? 'were' : 'was'} in for ${gainer}.`
+        : lOut.length ? `When the lineups came out, ${loser} were without ${names(lOut)}.`
+        : `When the lineups came out, ${gainer}’s was stronger than we expected that morning.`,
+      long: `The same check as “Who’s been playing”, done again with the players who actually dressed tonight. It only moves when someone came in or went out after the morning: here ${gainer} looked stronger, or ${loser} weaker, than we had expected.${changes.length ? ` ${changes.join('; ')}.` : ''}` };
+  }
   return { short: '', long: '' };
 };
 // The steps for one team's side, ready for the story: start at 50, each input, the morning figure, and the puck-drop

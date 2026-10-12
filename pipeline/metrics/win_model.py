@@ -154,7 +154,10 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     Returns, per (game, team): `lineup` (who actually dressed, known at puck drop), `roster` (the morning lineup)
     and `roster_last` (the previous lineup without news), plus, per team, its next game's morning lineup: `roster`,
     the players news took `out` and put `in`, the skaters its rating still counts on who are not in it (`missing`)
-    and those in it whom its rating has barely seen (`back`), each as (player, expected goals a game)."""
+    and those in it whom its rating has barely seen (`back`), each as (player, expected goals a game). Third, per
+    (game, team) for the post-game page, who made the difference: `missing` (skaters the rating counts on, still with
+    the club, not in the morning lineup) and `late_out` / `late_in` (morning lineup against who dressed), each as
+    (player, expected goals a game, dressed for this club this season)."""
     have = [s for s in range(min(seasons) - 2, max(seasons) + 1) if (TABLES / str(s) / "player_game.parquet").exists()]
     rate = {s: _rates(s, have) for s in seasons}
     news = _news(seasons)
@@ -169,6 +172,8 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     seen_w: dict[int, float] = defaultdict(float)  # per team: decayed game count, as in pregame
     last: dict[int, tuple[list, list, str]] = {}  # per team: skaters, positions and date of its latest game
     team_of: dict[int, tuple[int, str]] = {}  # per skater: his latest team and position
+    dressed: dict[int, set] = defaultdict(set)  # per team: skaters who have dressed for it this season
+    who: dict[tuple[int, int], dict] = {}
     season, r = None, {}
 
     def shares(ids, pos):
@@ -204,12 +209,23 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
             ids[i], pos[i] = q, team_of[q][1]
         return ids, pos, zero, out, back
 
+    def worth(q):  # what a skater's usual night is worth, in expected goals a game
+        return r.get(q, 0.0) * (tx[q] / tw[q] if tw[q] else 0.0) / 3600
+
+    def names_for(tid, am, tonight):
+        w = seen_w[tid] + p.prior_games
+        keep = lambda xs: sorted(((q, v, q in dressed[tid]) for q, v in xs if v > 0.01), key=lambda x: -x[1])
+        return {"missing": keep((q, r.get(q, 0.0) * sec / 3600 / w) for q, sec in seen[tid].items()
+                                if q not in am and team_of.get(q, (tid,))[0] == tid),
+                "late_out": keep((q, worth(q)) for q in am - tonight), "late_in": keep((q, worth(q)) for q in tonight - am)}
+
     rows = []
     for day in pg.partition_by("date", maintain_order=True):
         d0 = str(day["date"][0])
         if day["season"][0] != season:
             season = day["season"][0]
             r = rate.get(season, {})
+            dressed.clear()
             for t in seen:
                 seen_w[t] *= p.carry
                 for q in seen[t]:
@@ -224,6 +240,8 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
             else:
                 am = plain = now
             rows.append({"game_id": gid, "team_id": tid, "lineup": now - b, "roster": am - b, "roster_last": plain - b})
+            if tid in last:
+                who[(gid, tid)] = names_for(tid, set(am_ids) - zero, set(ids))
             today.append((tid, ids, pos, shares(ids, pos)))
         for tid, ids, pos, sh in today:
             seen_w[tid] = seen_w[tid] * p.decay + 1
@@ -232,6 +250,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
             for q, sec in zip(ids, sh):
                 seen[tid][q] += sec
             last[tid] = (ids, pos, d0)
+            dressed[tid].update(ids)
             for q, x in zip(ids, pos):
                 team_of[q] = (tid, x)
         for q, sec in zip(day["player_id"].to_list(), day["sec5"].to_list()):
@@ -255,7 +274,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
         upcoming[tid] = {"roster": value(ids, pos, zero) - b, "out": out, "in": back,
                          "missing": sorted(missing, key=lambda x: -x[1]), "back": sorted((x for x in added if x[1] > 0.01), key=lambda x: -x[1])}
     df = pl.DataFrame(rows, schema={"game_id": pl.Int64, "team_id": pl.Int64, "lineup": pl.Float64, "roster": pl.Float64, "roster_last": pl.Float64})
-    return df.filter(pl.col("game_id") // 1_000_000 >= min(seasons)), upcoming
+    return df.filter(pl.col("game_id") // 1_000_000 >= min(seasons)), upcoming, who
 
 
 def lineups(seasons: list[int], p: Params = Params()) -> pl.DataFrame:
@@ -267,6 +286,11 @@ def lineups(seasons: list[int], p: Params = Params()) -> pl.DataFrame:
 def next_rosters(seasons: list[int], p: Params = Params()) -> dict[int, float]:
     """Each team's `roster` term for its next game: its latest lineup, with news since, against what its rating has seen."""
     return {t: u["roster"] for t, u in _lineup_pass(tuple(sorted(seasons)), p)[1].items()}
+
+
+def lineup_names(seasons: list[int], p: Params = Params()) -> dict[tuple[int, int], dict]:
+    """Per (game, team), who the lineup terms were about (see _lineup_pass)."""
+    return _lineup_pass(tuple(sorted(seasons)), p)[2]
 
 
 def next_lineups(seasons: list[int], p: Params = Params()) -> dict[int, dict]:
