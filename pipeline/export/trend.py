@@ -242,42 +242,52 @@ def _level(share: float) -> str:
             else "chased the play a little" if share > 47 else "spent a lot of nights chasing the play")
 
 
+def _last_spring(full: list[dict]) -> dict | None:
+    """Last season's playoff result and the streak it extends, short enough to sit on the chart."""
+    past = [h for h in full if h["season"] < CURRENT_SEASON]
+    if not past:
+        return None
+    last = past[-1]
+    dry = next((i for i, h in enumerate(reversed(past)) if h["playoffs"]), len(past))
+    run = next((i for i, h in enumerate(reversed(past)) if not h["playoffs"]), len(past))
+    words = ["Missed the playoffs", "Out in round one", "Out in round two", "Out in the conference final", "Lost in the Final",
+             "Won the Stanley Cup"][last["playoffs"]]
+    streak = (f"{_ordinal(dry)} straight year out" if dry >= 2 else None) if not last["playoffs"] else \
+        (f"{_ordinal(run)} straight spring in" if run >= 3 else None)
+    return {"result": words, "streak": streak}
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
 def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[dict], full: list[dict]) -> dict:
-    """A headline and three or four sentences: the history, last season's play, whether it changed, what's new."""
+    """A headline, a one- or two-sentence lede about style, the history sentence (kept for the fold under the chart)
+    and the notes the chart writes on itself: last season's level and how it ended, this season's level so far, and
+    the change date."""
     X, key = _the(t), (abbr, "trend")
     nick = t.get("nick") or t["place"]
     last = g.filter(pl.col("season") == CURRENT_SEASON - 1)
     now = g.filter(pl.col("season") == CURRENT_SEASON)
     new = [r for r in traits if r["tag"] == "new"]
     kept = [r for r in traits if r["tag"] == "kept"]
-    lines = []
-    h = _history_line(t, full)
-    if h:
-        lines.append(h)
-    if len(last):
-        s = 100 * _share(last["xgf_adj"].to_numpy(), last["xga_adj"].to_numpy())
-        lines.append(f"Last season they {_level(s)} at 5-on-5, with {s:.0f}% of the chances.")
-    dates = g["date"].to_list()
-    if brk:
-        k = brk["k"]
-        if dates[k] >= min(now["date"].to_list() or ["9999"]):
-            when = "at the start of this season"
-        else:
-            when = f"around {_day(dates[k])}{'' if dates[k][:4] == dates[-1][:4] else ', ' + dates[k][:4]}"
-        lines.append(f"Then something changed {when}: {brk['before']:.0f}% of the chances before, {brk['after']:.0f}% since. "
-                     f"That’s a bigger split than bounces produce.")
-    if len(now):
-        s = 100 * _share(now["xgf_adj"].to_numpy(), now["xga_adj"].to_numpy())
-        lines.append(f"This season, {_num(len(now))} {'game' if len(now) == 1 else 'games'} in, they’re at {s:.0f}%.")
-    n_last = len(dates) - len(now)
-    recent = bool(brk) and brk["k"] >= n_last - WINDOW  # the change takes in this season, or last season's final stretch
+    lede = []
     if new:
         moves = [MOVE[r["key"]][0 if r["now"]["pct"] > r["then"]["pct"] else 1] for r in new]
         lead = "One thing has changed" if len(new) == 1 else "What’s new"
-        lines.append(f"{lead}: they’re {_and(moves)}, by more than {'early-season ' if len(now) < 20 else ''}bounces would explain.")
+        lede.append(f"{lead}: they’re {_and(moves)}, by more than {'early-season ' if len(now) < 20 else ''}bounces would explain.")
     if kept:
         habits = [KNOWN[r["key"]][0 if r["then"]["pct"] > 50 else 1] for r in kept[:2]]
-        lines.append(f"{'Otherwise they' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
+        lede.append(f"{'Otherwise they' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
+    notes: dict = {}
+    if len(last):
+        s = 100 * _share(last["xgf_adj"].to_numpy(), last["xga_adj"].to_numpy())
+        notes["last"] = {"share": round(s, 1), "words": _level(s), **(_last_spring(full) or {})}
+    if len(now):
+        notes["now"] = {"share": round(100 * _share(now["xgf_adj"].to_numpy(), now["xga_adj"].to_numpy()), 1), "games": len(now)}
+    dates = g["date"].to_list()
+    n_last = len(dates) - len(now)
+    recent = bool(brk) and brk["k"] >= n_last - WINDOW  # the change takes in this season, or last season's final stretch
     # Headline: a new version of themselves, a turn last season, the same team, or too early to say.
     if len(new) >= 2 or recent:
         head, changed = _pick([f"A new version of the {nick}", f"Not the {nick} you remember", f"The {nick} have changed"], *key), True
@@ -292,7 +302,8 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
         head, changed = _pick([f"Same {nick}, so far", f"The {nick} you know", f"No surprises from the {nick} yet"], *key), False
     else:
         head, changed = _pick([f"Too early to call the {nick}", f"Still getting to know the {nick}"], *key), False
-    return {"head": head, "text": [x.replace("'", "’") for x in lines], "changed": changed}
+    hist = _history_line(t, full)
+    return {"head": head, "lede": lede, "history_text": hist.replace("'", "’") if hist else None, "notes": notes, "changed": changed}
 
 
 # ---------------------------------------------------------------- run
