@@ -9,6 +9,11 @@ Nothing from the game day itself or later is used, with one exception: whether a
 his club (lines notes) comes from today's league listing, which keeps no history. Earlier seasons, the arena factors,
 score-and-venue weights and the xG model are all built from 2023-24 to 2025-26 only.
 
+Previews saved before puck drop are rebuilt too once their game is over, whenever they were written under an older
+rulebook or older methods (the user's decision, 2026-10-12: the site is in testing and she uses past calls to decide
+what to change). The first time a live snapshot is replaced, the original is kept in raw/previews_live/{season}/,
+which goes to the data branch but not the site, so what the preview really said before the game is never lost.
+
 Rebuilt calls are graded on the post-game page like any other and count in the season tally like live ones (the
 user decided the difference is not relevant to fans).
 """
@@ -23,11 +28,10 @@ from pathlib import Path
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, DATA, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, DATA, RAW, SITE_DATA, TABLES
 from pipeline.export import previews
 
-METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach rebuilt ones;
-# the rulebook (previews.RULES_VERSION) already redoes them on its own. Live snapshots are never redone either way.
+METHODS = previews.METHODS
 
 def cut_tables(season: int, day: str, root: Path) -> int:
     """A data folder under `root` whose `season` tables hold only games played before `day`; everything else is linked."""
@@ -90,13 +94,22 @@ def _stale(path: Path) -> bool:
     if not path.exists():
         return True
     snap = json.loads(path.read_text())
-    return bool(snap.get("rebuilt")) and (snap.get("rules", 1) < previews.RULES_VERSION or snap.get("methods", 0) < METHODS)
+    return snap.get("rules", 1) < previews.RULES_VERSION or snap.get("methods", 0) < METHODS
+
+
+def keep_original(path: Path, season: int) -> None:
+    """Save a live snapshot (one written before puck drop) before it is replaced by a rebuilt one; earlier copies win."""
+    if not path.exists() or json.loads(path.read_text()).get("rebuilt"):
+        return
+    dst = RAW / "previews_live" / str(season) / path.name
+    if not dst.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(path.read_bytes())
 
 
 def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
-    """Rebuild a preview for every finished game that has none, and redo rebuilt ones written under an older rulebook
-    or older methods.
-    Live snapshots (saved before puck drop) are never touched."""
+    """Rebuild a preview for every finished game that has none, or whose preview (rebuilt or saved before puck drop)
+    was written under an older rulebook or older methods. Live originals are kept first (keep_original)."""
     now = now or datetime.now(timezone.utc)
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
     places = {t["abbr"]: t["place"] for t in json.loads((SITE_DATA / "teams.json").read_text())}
@@ -114,6 +127,7 @@ def run(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
         for g in todo[day]:
             if g["away"] not in site["fingerprints"]["teams"] or g["home"] not in site["fingerprints"]["teams"]:
                 continue
+            keep_original(out_dir / f"{g['id']}.json", season)
             snap = previews.snapshot(g, site, places, sched, now, chances.get(g["id"]), rebuilt=True, games_before=n, data_through=through,
                                      methods=METHODS)
             (out_dir / f"{g['id']}.json").write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
