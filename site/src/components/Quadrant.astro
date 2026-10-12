@@ -6,8 +6,8 @@ const { league, highlights, tall = false, xDomain = [1.9, 3.25], yDomain = [-0.7
 // `tall` draws a near-square chart for narrow, tall slots.
 // The plot sits in a pale box with the quadrant names inside its corners; the vertical range gets extra room so dots
 // clear those names.
-const W = 360, H = tall ? 400 : 300, m = { l: 0, r: 0, t: 0, b: 22 };
-const yPad = (yDomain[1] - yDomain[0]) * 0.14;
+const W = 360, H = tall ? 400 : 300, m = { l: 0, r: 0, t: 0, b: 26 };
+const yPad = (yDomain[1] - yDomain[0]) * 0.22;
 const yLo = yDomain[0] - yPad, yHi = yDomain[1] + yPad;
 const bh = H - m.b;
 // Rounded to a tenth of a unit (well under a pixel): full-precision coordinates were a large share of each page.
@@ -30,11 +30,11 @@ const labels = highlights.map((p) => {
   <rect class="q-box" x="0" y="0" width={W} height={bh} rx="12" />
   <line class="q-axis" x1="0" x2={W} y1={cy} y2={cy} />
   <line class="q-axis" x1={cx} x2={cx} y1="0" y2={bh} />
-  <text class="q-corner" x="12" y="18"><tspan x="12">System and goalie</tspan><tspan x="12" dy="10">both good</tspan></text>
-  <text class="q-corner" x={W - 12} y="18" text-anchor="end"><tspan x={W - 12}>Goalie bailing</tspan><tspan x={W - 12} dy="10">them out</tspan></text>
-  <text class="q-corner" x="12" y={bh - 20}><tspan x="12">Goalie giving back</tspan><tspan x="12" dy="10">what the system earns</tspan></text>
-  <text class="q-corner" x={W - 12} y={bh - 20} text-anchor="end"><tspan x={W - 12}>Trouble</tspan><tspan x={W - 12} dy="10">everywhere</tspan></text>
-  <text class="q-axis-label" x={W / 2} y={H - 4} text-anchor="middle">Team allows fewer chances ← → more chances</text>
+  <text class="q-corner" x="12" y="22"><tspan x="12">System and goalie</tspan><tspan x="12" dy="13">both good</tspan></text>
+  <text class="q-corner" x={W - 12} y="22" text-anchor="end"><tspan x={W - 12}>Goalie bailing</tspan><tspan x={W - 12} dy="13">them out</tspan></text>
+  <text class="q-corner" x="12" y={bh - 26}><tspan x="12">Goalie giving back</tspan><tspan x="12" dy="13">what the system earns</tspan></text>
+  <text class="q-corner" x={W - 12} y={bh - 26} text-anchor="end"><tspan x={W - 12}>Trouble</tspan><tspan x={W - 12} dy="13">everywhere</tspan></text>
+  <text class="q-axis-label" x={W / 2} y={H - 6} text-anchor="middle">Team allows fewer chances ← → more chances</text>
   {league.map((p) => (
     <g class="q-pt" data-tip={p.name ? `${p.name}${p.team ? ` (${p.team})` : ''}: ${p.y > 0 ? '+' : '−'}${Math.abs(p.y).toFixed(2)} goals saved above expected per 60; his team allows ${p.x.toFixed(2)} expected goals per 60 in front of him.` : undefined}>
       <circle class="q-hit" cx={X(p.x)} cy={Y(p.y)} r="8" />
