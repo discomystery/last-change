@@ -281,8 +281,9 @@ const teamList = teams as { abbr: string; name: string }[];
       })();
     </script>
     <script is:inline>
-      // Season switch: on screen, the scales' dots glide to their new spots a card at a time, each leaving a fading
-      // ring where it was (styles/motion.css). Off screen they simply change.
+      // Season switch: on screen, the scales' dots glide to their new spots a card at a time, each leaving an open ring
+      // where it was and a bar over the distance it moved (the chart guide's gap), which stay a few seconds and fade
+      // (styles/motion.css). The whisker steps aside while the gap shows. Off screen they simply change.
       document.addEventListener('prefs', (e) => {
         const root = document.documentElement;
         if (e.detail.key !== 'mode' || !root.classList.contains('motion')) return;
@@ -296,11 +297,23 @@ const teamList = teams as { abbr: string; name: string }[];
         lanes.forEach((l) => l.style.setProperty('--sd', Math.min(groups.indexOf(l.closest('.card') || l.parentElement), 12) * 45 + 'ms'));
         lanes.forEach((l) => {
           const dot = l.querySelector('.dot');
+          if (!l.clientWidth) return;
+          const was = (100 * parseFloat(getComputedStyle(dot).left)) / l.clientWidth;
+          const now = parseFloat(getComputedStyle(l).getPropertyValue('--v'));
+          l.querySelectorAll('.sw-gap, .dot-ghost').forEach((x) => x.remove());
+          if (!isFinite(was) || !isFinite(now) || Math.abs(now - was) < 1.5) return;
           const g = document.createElement('i');
           g.className = 'dot-ghost';
-          g.style.left = getComputedStyle(dot).left;
-          l.appendChild(g);
-          setTimeout(() => g.remove(), 2000);
+          g.style.left = was + '%';
+          const bar = document.createElement('i');
+          bar.className = 'sw-gap';
+          bar.style.left = Math.min(was, now) + '%';
+          bar.style.width = Math.abs(now - was) + '%';
+          bar.style.transformOrigin = now > was ? 'left' : 'right';
+          // Previews compare two teams on one card; there the ring alone marks where each was (no bar between them).
+          if (l.closest('.fpp')) l.append(g); else { l.append(bar, g); l.classList.add('gapping'); }
+          clearTimeout(l.lcGapT);
+          l.lcGapT = setTimeout(() => { bar.remove(); g.remove(); l.classList.remove('gapping'); }, 4200);
         });
         root.classList.add('mode-switch');
         clearTimeout(window.lcModeT);
@@ -539,8 +552,8 @@ const teamList = teams as { abbr: string; name: string }[];
   .term { text-decoration: underline dotted var(--ink-3); text-underline-offset: 3px; cursor: help; }
   .key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin-top: 14px; align-items: center; }
   .key span { display: inline-flex; align-items: center; gap: 6px; }
-  .key .avg::before { content: ''; width: 2px; height: 14px; background: var(--ink); display: inline-block; }
-  .key .rng::before { content: ''; width: 18px; height: 2px; background: var(--ink); display: inline-block; }
+  .key .avg::before { content: ''; width: 2px; height: 14px; background: var(--ink); opacity: 0.5; border-radius: 1px; display: inline-block; }
+  .key .rng::before { content: ''; width: 22px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team, var(--ink)) 45%, var(--track)); display: inline-block; }
   .chip { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
   .chip.solid { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
 
@@ -589,11 +602,17 @@ const teamList = teams as { abbr: string; name: string }[];
   .shotmap figcaption { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
   .shot { fill: var(--team); fill-opacity: 0.5; stroke: var(--sheet); stroke-width: 0.35; }
 
-  .histo { width: 100%; max-width: 260px; height: auto; display: block; }
-  .histo-bar { fill: var(--team); }
-  .histo-axis { stroke: var(--rule); stroke-width: 1; }
-  .histo-zero { stroke: var(--ink); stroke-width: 1; opacity: 0.55; }
-  .histo text, .quad text { font: 500 9px var(--body); fill: var(--ink-3); }
+  /* The start strip (components/Histogram.astro): one puck per start over a lane, the even mark in the middle. */
+  .sstrip { display: grid; gap: 0; }
+  .ss-cols { display: grid; grid-template-columns: repeat(6, 1fr); align-items: end; padding: 0 2px; }
+  .ss-col { display: flex; justify-content: center; padding-top: 4px; cursor: help; outline-offset: 2px; border-radius: 4px; }
+  .ss-col:not([data-tip]) { cursor: default; }
+  .ss-stack { display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 3px; width: calc(var(--per) * 13px - 3px); padding-bottom: 6px; }
+  .ss-stack i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .ss-lane { position: relative; height: 4px; border-radius: 2px; background: var(--track); }
+  .ss-lane i { position: absolute; left: 50%; top: -8px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: 0.5; }
+  .ss-lab { display: flex; justify-content: space-between; margin-top: 8px; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .quad text { font: 500 9px var(--ui); fill: var(--ink-3); }
 
   .quad { width: 100%; height: auto; display: block; }
   .q-box { fill: var(--ice); }
@@ -602,7 +621,7 @@ const teamList = teams as { abbr: string; name: string }[];
   @media (prefers-color-scheme: dark) { .q-lg { opacity: 0.6; } }
   .q-hi { fill: var(--team); stroke: var(--ice); stroke-width: 2; }
   .q-hi.backup { fill: var(--ice); stroke: var(--team); stroke-width: 2.5; }
-  .quad .q-name { font: 600 11px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--ice); stroke-width: 3px; }
+  .quad .q-name { font: 600 11px var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--ice); stroke-width: 3px; }
   .quad .q-corner { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; fill: var(--ink-3); }
   .quad .q-axis-label { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; fill: var(--ink-3); }
   .q-hit { fill: transparent; }

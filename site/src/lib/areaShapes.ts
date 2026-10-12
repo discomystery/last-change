@@ -69,3 +69,30 @@ const SHAPES: Record<string, Pt[]> = {
 export const paths: Record<string, string> = Object.fromEntries(Object.entries(SHAPES).map(([k, pts]) => [k, soft(pts, 3)]));
 export const AREA_KEYS = Object.keys(paths);
 export const shapeId = (k: string) => `ams-${k}`;
+
+// Which area a shot is in (x, y in NHL feet, net at x 89), the same rule as the pipeline's `area()`.
+export function areaOf(x: number, y: number): string {
+  if (x < 25) return 'outside';
+  const side = y > 0 ? 'L' : 'R';
+  const d = Math.hypot(89 - x, y);
+  const a = (Math.atan2(Math.abs(y), 89 - x) * 180) / Math.PI;
+  if (d <= INNER) return a > 90 ? 'behind' : d <= CREASE ? 'crease' : a <= LOW ? 'lowSlot' : `netSide${side}`;
+  if (a > CORNER) return `corner${side}`;
+  if (a <= SLOT) return d <= MIDDLE ? 'highSlot' : 'point';
+  if (d <= MIDDLE) return `circle${side}`;
+  return d <= OUTER ? `outer${side}` : `point${side}`;
+}
+export const AREA_NAME: Record<string, string> = {
+  crease: 'Crease', lowSlot: 'Low slot', netSideL: 'Left of the net', netSideR: 'Right of the net', highSlot: 'High slot', circleL: 'Left circle', circleR: 'Right circle',
+  behind: 'Behind the net', cornerL: 'Left corner', cornerR: 'Right corner', outerL: 'Left side, high', outerR: 'Right side, high', point: 'Middle of the blue line',
+  pointL: 'Left point', pointR: 'Right point', outside: 'Outside the zone',
+};
+// Where each area's number sits, as [distance from the net, degrees off straight out] for the left-hand areas.
+const SPOT: Record<string, [number, number]> = {
+  crease: [3.4, 0], behind: [6.5, 180], lowSlot: [15, 0], netSideL: [15, 60], cornerL: [30, 96], highSlot: [34, 0],
+  circleL: [34, 44], outerL: [53, 45], point: [55, 0], pointL: [65, 32],
+};
+export const areaCentre = (k: string): Pt => {
+  const [d, a] = SPOT[k] ?? SPOT[k.replace(/R$/, 'L')];
+  return polar(d, k.endsWith('R') ? -a : a);
+};

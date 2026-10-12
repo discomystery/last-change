@@ -14,16 +14,30 @@ const bh = H - m.b;
 const X = (v: number) => +(m.l + ((v - xDomain[0]) / (xDomain[1] - xDomain[0])) * (W - m.l - m.r)).toFixed(1);
 const Y = (v: number) => +(m.t + ((yHi - v) / (yHi - yLo)) * (bh - m.t)).toFixed(1);
 const cx = X(xMid), cy = Y(0);
-// Name labels: right of the dot unless near the right edge; a label that would overlap one already placed moves
-// above or below it (about 6.5 units a character at this size).
-const placed: { x0: number; x1: number; y: number }[] = [];
+// Name labels (sans, about 6.2 units a character): each tries right of its dot, then left, above and below, and takes
+// the first spot that clears the box edges, every named goalie's dot and the labels already placed. If none is clear
+// it goes right of the dot, nudged up or down past the labels in the way.
+type Box = { x0: number; x1: number; y0: number; y1: number };
+const hit = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+const dots: Box[] = highlights.map((p) => ({ x0: X(p.x) - 8, x1: X(p.x) + 8, y0: Y(p.y) - 8, y1: Y(p.y) + 8 }));
+const placed: Box[] = [];
 const labels = highlights.map((p) => {
-  const x = X(p.x), y = Y(p.y), right = x < W - 110, w = p.name.length * 6.5;
-  const lx = x + (right ? 11 : -11), x0 = right ? lx : lx - w, x1 = right ? lx + w : lx;
-  let ly = y + 4;
-  for (const o of placed) if (x0 < o.x1 && x1 > o.x0 && Math.abs(ly - o.y) < 13) ly = ly <= o.y ? o.y - 13 : o.y + 13;
-  placed.push({ x0, x1, y: ly });
-  return { lx, ly: +ly.toFixed(1), anchor: right ? 'start' : 'end' };
+  const x = X(p.x), y = Y(p.y), w = p.name.length * 6.2;
+  const tries: { lx: number; ly: number; anchor: string; box: Box }[] = [
+    { lx: x + 11, ly: y + 4, anchor: 'start', box: { x0: x + 11, x1: x + 11 + w, y0: y - 6, y1: y + 6 } },
+    { lx: x - 11, ly: y + 4, anchor: 'end', box: { x0: x - 11 - w, x1: x - 11, y0: y - 6, y1: y + 6 } },
+    { lx: x, ly: y - 12, anchor: 'middle', box: { x0: x - w / 2, x1: x + w / 2, y0: y - 22, y1: y - 9 } },
+    { lx: x, ly: y + 20, anchor: 'middle', box: { x0: x - w / 2, x1: x + w / 2, y0: y + 9, y1: y + 22 } },
+  ];
+  const fits = (t: (typeof tries)[number]) => t.box.x0 >= 2 && t.box.x1 <= W - 2 && t.box.y0 >= 2 && t.box.y1 <= bh - 2
+    && !placed.some((o) => hit(o, t.box)) && !dots.some((d, j) => highlights[j] !== p && hit(d, t.box));
+  let t = tries.find(fits);
+  if (!t) {
+    t = x < W - 110 ? tries[0] : tries[1];
+    for (const o of placed) if (hit(o, t.box)) { const dy = t.box.y0 <= o.y0 ? o.y0 - 13 - t.box.y0 : o.y1 + 1 - t.box.y0; t = { ...t, ly: t.ly + dy, box: { ...t.box, y0: t.box.y0 + dy, y1: t.box.y1 + dy } }; }
+  }
+  placed.push(t.box);
+  return { lx: +t.lx.toFixed(1), ly: +t.ly.toFixed(1), anchor: t.anchor };
 });
 ---
 <svg class="quad" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Goalie performance against the workload his team gives him">

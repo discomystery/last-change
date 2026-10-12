@@ -6,7 +6,7 @@
 export type Beat = { key: string; label: string; short: string; long?: string; pts: number; before: number; end: number; sum?: boolean };
 interface Props { team: string; teamCls: string; other: string; otherCls: string; chance: number; outcome: string; beats: Beat[] }
 const { team, teamCls, other, otherCls, chance, outcome, beats } = Astro.props;
-// Small tracks in the full list run from 20% to 80% so a few points still show; the big gauge runs 0 to 100.
+// Small gauges in the full list run from 20% to 80% so a few points still show; the big gauge runs 0 to 100.
 const at = (v: number) => Math.max(0, Math.min(100, ((v - 20) / 60) * 100));
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const final = Math.round(beats[beats.length - 1].end);
@@ -49,10 +49,11 @@ const final = Math.round(beats[beats.length - 1].end);
       {beats.map((b) => (
         <li class:list={['step', { sum: b.sum, start: b.key === 'start' }]}>
           <div class="st-l"><b>{b.label}</b>{(b.long ?? (b.sum || b.key === 'start' ? '' : b.short)) && <span>{b.long ?? b.short}</span>}</div>
-          <div class="st-t" aria-hidden="true">
+          <div class={`st-t ${otherCls}`} aria-hidden="true">
+            <span class={`fill ${teamCls}`} style={`width:${at(b.end).toFixed(1)}%`}></span>
             <i class="mid"></i>
-            {b.pts !== 0 && !b.sum && <span class={`seg ${b.pts > 0 ? teamCls : otherCls}`} style={`left:${Math.min(at(b.before), at(b.end)).toFixed(1)}%;width:${Math.abs(at(b.end) - at(b.before)).toFixed(1)}%`}></span>}
-            <i class="dot" style={`left:${at(b.end).toFixed(1)}%`}></i>
+            {b.pts !== 0 && !b.sum && <i class="ghost" style={`left:${at(b.before).toFixed(1)}%`}></i>}
+            <i class="needle" style={`left:${at(b.end).toFixed(1)}%`}></i>
           </div>
           <div class="st-n">{!b.sum && b.key !== 'start' && signed(b.pts)}<b>{Math.round(b.end)}%</b></div>
         </li>
@@ -188,10 +189,13 @@ const final = Math.round(beats[beats.length - 1].end);
   .st-l span { display: block; color: var(--ink-2); font-size: 13.5px; }
   .st-n { grid-area: n; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-3); }
   .st-n b { color: var(--ink); font-weight: 600; margin-left: 10px; }
-  .st-t { grid-area: t; position: relative; height: 8px; background: var(--track); border-radius: 999px; }
-  .st-t .mid { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.5; }
-  .st-t .seg { position: absolute; top: 0; bottom: 0; background: var(--team); border-radius: 999px; }
-  .st-t .dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
+  /* Each step is the gauge above in miniature: the two teams' colours split at the needle, the even mark in the
+     middle, and a faint tick where the needle stood before this step. */
+  .st-t { grid-area: t; position: relative; height: 8px; border-radius: 999px; background: color-mix(in oklab, var(--team) 35%, var(--track)); }
+  .st-t .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px 0 0 999px; background: var(--team); }
+  .st-t .mid { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--sheet); }
+  .st-t .ghost { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink-3); opacity: 0.6; }
+  .st-t .needle { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
   .step.sum { border-top-color: var(--ink-3); }
   .step.sum .st-l b, .step.sum .st-n b { font-weight: 700; }
 

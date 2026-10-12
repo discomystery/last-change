@@ -29,6 +29,7 @@ import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
+import AreaShapes from '../../components/AreaShapes.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
@@ -134,6 +135,7 @@ const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 ---
 <Base section="teams" title={team.name}>
+  <AreaShapes />
   <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
   <div class="tcard-wrap" style={`--team:${teamColour(abbr)}`}>
     <div class:list={['card', 'tcard', tiText.length > 0 && 'joined']}>
@@ -337,7 +339,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
           </div>
           <div class="card mapcard" id="ppmap">
             <p class="map-who" id="map-who" aria-live="polite">&nbsp;</p>
-            <ShotMap long team="one" shots={sp.shots} title={`Where ${team.place}’s last ${sp.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />
+            <ShotMap long team="one" shots={sp.shots} title={`Where ${team.place}’s last ${sp.shots.length} power-play shots came from.`} />
           </div>
           <div class="card">
             <h3 class="st-h">Penalty kill</h3>
