@@ -5,6 +5,8 @@ by an amount that depends on how repeatable the trait is (measured from split ha
 Goaltending is the exception: it starts from the goalies who have actually played for the team this season,
 each judged on his own last season, because a team's goaltending follows its goalies, not the logo.
 """
+from functools import lru_cache
+
 import numpy as np
 import polars as pl
 
@@ -24,6 +26,8 @@ DIMS = {
     "dShots": (["d_cf"], ["cf5"], 100, True),  # share of 5-on-5 shot attempts taken by defensemen
     "inClose": (["close_ff"], ["ff5"], 100, True),  # share of 5-on-5 shots (blocked ones aside) from within 20 feet
     "longShifts": (["long_fa"], ["fa5"], 100, False),  # share of 5-on-5 shots against while its skaters are 45 s+ into a shift
+    "shotsThrough": (["thru_n"], ["cf5"], 100, True),  # share of 5-on-5 shot attempts that get past the blockers (score and arena adjusted)
+    "blocking": (["blk_n"], ["ca5"], 100, True),  # share of opponents' 5-on-5 shot attempts it blocks (score and arena adjusted)
     "pp": (["pp_xgf"], ["pp_sec"], 3600, True),
     "pk": (["pk_xga"], ["pk_sec"], 3600, False),
     "powerKill": (["pk_xgf"], ["pk_sec"], 3600, True),
@@ -55,6 +59,12 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date", "home_id", "away_id")
     arena = _arena().select(pl.col("team_id").alias("home_id"), pl.col("hits").alias("f_hits"), pl.col("gives").alias("f_gives"), pl.col("takes").alias("f_takes"))
     games = games.join(arena, on="home_id", how="left").with_columns(pl.col("f_hits", "f_gives", "f_takes").fill_null(1.0))
+    stops = _stops(season).join(_stop_rates(), on="score_state", how="left").with_columns(
+        # Count each attempt that got through, or that this team blocked, against what the league does in the same score:
+        # teams ahead block a little more (29.6% of attempts) than tied (28.7%) or behind (27.0%).
+        thru_n=pl.col("cf") - pl.col("stopped_own") + pl.col("cf") * (pl.col("r_own") - pl.col("r_own_all")),
+        blk_n=pl.col("stopped_opp") - pl.col("ca") * (pl.col("r_opp") - pl.col("r_opp_all")),
+    ).group_by("game_id", "team_id").agg(pl.col("thru_n", "blk_n").sum())
     tg = pl.read_parquet(d / "team_game.parquet")
     if not {"d_cf", "close_ff", "long_fa"} <= set(tg.columns):  # saved before these columns existed: rebuild from saved tables
         from pipeline.metrics import team_game
@@ -87,13 +97,38 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("ca", s5).alias("ca5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("d_cf", s5).alias("d_cf"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
-        tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"),
+        tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"), tot("ca", s5).alias("ca5"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
         (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
-    ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).sort("team_id", "date", "game_id")
+    ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).join(
+        stops, on=["game_id", "team_id"], how="left").with_columns(pl.col("thru_n", "blk_n").fill_null(0.0)).sort("team_id", "date", "game_id")
+
+
+def _stops(season: int) -> pl.DataFrame:
+    """5-on-5 rows with the attempts that did not get through, each side, put on a common arena footing (some
+    buildings record more blocked shots, and home teams are credited with slightly fewer)."""
+    d = TABLES / str(season)
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id")
+    f = _arena().select(pl.col("team_id").alias("home_id"), pl.col("blocks").alias("f_blocks"))
+    w = rink_bias.home_road()["blocks"]
+    t = (pl.read_parquet(d / "team_game.parquet", columns=["game_id", "team_id", "is_home", "strength", "score_state", "cf", "ff", "ca", "fa"])
+         .filter(pl.col("strength") == "5v5").join(g, on="game_id").join(f, on="home_id", how="left").with_columns(pl.col("f_blocks").fill_null(1.0)))
+    own = pl.when(pl.col("is_home")).then(w["w_home"]).otherwise(w["w_away"])  # weight for blocks credited to this team
+    opp = pl.when(pl.col("is_home")).then(w["w_away"]).otherwise(w["w_home"])  # ... and to the other team
+    return t.select("game_id", "team_id", pl.col("score_state").clip(-3, 3), "cf", "ca",
+                    ((pl.col("cf") - pl.col("ff")) / pl.col("f_blocks") * opp).alias("stopped_own"),
+                    ((pl.col("ca") - pl.col("fa")) / pl.col("f_blocks") * own).alias("stopped_opp"))
+
+
+@lru_cache
+def _stop_rates() -> pl.DataFrame:
+    """League share of attempts stopped before the net, by the score from the team's side, over the full seasons."""
+    a = pl.concat([_stops(s) for s in FULL_SEASONS])
+    by = a.group_by("score_state").agg(r_own=pl.col("stopped_own").sum() / pl.col("cf").sum(), r_opp=pl.col("stopped_opp").sum() / pl.col("ca").sum())
+    return by.with_columns(r_own_all=pl.lit(a["stopped_own"].sum() / a["cf"].sum()), r_opp_all=pl.lit(a["stopped_opp"].sum() / a["ca"].sum()))
 
 
 _ARENA = None

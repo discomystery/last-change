@@ -86,12 +86,13 @@ let strengths: ReturnType<typeof standouts> | null = null;
 const strengthsBy = isG || !s.traits ? null : Object.fromEntries(modes.map(([m]) => [m, standouts(s, m)])) as Record<Mode, ReturnType<typeof standouts>>;
 
 // ---- Goalie ----
-type GMode = { starts: number; games: number; shots: number; goals: number; gsax: number; gsax60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
+type GMode = { starts: number; games: number; shots: number; goals: number; gsax: number; gsax60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; reb?: number | null; reb_exp?: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
 const g = isG ? (p.goalie as { name: string; blend: GMode; season: GMode | null }) : null;
 const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
 const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 const gSay: Record<string, (x: GMode) => string> = {
   gsax: (x) => `${sgn(x.gsax)} goals saved above expected in ${x.starts} ${x.starts === 1 ? 'start' : 'starts'}`,
+  rebounds: (x) => (x.reb == null ? '–' : `a rebound after ${x.reb} of every 100 saves, where the same saves usually give ${x.reb_exp}`),
   busy: (x) => `${x.sa60} shots faced per 60`,
   danger: (x) => (x.danger ? `the average shot he faces has a ${(100 * x.danger).toFixed(1)}% chance of going in` : '–'),
   breakdowns: (x) => `${x.bd60} defensive breakdowns in front of him per 60`,
