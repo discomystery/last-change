@@ -24,7 +24,7 @@ const label = (x: (typeof games)[number], me: string) => {
     const [mine, theirs] = x.home === me ? [x.hs, x.as] : [x.as, x.hs];
     return `${where} ${opp}, ${mine! > theirs! ? 'W' : 'L'} ${mine}–${theirs}${x.end && x.end !== 'REG' ? ` (${x.end})` : ''}`;
   }
-  return `${where} ${opp}, ${day(x.date, { month: 'short', day: 'numeric' })}`;
+  return `${where} ${opp}, ${day(x.date, { weekday: 'short', month: 'short', day: 'numeric' })}`;
 };
 const around = [g.away, g.home].map((me) => {
   const mine = games.filter((x) => x.home === me || x.away === me);

@@ -22,7 +22,7 @@ import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
 import Intro from '../../components/Intro.astro';
 import { teamIntro } from '../../lib/intros';
-import { teamColour } from '../../lib/teams';
+import { teamColour, matchupTable } from '../../lib/teams';
 import Roster from '../../components/Roster.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
@@ -40,6 +40,7 @@ const { abbr } = Astro.params;
 const base = import.meta.env.BASE_URL;
 const team = teams.find((t) => t.abbr === abbr)!;
 const names = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
+const places = Object.fromEntries(teams.map((t) => [t.abbr, t.place]));
 const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const finals = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
 const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === abbr).map((g) => g.id);
@@ -138,7 +139,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
   <SectionNav items={nav as [string, string][]} pinned />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
-    <div id="next-card"></div>
+    <div class="tickets" id="tickets"></div>
   </section>
 
   <Section id="form" title="Results and schedule" placeholder={false}>
@@ -264,7 +265,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
               <div class="card stripcard">
                 {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
                   <>
-                    <h4 class="mini-h">{title} against opposing forward lines</h4>
+                    <h3 class="mini-h">{title} against opposing forward lines</h3>
                     <ul class="strips">
                       {mu[k].rows.filter((r) => r.label[0] === kind).map((r) => (
                         <li class:list={{ thin: r.minutes < 10 }}>
@@ -305,7 +306,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
         )}
         <div class="st3">
           <div class="card">
-            <h4 class="st-h">Power play</h4>
+            <h3 class="st-h">Power play</h3>
             {sp.pp.map((u, k) => (
               <div class="stunit">
                 <p class="stunit-h"><span class="unit-label">{u.label}</span><span class="n term" tabindex="0" data-tip="Share of the team’s power-play time with this unit’s quarterback on the ice. A unit is its quarterback plus the four players most often out with him.">{u.share}% of the time</span></p><p class="stunit-rate"><span>Creates <strong>{u.rate.toFixed(1)}</strong> expected goals per 60</span><Pips pct={u.pct ?? 50} tip={`Creates ${u.rate.toFixed(1)} expected goals per 60, ${compared(u.pct ?? 50, 'more than', 'less than', `${k ? 'second' : 'top'} power-play units`, true)}. ${mmss(u.seconds)} on the ice.`} /></p>
@@ -318,7 +319,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
             <ShotMap long team="one" shots={sp.shots} title={`Where ${team.place}’s last ${sp.shots.length} power-play shots came from. Bigger dots are more dangerous.`} />
           </div>
           <div class="card">
-            <h4 class="st-h">Penalty kill</h4>
+            <h3 class="st-h">Penalty kill</h3>
             <p class="n m-blend">Kills allow {mine.dims.pk.blend.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.blend.rank)} of 32 (this season and last).</p>
             <p class="n m-season">Kills allow {mine.dims.pk.season.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.season.rank)} of 32 this season.</p>
             <PkRoles roles={(sp as any).pk_roles} />
@@ -371,7 +372,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
                     <ul class="fpgrid">
                       {goalieTraitInfo.map((t) => (
                         <li class="card fpc">
-                          <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                          <span class="term fpc-name" role="heading" aria-level="3" tabindex="0" data-tip={t.tip}>{t.label}</span>
                           <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                           <div class="lanes">{x.pct[t.key] !== null && <div class="lane" style={`--b:${x.pct[t.key]};--blo:${x.pct[t.key]};--bhi:${x.pct[t.key]};--c:${x.pct[t.key]};--clo:${x.pct[t.key]};--chi:${x.pct[t.key]}`}><span class="whisk"></span><span class="dot"></span></div>}{x.pct[t.key] === null && <div class="lane empty"></div>}</div>
                           <p class="gline"><span>{gSay[t.key](x)}</span>{x.pct[t.key] === null && <em>too few starts to place him</em>}</p>
@@ -448,7 +449,9 @@ const tiText = teamIntro(abbr)?.text ?? [];
   </Section>
 
   <script type="application/json" id="team-games" set:html={JSON.stringify(games)}></script>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
   <script type="application/json" id="team-names" set:html={JSON.stringify(names)}></script>
+  <script type="application/json" id="team-places" set:html={JSON.stringify(places)}></script>
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>
   <script type="application/json" id="team-recaps" set:html={JSON.stringify(recapIds)}></script>
 </Base>
@@ -459,37 +462,31 @@ const tiText = teamIntro(abbr)?.text ?? [];
     const me = host.dataset.team, base = host.dataset.base;
     const names = JSON.parse(document.getElementById('team-names').textContent);
     const games = JSON.parse(document.getElementById('team-games').textContent).map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    const MC = JSON.parse(document.getElementById('mcol').textContent);
+    const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     const RECAPS = new Set(JSON.parse(document.getElementById('team-recaps').textContent));
     const PREVIEWS = Object.fromEntries(JSON.parse(document.getElementById('team-previews').textContent).map((id) => [id, 'Preview']));
     const now = new Date();
     const next = games.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
-    const box = document.getElementById('next-card');
+    // Next game and latest post-game as two ticket stubs, each one opening its preview or post-game page (same as home).
+    const places = JSON.parse(document.getElementById('team-places').textContent);
+    const tickets = [];
     if (next) {
-      const rink = el('div', 'nrink');
-      rink.dataset.drop = '';
-      ['rl goal l', 'rl blue l', 'rl red', 'rl blue r', 'rl goal r'].forEach((c) => rink.append(el('span', c)));
-      rink.append(el('span', 'circle', 'at'));
-      [next.away, next.home].forEach((a, i) => {
-        const side = el('div', 'side' + (i ? ' home' : ''));
-        const ab = el('p', 'abbr' + (a === me ? ' me' : ''));
-        if (a === me) ab.textContent = a; else { const l = el('a', 'tlink', a); l.href = `${base}team/${a}/`; ab.append(l); }
-        side.append(ab, el('p', 'full', names[a] ?? a));
-        if (i) side.append(el('p', 'lc', 'Has last change'));
-        rink.append(side);
-      });
-      const when = el('div', 'next-when');
-      const at = el('p'); at.append(el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`);
-      when.append(el('p', 'when-day', longDay.format(next.t)), at);
-      if (PREVIEWS[next.id]) { const a = el('a', 'pill', 'Preview ›'); a.href = `${base}preview/${next.id}/`; when.append(a); }
-      else when.append(el('span', 'pill none', 'Preview opens a week before the game'));
-      box.append(rink, when);
-    } else {
-      box.append(el('p', 'next-meta', 'No upcoming games on the schedule.'));
+      const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+      if (!PREVIEWS[next.id]) when.push(el('br'), 'Preview opens a week before the game');
+      tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: PREVIEWS[next.id] ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
     }
+    const last = [...games].reverse().find((g) => g.final && RECAPS.has(g.id));
+    if (last) {
+      const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
+      const opp = last.home === me ? last.away : last.home;
+      tickets.push(window.lcTicket(last, { eyebrow: 'Latest post-game', href: `${base}recap/${last.id}/`, sub: [`${ms > ts ? 'Won' : 'Lost'} ${last.home === me ? 'against' : 'at'} ${places[opp] ?? opp}`], colour: colourOf }));
+    }
+    if (tickets.length) document.getElementById('tickets').replaceChildren(...tickets);
+    else document.getElementById('tickets').replaceWith(el('p', 'next-meta', 'No upcoming games on the schedule.'));
     // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
     const row = (g) => {
       const li = el('li', 'card row game go');

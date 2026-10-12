@@ -61,7 +61,7 @@ const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T
 const colours = matchupColours(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
-const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start) + ' ET';
+const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start);
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
@@ -155,7 +155,7 @@ const _ = ordinal;
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={snap.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{timeStr}</strong> · {snap.venue}</p></GameTrail>
+    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.
@@ -165,10 +165,7 @@ const _ = ordinal;
   </section>
   <SectionNav items={nav as [string, string][]} pinned />
 
-  <Section id="watch" title="The short version" placeholder={false}>
-    <Fragment slot="explain">
-      <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
-    </Fragment>
+  <section class="sec top" id="watch" aria-label="The short version">
     {story && <GameStory story={story} sides={sides} />}
     {!story && snap.outlook && (
       <div class="card outlook">
@@ -199,7 +196,8 @@ const _ = ordinal;
         <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
-  </Section>
+    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+  </section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">
@@ -404,7 +402,7 @@ const _ = ordinal;
           <ul class="fpgrid">
             {goalieTraitInfo.map((t) => (
               <li class="card fpc">
-                <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                <span class="term fpc-name" role="heading" aria-level="3" tabindex="0" data-tip={t.tip}>{t.label}</span>
                 <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                 <div class="lanes">
                   {order.flatMap((a) => goaliesOf(a).map((g, gi) => {
@@ -491,7 +489,16 @@ const _ = ordinal;
   </Section>
 </Base>
 
+<script is:inline define:vars={{ startIso: start.toISOString() }}>
+  // The page is built with Eastern times; the browser swaps in the visitor's own day and time, like every other page.
+  const t = new Date(startIso);
+  const fmt = { day: { weekday: 'long', month: 'long', day: 'numeric' }, time: { hour: 'numeric', minute: '2-digit' } };
+  document.querySelectorAll('[data-local]').forEach((n) => { n.textContent = new Intl.DateTimeFormat(undefined, fmt[n.dataset.local]).format(t); });
+</script>
+
 <style>
+  /* The short version opens the page without a heading, like the post-game overview. */
+  .top { margin-top: 28px; }
   .hero { margin-top: 0; }
   .banner { margin-top: 16px; padding: 12px 16px; }
   .outlook { margin-bottom: 16px; }
@@ -509,7 +516,7 @@ const _ = ordinal;
   .tpill:hover { background: color-mix(in oklab, var(--team) 28%, transparent); }
   .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
   .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
-  .projected .lbl { font: 700 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin-right: 10px; }
+  .projected .lbl { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 10px; }
   .projected i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 6px; }
   .projected .term { color: var(--ink-2); }
   .projected > span:not(.lbl) { white-space: nowrap; }
