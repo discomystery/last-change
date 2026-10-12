@@ -288,16 +288,15 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
     dates = g["date"].to_list()
     n_last = len(dates) - len(now)
     recent = bool(brk) and brk["k"] >= n_last - WINDOW  # the change takes in this season, or last season's final stretch
-    # Headline: a new version of themselves, a turn last season, the same team, or too early to say.
-    if len(new) >= 2 or recent:
+    # Headline: a new version of themselves (one new trait or a recent change is enough, Sora 2026-10-12), a turn last
+    # season, the same team, or too early to say.
+    if new or recent:
         head, changed = _pick([f"A new version of the {nick}", f"Not the {nick} you remember", f"The {nick} have changed"], *key), True
     elif brk:
         when = _day(dates[brk["k"]])
         head = _pick([f"The {nick} turned a corner", f"A different {nick} since {when}"], *key) if brk["after"] > brk["before"] else \
             _pick([f"The {nick} have slipped", f"Something went out of the {nick} around {when}"], *key)
         changed = True
-    elif new:
-        head, changed = _pick([f"Mostly the {nick} you know", f"The {nick}, with one twist"], *key), False
     elif kept:
         head, changed = _pick([f"Same {nick}, so far", f"The {nick} you know", f"No surprises from the {nick} yet"], *key), False
     else:
