@@ -33,6 +33,7 @@ import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
+import FpRow from '../../components/FpRow.astro';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -51,6 +52,14 @@ type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index
 const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
+// "What sets them apart": traits whose likely range sits clear of the middle (above the 65th or below the 35th percentile),
+// most extreme first, two to four of them. Picked separately for the blended and season-only readings.
+const fpStandouts = (mode: 'blend' | 'season') => {
+  const ok = fp.filter((c) => c[mode] && c[mode].pct !== null && c[mode].pct !== undefined);
+  const far = (c: (typeof fp)[number]) => Math.abs(c[mode].pct - 50);
+  const clear = ok.filter((c) => c[mode].lo >= 65 || c[mode].hi <= 35).sort((x, y) => far(y) - far(x));
+  return (clear.length >= 2 ? clear : [...ok].sort((x, y) => far(y) - far(x))).slice(0, 4);
+};
 type Unit = { label: string; players: string[]; gp?: number; new?: boolean; minutes: number; seconds: number; toi_sec: number | null; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; seconds: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
@@ -158,11 +167,11 @@ const tiText = teamIntro(abbr)?.text ?? [];
       <p class="note">Forecheck pressure and physicality are shown as arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
     <div class="key"><span class="one"><i></i>{team.name}</span><span class="avg">League average</span><span class="rng">Likely range</span></div>
-    {fpGroups.map((g) => fp.some((c) => c.group === g) && (
-      <>
-        <h3 class="sub">{g}</h3>
+    <h3 class="sub">What sets them apart</h3>
+    {(['blend', 'season'] as const).map((mode) => (
+      <div class={`gmode m-${mode}`}>
         <ul class="fpgrid">
-          {fp.filter((c) => c.group === g).map((c) => (
+          {fpStandouts(mode).map((c) => (
             <li class="card fpc">
               <span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>
               <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
@@ -180,8 +189,18 @@ const tiText = teamIntro(abbr)?.text ?? [];
             </li>
           ))}
         </ul>
-      </>
+      </div>
     ))}
+    <h3 class="sub">Every trait</h3>
+    <p class="note fpr-hint">Tap a trait for the number behind it.</p>
+    <div class="fpr-groups">
+      {fpGroups.map((g) => fp.some((c) => c.group === g) && (
+        <div class="card fpr-grp">
+          <h3>{g}</h3>
+          {fp.filter((c) => c.group === g).map((c) => <FpRow c={{ ...c, [abbr!]: { blend: c.blend, season: c.season } }} sides={[{ abbr: abbr!, cls: 't-one', place: team.place }]} />)}
+        </div>
+      ))}
+    </div>
   </Section>
 
   <Section id="players" title="Key players" placeholder={false} takeaway={`Who ${team.place} leans on, and what they do best.`}>

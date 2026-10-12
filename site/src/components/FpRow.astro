@@ -1,0 +1,69 @@
+---
+// One fingerprint trait as a compact row: name and rank on top, the scale with its end words underneath.
+// Tapping the row opens the stat in words. One side on team pages, two on previews (a lane per team).
+// `c` carries the trait's label, tip, scale ends and `say`, plus each side's blended and season-only estimates keyed by abbreviation.
+import { ordinal } from '../data/mock';
+interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
+const { c, sides } = Astro.props;
+const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
+const two = sides.length > 1;
+const has = (e: any) => e && e.pct !== null && e.pct !== undefined && !(e.raw !== undefined && e.index === null);
+// Rank text for one side in one mode, with the raw ranking alongside for arena-adjusted traits.
+const rank = (e: any) => !has(e) ? '–' : e.raw === undefined ? ordinal(e.rank) : null;
+---
+<details class="fpr">
+  <summary>
+    <span class="fpr-name">{c.label}</span>
+    <span class="fpr-rk">
+      {sides.map((s) => {
+        const b = c[s.abbr].blend, n = c[s.abbr].season;
+        return (
+          <span class={s.cls}>
+            {(['b', 's'] as const).map((m) => {
+              const e = m === 'b' ? b : n;
+              return rank(e) !== null
+                ? <span class={`r-${m}`}>{rank(e)}</span>
+                : <span class={`r-${m}`}><span class="a-adj">{ordinal(e.rank)}</span><span class="a-raw">{ordinal(e.raw_rank)}</span></span>;
+            })}
+          </span>
+        );
+      })}
+    </span>
+    <span class="fpr-scale">
+      <span class="fpr-lo">{c.lo}</span>
+      <span class="lanes">
+        {sides.map((s) => {
+          const b = c[s.abbr].blend, n = c[s.abbr].season;
+          // A team with no games yet this season has no season-only dot.
+          const none = !has(n);
+          return <span class:list={['lane', two && s.cls, { 'no-season': none }]} style={none ? `--b:${b.pct};--blo:${b.lo};--bhi:${b.hi}` : `--b:${b.pct};--blo:${b.lo};--bhi:${b.hi};--c:${n.pct};--clo:${n.lo};--chi:${n.hi}`}><span class="whisk"></span><span class="dot"></span></span>;
+        })}
+      </span>
+      <span class="fpr-hi">{c.hi}</span>
+    </span>
+  </summary>
+  <div class="fpr-say">
+    {sides.map((s) => (
+      <div class:list={['fpr-side', s.cls]}>
+        {two && <i></i>}
+        {(['blend', 'season'] as const).map((mode) => {
+          const e = c[s.abbr][mode];
+          const who = two ? <b>{s.place}: </b> : null;
+          return (
+            <p class={`fpc-line m-${mode}`}>
+              {!has(e)
+                ? <span>{who}nothing to show yet this season</span>
+                : e.raw === undefined
+                ? <><span>{who}{c.say(e.v)}</span><em>{ordinal(e.rank)} of 32</em></>
+                : <>
+                    <span class="a-adj">{who}{c.say(e.index)}</span><em class="a-adj">{ordinal(e.rank)} of 32</em>
+                    <span class="a-raw">{who}{e.raw.toFixed(1)} {rawWords[c.key]}</span><em class="a-raw">{ordinal(e.raw_rank)} of 32</em>
+                  </>}
+            </p>
+          );
+        })}
+      </div>
+    ))}
+    <p class="fpr-tip">{c.tip}</p>
+  </div>
+</details>
