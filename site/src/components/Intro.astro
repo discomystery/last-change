@@ -19,7 +19,7 @@ const hasNext = show('next') && next.length > 0;
     )}
     {hasNext && (
       <aside class="intro-next">
-        <p class="intro-eyebrow">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
+        <p class="intro-eyebrow box-h">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
         <p class="intro-story">{next.join(' ')}</p>
       </aside>
     )}
@@ -32,7 +32,7 @@ const hasNext = show('next') && next.length > 0;
   .intro-text { font: 400 18px/1.65 var(--body); color: var(--ink-2); }
   .intro-lead + .intro-text { margin-top: 10px; }
   .intro-next { margin-top: 18px; padding: 12px 16px; background: var(--sheet); border-radius: 14px; border-left: 4px solid var(--tc); }
-  .intro-eyebrow { margin-bottom: 4px !important; font: 700 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .intro-eyebrow { margin-bottom: 4px !important; }
   .intro-eyebrow a { color: inherit; }
   .intro-story { font: 400 17px/1.6 var(--body); }
   @media (max-width: 719px) { .intro-lead { font-size: 22px; } }

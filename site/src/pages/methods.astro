@@ -66,7 +66,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
 
   <SectionNav items={nav} />
 
-  <Section id="sources" title="Where the numbers come from" placeholder={false} takeaway="The NHL’s public game data, refreshed twice a day, with a few things left out on purpose.">
+  <Section id="sources" title="Where the numbers come from" placeholder={false} lead takeaway="The NHL’s public game data, refreshed twice a day, with a few things left out on purpose.">
     <div class="card explain">
       <p><strong>Games.</strong> Play-by-play, shifts, boxscores, rosters, standings and the schedule come from the NHL’s public game data, pulled every morning and afternoon. When the shift feed is missing a game, the NHL’s official time-on-ice reports fill the gap, and every player’s ice time is checked against the boxscore.</p>
       <p><strong>Skating and shot speed.</strong> Player pages use NHL EDGE, the league’s puck and player tracking.</p>
@@ -74,7 +74,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </div>
   </Section>
 
-  <Section id="xg" title="Rating every chance" placeholder={false} takeaway="Every shot gets a rating: how often shots like it go in.">
+  <Section id="xg" title="Rating every chance" placeholder={false} lead takeaway="Every shot gets a rating: how often shots like it go in.">
     <div class="card explain">
       <p>Goals are rare and streaky, so most of this site works from expected goals: every shot that gets past the shot blockers gets a chance of going in, and adding those up says how many goals a team’s chances were worth. The model is our own, trained on about 360,000 shots from three seasons. For each shot it looks at where it came from, what kind of shot it was, what happened just before (a save, a turnover, a faceoff win) and how long before, the manpower, the score and the period. It deliberately doesn’t know who shot or who was in net, so a goalie or a sniper is judged against the shot, not against himself.</p>
       <div class="try" id="try-xg" data-src={`${base}data/xg_grid.json`} hidden>
@@ -100,17 +100,17 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
         </div>
         <p class="note">The average rating our model gave real 5-on-5 shots of that kind from that spot, <span id="try-n"></span>. Darker means more dangerous. A spot with few shots of one kind leans on all shots from there.</p>
       </div>
-      <p>Tested on a full season it had never seen, it was about as sharp as the best public models on the same shots, and well calibrated: shots it rated around 10% went in about 10% of the time. Because one model rates every season, a team’s numbers from different years can be compared fairly. <a href={`${base}xg-check/`}>See how it rated the chances in recent games.</a></p>
+      <p>Tested on a full season it had never seen, it was about as sharp as the best public models on the same shots, and well calibrated: shots it rated around 10% went in about 10% of the time. Because one model rates every season, a team’s numbers from different years can be compared fairly.</p>
     </div>
   </Section>
 
-  <Section id="score" title="Score effects" placeholder={false} takeaway="Teams that are behind shoot more, and so do home teams. Shot numbers are corrected for both.">
+  <Section id="score" title="Score effects" placeholder={false} lead takeaway="Teams that are behind shoot more, and so do home teams. Shot numbers are corrected for both.">
     <div class="card explain">
       <p>A team protecting a lead sits back; a team chasing one throws everything at the net. Raw shot totals would reward teams for trailing. So each 5-on-5 shot is weighted by the score when it was taken and by whether the shooter was at home, with weights set so that across three seasons the home and away totals come out even in every score situation. Behavior that depends on the score, like hitting, is measured only while the game is close.</p>
     </div>
   </Section>
 
-  <Section id="arena" title="The arena correction" placeholder={false} takeaway="Hits, giveaways, takeaways and blocked shots are counted by people, and some buildings count a lot more than others.">
+  <Section id="arena" title="The arena correction" placeholder={false} lead takeaway="Hits, giveaways, takeaways and blocked shots are counted by people, and some buildings count a lot more than others.">
     <div class="card explain">
       <p>Every arena has its own off-ice scorers, and they don’t agree on what a hit is. At {ex.venue} scorers log about <strong>{Math.round(ex.hits_here as number)}</strong> hits per 60; when the {nick(ex.team as string)} and their opponents play anywhere else, the same kind of games produce about <strong>{Math.round(ex.hits_elsewhere as number)}</strong>. Teams don't regularly hit more just because they're at home. Leave that alone and every team looks more physical for the nights they play in a generous building, and the home team looks like bruisers when they may be ordinary.</p>
       <p><strong>How we measure it.</strong> For each arena we compare two sets of games from the last three seasons ({data.seasons}): the home team’s games in their own building, and the same team’s road games. Both sets have the same team in them, so that team’s own style cancels out, and what’s left is the building. The opponents differ, but over 120-odd road games the home team visits every other arena, so those quirks wash out. Dividing one rate by the other gives the arena’s factor: {ex.hits_here} ÷ {ex.hits_elsewhere} = <strong>{(ex.hits_raw as number).toFixed(2)}</strong> for hits at {ex.venue}.</p>
@@ -147,7 +147,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     {!arenas.some((a) => a.team === 'UTA') && <p class="note">Utah’s arena doesn’t appear in this table because there’s not enough data to go on. We’ll see you next year, Mammoth.</p>}
   </Section>
 
-  <Section id="blend" title="Blending this season with last" placeholder={false} takeaway={`${N} games in, some things about a team are already clear and some are still mostly bounces. Each trait gets its own answer.`}>
+  <Section id="blend" title="Blending this season with last" placeholder={false} lead takeaway={`${N} games in, some things about a team are already clear and some are still mostly bounces. Each trait gets its own answer.`}>
     <div class="card explain">
       <p>Early in a season, a team’s shot volume already tells you a lot about them, while their goaltending numbers barely tell you anything yet. Most sites either show the raw season numbers, which swing wildly in October, or lean on last season, which misses real change. We do something in between, and how far each number leans depends on the trait.</p>
       <p><strong>How long each trait takes to settle.</strong> We took three full seasons, split every team’s games into odd and even nights, and checked how well one half predicted the other. Shot volume barely changes from one half to the other, so it’s a habit. Second chances in one half say almost nothing about the other. From that comparison we get, for each trait, the number of games at which this season’s results and what we knew before count equally:</p>
@@ -183,7 +183,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </div>
   </Section>
 
-  <Section id="lines" title="Lines, power plays and penalty kills" placeholder={false} takeaway="First line, second line and so on are decided by ice time together, not reputation.">
+  <Section id="lines" title="Lines, power plays and penalty kills" placeholder={false} lead takeaway="First line, second line and so on are decided by ice time together, not reputation.">
     <div class="card explain">
       <p><strong>Lines and pairs</strong> are numbered by how much 5-on-5 time each group has played together over the team’s last ten games, with each older game counting half as much as the one after it. It’s not perfect, but relying heavily on the latest combinations gives us the best guess for the next game: tested on the last two seasons, lines picked this way covered about 45% of the next game’s forward ice time, against about 30% when all ten games counted equally. A group’s ice time is its average in the games it was one of that night’s lines, our best guess for its time together next game. We count how many of the past ten games this season that line played, with “in 3 of last 5” when it wasn’t a line every game. A group that was a line for the first time in ten games the previous game is marked “New.” When a team’s four most-used trios cover under a third of their forwards’ 5-on-5 time (a typical team’s cover about half), the page lets you know that their lines keep changing. Each line is rated against the same-numbered line on the other 31 teams: first lines with first lines, third pairs with third pairs.</p>
       <p><strong>Power-play units</strong> are built around the defenseman running them, because that’s how fans tell units apart: the first unit is the quarterback with the most power-play time plus the four skaters most often out with him, the second is built the same way around the next one. Forwards who stay out for both are listed on both. When one player takes the draw and then changes for someone else, he’s shown as the faceoff specialist and his time goes to whoever replaces him (looking at you, Jordan Staal). Special teams units use the current season only, no blending. A player’s role tags are awarded based only on a player’s games with his current team.</p>
@@ -192,7 +192,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </div>
   </Section>
 
-  <Section id="players" title="Player ratings" placeholder={false} takeaway="Each player is compared with others who play his position, after accounting for who he plays with and against.">
+  <Section id="players" title="Player ratings" placeholder={false} lead takeaway="Each player is compared with others who play his position, after accounting for who he plays with and against.">
     <div class="card explain">
       <p><strong>Settling, for players.</strong> Ratings blend the same way team traits do, but the yardstick is ice time (or shots, or faceoffs) rather than games, and a short sample is pulled toward the average for his position. Shot volume and hitting settle within a few games; finishing and power-play scoring take seasons, so they barely move early on. “This season and last” also leans on his own previous season. Even “this season only” keeps the pull toward the position average, or five-game players would fill the top of every list.</p>
       <p><strong>Who he’s compared with.</strong> Forwards are compared with forwards and defensemen with defensemen, among regulars (20+ games over two seasons, or 3 this season). Centers and wingers are split only where they really play different games: shooting volume, creating their own chances, shot blocking, hardest shot and distance skated. We checked every rating and split only where the gap was large; defense showed none. Three ratings only count players who do enough of that thing, so their group is smaller and the page names it: power play (60+ minutes on it over two seasons, or 10+ this season), shorthanded threat (30+ minutes killing penalties, or 5+) and faceoffs (200+ draws, or 40+). That’s why a forward can rank 1st of 193 penalty-killing forwards but 9th of 381 forwards at creating chances. A player is listed as better or worse than most only when even the cautious end of his likely range is clearly away from the middle.</p>
@@ -202,7 +202,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </div>
   </Section>
 
-  <Section id="games" title="Previews and post-game pages" placeholder={false} takeaway="Every preview call is written down before puck drop and graded afterwards, never rewritten.">
+  <Section id="games" title="Previews and post-game pages" placeholder={false} lead takeaway="Every preview call is written down before puck drop and graded afterwards, never rewritten.">
     <div class="card explain">
       <p><strong>Previews</strong> are procedurally generated, looking out for a few things: two of a team’s traits meeting head on, a coach’s matching habit at home, a team playing unlike their usual selves, and a few more. Each prediction is saved as a checkable claim (meaning specific numbers that will clearly happen or not happen) and frozen at puck drop. After the game, the same rule grades it from that game’s data: held, partly, or didn’t happen. The <a href={`${base}record/`}>Track record</a> keeps the season’s tally.</p>
       <p><strong>Report cards</strong> judge each player only against earlier games, so a card never changes. The scoresheet isn’t everything, and we want to know if a player fulfilled the responsibilities he normally shoulders for his team on a given night, AKA “doing his job.” We assigned jobs based on what a player is relied on for (power play, penalty kill, faceoffs) and what he’s better at than most other players. A player did his job when he had a typical night for him, not an average one: single games are lopsided, so most players fall short of their own average more often than not.</p>
@@ -212,7 +212,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
     </div>
   </Section>
 
-  <Section id="limits" title="Blind spots" placeholder={false} takeaway="We don’t pretend to know this, because we use free data and free data won’t help us here.">
+  <Section id="limits" title="Blind spots" placeholder={false} lead takeaway="We don’t pretend to know this, because we use free data and free data won’t help us here.">
     <ul class="limits">
       <li><strong>Passes before a shot</strong> aren’t in public data, so expected goals can’t see a cross-ice pass. Goalies behind teams that allow those will look worse than they are.</li>
       <li><strong>Rush chances</strong> can’t be picked out from the league’s public data, which records too little between the blue lines. We tried approximating a “rush” shot based on timing, but those shots were inordinately few and somehow scored <em>less</em> than ordinary shots, which would make our information less accurate. Good rush counts come from real-person trackers and cameras we don’t pretend to have access to.</li>

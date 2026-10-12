@@ -24,7 +24,7 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
   </div>
   {story.items.length > 0 && (
     <div class="s-list">
-      <h4 class="list-h">{story.list_head}</h4>
+      <h4 class="list-h box-h">{story.list_head}</h4>
       <ul>
         {story.items.map((i) => <li><span class="tag">{i.tag}</span><span>{i.text}</span></li>)}
       </ul>
@@ -39,7 +39,7 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
   .s-list { grid-area: list; background: var(--ice); border-radius: 12px; padding: 16px 18px; align-self: start; }
   .story h3 { font: 600 28px/1.15 var(--display); margin: 6px 0 12px; }
   .story .para { font: 400 18px/1.6 var(--body); margin: 0 0 12px; }
-  .list-h { font: 700 12.5px/1.2 var(--ui); margin: 0 0 4px; color: var(--ink); text-transform: uppercase; letter-spacing: 0.08em;
+  .list-h { margin: 0 0 4px;
     padding-bottom: 8px; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.12)); }
   .story ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 12px; }
   .story li { display: grid; gap: 2px; align-content: start; font: 400 16px/1.5 var(--ui); }

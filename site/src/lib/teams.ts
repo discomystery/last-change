@@ -43,3 +43,15 @@ export function matchupColours(away: string, home: string): { away: string; home
   const a = [teamColour(away), SECOND[away], FALLBACK].find((c) => c && distance(c, h) >= MIN_DISTANCE) ?? FALLBACK;
   return { away: a, home: h };
 }
+
+/** Every matchup's colours in a small table for pages that draw games in the browser (home, team pages): each club's
+ * own colour, plus the visitors' replacement for the pairs where `matchupColours` switches it. */
+export function matchupTable(): { c: Record<string, string>; s: Record<string, string> } {
+  const s: Record<string, string> = {};
+  for (const a of Object.keys(COLOURS)) for (const h of Object.keys(COLOURS)) {
+    if (a === h) continue;
+    const m = matchupColours(a, h).away;
+    if (m !== COLOURS[a]) s[`${a}@${h}`] = m;
+  }
+  return { c: { ...COLOURS }, s };
+}

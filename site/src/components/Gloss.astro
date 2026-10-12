@@ -1,11 +1,11 @@
 ---
-// A small "+ label" toggle for the explanations under a section: what the labels mean, how a number is worked out.
+// A small "? label" toggle for the explanations under a section: what the labels mean, how a number is worked out.
 // Kept quiet on purpose (the full-width .fold bar is for content people open often).
 interface Props { label: string }
 const { label } = Astro.props;
 ---
 <details class="gloss">
-  <summary><i aria-hidden="true"></i>{label}</summary>
+  <summary><i aria-hidden="true">?</i>{label}</summary>
   <div class="gloss-body"><slot /></div>
 </details>
 <style>
@@ -13,10 +13,8 @@ const { label } = Astro.props;
   .gloss > summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: 500 13px var(--ui); color: var(--ink-3); }
   .gloss > summary::-webkit-details-marker { display: none; }
   .gloss > summary:hover { color: var(--ink); }
-  .gloss > summary i { position: relative; width: 18px; height: 18px; border-radius: 50%; background: var(--track); flex: none; }
-  .gloss > summary i::before, .gloss > summary i::after { content: ''; position: absolute; left: 5px; right: 5px; top: 8.25px; height: 1.5px; background: currentColor; border-radius: 1px; }
-  .gloss > summary i::after { transform: rotate(90deg); transition: transform 0.15s; }
-  .gloss[open] > summary i::after { transform: rotate(0deg); }
+  .gloss > summary i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--track); color: var(--ink-2); font: 700 11px/1 var(--ui); font-style: normal; flex: none; }
+  .gloss[open] > summary i { background: var(--ink); color: var(--sheet); }
   .gloss-body { margin-top: 4px; max-width: 920px; }
   .gloss-body :global(.note) { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
 </style>

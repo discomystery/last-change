@@ -138,10 +138,10 @@ const statRow = (x: any) => (isG ? null : x);
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
-    <SectionNav items={nav as [string, string][]} />
+    <SectionNav items={nav as [string, string][]} pinned />
 
     {!isG && !s.traits && (
-      <Section id="role" title="Role" placeholder={false} takeaway="Why he isn’t playing.">
+      <Section id="role" title="Role" placeholder={false}>
         <div class="card prole">
           <dl class="rl">
             <div><dt>Status</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>
@@ -154,7 +154,7 @@ const statRow = (x: any) => (isG ? null : x);
     {!isG && s.traits && (
       <>
         {!role && (
-          <Section id="role" title="Role" placeholder={false} takeaway={`He hasn’t played for ${team?.place ?? p.team} this season.`}>
+          <Section id="role" title="Role" placeholder={false} takeaway={`He hasn’t played for ${team?.place ?? p.team} this season.`} lead>
             <div class="card prole">
               <dl class="rl">
                 <div><dt>Status</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>
@@ -235,6 +235,7 @@ const statRow = (x: any) => (isG ? null : x);
         <PlayerReport p={p} place={team?.place ?? p.team} />
 
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
+          <Fragment slot="explain">{modes.map(([m, mw]) => <p class={`note m-${m}`}>Listed only when we can be confident he is above or below average. Numbers from {mw}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>)}</Fragment>
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
@@ -260,22 +261,24 @@ const statRow = (x: any) => (isG ? null : x);
                       : <p class="n">Nothing yet where we can be confident he is below most {groupWord[s.group]}.</p>}
                   </div>
                 </div>
-                <p class="note">Listed only when we can be confident he is above or below average. Numbers from {mw}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>
               </div>
             );
           })}
         </Section>
 
         <Section id="ratings" title="All ratings" placeholder={false} takeaway={`Every rating, against other ${groupWord[s.group]}.`}>
+          <Fragment slot="explain">
+            {unplayed
+              ? <p class="note m-blend">He hasn’t played this season, so these come from last season’s {s.games_last} games alone, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
+              : <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>}
+            {s.moved_from && <p class="note m-blend">He played for {(teams.find((t) => t.abbr === s.moved_from)?.name) ?? s.moved_from} last season. Habits that travel with a player (shooting, hitting, penalties) still use that season in full; setting up goals, finishing, faceoffs and power-play chances depend more on linemates and role, so they lean on it less. We measured how much each one carries over for players who change teams.</p>}
+            {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
+            {unplayed
+              ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The grey dots show last season.</p>
+              : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
+            <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
+          </Fragment>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
-          {unplayed
-            ? <p class="note m-blend">He hasn’t played this season, so these come from last season’s {s.games_last} games alone, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>
-            : <p class="note m-blend">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} blended with last season’s {s.games_last}, and pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'} by an amount that depends on how quickly each rating settles.</p>}
-          {s.moved_from && <p class="note m-blend">He played for {(teams.find((t) => t.abbr === s.moved_from)?.name) ?? s.moved_from} last season. Habits that travel with a player (shooting, hitting, penalties) still use that season in full; setting up goals, finishing, faceoffs and power-play chances depend more on linemates and role, so they lean on it less. We measured how much each one carries over for players who change teams.</p>}
-          {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
-          {unplayed
-            ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The grey dots show last season.</p>
-            : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
           {GROUPS.map((grp) => (
             <>
               <h3 class="sub">{grp}</h3>
@@ -303,10 +306,12 @@ const statRow = (x: any) => (isG ? null : x);
               </ul>
             </>
           ))}
-          <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
         </Section>
 
         <Section id="shots" title="Shots" placeholder={false} takeaway="Where his shots come from, and how his misses miss.">
+          <Fragment slot="explain">
+            <p class="note">The NHL’s game data records how a shot missed, but not where in the net a goal or save went (glove side, blocker, five-hole). That needs paid camera tracking, so we don’t show it.</p>
+          </Fragment>
           <div class="pick"><span>Show</span>
             <select class="map-pick" aria-label="Map view"><option value="areas">where his shots come from</option><option value="dots">every shot, goals in black</option></select>
           </div>
@@ -342,12 +347,14 @@ const statRow = (x: any) => (isG ? null : x);
                   </div>
                 );
               })}
-              <p class="note">The NHL’s game data records how a shot missed, but not where in the net a goal or save went (glove side, blocker, five-hole). That needs paid camera tracking, so we don’t show it.</p>
             </div>
           </div>
         </Section>
 
         <Section id="edge" title="Skating and shot" placeholder={false} takeaway={`Speed, bursts, shot power and where he spends his shifts, from the NHL’s own tracking (NHL EDGE).`}>
+          <Fragment slot="explain">
+            {s.edge && <p class="note">Top speed and hardest shot are his best single moments{' '}<span class="inl m-blend">over this season and last</span><span class="inl m-season">this season</span>; bursts and distance are per 60 minutes of his ice time. Tracking data: NHL EDGE.</p>}
+          </Fragment>
           {s.edge ? (
             <>
               <ul class="fpgrid">
@@ -367,7 +374,6 @@ const statRow = (x: any) => (isG ? null : x);
                   );
                 })}
               </ul>
-              <p class="note">Top speed and hardest shot are his best single moments{' '}<span class="inl m-blend">over this season and last</span><span class="inl m-season">this season</span>; bursts and distance are per 60 minutes of his ice time. Tracking data: NHL EDGE.</p>
             </>
           ) : <p class="note">No NHL EDGE tracking data for him yet.</p>}
         </Section>
@@ -387,6 +393,9 @@ const statRow = (x: any) => (isG ? null : x);
           </div>
         </Section>
         <Section id="card" title="Goalie card" placeholder={false} takeaway="Is he stopping more than he should, and what is his team asking him to face?">
+          <Fragment slot="explain">
+            <p class="note">Ratings compare him with goalies who have at least {goalieData.min_starts.blend} starts over two seasons, or {goalieData.min_starts.season} this season. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
+          </Fragment>
           {modes.map(([m, mw]) => {
             const x = g[m];
             if (!x) return <div class={`gmode m-${m}`}><p class="note">He hasn’t played this season. Pick “this season and last” in the settings to see last season.</p></div>;
@@ -411,7 +420,7 @@ const statRow = (x: any) => (isG ? null : x);
                 <ul class="fpgrid gtraits">
                   {goalieTraitInfo.map((t) => (
                     <li class="card fpc">
-                      <span class="term fpc-name" tabindex="0" data-tip={t.tip}>{t.label}</span>
+                      <span class="term fpc-name" role="heading" aria-level="3" tabindex="0" data-tip={t.tip}>{t.label}</span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes">{x.pct[t.key] !== null ? <div class="lane" style={`--b:${x.pct[t.key]};--blo:${x.pct[t.key]};--bhi:${x.pct[t.key]};--c:${x.pct[t.key]};--clo:${x.pct[t.key]};--chi:${x.pct[t.key]}`}><span class="whisk"></span><span class="dot"></span></div> : <div class="lane empty"></div>}</div>
                       <p class="gline"><span>{gSay[t.key](x)}</span>{x.pct[t.key] === null && <em>too few starts to place him</em>}</p>
@@ -421,7 +430,6 @@ const statRow = (x: any) => (isG ? null : x);
               </div>
             );
           })}
-          <p class="note">Ratings compare him with goalies who have at least {goalieData.min_starts.blend} starts over two seasons, or {goalieData.min_starts.season} this season. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>
         </Section>
         <Section id="faced" title="Shots he faces" placeholder={false} takeaway="Where the shots on goal against him come from, seen from the shooter’s side.">
           <div class="st2">

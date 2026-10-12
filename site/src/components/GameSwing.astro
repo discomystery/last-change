@@ -1,5 +1,4 @@
 ---
-import Gloss from './Gloss.astro';
 // Post-game Swing: each player's night as one number, as a bar in his team's colour, with tonight's lines and pairs
 // highlighted on request. Data: scores/{game_id}.json, written by pipeline/export/game_scores.py from finished games.
 import Section from './Section.astro';
@@ -111,6 +110,12 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
 {d && d.players.length > 0 && (
   <Section id="swing" title="Swing" placeholder={false}
     takeaway="How far each player swung tonight’s result, for his team or against it.">
+    <Fragment slot="explain">
+      <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The label beside it is his report card from “Did they do their job?” below; L1 to L4 and P1 to P3 are tonight’s lines and pairs.</p>
+      <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
+      <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus actual goals for and against at half the weight of a chance. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: everything with him on the ice on the power play and penalty kill, chances and goals both ways (a shorthanded goal against counts against the power-play unit), compared with a league-average unit.</p>
+      <p class="note"><strong>Company kept</strong> (counted inside 5-on-5): from every player’s 5-on-5 impact going into this season, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who swung this result, not who is better.</p>
+    </Fragment>
     <p class="sw-lead">
       The biggest swings: {best.map((r, i) => <Fragment>{i > 0 && (i === best.length - 1 ? ' and ' : ', ')}<span class={`sw-who t-${side(r.team)}`}><i></i><PLink id={r.id} name={r.name} /> <span class="sw-lead-n">{one(r.score)}</span></span></Fragment>)}.
     </p>
@@ -166,12 +171,6 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
       );
     })}
     <p class="note">Tap a player to see where his number came from.</p>
-    <Gloss label="How Swing is worked out">
-      <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The label beside it is his report card from “Did they do their job?” below; L1 to L4 and P1 to P3 are tonight’s lines and pairs.</p>
-      <p class="note"><strong>Scoresheet</strong>: each goal is shared 40% to the scorer, 35% to the first assist and 25% to the second, plus a quarter of the expected goals of his own shots. A penalty drawn adds 0.16 and one taken costs 0.16, what a power play is worth on average; each faceoff won or lost moves it by 0.006.</p>
-      <p class="note"><strong>5-on-5</strong> counts most: expected goals for minus against with him on, half compared with league average (adjusted for score and venue) and half compared with his own team when he was on the bench, plus actual goals for and against at half the weight of a chance. A player on a losing team can score well if his line held its own. <strong>Special teams</strong>: everything with him on the ice on the power play and penalty kill, chances and goals both ways (a shorthanded goal against counts against the power-play unit), compared with a league-average unit.</p>
-      <p class="note"><strong>Company kept</strong> (counted inside 5-on-5): from every player’s 5-on-5 impact going into this season, a player out with strong linemates against weak opponents gives a little back, and the reverse earns a little. <strong>Goalies</strong>: goals saved above expected. Empty-net shots and shootouts are left out. One game is a small sample: this says who swung this result, not who is better.</p>
-    </Gloss>
   </Section>
 )}
 
@@ -285,7 +284,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .sw-lane::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.4; }
   .sw-lane :global(i) { position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink-3); opacity: 0.25; }
   .sw-lane i.me { top: 1px; width: 14px; height: 14px; margin-left: -7px; background: var(--team); opacity: 1; box-shadow: 0 0 0 2px var(--sheet); z-index: 1; }
-  .sw-ends { display: flex; justify-content: space-between; font: 600 10px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .sw-ends { display: flex; justify-content: space-between; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   .sw-sen { font: 400 15px/1.45 var(--body); color: var(--ink-2); margin-top: 8px; }
   .sw-sen b { color: var(--ink); font-weight: 600; }
   .sw-dp { display: flex; align-items: center; gap: 8px; font: 500 13px var(--ui); color: var(--ink-3); margin-top: 4px; }

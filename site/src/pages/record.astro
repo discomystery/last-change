@@ -189,6 +189,9 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   </Section>
 
   <Section id="chances" title="Win chances, after the fact" placeholder={false} takeaway="When we gave a team about 60%, did teams like that win about 60% of the time?">
+    <Fragment slot="explain">
+      <p class="note foot">The win chance is never shown before a game. It is worked out afterwards from what was known that morning, and each post-game page reveals it with the reasons.</p>
+    </Fragment>
     {win.season || win.past ? (
       <>
         <div class="tiles">
@@ -248,7 +251,6 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             );
           })}
         </div>
-        <p class="note foot">The win chance is never shown before a game. It is worked out afterwards from what was known that morning, and each post-game page reveals it with the reasons.</p>
       </>
     ) : <p class="note">No finished games to score yet.</p>}
   </Section>
@@ -326,7 +328,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   .lh { font: 600 18px / 1.35 var(--display); }
   .lcall { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin-top: 3px; }
   .nums { display: flex; gap: 18px; text-align: right; }
-  .nums dt { font: 500 11px var(--ui); color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .nums dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); white-space: nowrap; }
   .nums dd { margin: 2px 0 0; font: 600 15px var(--ui); white-space: nowrap; }
   .nums div:first-child:not(:last-child) dd { color: var(--ink-2); font-weight: 500; }
 
