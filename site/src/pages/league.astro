@@ -156,6 +156,10 @@ const _ = ordinal;
   <SectionNav items={nav} />
 
   <Section id="style" title="Team styles" placeholder={false} takeaway="Every team on one scale at a time, from one end of the trait to the other.">
+    <Fragment slot="explain">
+      <p class="note m-blend">Through {asOf}: {gamesRange[0]}–{gamesRange[1]} games a team this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
+      <p class="note m-season">Through {asOf}, from this season’s {gamesRange[0]}–{gamesRange[1]} games a team only. Expect big swings this early; the likely ranges show how big.</p>
+    </Fragment>
     <div class="pick"><span>Rank teams by</span>
       <select id="trait-pick" aria-label="Trait">
         {fpGroups.map((g) => (
@@ -163,8 +167,6 @@ const _ = ordinal;
         ))}
       </select>
     </div>
-    <p class="note m-blend">Through {asOf}: {gamesRange[0]}–{gamesRange[1]} games a team this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
-    <p class="note m-season">Through {asOf}, from this season’s {gamesRange[0]}–{gamesRange[1]} games a team only. Expect big swings this early; the likely ranges show how big.</p>
     {traits.map((t, i) => (
       <div class="card rank-card" data-trait={t.key} hidden={i !== 0}>
         <p class="rank-tip"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span>: <span>{t.tip}</span></p>
@@ -197,6 +199,9 @@ const _ = ordinal;
   </Section>
 
   <Section id="table" title="Every trait, every team" placeholder={false} takeaway={`The whole league at a glance: each team’s place on all ${gTraits.length} traits, side by side.`}>
+    <Fragment slot="explain">
+      <p class="note">Tap any column heading to sort by it; tap again to flip the order. Point at a box for the number in words.</p>
+    </Fragment>
     <div class="tctl">
       <div class="pick"><span>Show</span>
         <select id="tb-view" aria-label="Ranks or numbers"><option value="rank">ranks</option><option value="num">the numbers</option></select>
@@ -216,7 +221,6 @@ const _ = ordinal;
       </div>
     </div>
     <div class="key tkey"><span class="ramp"><i></i></span><span>Darker is better, or simply more of it where neither end is better</span><span class="you">Your team is outlined</span></div>
-    <p class="note">Tap any column heading to sort by it; tap again to flip the order. Point at a box for the number in words.</p>
     <div class="tb-wrap" id="tb-wrap">
       <table class="tb" id="tb">
         <thead>
@@ -255,12 +259,14 @@ const _ = ordinal;
   </Section>
 
   <Section id="lines" title="Lines" placeholder={false} takeaway="Each team’s lines and pairs against the same-numbered group on every other team.">
+    <Fragment slot="explain">
+      <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games, this season only, with the latest games counting most. With so few games, each group’s results are pulled toward the average for its line number, and the ranking follows those pulled-in figures.</p>
+    </Fragment>
     <div class="pick"><span>Rank</span>
       <select id="unit-pick" aria-label="Which lines or pairs">{unitNames.map(([v, w]) => <option value={v}>{w}</option>)}</select>
       <span>by</span>
       <select id="stat-pick" aria-label="Ranked by">{unitStats.map(([v, w]) => <option value={v}>{w}</option>)}</select>
     </div>
-    <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over each team’s last {linesData.window} games, this season only, with the latest games counting most. With so few games, each group’s results are pulled toward the average for its line number, and the ranking follows those pulled-in figures.</p>
     <div class="key"><span><span class="pips demo"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span>How good, against the same group on other teams</span><span><span class="marker demo"><i style="--p:65"></i></span>How much (not good or bad)</span></div>
     {unitNames.map(([label, words], i) => (
       <div class="card unit-card" data-unit={label} data-stat="share" hidden={i !== 0}>
@@ -286,6 +292,10 @@ const _ = ordinal;
   </Section>
 
   <Section id="goalies" title="Goalies" placeholder={false} takeaway="Who is stopping more than he should, and what each team asks their goalie to face.">
+    <Fragment slot="explain">
+      <p class="note m-blend">Goalies with at least {goalieData.min_starts.blend} starts over this season and last ({ratedCount('blend')} of them).</p>
+      <p class="note m-season">Goalies with at least {goalieData.min_starts.season} starts this season ({ratedCount('season')} of them).</p>
+    </Fragment>
     {modes.map((m) => {
       const q = quad(m);
       return (
@@ -299,8 +309,6 @@ const _ = ordinal;
     <div class="pick"><span>Rank goalies by</span>
       <select id="goalie-pick" aria-label="Goalie trait">{goalieTraitInfo.map((t) => <option value={t.key}>{t.label.toLowerCase()}</option>)}</select>
     </div>
-    <p class="note m-blend">Goalies with at least {goalieData.min_starts.blend} starts over this season and last ({ratedCount('blend')} of them).</p>
-    <p class="note m-season">Goalies with at least {goalieData.min_starts.season} starts this season ({ratedCount('season')} of them).</p>
     {goalieTraitInfo.map((t, i) => (
       <div class="card rank-card g-card" data-gtrait={t.key} hidden={i !== 0}>
         <p class="rank-tip"><span class="term" tabindex="0" data-tip={t.tip}>{t.label}</span>: <span>{t.tip}</span></p>
@@ -320,12 +328,15 @@ const _ = ordinal;
   </Section>
 
   <Section id="sources" title="Goal sources" placeholder={false} takeaway="Where every team’s goals come from, against what luck alone would hand a league-average team.">
+    <Fragment slot="explain">
+      <p class="note">Most of these differences are luck: a team’s goal mix barely carries over from one half of a season to the other. Only the power play and everyday even-strength play show real habits. The grey band is where 80% of league-average teams with the same number of goals would land; a dot outside it is more than luck would usually explain.</p>
+      <p class="note">League average: {srcInfo.map(([k, w]) => `${w} ${lgSrc[k]}%`).join(', ')}. “This season and last” pools both seasons; the luck range is wider for teams with fewer goals.</p>
+    </Fragment>
     <div class="pick"><span>Rank teams by share of</span>
       <select id="side-pick" aria-label="Goals scored or allowed">{sides.map(([v, w]) => <option value={v}>{w}</option>)}</select>
       <span>from</span>
       <select id="src-pick" aria-label="Source">{srcInfo.map(([v, w]) => <option value={v}>{w}</option>)}</select>
     </div>
-    <p class="note">Most of these differences are luck: a team’s goal mix barely carries over from one half of a season to the other. Only the power play and everyday even-strength play show real habits. The grey band is where 80% of league-average teams with the same number of goals would land; a dot outside it is more than luck would usually explain.</p>
     <div class="key t-one"><span class="one"><i></i>Share of the team’s goals</span><span class="avg">League average</span><span class="luck">Luck’s range</span></div>
     {sides.map(([side]) => srcInfo.map(([key]) => {
       const { scale, rows } = srcRows(side as 'for' | 'against', key);
@@ -354,7 +365,6 @@ const _ = ordinal;
         </div>
       );
     }))}
-    <p class="note">League average: {srcInfo.map(([k, w]) => `${w} ${lgSrc[k]}%`).join(', ')}. “This season and last” pools both seasons; the luck range is wider for teams with fewer goals.</p>
   </Section>
 </Base>
 

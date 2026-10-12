@@ -1,12 +1,23 @@
 ---
-interface Props { id: string; title: string; takeaway?: string; placeholder?: boolean }
-const { id, title, takeaway, placeholder = true } = Astro.props;
+// A page section. The explainer (`takeaway`, plus anything in the `explain` slot) sits behind a "?" beside the
+// title and opens on demand. `lead` keeps the takeaway on show instead, for lines that carry this page's own facts
+// (a game's tally of calls) or pages that are explanation through and through (Methods).
+interface Props { id: string; title: string; takeaway?: string; placeholder?: boolean; lead?: boolean }
+const { id, title, takeaway, placeholder = true, lead = false } = Astro.props;
+const tucked = (takeaway && !lead) || Astro.slots.has('explain');
 ---
 <section class="sec" id={id} aria-labelledby={`${id}-h`}>
   <header class="sec-head">
     <h2 id={`${id}-h`}>{title}</h2>
+    {tucked && <button type="button" class="xp-q" aria-expanded="false" aria-controls={`${id}-xp`} aria-label={`What this shows: ${title}`}>?</button>}
     {placeholder && <span class="ph">Placeholder numbers</span>}
   </header>
-  {takeaway && <p class="takeaway">{takeaway}</p>}
+  {takeaway && lead && <p class="takeaway">{takeaway}</p>}
+  {tucked && (
+    <div class="xp" id={`${id}-xp`} hidden>
+      {takeaway && !lead && <p class="xp-lead">{takeaway}</p>}
+      <slot name="explain" />
+    </div>
+  )}
   <slot />
 </section>
