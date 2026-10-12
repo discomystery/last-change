@@ -3,6 +3,7 @@
 // many skaters in the league carry as much, and his teammates as dots), who is next in line for each thing he does,
 // what a fill-in gives back, and how the team did in games he missed. Data: `carries` in his player JSON
 // (pipeline/export/carries.py).
+import Explain from './Explain.astro';
 import Section from './Section.astro';
 import { clock } from '../lib/format';
 import { most, ordinal } from '../lib/players';
@@ -96,7 +97,7 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
   <div class="ld-two">
     {f && (
       <div class="card">
-        <p class="chart-title">What a fill-in gives back</p>
+        <Explain id="ld-fill" tag="p" class="chart-title" title="What a fill-in gives back"><p class="n">Goals scored or assisted per game, this season and last. Faint dots are his {place} teammates {isD ? 'on defense' : 'up front'}; ticks are the typical NHL {isD ? 'defenseman' : 'forward'} by ice-time rank on his team.</p></Explain>
         <p class="ld-say">He’s in on <strong>{f.v.toFixed(2)} goals a game</strong>.{fillIn && ` A typical depth ${isD ? 'defenseman' : 'forward'} called up to replace him is in on about ${fillIn[0].toFixed(2)}.`}</p>
         <div class="ld-lane">
           <span class="ld-line"></span>
@@ -104,11 +105,10 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
           {f.ticks.map(([v, l]: any, k: number) => <span class:list={['ld-mark', { up: k === 1 && Math.abs(fAt(v) - fAt(f.v)) >= 18, low: k === 1 && Math.abs(fAt(v) - fAt(f.v)) < 18 }]} style={`left:${fAt(v)}%`} tabindex="0" data-tip={`${l}: ${v.toFixed(2)} goals a game`}><i></i><em>{l}</em></span>)}
           <span class="ld-him" style={`left:${fAt(f.v)}%`}><i></i><em>{p.last}</em></span>
         </div>
-        <p class="n">Goals scored or assisted per game, this season and last. Faint dots are his {place} teammates {isD ? 'on defense' : 'up front'}; ticks are the typical NHL {isD ? 'defenseman' : 'forward'} by ice-time rank on his team.</p>
       </div>
     )}
     <div class="card">
-      <p class="chart-title">When he’s been out</p>
+      {out && out.missed ? <Explain id="ld-out" tag="p" class="chart-title" title="When he’s been out"><p class="n">{out.missed < 10 ? `${out.missed} ${out.missed === 1 ? 'game is' : 'games is'} far too few to read much into: short stretches swing either way by luck.` : 'Even over this many games, results swing a lot by luck, and other players come and go too.'}</p></Explain> : <p class="chart-title">When he’s been out</p>}
       {out && out.missed ? (
         <>
           <p class="ld-say">He missed <strong>{out.missed} {out.missed === 1 ? 'game' : 'games'}</strong> {span}. {place} won {out.without.won} of {out.missed === 1 ? 'it' : 'them'}.</p>
@@ -120,7 +120,6 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
               <tr><th><span class="term" tabindex="0" data-tip="Expected goals for minus against per game, all situations, empty nets left out.">Chance edge a game</span></th><td>{sgn(out.with.xgd)}</td><td>{sgn(out.without.xgd)}</td></tr>
             </tbody>
           </table>
-          <p class="n">{out.missed < 10 ? `${out.missed} ${out.missed === 1 ? 'game is' : 'games is'} far too few to read much into: short stretches swing either way by luck.` : 'Even over this many games, results swing a lot by luck, and other players come and go too.'}</p>
         </>
       ) : <p class="ld-say">He hasn’t missed a game for {place} this season or last, so there is nothing to compare yet.</p>}
     </div>

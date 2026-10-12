@@ -2,7 +2,7 @@
 // A heading with a small "?" beside it; the explanation sits under the heading, closed until someone asks for it.
 // Section.astro does the same for section titles (its `takeaway` and an `explain` slot). Opening and closing is
 // one shared script in Base.astro; without scripts the explanation simply shows.
-interface Props { id: string; title?: string; tag?: 'h3' | 'h4'; class?: string }
+interface Props { id: string; title?: string; tag?: 'h3' | 'h4' | 'p'; class?: string }
 const { id, title, tag: Tag = 'h3', class: cls = 'sub' } = Astro.props;
 ---
 {title
