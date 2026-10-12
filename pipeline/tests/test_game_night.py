@@ -54,3 +54,34 @@ def test_quick_becomes_full_when_owed(tmp_path, monkeypatch):
     assert run.mode("quick", datetime(2026, 10, 12, 10, 5, tzinfo=timezone.utc)) == "full"  # the 10:00 update came due
     run.STATE.write_text(json.dumps({"full_at": "2026-10-11T20:20:00+00:00", "full_sha": "abc"}))
     assert run.mode("quick", at) == "full"  # the 20:30 update it may have replaced in the queue
+
+
+def test_shift_waits_for_the_next_slate_then_hands_over(monkeypatch):
+    """A shift that starts after the night is done sleeps until an hour before tomorrow's first game, follows it, and
+    starts the next shift when its time is up."""
+    start = datetime(2026, 10, 12, 6, 30, tzinfo=timezone.utc)  # yesterday's games long over
+    clock = {"t": start}
+    slates = {"2026-10-11": [(T0 + timedelta(hours=1), 1)], "2026-10-12": [(datetime(2026, 10, 12, 10, 0, tzinfo=timezone.utc), 2)]}
+    sent, handed = [], []
+    monkeypatch.setattr(W, "now", lambda: clock["t"])
+    monkeypatch.setattr(W, "scoreboard", lambda day: [{"id": i, "start": s, "state": "OFF" if clock["t"] >= s + timedelta(hours=3) else "FUT"} for s, i in slates.get(day, [])])
+    monkeypatch.setattr(W, "dispatch", lambda mode: sent.append((clock["t"], mode)))
+    monkeypatch.setattr(W, "next_shift", lambda: handed.append(clock["t"]))
+    monkeypatch.setattr(W.time, "sleep", lambda s: clock.update(t=clock["t"] + timedelta(seconds=s)))
+    W.shift()
+    assert not [t for t, _ in sent if t < datetime(2026, 10, 12, 8, 55, tzinfo=timezone.utc)]  # nothing while waiting
+    assert sent[0][1] == "quick" and sent[0][0] <= datetime(2026, 10, 12, 9, 2, tzinfo=timezone.utc)  # 60 min before puck drop
+    assert len(handed) == 1 and handed[0] >= start + timedelta(seconds=W.SHIFT)  # hands over once, at the end of the shift
+    assert handed[0] < start + timedelta(minutes=350)  # before GitHub's job limit
+
+
+def test_a_day_without_games_still_hands_over(monkeypatch):
+    clock = {"t": T0}
+    handed = []
+    monkeypatch.setattr(W, "now", lambda: clock["t"])
+    monkeypatch.setattr(W, "scoreboard", lambda day: [])
+    monkeypatch.setattr(W, "dispatch", lambda mode: (_ for _ in ()).throw(AssertionError("no runs expected")))
+    monkeypatch.setattr(W, "next_shift", lambda: handed.append(clock["t"]))
+    monkeypatch.setattr(W.time, "sleep", lambda s: clock.update(t=clock["t"] + timedelta(seconds=s)))
+    W.shift()
+    assert len(handed) == 1 and handed[0] - T0 <= timedelta(seconds=W.SHIFT + W.POLL * 5)
