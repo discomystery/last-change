@@ -6,7 +6,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 const day = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
 const c = data.checks;
 ---
-<Base title="Real data check" mock={false}>
+<Base title="Real data check">
   <h1 class="page-top">Real lines from each team’s last game</h1>
   <p class="lede">Who actually played together at 5-on-5, for how long, and what happened while they were out there. Find a game you watched and see if it matches.</p>
   <ul class="checks">

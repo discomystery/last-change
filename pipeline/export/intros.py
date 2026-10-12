@@ -168,6 +168,7 @@ STYLE = {
     "suppression": ("give up very few shots", "let the other team shoot a lot"),
     "qualityAllowed": ("keep the other team to hopeful shots", "give up dangerous chances"),
     "breakdowns": ("rarely get burned after losing the puck", "get caught after turnovers too often"),
+    "longShifts": ("rarely get stuck out on long shifts", "get pinned in their own end on long shifts"),
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
@@ -358,6 +359,7 @@ SKILL = {
     "finishing": "finishes better than most",
     "playmaking": "sets up a lot of goals",
     "powerPlay": "is a real threat on the power play",
+    "ppImpact": "makes the power play better whenever he's on it",
     "shThreat": "stays dangerous even while killing penalties",
     "hits": "plays a heavy, physical game",
     "blocks": "throws himself in front of shots",
@@ -373,6 +375,8 @@ def _skills(p: dict) -> list[str]:
         e = (p.get("traits", {}).get(k) or {}).get("blend")
         if e and e.get("ok") and e["pct"] >= 85 and e.get("lo", 0) >= 60:
             found.append((k, e["pct"]))
+    if any(k == "ppImpact" for k, _ in found):  # one power-play line is enough
+        found = [kv for kv in found if kv[0] != "powerPlay"]
     found.sort(key=lambda kv: -kv[1])
     return [SKILL[k] for k, _ in found[:2]]
 
@@ -456,7 +460,9 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
 
     # 1. Hook.
     run = f", with goals in {_num(gn)} straight" if gn >= 3 else f", with a point in {_num(pn)} straight" if pn >= 4 else ""
-    if new:
+    if p.get("unplayed"):  # with the club but not dressed yet: never say why (the page's status tag does, when NHL.com has)
+        out.append(_pick([f"{last} hasn't played for {_for(team)} yet this season.", f"{last} has yet to play a game this season."], *key, "out"))
+    elif new:
         were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop in {new['place']}"
         if hot:
             out.append(f"{last} has wasted no time {_in(team)}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
@@ -503,7 +509,7 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
             out.append(f"He had {lp} points last season.")
 
     stories = []
-    if career and next_game:
+    if career and next_game and not p.get("unplayed"):  # next-game storylines assume he plays
         p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
         stories = opponent_notes(p, games, stints, next_game["opp"], teams, next_game["date"] == today)
         stories += reunions(stints, games, opp_players or [])
@@ -665,7 +671,7 @@ def run(today: str | None = None) -> dict:
             continue
         n = nxt.get(p["team"])
         player_out[pid] = player_intro(p, careers.get(pid), teams, n, today, by_team.get(n["opp"], []) if n else [])
-        if n:
+        if n and not p.get("unplayed"):
             player_out[pid]["game"] = n
     curly = lambda xs: [x.replace("'", "’") for x in xs]
     for v in team_out.values():

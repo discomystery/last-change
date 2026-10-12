@@ -1,5 +1,7 @@
 ---
 // The matchup drawn as a rink seen from above: visitors on the left, home team on the right.
+// With the site's motion on, it drops the puck once when it comes into view (script in Base.astro): the boards trace round, the lines paint in from centre ice,
+// the centre circle draws itself, the teams skate in from their own ends, and a final score ticks up.
 // Real pages pass `sides`; the mock recap still falls back to the mock teams.
 import { order, home, teams, type Abbr } from '../data/mock';
 type Side = { abbr: string; cls: string; full: string; rec?: string; score?: number; home: boolean; href?: string };
@@ -9,12 +11,13 @@ const rec = (a: Abbr) => `${teams[a].record.w}-${teams[a].record.l}-${teams[a].r
 const list: Side[] = sides ?? order.map((a) => ({ abbr: a, cls: `t-${a}`, full: `${teams[a].place} ${teams[a].name}`, rec: rec(a), score: score?.[a], home: a === home }));
 const scored = list.some((s) => s.score !== undefined);
 ---
-<div class="rink">
+<div class="rink" data-drop>
+  <svg class="rk-boards" aria-hidden="true"><rect pathLength="100" /></svg>
   <span class="rl goal l"></span><span class="rl blue l"></span><span class="rl red"></span><span class="rl blue r"></span><span class="rl goal r"></span>
   <span class="dot-circle"><span>{centre}</span></span>
   {list.map((s) => (
     <div class:list={['side', s.cls, s.home ? 'is-home' : 'is-away']}>
-      <p class="abbr">{s.href ? <a class="rlink" href={s.href}>{s.abbr}</a> : s.abbr}{s.score !== undefined && <span class="score">{s.score}</span>}</p>
+      <p class="abbr">{s.href ? <a class="rlink" href={s.href}>{s.abbr}</a> : s.abbr}{s.score !== undefined && <span class="score" data-to={s.score}>{s.score}</span>}</p>
       <p class="fullname">{s.href ? <a class="rlink" href={s.href}>{s.full}</a> : s.full}</p>
       {!scored && s.rec && <p class="rec">{s.rec}</p>}
       {s.home && !scored && <p class="lc"><span class="term" tabindex="0" data-tip="The home coach sends his players out second after every whistle, so he picks the matchups.">Has last change</span></p>}
@@ -31,6 +34,16 @@ const scored = list.some((s) => s.score !== undefined);
   .rl.goal { width: 1px; background: var(--line-red); }
   .rl.goal.l { left: 5.5%; } .rl.goal.r { right: 5.5%; }
   .dot-circle { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 2px solid var(--line-blue); background: var(--sheet); display: grid; place-items: center; font: italic 500 22px/1 var(--body); color: var(--ink-2); }
+  /* The ring is its own layer so it can draw itself while the disc already covers the red line. */
+  .dot-circle::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--line-blue); }
+  .dot-circle { border-color: transparent; }
+  /* The boards, drawn by the script below once it knows the rink's size; until then the plain border shows. */
+  .rk-boards { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .rk-boards rect { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .rk-boards :global(.rk-crease) { fill: var(--line-blue); fill-opacity: 0.45; stroke: var(--line-red); stroke-width: 1; }
+  .run .rk-boards :global(.rk-crease) { animation: rk-fade 0.5s ease 0.6s backwards; }
+  .rink.boards { border-color: transparent; background-clip: padding-box; }
+  .rink.boards .rk-boards { display: block; }
   .side { position: relative; padding: 28px clamp(20px, 7vw, 76px); display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
   .side.is-home { text-align: right; align-items: flex-end; }
   .abbr { font: 700 clamp(42px, 12.5vw, 108px) / 0.9 var(--ui); letter-spacing: -0.035em; color: var(--team); display: flex; align-items: baseline; gap: 0.25em; }
@@ -46,4 +59,29 @@ const scored = list.some((s) => s.score !== undefined);
   .fullname { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
   .rec { color: var(--ink-2); font: 400 14px var(--ui); }
   .lc { font: 600 13px var(--ui); margin-top: 4px; }
+
+  /* Dropping the puck (html.motion only, so reduced motion and automated browsers see the rink as it is).
+     Until the rink is on screen its moving parts wait out of sight; `.run` plays them once. */
+  :global(html.motion) .rink:not(.run) :is(.rl, .dot-circle, .abbr, .fullname, .rec, .lc, .rk-boards) { opacity: 0; }
+  .run .rk-boards rect { stroke-dasharray: 100; animation: rk-trace 1.1s cubic-bezier(0.5, 0, 0.3, 1) backwards; }
+  @keyframes rk-trace { from { stroke-dashoffset: 100; } }
+  .run .rl { animation: rk-line 0.6s cubic-bezier(0.3, 0.8, 0.25, 1) 0.15s backwards; }
+  .run .rl.blue { animation-delay: 0.25s; }
+  .run .rl.goal { animation-delay: 0.35s; }
+  .run .dot-circle { animation: rk-fade 0.3s ease 0.1s backwards; }
+  .run .dot-circle::before { animation: rk-draw 0.8s ease-out 0.3s backwards; }
+  .run .dot-circle > span { animation: rk-fade 0.5s ease 0.6s backwards; }
+  .run .is-away .abbr { animation: rk-in-l 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
+  .run .is-home .abbr { animation: rk-in-r 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
+  .run :is(.fullname, .rec, .lc) { animation: rk-fade 0.6s ease 0.8s backwards; }
+  @property --rk-arc { syntax: '<angle>'; inherits: false; initial-value: 360deg; }
+  @keyframes rk-line { from { transform: scaleY(0); } }
+  @keyframes rk-draw { from { --rk-arc: 0deg; } }
+  .run .dot-circle::before { -webkit-mask: conic-gradient(#000 var(--rk-arc), transparent 0); mask: conic-gradient(#000 var(--rk-arc), transparent 0); }
+  @keyframes rk-fade { from { opacity: 0; } }
+  @keyframes rk-in-l { from { opacity: 0; transform: translateX(-46px); } }
+  @keyframes rk-in-r { from { opacity: 0; transform: translateX(46px); } }
 </style>
+
+<!-- The boards, creases and the puck drop are run by the rink script in Base.astro, which also serves the next-game
+     rinks that home and team pages build in the browser. -->

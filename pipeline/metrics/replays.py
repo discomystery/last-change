@@ -32,6 +32,13 @@ from pipeline.config import TABLES
 from pipeline.metrics import adjust
 
 UNBLOCKED = ("shot-on-goal", "missed-shot", "goal")
+# Read honestly (2026-10-11, thread "Model improvements"): the post-game page shows how often teams with chances like
+# these actually win, not the raw replay share. One number fitted on 2023-24 to 2025-26 (both teams of every game):
+# chance = 1 / (1 + ((1 - share) / share) ** CAL_SLOPE). Fitted on two seasons and tested on the third, the slope was
+# 0.47 / 0.46 / 0.52 and log loss improved every season (0.687 -> 0.667, 0.683 -> 0.668, 0.706 -> 0.678; 2026-27 so
+# far 0.648 -> 0.643). Pooled, teams given 60-70% won 65% (said 64%), 70-80% won 70% (said 73%); raw replay shares of
+# 80%+ had won 67-73%. A raw 85% reads 70%, 70% reads 60%.
+CAL_SLOPE = 0.484
 REBOUND_GAP = 3  # seconds; the same rebound rule team_game uses
 
 
@@ -88,6 +95,12 @@ def chances(s: pl.DataFrame, collapse_flurries: bool = True) -> pl.DataFrame:
     if not collapse_flurries:
         return s.select("game_id", "is_home", pl.col("xg").alias("p"))
     return s.group_by("game_id", "flurry", "is_home").agg((1 - (1 - pl.col("xg")).product()).alias("p"))
+
+
+def calibrated(share: float) -> float:
+    """How often a team with this replay share actually wins (see CAL_SLOPE)."""
+    s = min(max(share, 1e-4), 1 - 1e-4)
+    return 1 / (1 + ((1 - s) / s) ** CAL_SLOPE)
 
 
 def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool = True, adjust_score: bool = False) -> pl.DataFrame:

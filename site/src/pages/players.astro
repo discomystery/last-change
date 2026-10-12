@@ -5,14 +5,14 @@ import teams from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
 import Portrait from '../components/Portrait.astro';
 
-type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
+type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null; unplayed?: boolean };
 const players = [...(index as P[])].sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
 const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 const base = import.meta.env.BASE_URL;
 ---
-<Base section="players" title="Players" mock={false} description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
+<Base section="players" title="Players" description="Every NHL player who has played this season: role, strengths and weak spots, shots and skating.">
   <header class="page-top"><h1>Players</h1></header>
-  <p class="lede">Everyone who has dressed this season. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
+  <p class="lede">Everyone on an NHL club, including players who are hurt or haven’t played yet this season. Each page shows his role, what he does better or worse than others at his position, his shots and his skating.</p>
   <nav class="ptabs" aria-label="Players"><a class="ptab" href={`${base}players/`} aria-current="page">Find a player</a><a class="ptab" href={`${base}players/rankings/`}>Rankings</a></nav>
   <div class="find">
     <label class="search">
@@ -37,7 +37,7 @@ const base = import.meta.env.BASE_URL;
     {players.map((p) => (
       <li class="card row prow go" data-name={`${p.name} ${p.number ?? ''}`.toLowerCase()} data-team={p.team} data-pos={p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F'}>
         <a class="pname go-link" href={`${base}player/${p.id}/`}>{p.name}</a>
-        <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a></span>
+        <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a>{p.unplayed && ' · Hasn’t played this season'}</span>
         <Portrait id={p.id} size={72} class="prow-photo" />
       </li>
     ))}

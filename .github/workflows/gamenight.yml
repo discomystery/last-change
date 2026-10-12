@@ -1,0 +1,36 @@
+# Game-night watcher: follows tonight's games and starts quick runs of the nightly update before puck drop (lineups,
+# starters, injury news) and after each final (its post-game page within minutes), then one full update once the
+# night is done. See pipeline/watch_games.py. GitHub stops a job after 6 hours, so three shifts cover the day; each
+# waits in this queue for the one before to finish. A day without games ends in seconds.
+name: Game-night watcher
+
+on:
+  schedule:
+    - cron: "30 15 * * *"  # 15:30 UTC: afternoon games
+    - cron: "0 21 * * *"   # 21:00 UTC: the evening slate
+    - cron: "30 2 * * *"   # 02:30 UTC: West Coast games
+  workflow_dispatch: {}
+
+permissions:
+  actions: write  # to start the nightly workflow
+  contents: read
+
+concurrency:
+  group: gamenight
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: pipeline/watch_games.py
+          sparse-checkout-cone-mode: false
+
+      - name: Follow tonight's games
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 pipeline/watch_games.py

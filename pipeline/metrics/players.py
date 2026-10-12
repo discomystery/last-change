@@ -145,7 +145,9 @@ def _pct(v: float, pool: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * p, 1, 99))
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dict:
+    """Ratings for everyone who has dressed this season. `idle` (player id -> current team id) adds players a club
+    holds who have not dressed yet (injured, in the minors): rated from last season alone, with no games this season."""
     from pipeline.metrics import rapm
 
     stab = stabilization()
@@ -174,13 +176,18 @@ def run(season: int = CURRENT_SEASON) -> dict:
         return (n * v + k * prior) / (n + k)
 
     team_now, team_last = _teams(now_pg, latest=True), _teams(last_pg)
+    empty = np.zeros((0, len(COLS)))
+    for pid, tid in (idle or {}).items():
+        if pid not in now and pid in last:
+            now[pid] = empty
+            team_now[pid] = tid
     players = {}
     for pid, m in now.items():
         g, sb = grp[pid], sub[pid]
         prev = last.get(pid)
         moved = prev is not None and team_last.get(pid) != team_now.get(pid)
         s_now, s_prev = m.sum(axis=0), None if prev is None else prev.sum(axis=0)
-        boot_now = rng.multinomial(len(m), np.full(len(m), 1 / len(m)), size=BOOTSTRAPS) @ m
+        boot_now = rng.multinomial(len(m), np.full(len(m), 1 / len(m)), size=BOOTSTRAPS) @ m if len(m) else np.zeros((BOOTSTRAPS, len(COLS)))
         boot_prev = None if prev is None else rng.multinomial(len(prev), np.full(len(prev), 1 / len(prev)), size=BOOTSTRAPS) @ prev
         p = {"group": g, "sub": sb, "moved_from": team_last.get(pid) if moved else None, "games": len(m), "games_last": 0 if prev is None else len(prev), "sums": {"season": s_now, "last": s_prev}, "est": {}, "boot": {}}
         for mode in ("blend", "season"):
@@ -226,7 +233,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                     out[pid]["traits"].setdefault(t, {})[mode] = rec
 
     # Isolated 5-on-5 impact (offense and defense) and the competition each player faces, from rapm.py.
-    fits = {"blend": rapm.run([season - 1, season], RAPM_LAMBDA), "season": rapm.run([season], RAPM_LAMBDA)}
+    fits = {"blend": rapm.chained(season), "season": rapm.run([season], RAPM_LAMBDA)}
     ratings = fits["blend"]
     comp = {"blend": rapm.competition([season - 1, season], ratings), "season": rapm.competition([season], ratings)}
     for mode, fit_ in fits.items():
@@ -241,6 +248,23 @@ def run(season: int = CURRENT_SEASON) -> dict:
                     a, b = sorted((_pct(v - Z80 * sd, pool, True), _pct(v + Z80 * sd, pool, True)))
                     out[pid]["traits"].setdefault(key, {})[mode] = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": regular(players[pid], mode),
                                                                      "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
+        # Power-play impact: the same idea on 5-on-4 play (rapm.power_play), for players with real power-play time.
+        pp = rapm.power_play(list(range(rapm.FIRST_SEASON, season + 1)) if mode == "blend" else [season], fit_)
+        est_pp = {r["player_id"]: r for r in pp.iter_rows(named=True)}
+        if mode == "blend":
+            ref_pp = {pid: r["pp"] for pid, r in est_pp.items()}
+        min_w = TRAITS["powerPlay"][3]
+        for g in ("F", "D"):
+            members = [pid for pid, p in players.items() if p["group"] == g and pid in est_pp]
+            pool = np.array([ref_pp[pid] for pid in members if pid in ref_pp and regular(players[pid], "blend") and float(both(players[pid], "blend")[C["sec_pp"]]) >= min_w["blend"]])
+            if not len(pool):
+                continue
+            for pid in members:
+                v, sd = est_pp[pid]["pp"], est_pp[pid]["pp_sd"]
+                a, b = sorted((_pct(v - Z80 * sd, pool, True), _pct(v + Z80 * sd, pool, True)))
+                ok = regular(players[pid], mode) and float(both(players[pid], mode)[C["sec_pp"]]) >= min_w[mode]
+                out[pid]["traits"].setdefault("ppImpact", {})[mode] = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": ok,
+                                                                       "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
         c = comp[mode]
         for g in ("F", "D"):
             members = [pid for pid, p in players.items() if p["group"] == g and pid in c]

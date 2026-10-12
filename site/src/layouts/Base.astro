@@ -2,8 +2,8 @@
 import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
-interface Props { title: string; description?: string; mock?: boolean | 'mixed'; section?: Section }
-const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', mock = true, section } = Astro.props;
+interface Props { title: string; description?: string; section?: Section }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
 // Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
@@ -38,15 +38,6 @@ const teamList = teams as { abbr: string; name: string }[];
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..800,100&family=Hanken+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Young+Serif&display=swap" rel="stylesheet" />
   </head>
   <body>
-    {mock === 'mixed' ? (
-      <div class="mockbar" role="note"><strong>Part real, part mock-up.</strong> Sections tagged “placeholder numbers” are invented; everything else is real.</div>
-    ) : mock ? (
-      <div class="mockbar" role="note">
-        <strong>Mock-up.</strong> Names, records, date and venue are real. Every statistic, line combination and insight is a placeholder.
-      </div>
-    ) : (
-      <div class="mockbar real" role="note"><strong>Real data.</strong> Everything on this page is computed from actual games.</div>
-    )}
     <header class="site-head">
       <div class="brand">
         <a class="wordmark" href={base}>Spare Line Change</a>
@@ -168,6 +159,21 @@ const teamList = teams as { abbr: string; name: string }[];
       })();
     </script>
     <script is:inline>
+      // Matchup strips: pointing at (or tapping) an opposing line's box lights that line up in every strip of the card.
+      (() => {
+        const light = (e) => {
+          const box = e.target.closest?.('.strip > span');
+          const card = e.target.closest?.('.stripcard');
+          if (!card) return;
+          if (box) card.dataset.hl = String([...box.parentElement.children].indexOf(box));
+          else delete card.dataset.hl;
+        };
+        document.addEventListener('pointerover', light);
+        document.addEventListener('focusin', light);
+        document.addEventListener('pointerout', (e) => { const card = e.target.closest?.('.stripcard'); if (card && !card.contains(e.relatedTarget)) delete card.dataset.hl; });
+      })();
+    </script>
+    <script is:inline>
       // Reveal cards, headings and charts as they scroll into view (see styles/motion.css). Cards a page script adds
       // later, like a day's games, are picked up too. Ones that arrive together come in one after another.
       (() => {
@@ -195,6 +201,77 @@ const teamList = teams as { abbr: string; name: string }[];
         scan(main);
         new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((node) => node.nodeType === 1 && scan(node)))).observe(main, { childList: true, subtree: true });
       })();
+    </script>
+    <script is:inline>
+      // Rink headers (Rink.astro on preview and post-game pages, and the next-game rinks home and team pages build in
+      // the browser): the boards and goal creases are drawn in an SVG fitted to each rink, so the creases stay round
+      // whatever the rink's shape. With the site's motion on, the puck drops once when a rink is half on screen: the
+      // boards trace round, the lines and centre circle draw themselves, the teams skate in and a final score counts up.
+      (() => {
+        const root = document.documentElement, NS = 'http://www.w3.org/2000/svg';
+        const add = (parent, tag, attrs) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, String(attrs[k])); parent.append(el); return el; };
+        const fit = (rink) => {
+          let svg = rink.querySelector(':scope > .rk-boards');
+          if (!svg) { svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rk-boards'); svg.setAttribute('aria-hidden', 'true'); add(svg, 'rect', { pathLength: 100 }); rink.prepend(svg); }
+          const r = svg.querySelector('rect'), w = rink.clientWidth, h = rink.clientHeight;
+          if (!w || (rink.dataset.fw === String(w) && rink.dataset.fh === String(h))) return;
+          rink.dataset.fw = String(w); rink.dataset.fh = String(h);
+          const rad = parseFloat(getComputedStyle(rink).borderTopLeftRadius) - 3;
+          Object.entries({ x: 1, y: 1, width: w - 2, height: h - 2, rx: Math.max(0, Math.min(rad, h / 2 - 1)) }).forEach(([k, v]) => r.setAttribute(k, String(v)));
+          svg.querySelector('.rk-marks')?.remove();
+          // A goal crease, a half circle 6 ft deep in front of each goal line (the rink is 85 ft wide).
+          const g = add(svg, 'g', { class: 'rk-marks' }), ft = h / 85;
+          for (const side of [0, 1]) {
+            const gx = side ? w * 0.945 : w * 0.055;
+            add(g, 'path', { class: 'rk-crease', d: `M${gx} ${h / 2 - 6 * ft} a${6 * ft} ${6 * ft} 0 0 ${side ? 0 : 1} 0 ${12 * ft}Z` });
+          }
+          rink.classList.add('boards');
+        };
+        const motion = root.classList.contains('motion') && 'IntersectionObserver' in window;
+        const io = motion && new IntersectionObserver((entries) => entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          io.unobserve(e.target);
+          e.target.querySelectorAll('.score[data-to]').forEach((s) => {
+            const to = +s.dataset.to;
+            s.textContent = '0';
+            for (let i = 1; i <= to; i++) setTimeout(() => { s.textContent = String(i); }, 700 + i * Math.min(140, 700 / to));
+          });
+          e.target.classList.add('run');
+        }), { threshold: 0.5 });
+        const ro = 'ResizeObserver' in window && new ResizeObserver((es) => es.forEach((e) => fit(e.target)));
+        const taken = new WeakSet();
+        const take = (rink) => { if (taken.has(rink)) return; taken.add(rink); fit(rink); ro && ro.observe(rink); io && io.observe(rink); };
+        const scan = (n) => { if (n.matches?.('[data-drop]')) take(n); n.querySelectorAll?.('[data-drop]').forEach(take); };
+        scan(document);
+        new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && scan(n)))).observe(document.body, { childList: true, subtree: true });
+      })();
+    </script>
+    <script is:inline>
+      // Season switch: on screen, the scales' dots glide to their new spots a card at a time, each leaving a fading
+      // ring where it was (styles/motion.css). Off screen they simply change.
+      document.addEventListener('prefs', (e) => {
+        const root = document.documentElement;
+        if (e.detail.key !== 'mode' || !root.classList.contains('motion')) return;
+        const vh = window.innerHeight;
+        const lanes = [...document.querySelectorAll('.lane')].filter((l) => {
+          if (!l.querySelector('.dot') || !l.offsetParent) return false;
+          const r = l.getBoundingClientRect();
+          return r.bottom > -40 && r.top < vh + 40;
+        }).slice(0, 240);
+        const groups = [...new Set(lanes.map((l) => l.closest('.card') || l.parentElement))];
+        lanes.forEach((l) => l.style.setProperty('--sd', Math.min(groups.indexOf(l.closest('.card') || l.parentElement), 12) * 45 + 'ms'));
+        lanes.forEach((l) => {
+          const dot = l.querySelector('.dot');
+          const g = document.createElement('i');
+          g.className = 'dot-ghost';
+          g.style.left = getComputedStyle(dot).left;
+          l.appendChild(g);
+          setTimeout(() => g.remove(), 2000);
+        });
+        root.classList.add('mode-switch');
+        clearTimeout(window.lcModeT);
+        window.lcModeT = setTimeout(() => root.classList.remove('mode-switch'), 700);
+      });
     </script>
   </body>
 </html>
@@ -245,7 +322,7 @@ const teamList = teams as { abbr: string; name: string }[];
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--ice); color: var(--ink); font: 400 17px/1.6 var(--body); font-variant-numeric: lining-nums tabular-nums; }
   h1, h2, h3, h4, .wordmark { font-variation-settings: 'SOFT' 100; }
-  .mockbar, .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
+  .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
   a { color: inherit; text-decoration: none; }
   /* Links never look like underlined web links. A link inside text is set a little bolder; under the
      pointer every text link (team names, crumbs) gets a soft rounded highlight instead of an underline. */
@@ -280,12 +357,6 @@ const teamList = teams as { abbr: string; name: string }[];
     :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%23e6edf3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   }
 
-  .mockbar {
-    position: sticky; top: 0; z-index: 20; padding: 8px 16px; font-size: 13px; line-height: 1.35; text-align: center;
-    color: var(--ink); border-bottom: 1px solid var(--rule);
-    background: repeating-linear-gradient(-45deg, var(--sheet) 0 10px, var(--track) 10px 20px);
-  }
-  .mockbar.real { background: var(--sheet); }
   .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
   .site-head { padding-block: 18px 6px; display: grid; gap: 14px; }
   .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
@@ -342,6 +413,36 @@ const teamList = teams as { abbr: string; name: string }[];
   .nrink .abbr.me { color: var(--ink); }
   .nrink .full { font-weight: 600; font-size: clamp(13px, 2.6vw, 17px); margin-top: 10px; line-height: 1.3; }
   .nrink .lc { font: 600 13px var(--ui); margin-top: 4px; color: var(--ink-2); }
+  .nrink .rl.goal { width: 1px; background: var(--line-red); }
+  .nrink .rl.goal.l { left: 5.5%; } .nrink .rl.goal.r { right: 5.5%; }
+  /* Boards and creases drawn by the rink script below; until then the plain border shows. Same look as Rink.astro. */
+  .nrink .rk-boards { display: none; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .nrink .rk-boards rect { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .nrink .rk-boards .rk-crease { fill: var(--line-blue); fill-opacity: 0.45; stroke: var(--line-red); stroke-width: 1; }
+  .nrink.boards { border-color: transparent; background-clip: padding-box; }
+  .nrink.boards .rk-boards { display: block; }
+  .nrink .circle { border-color: transparent; }
+  .nrink .circle::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--line-blue); }
+  /* The puck drop, as on game pages (html.motion only). */
+  html.motion .nrink:not(.run) :is(.rl, .circle, .abbr, .full, .lc, .rk-boards) { opacity: 0; }
+  .nrink.run .rk-boards rect { stroke-dasharray: 100; animation: nrk-trace 1.1s cubic-bezier(0.5, 0, 0.3, 1) backwards; }
+  .nrink.run .rk-crease { animation: nrk-fade 0.5s ease 0.6s backwards; }
+  .nrink.run .rl { animation: nrk-line 0.6s cubic-bezier(0.3, 0.8, 0.25, 1) 0.15s backwards; }
+  .nrink.run .rl.blue { animation-delay: 0.25s; }
+  .nrink.run .rl.goal { animation-delay: 0.35s; }
+  .nrink.run .circle { animation: nrk-fade 0.3s ease 0.1s backwards; }
+  .nrink.run .circle::before { -webkit-mask: conic-gradient(#000 var(--rk-arc), transparent 0); mask: conic-gradient(#000 var(--rk-arc), transparent 0); animation: nrk-draw 0.8s ease-out 0.3s backwards; }
+  .nrink.run .side:not(.home) .abbr { animation: nrk-in-l 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
+  .nrink.run .side.home .abbr { animation: nrk-in-r 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) 0.35s backwards; }
+  .nrink.run :is(.full, .lc) { animation: nrk-fade 0.6s ease 0.8s backwards; }
+  @property --rk-arc { syntax: '<angle>'; inherits: false; initial-value: 360deg; }
+  @keyframes nrk-trace { from { stroke-dashoffset: 100; } }
+  @keyframes nrk-line { from { transform: scaleY(0); } }
+  @keyframes nrk-draw { from { --rk-arc: 0deg; } }
+  @keyframes nrk-fade { from { opacity: 0; } }
+  @keyframes nrk-in-l { from { opacity: 0; transform: translateX(-46px); } }
+  @keyframes nrk-in-r { from { opacity: 0; transform: translateX(46px); } }
+  @media print { html.motion .nrink:not(.run) :is(.rl, .circle, .abbr, .full, .lc, .rk-boards) { opacity: 1; } }
   /* The one line of facts under a rink header (date, time, arena), the same on every page that has one. */
   .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
   /* Breadcrumb trail above a page title (game, team pages). */
@@ -381,6 +482,14 @@ const teamList = teams as { abbr: string; name: string }[];
 
   /* Sections */
   .sec { margin-top: 72px; scroll-margin-top: 96px; }
+  /* Placeholders shown while a page builds itself in the browser; the page's script replaces them. */
+  .skel { display: block; background: var(--track); border-radius: 14px; list-style: none; }
+  .skel-card { height: 112px; }
+  .skel-row { height: 58px; margin-bottom: 8px; }
+  .skel-day { width: 76px; height: 58px; border-radius: 12px; }
+  .skel-line { display: inline-block; width: 14ch; height: 0.8em; border-radius: 8px; }
+  html.motion .skel { background: linear-gradient(100deg, var(--track) 40%, color-mix(in oklab, var(--track) 55%, var(--sheet)) 50%, var(--track) 60%) 0 0 / 300% 100%; animation: skel-sheen 1.6s ease-in-out infinite; }
+  @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
   .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; }
   .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }

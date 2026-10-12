@@ -14,7 +14,7 @@ A skater's night is the sum of four parts, in goal-sized units:
                minus against, each judged against what a league-average unit creates and allows in the same time
                (so a shorthanded goal against costs the power-play unit that gave it up);
   usage        a small give-back for strong linemates and weak opponents (and credit for the reverse), from the
-               5-on-5 impact ratings of the two seasons before.
+               5-on-5 impact ratings as they stood at the end of last season.
 PLAY sets how much on-ice play counts against the scoresheet; the user chose "play-led" (2026-10-10), so it is the
 largest part, as on Dom Luszczyszyn's Game Score cards. A goalie's night is his goals saved above expected.
 
@@ -28,6 +28,7 @@ import polars as pl
 
 from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rapm
 from pipeline.metrics import units as U
@@ -76,11 +77,9 @@ def special_on_ice(season: int) -> pl.DataFrame:
     return pl.concat(parts).explode("player_id").drop_nulls("player_id").group_by("game_id", "player_id").agg(pl.all().sum())
 
 
-def _ratings(seasons: list[int]) -> dict[int, tuple[float, float]]:
-    seasons = [s for s in seasons if (TABLES / str(s) / "stints.parquet").exists()]
-    if not seasons:
-        return {}
-    r = rapm.run(seasons, P.RAPM_LAMBDA)
+def _ratings(through: int) -> dict[int, tuple[float, float]]:
+    """Impact ratings as they stood at the end of season `through` (rapm.chained, nothing of the season after)."""
+    r = rapm.chained(through)
     return {p: (o, d) for p, o, d in zip(r["player_id"].to_list(), r["off"].to_list(), r["def"].to_list())}
 
 
@@ -168,15 +167,18 @@ def league_rates(season: int) -> dict[str, float]:
             "pp_g": g["pp_gf"] / t["sec_pp"], "sh_g": g["pp_ga"] / t["sec_pp"]}
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
+    """Swing for every finished game, or only the games in `only` (the quick game-night pass). Games whose shift
+    chart the NHL is still filling in get none yet."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
     league = league_rates(season - 1)
-    now = table(season, _ratings([season - 2, season - 1]), league).filter(pl.col("game_id").is_in(list(info)))
-    ref = table(season - 1, _ratings([season - 3, season - 2]), league_rates(season - 2))
+    wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
+    now = table(season, _ratings(season - 1), league).filter(pl.col("game_id").is_in(list(wanted)))
+    ref = table(season - 1, _ratings(season - 2), league_rates(season - 2))
     pools = {g: np.sort(ref.filter(pl.col("grp") == g)["score"].to_numpy()) for g in ("F", "D", "G")}
     pct = lambda g, v: int(max(1, min(99, round(100 * np.searchsorted(pools[g], v, side="right") / len(pools[g]))))) if len(pools[g]) else None
 
@@ -194,7 +196,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         return out
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in OUT.glob("*.json"):
+    for old in OUT.glob("*.json") if only is None else ():
         old.unlink()
     for (gid,), rows in now.group_by("game_id"):
         g = info[gid]

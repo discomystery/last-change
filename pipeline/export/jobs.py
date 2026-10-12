@@ -7,7 +7,7 @@ cards on team pages:
   game as a centre);
 - better than most at: his own numbers (shot attempts, chances, hits, blocks, takeaways, faceoffs) at the 75th
   percentile or better among last season's regulars at his position, or driving / preventing chances at 5-on-5 at
-  the 75th percentile or better over the two previous seasons' isolated ratings (rapm.py).
+  the 75th percentile or better on the isolated ratings as they stood at the end of last season (rapm.chained).
 
 Each job is graded the way preview calls are: "held" means he reached a typical night for himself in the ice time he
 got, "partly" means he beat a benchmark (an average player at his position, the league, or his own team with him off
@@ -28,6 +28,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rink_bias
 
@@ -361,10 +362,10 @@ class Reference:
 
 
 def impact_pcts(season: int) -> dict[int, dict[str, float]]:
-    """Percentiles of each skater's isolated 5-on-5 offense and defense over the two seasons before this one."""
+    """Percentiles of each skater's isolated 5-on-5 offense and defense as they stood at the end of last season."""
     from pipeline.metrics import rapm
 
-    fit = rapm.run([season - 2, season - 1], P.RAPM_LAMBDA)
+    fit = rapm.chained(season - 1)  # everything up to the end of last season
     gp = pl.concat([P.load(s).select("player_id", "pos") for s in (season - 2, season - 1)])
     info = {r["player_id"]: (r["n"], P.GROUP[r["pos"]]) for r in gp.group_by("player_id").agg(pl.len().alias("n"), pl.col("pos").mode().first()).iter_rows(named=True)}
     out = {}
@@ -377,10 +378,14 @@ def impact_pcts(season: int) -> dict[int, dict[str, float]]:
     return out
 
 
-def run(season: int = CURRENT_SEASON) -> dict:
+def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
+    """Report cards for every finished game, or only for the games in `only` (the quick game-night pass: cards are
+    judged from earlier games alone, so one game's cards come out the same either way). Games whose shift chart the
+    NHL is still filling in get no cards yet."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
+    wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
@@ -417,6 +422,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             while j > 0 and ex[j - 1]["date"] == e["date"]:  # only games on earlier days count as "before"
                 j -= 1
             before_sp = {c: prev_sp[c] + cum_sp[j][k] for k, c in enumerate(special_cols)}
+            if e["game_id"] not in wanted:
+                continue
             card = player_card(e, grp.get(pid, P.GROUP.get(e["pos"], "F")), sub.get(pid, P.SUB.get(e["pos"], "W")), prev, cum[j], m[i], n_prev + j, before_sp,
                                ref, impact.get(pid, {}), fac, hr, league, typical)
             if card:
@@ -429,11 +436,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
                 card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)
 
-    for gid, card in goalie_cards(season, set(info)):
+    for gid, card in goalie_cards(season, wanted):
         cards[gid].append(card)
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in OUT.glob("*.json"):
+    for old in OUT.glob("*.json") if only is None else ():
         old.unlink()
     for gid, cs in cards.items():
         g = info[gid]
@@ -542,7 +549,7 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
                 outs.append({"key": t, "label": LABEL[t], "p": round(p, 4),
                              "text": f"{n} {one if n == 1 else many}{where} in {clock(time_)}, when his usual pace would give about {exp_u * mult:.1f}{' in this arena' if t in RAW_COL else ''}."})
 
-    # Driving and preventing chances at 5-on-5, for players rated for it over the two previous seasons.
+    # Driving and preventing chances at 5-on-5, for players rated for it going into this season.
     for key, col, team_col, higher in (("offImpact", "on_xgf_adj", "t_xgf_adj", True), ("defImpact", "on_xga_adj", "t_xga_adj", False)):
         pct = imp.get(key)
         if pct is None or pct < STRONG:

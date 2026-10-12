@@ -810,6 +810,8 @@ def run_recaps(season: int = CURRENT_SEASON) -> int:
     n = 0
     for p in sorted((SITE_DATA / "recaps").glob("2*.json")):
         r = json.loads(p.read_text())
+        if r.get("pending"):  # the story leans on Swing and the graded calls: written once the shift chart is in
+            continue
         try:
             story = recap_story(r, places, season)
         except Exception as e:  # a story is a nice-to-have: never lose the page over it

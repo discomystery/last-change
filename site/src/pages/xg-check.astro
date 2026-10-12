@@ -5,7 +5,7 @@ import data from '../../public/data/xg_check.json';
 const day = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
 const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%`);
 ---
-<Base title="Expected goals check" mock={false}>
+<Base title="Expected goals check">
   <h1 class="page-top">How dangerous was that chance?</h1>
   <p class="lede">Our own expected-goals model rates every shot by how often shots like it go in. Here is every goal and the eight best chances that didn’t go in, from each team’s most recent game. Pick a game you watched and see whether the ratings match your memory. MoneyPuck.com’s rating of the same shot is shown beside ours for comparison; nothing else on the site uses it.</p>
   <div class="pick"><span>Show</span>

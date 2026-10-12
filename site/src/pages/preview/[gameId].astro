@@ -149,7 +149,7 @@ const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{displ
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
 const _ = ordinal;
 ---
-<Base section="games" title={`${away} at ${home} preview`} mock={false}>
+<Base section="games" title={`${away} at ${home} preview`}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
@@ -372,7 +372,7 @@ const _ = ordinal;
                 <div class="ghead">
                   <div class="ghead-text">
                     <p class="gname"><i></i><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots, {words}</span></p>
-                    <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                    <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                   </div>
                   <Portrait id={g.id} size={96} class="g-photo" />
                 </div>

@@ -16,6 +16,10 @@ ATTEMPTS = UNBLOCKED | {"blocked-shot"}
 TURNOVER_WINDOW = 5  # seconds from a turnover to a shot for it to count as off-turnover
 POINT_DISTANCE = 50  # feet; only for the retired "point" trait, kept so calls frozen under it still grade
 CLOSE_DISTANCE = 20  # feet from the middle of the goal line: "in close"
+# A shot against counts as "on a long shift" when the defending skaters average 45 s or more into their shifts
+# (about the top fifth of shots). How often a team is caught there repeats strongly half to half (r 0.76-0.82,
+# 2023-26); how much worse its chances against get there does not (r -0.33 to 0.25), so only the first is a trait.
+LONG_SHIFT = 45
 BREAKDOWN_XG = 0.15  # an off-turnover shot at least this dangerous counts as a breakdown chance
 FACEOFF_WINDOW = 5  # seconds from an offensive-zone faceoff win to a goal for it to count as off the draw
 # A shot that hits the shooter's own teammate is filed as a blocked shot with this reason and the teammate as the
@@ -37,7 +41,8 @@ def build(season: int) -> dict:
     # within 3 seconds of a teammate's shot on goal.
     own = pl.read_parquet(d / "shots_xg_own.parquet").rename({"xg": "xGoal"})
     feats = pl.read_parquet(d / "shot_features.parquet").select(
-        "game_id", "event_id", ((pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3)).alias("shotRebound"))
+        "game_id", "event_id", ((pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3)).alias("shotRebound"),
+        (pl.col("def_shift_avg") >= LONG_SHIFT).alias("long_shift"))
     events = pl.read_parquet(d / "events.parquet").join(own, on=["game_id", "event_id"], how="left").join(feats, on=["game_id", "event_id"], how="left").sort("game_id", "sort")
     stints = pl.read_parquet(d / "stints.parquet")
 
@@ -113,6 +118,8 @@ def build(season: int) -> dict:
                     bump(side, "f" + sfx)
                     if close:
                         bump(side, "close_f" + sfx)
+                    if sfx == "a" and e["long_shift"]:
+                        bump(side, "long_fa")  # the defending team's skaters were 45 s or more into their shift
                     bump(side, "xg" + sfx, xg)
                     if e["shotRebound"]:
                         bump(side, "reb_xg" + sfx, xg)
@@ -150,7 +157,7 @@ def build(season: int) -> dict:
                 bump(home, "oz_takes")
 
     cols = ["sec", "cf", "ca", "ff", "fa", "sf", "sa", "gf", "ga", "xgf", "xga", "reb_xgf", "reb_xga",
-            "to_xgf", "to_xga", "point_cf", "point_ca", "d_cf", "d_ca", "close_ff", "close_fa", "hits", "gives", "takes", "blocks", "bd_f", "bd_a", "oz_hits", "oz_takes", "forced_gives"]
+            "to_xgf", "to_xga", "point_cf", "point_ca", "d_cf", "d_ca", "close_ff", "close_fa", "long_fa", "hits", "gives", "takes", "blocks", "bd_f", "bd_a", "oz_hits", "oz_takes", "forced_gives"]
     table = pl.DataFrame(
         [{"game_id": k[0], "team_id": k[1], "is_home": k[2], "strength": k[3], "score_state": k[4], **{c: float(v.get(c, 0.0)) for c in cols}} for k, v in rows.items()]
     )

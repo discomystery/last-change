@@ -1,15 +1,19 @@
 """Command line entry point: python -m pipeline.run <step> [options]."""
 import argparse
 import json
+import os
+import subprocess
+from datetime import datetime, timedelta, timezone
 
-from pipeline.config import CURRENT_SEASON, FULL_SEASONS, TABLES
+from pipeline.config import CURRENT_SEASON, FINAL_STATES, FULL_SEASONS, RAW, SITE_DATA, TABLES
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update", "replays", "publish"])
+    p.add_argument("step", choices=["ingest", "build", "validate", "export", "update", "replays", "publish", "quick", "mode"])
     p.add_argument("--season", type=int, default=CURRENT_SEASON)
     p.add_argument("--limit", type=int)
+    p.add_argument("--requested", default="full", help="mode: what the workflow was asked for (full or quick)")
     a = p.parse_args()
     if a.step == "ingest":
         from pipeline.ingest import nhl
@@ -30,6 +34,10 @@ def main() -> None:
         print(json.dumps(update(a.season)))
     elif a.step == "publish":
         print(json.dumps(publish(a.season)))
+    elif a.step == "quick":
+        print(json.dumps(quick(a.season)))
+    elif a.step == "mode":
+        print(mode(a.requested))
 
 
 def update(season: int) -> dict:
@@ -63,13 +71,108 @@ def update(season: int) -> dict:
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
+    from pipeline.metrics import drift, rapm
+    rec = drift.check(season)  # has the league changed how it records plays? the workflow opens an issue if so
+    drift.save(rec)
+    out["recording_check"] = rec["status"]
+    out["rapm_cache_pruned"] = rapm.prune_cache()
+    _save_state(season)
+    return out
+
+
+# Game-night fast lane (user decision 2026-10-11, thread "Why the site rebuilds"). A watcher workflow follows each
+# night's games and asks for quick runs: before puck drop to pick up scratches, NHL.com's projected starters and the
+# league's injury news for tonight's previews, and after each final to put its post-game page up within minutes. The
+# full update (every rating, team and player page) still runs on its schedule, after merges, and once the night's last
+# game is done. All runs share one queue, where a newer waiting run replaces an older one, so a quick request turns
+# itself into a full update whenever one is owed (see `mode`): a merge or a scheduled update is never lost.
+
+STATE = RAW / "run_state.json"  # when the last full update ran and on which commit; saved on the data branch
+FULL_SLOTS = ((10, 0), (16, 0), (20, 30))  # the nightly workflow's scheduled full updates, UTC
+
+
+def _commit() -> str | None:
+    sha = os.environ.get("GITHUB_SHA")
+    if sha:
+        return sha
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip() or None
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _save_state(season: int) -> None:
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps({"full_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "full_sha": _commit(), "season": season}))
+
+
+def mode(requested: str, now: datetime | None = None) -> str:
+    """"quick" only when a quick run was asked for and no full update is owed: the code hasn't changed since the last
+    full update and no scheduled full update has come due since it ran."""
+    if requested != "quick" or not STATE.exists():
+        return "full"
+    state = json.loads(STATE.read_text())
+    sha = _commit()
+    if sha and state.get("full_sha") != sha:
+        return "full"
+    now = now or datetime.now(timezone.utc)
+    slots = [datetime(d.year, d.month, d.day, h, m, tzinfo=timezone.utc) for d in (now - timedelta(days=1), now) for h, m in FULL_SLOTS]
+    due = max(t for t in slots if t <= now)
+    return "full" if datetime.fromisoformat(state["full_at"]) < due else "quick"
+
+
+def quick(season: int = CURRENT_SEASON) -> dict:
+    """The game-night pass: only what tonight's previews and just-finished games need, in a minute or two. Fetches new
+    finals (and shift charts the NHL was still filling in), rebuilds the game tables, refreshes rosters, scratches,
+    injury news and projected starters, rewrites previews for games starting in the next 18 hours, and writes post-game
+    pages, report cards and Swing for finished games that don't have them yet. Ratings, team and player pages wait for
+    the next full update."""
+    from pipeline.build import games, shot_features
+    from pipeline.export import flow, game_scores, jobs, pending, previews, recaps, roster, site_json, stories, track
+    from pipeline.ingest import game_rosters, nhl, nhl_previews, rosters, status_report, transactions
+    from pipeline.metrics import availability, player_game, team_game, units, xg_model
+    import polars as pl
+
+    out = {"ingest": nhl.ingest_season(season, refresh_schedule=True)}
+    out["build"] = games.build_season(season)
+    shot_features.build(season)
+    out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
+    team_game.build(season)
+    units.game_units(season)
+    player_game.build(season)
+    out["rosters"] = rosters.snapshot(season)
+    out["game_rosters"] = game_rosters.update(season)  # tonight's scratches, posted before puck drop
+    try:  # only today's injury news: earlier days were read by the full update
+        status_report.fetch(season, status_report.today())
+    except Exception as e:
+        print(f"status report unavailable: {e!r}")
+    status_report.build(season)
+    out["transactions"] = transactions.update(season)  # today's roster moves (keeps the saved copy if unreachable)
+    out["availability"] = availability.build(season)
+    out["nhl_previews"] = nhl_previews.update(season)
+    out["teams_and_schedule"] = site_json.export_teams_and_schedule(season)  # standings, and which games are final
+    roster.run(season)
+    out["previews"] = previews.run(within=timedelta(hours=18))
+    pending.games.cache_clear()
+    since = (datetime.now(timezone.utc).date() - timedelta(days=pending.DAYS)).isoformat()
+    built = pl.read_parquet(TABLES / str(season) / "games.parquet").filter(pl.col("state").is_in(list(FINAL_STATES)) & (pl.col("date") >= since))
+    recent = set(built["game_id"].to_list())
+    todo = {g for g in recent - pending.games(season)
+            if not (SITE_DATA / "jobs" / f"{g}.json").exists() or not (SITE_DATA / "scores" / f"{g}.json").exists()}
+    out["recaps"] = recaps.run(season)
+    out["jobs"] = jobs.run(season, only=todo)
+    out["scores"] = game_scores.run(season, only=todo)
+    out["flow"] = flow.run(season)
+    out["stories"] = stories.run_recaps(season)
+    track.run(season)
+    out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
 
 
 def availability_update(season: int) -> dict:
     """Game-day rosters and scratches, NHL.com injury news, then who was available to each club each day. Last
     season's game rosters and reports are filled in once, so absences can be studied over a full season."""
-    from pipeline.ingest import game_rosters, status_report
+    from pipeline.ingest import game_rosters, status_report, transactions
     from pipeline.metrics import availability
 
     out = {}
@@ -78,6 +181,7 @@ def availability_update(season: int) -> dict:
             out[f"game_rosters_{s}"] = game_rosters.update(s)
         if s == season or not status_report.path(s).exists():
             out[f"status_{s}"] = status_report.update(s)
+    out["transactions"] = transactions.update(season)  # injured reserve, minors, suspensions: all 32 clubs
     out["table"] = availability.build(season)
     return out
 
@@ -150,9 +254,10 @@ def publish(season: int) -> dict:
     units.depth_table(season)
     player_game.build(season)
     if season == CURRENT_SEASON:
-        from pipeline.ingest import status_report
+        from pipeline.ingest import status_report, transactions
         from pipeline.metrics import availability
         status_report.build(season)  # re-read the saved reports with the current rules
+        transactions.build(season)  # and the saved roster moves
         out["availability"] = availability.build(season)
     out["export"] = site_json.run(season)
     return out

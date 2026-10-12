@@ -14,6 +14,11 @@ UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 TIERS = (("low", 0.0, 0.05), ("medium", 0.05, 0.15), ("high", 0.15, 9.9))
 LONG_WAIT = 180
 MIN_STARTS = {"blend": 10, "season": 2}
+# Goals saved above expected are mostly bounces over a few weeks, so the rating behind the "gsax" percentile is pulled
+# toward league average (zero) by this many unblocked shots, about a season and a half for a starter. Picked
+# 2026-10-11 by predicting the rest of each 2023-24 to 2025-26 season from a goalie's first 5 / 10 / 20 starts (and
+# odd games from even): error per shot after 10 starts 1.65 raw, 0.67 at 1,000, 0.62 at 3,000, flat beyond.
+SHRINK_SHOTS = 3000
 
 
 def shots(season: int) -> pl.DataFrame:
@@ -59,6 +64,7 @@ def summarise(games: pl.DataFrame, league_sv: dict[int, float]) -> dict:
         bins[int(min(5, max(0, np.floor(v) + 3)))] += 1
     hours = sec / 3600 if sec else None
     out = {"starts": starts.height, "games": g.height, "shots": int(sa), "goals": int(ga), "gsax": round(xga - ga, 1), "gsax60": round((xga - ga) / hours, 3) if hours else None,
+           "gsax_est60": round((xga - ga) / hours * fa / (fa + SHRINK_SHOTS), 3) if hours else None,
            "xga60": round(xga / hours, 3) if hours else None, "sv": round((sa - ga) / sa, 3) if sa else None, "sa60": round(sa / hours, 1) if hours else None,
            "danger": round(xga / fa, 4) if fa else None, "bd60": round(float(g["bd"].sum()) / hours, 2) if hours else None,
            "gap": round(float(np.median(all_gaps))) if len(all_gaps) else None, "long_wait": round(100 * float((all_gaps > LONG_WAIT).mean())) if len(all_gaps) else None,
@@ -70,7 +76,7 @@ def summarise(games: pl.DataFrame, league_sv: dict[int, float]) -> dict:
     return out
 
 
-TRAITS = {"gsax": ("gsax60", True), "busy": ("sa60", True), "danger": ("danger", True), "breakdowns": ("bd60", True), "gaps": ("gap", True), "steady": ("qs", True)}
+TRAITS = {"gsax": ("gsax_est60", True), "busy": ("sa60", True), "danger": ("danger", True), "breakdowns": ("bd60", True), "gaps": ("gap", True), "steady": ("qs", True)}
 
 
 def run(season: int) -> dict:
@@ -100,4 +106,6 @@ def run(season: int) -> dict:
     use = current.group_by("team_id", "goalie_id").agg(pl.col("sec").sum(), pl.col("started").sum().alias("starts"), pl.col("date").max()).sort("sec", descending=True)
     for r in use.iter_rows(named=True):
         by_team[r["team_id"]].append(r["goalie_id"])
-    return {"goalies": {gid: m for gid, m in goalies.items() if "season" in m}, "league": league, "by_team": dict(by_team), "league_sv": league_sv, "min_starts": MIN_STARTS}
+    # Goalies who played last season but not yet this one (injured, in the minors), for their player pages.
+    idle = {gid: m for gid, m in goalies.items() if "season" not in m}
+    return {"goalies": {gid: m for gid, m in goalies.items() if "season" in m}, "idle": idle, "league": league, "by_team": dict(by_team), "league_sv": league_sv, "min_starts": MIN_STARTS}

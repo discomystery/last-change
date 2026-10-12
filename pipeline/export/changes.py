@@ -153,6 +153,8 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
     today_rows = av.filter(pl.col("date") == av["date"].max())
     ids = _team_ids(season)
     roles = _roles(season)
+    from pipeline.metrics import relevancy
+    stars = relevancy.standouts(season)  # always worth an Out note, even when this season's games barely show him
     g_now, d_now, u_now = patterns._team_frame(season)
     g_old, _, u_old = patterns._team_frame(season - 1)
     names = {}
@@ -184,23 +186,24 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         for r in rows.filter(pl.col("status").is_in(list(OUT_STATUSES))).iter_rows(named=True):
             pid, ro = r["player_id"], role.get(r["player_id"])
             reported = r["status"] in ("injured", "suspended", "personal")
-            if ro is None or ro["toi_rank"] > TOP[ro["grp"]] and ro["worth_rank"] > 5:
+            star = pid in stars
+            if not star and (ro is None or ro["toi_rank"] > TOP[ro["grp"]] and ro["worth_rank"] > 5):
                 continue
             if not reported and (r["games_missed"] or 0) < UNREPORTED_MIN_MISSED:
                 continue
             who = names.get(pid) or _name(r)
             text = f"{who} {_status_text(r, len(game_ids))}."
-            matters = _matters(ro, len(role))
+            matters = _matters(ro, len(role)) or ("one of their best players" if star else None)
             if matters:
                 text += f" He is {matters}."
-            kind = "D" if ro["grp"] == "D" else "F"
+            kind = "D" if (ro["grp"] if ro else ("D" if r["pos"] == "D" else "F")) == "D" else "F"
             with_ids = [g for g in game_ids if g in played.get(pid, set())]
             without = [g for g, d in zip(game_ids, game_dates) if g not in played.get(pid, set()) and (r["last_played"] is None or d > r["last_played"])]
             cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
             if cover:
                 text += " " + cover
             found.append({"player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
-                          "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"]})
+                          "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"] if ro else 0})
         found = sorted(found, key=lambda n: n["order"])[:MAX_OUT]
 
         # Back: returned in the latest game after missing two or more, or reported as playing after missing games.

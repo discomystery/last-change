@@ -23,6 +23,7 @@ DIMS = {
     "point": (["point_cf"], ["cf5"], 100, True),  # retired 2026-10-10 (mixed defensemen and long shots); kept for old calls
     "dShots": (["d_cf"], ["cf5"], 100, True),  # share of 5-on-5 shot attempts taken by defensemen
     "inClose": (["close_ff"], ["ff5"], 100, True),  # share of 5-on-5 shots (blocked ones aside) from within 20 feet
+    "longShifts": (["long_fa"], ["fa5"], 100, False),  # share of 5-on-5 shots against while its skaters are 45 s+ into a shift
     "pp": (["pp_xgf"], ["pp_sec"], 3600, True),
     "pk": (["pk_xga"], ["pk_sec"], 3600, False),
     "powerKill": (["pk_xgf"], ["pk_sec"], 3600, True),
@@ -49,7 +50,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     arena = _arena().select(pl.col("team_id").alias("home_id"), pl.col("hits").alias("f_hits"), pl.col("gives").alias("f_gives"), pl.col("takes").alias("f_takes"))
     games = games.join(arena, on="home_id", how="left").with_columns(pl.col("f_hits", "f_gives", "f_takes").fill_null(1.0))
     tg = pl.read_parquet(d / "team_game.parquet")
-    if not {"d_cf", "close_ff"} <= set(tg.columns):  # saved before these columns existed: rebuild from saved tables
+    if not {"d_cf", "close_ff", "long_fa"} <= set(tg.columns):  # saved before these columns existed: rebuild from saved tables
         from pipeline.metrics import team_game
         team_game.build(season)
         tg = pl.read_parquet(d / "team_game.parquet")
@@ -80,6 +81,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
         tot("d_cf", s5).alias("d_cf"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
+        tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),

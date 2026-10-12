@@ -46,7 +46,7 @@ const signed = (v: number, d: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${M
 const numFmt: Record<string, [(v: number) => string, string]> = {
   volume: [f1, 'attempts per 60'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
   turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], suppression: [f1, 'allowed per 60'],
-  qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
+  qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], longShifts: [(v) => `${f1(v)}%`, 'of shots against'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
   pace: [f1, 'shots per 60, both teams'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'],
   depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
   discipline: [(v) => signed(v, 2), 'drawn minus taken per 60'],
@@ -150,7 +150,7 @@ const pc = (v: number, min: number, max: number) => Math.max(0, Math.min(100, ((
 const nav: [string, string][] = [['style', 'Team styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 ---
-<Base section="league" title="League" mock={false} description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
+<Base section="league" title="League" description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
   <header class="team-top"><h1>League</h1></header>
   <p class="lede">All 32 teams side by side, on every number the site tracks. Pick a trait and see who sits where. For skaters, see the <a href={`${import.meta.env.BASE_URL}players/rankings/`}>skater rankings</a>.</p>
   <SectionNav items={nav} />
@@ -196,7 +196,7 @@ const _ = ordinal;
     ))}
   </Section>
 
-  <Section id="table" title="Every trait, every team" placeholder={false} takeaway="The whole league at a glance: each team’s place on all 17 traits, side by side.">
+  <Section id="table" title="Every trait, every team" placeholder={false} takeaway={`The whole league at a glance: each team’s place on all ${gTraits.length} traits, side by side.`}>
     <div class="tctl">
       <div class="pick"><span>Show</span>
         <select id="tb-view" aria-label="Ranks or numbers"><option value="rank">ranks</option><option value="num">the numbers</option></select>
@@ -362,13 +362,39 @@ const _ = ordinal;
   (() => {
     const remember = (k, v) => { try { localStorage.setItem('lc-league-' + k, v); } catch {} };
     const recall = (k) => { try { return localStorage.getItem('lc-league-' + k); } catch { return null; } };
+    // Rows glide to their new places when a picker re-ranks a list, so a team can be followed up or down.
+    // Positions are read before the change and each row (and its dot) is animated back from where it was.
+    // Only with the site's motion on (html.motion: off for reduced motion and automated browsers).
+    const glide = (change) => {
+      const root = document.documentElement;
+      if (!root.classList.contains('motion') || !Element.prototype.animate) return change();
+      const rows = () => [...document.querySelectorAll('.ranks li, .uranks li, .sranks li, #tb tbody tr')].filter((el) => el.offsetParent);
+      const key = (el) => (el.closest('section')?.id ?? '') + '|' + el.dataset.t + '|' + (el.querySelector('.rname, .uwho')?.textContent ?? '');
+      const was = new Map(rows().map((el) => [key(el), { y: el.getBoundingClientRect().top, x: el.querySelector('.dot')?.getBoundingClientRect().left }]));
+      change();
+      const ease = { duration: 650, easing: 'cubic-bezier(0.3, 0.8, 0.25, 1)', fill: 'backwards' };
+      for (const el of rows()) {
+        const w = was.get(key(el));
+        if (!w) continue;
+        const dy = w.y - el.getBoundingClientRect().top;
+        // Long jumps leave a little later, so the eye can follow the big movers.
+        const delay = Math.min(Math.abs(dy) / 40, 20) * 10;
+        if (Math.abs(dy) > 1) {
+          // a moving row carries the card's background so rows crossing each other stay readable
+          el.classList.add('gliding');
+          el.animate([{ translate: `0 ${dy}px` }, { translate: '0 0' }], { ...ease, delay }).finished.then(() => el.classList.remove('gliding'), () => el.classList.remove('gliding'));
+        }
+        const dot = el.querySelector('.dot');
+        if (dot && w.x !== undefined) { const dx = w.x - dot.getBoundingClientRect().left; if (Math.abs(dx) > 1) dot.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { ...ease, delay }); }
+      }
+    };
     // A sentence picker that shows one of several cards.
     const picker = (id, cards, match) => {
       const sel = document.getElementById(id);
       const show = () => { document.querySelectorAll(cards).forEach((c) => { c.hidden = !match(c, sel.value); }); remember(id, sel.value); };
       const saved = recall(id);
       if (saved && [...sel.options].some((o) => o.value === saved)) sel.value = saved;
-      sel.addEventListener('change', show);
+      sel.addEventListener('change', () => glide(show));
       show();
       return sel;
     };
@@ -379,11 +405,11 @@ const _ = ordinal;
     const setStat = () => { document.querySelectorAll('[data-unit]').forEach((c) => { c.dataset.stat = stat.value; }); remember('stat-pick', stat.value); };
     const savedStat = recall('stat-pick');
     if (savedStat && [...stat.options].some((o) => o.value === savedStat)) stat.value = savedStat;
-    stat.addEventListener('change', setStat);
+    stat.addEventListener('change', () => glide(setStat));
     setStat();
     const side = document.getElementById('side-pick'), src = document.getElementById('src-pick');
     const showSrc = () => { document.querySelectorAll('[data-src]').forEach((c) => { c.hidden = c.dataset.side !== side.value || c.dataset.src !== src.value; }); remember('side-pick', side.value); remember('src-pick', src.value); };
-    [['side-pick', side], ['src-pick', src]].forEach(([k, s]) => { const v = recall(k); if (v && [...s.options].some((o) => o.value === v)) s.value = v; s.addEventListener('change', showSrc); });
+    [['side-pick', side], ['src-pick', src]].forEach(([k, s]) => { const v = recall(k); if (v && [...s.options].some((o) => o.value === v)) s.value = v; s.addEventListener('change', () => glide(showSrc)); });
     showSrc();
     void unit;
 
@@ -460,7 +486,7 @@ const _ = ordinal;
     rest.addEventListener('change', () => { highlight(); save(); });
     document.querySelectorAll('#tb [data-sort]').forEach((h) => h.addEventListener('click', () => {
       if (sortBy === h.dataset.sort) dir = -dir; else { sortBy = h.dataset.sort; dir = 1; }
-      sort();
+      glide(sort);
     }));
     document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') { syncMine(); highlight(); } else { paint(); sort(); } });
     // Crosshair: the column under the pointer lights up along with its row.
@@ -490,6 +516,7 @@ const _ = ordinal;
 
   /* One row per team: rank, name, the trait's scale, the number in words. Order follows the season and arena switches. */
   .ranks, .uranks, .sranks { display: flex; flex-direction: column; margin-top: 10px; }
+  .gliding { position: relative; z-index: 1; background: var(--sheet); }
   .ranks li, .rank-ends { display: grid; grid-template-columns: 2.2em minmax(150px, 210px) minmax(120px, 1fr) minmax(200px, 300px); gap: 0 16px; align-items: center; }
   .ranks li { padding: 7px 8px; margin-inline: -8px; border-top: 1px solid var(--rule); order: var(--ob); }
   html[data-mode='season'] .ranks li { order: var(--os); }
@@ -559,7 +586,7 @@ const _ = ordinal;
   .tctl .pick { margin-block: 0; }
   .tkey .ramp i { display: inline-block; width: 64px; height: 12px; border-radius: 3px; background: linear-gradient(90deg, var(--sheet), color-mix(in oklab, var(--heat) 62%, var(--sheet))); border: 1px solid var(--rule); }
   .tkey .you::before { content: ''; width: 18px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--ink); display: inline-block; }
-  /* Wider than the text column on big screens, so all 17 traits fit without scrolling sideways. */
+  /* Wider than the text column on big screens, so every trait fits without scrolling sideways. */
   .tb-wrap { margin-inline: calc(50% - min(50vw - 16px, 720px)); overflow: auto; max-height: min(78vh, 1180px); margin-top: 14px; border-radius: 18px; background: var(--sheet); border: 1px solid var(--rule); overscroll-behavior-x: contain; }
   .tb { border-collapse: separate; border-spacing: 0; font: 600 13px var(--ui); width: 100%; }
   .tb th, .tb td { padding: 0; }

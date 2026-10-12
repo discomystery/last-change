@@ -122,7 +122,7 @@ const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 ---
-<Base section="teams" title={team.name} mock={false}>
+<Base section="teams" title={team.name}>
   <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
   <div class="tcard-wrap" style={`--team:${teamColour(abbr)}`}>
     <div class:list={['card', 'tcard', tiText.length > 0 && 'joined']}>
@@ -334,7 +334,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
                       <div class="ghead">
                         <div class="ghead-text">
                           <p class="gname"><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
-                          <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                          <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                         </div>
                         <Portrait id={g.id} size={96} class="g-photo" />
                       </div>
@@ -453,7 +453,8 @@ const tiText = teamIntro(abbr)?.text ?? [];
     const box = document.getElementById('next-card');
     if (next) {
       const rink = el('div', 'nrink');
-      ['rl blue l', 'rl red', 'rl blue r'].forEach((c) => rink.append(el('span', c)));
+      rink.dataset.drop = '';
+      ['rl goal l', 'rl blue l', 'rl red', 'rl blue r', 'rl goal r'].forEach((c) => rink.append(el('span', c)));
       rink.append(el('span', 'circle', 'at'));
       [next.away, next.home].forEach((a, i) => {
         const side = el('div', 'side' + (i ? ' home' : ''));

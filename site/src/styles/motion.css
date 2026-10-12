@@ -38,10 +38,22 @@ html.motion .seen .q-pt, html.motion .seen .quad g[class^='t-'] { animation: lc-
 html.motion .seen .shot { transform-box: fill-box; transform-origin: center; animation: lc-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
 html.motion .seen .shot:nth-child(3n) { animation-delay: calc(var(--rv-delay, 0ms) + 320ms); }
 html.motion .seen .shot:nth-child(3n + 1) { animation-delay: calc(var(--rv-delay, 0ms) + 440ms); }
-html.motion .seen .am-area use { animation: lc-fade 0.7s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms); }
 
-/* Run it back: the 100 replays drop in one after another, away wins, ties, then home wins. */
-html.motion .seen .replays i { animation: lc-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 14ms + 150ms); }
+/* Swing: each player's bar grows out from the zero line when his team's card comes into view, biggest night first. */
+html.motion .seen .sw-bar { animation: lc-sw 0.7s cubic-bezier(0.25, 1, 0.35, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 150ms + var(--i, 0) * 45ms); }
+html.motion .seen .sw-n { animation: lc-fade 0.4s ease backwards; animation-delay: calc(var(--rv-delay, 0ms) + 400ms + var(--i, 0) * 45ms); }
+@keyframes lc-sw { from { clip-path: inset(-6px calc(100% - var(--z, 50%)) -6px var(--z, 50%)); } to { clip-path: inset(-6px 0 -6px 0); } }
+
+/* Matchup strips start in even columns, as they would with no line matching, then slide to the real split of ice
+   time: the boxes that grow are the matchups the coach chases. Forward lines first, then the pairs. */
+html.motion .seen .strips { animation: lc-settle 1s cubic-bezier(0.3, 0.9, 0.25, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 350ms); }
+html.motion .seen .strips ~ .strips { animation-delay: calc(var(--rv-delay, 0ms) + 750ms); }
+@keyframes lc-settle { from { --even: 1; } }
+
+/* The rule under each section heading paints in left to right, like a blue line going down on fresh ice. */
+html.motion .sec-head { position: relative; border-bottom-color: transparent; }
+html.motion .sec-head::after { content: ''; position: absolute; left: 0; right: 0; bottom: -5px; height: 5px; background: var(--line-blue); transform-origin: left; transform: scaleX(0); }
+html.motion .sec-head.seen::after { transform: scaleX(1); transition: transform 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) calc(var(--rv-delay, 0ms) + 120ms); }
 
 /* Folds open with a short slide instead of a jump. */
 html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
@@ -52,6 +64,14 @@ html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezi
   html.motion .card.go:hover { translate: 0 -2px; box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--ink) 45%, transparent); }
 }
 
+/* Season switch: each dot glides to its new spot, cards a beat apart (`--sd`, set by the script in Base.astro),
+   leaving a faint ring where it was that fades as it arrives. The sentences under the scales fade across. */
+html.motion .lane .dot { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
+html.motion .lane .whisk { transition: left 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms), width 0.8s cubic-bezier(0.3, 0.75, 0.2, 1) var(--sd, 0ms); }
+.dot-ghost { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--team); opacity: 0; pointer-events: none; animation: lc-ghost 1.3s ease-out var(--sd, 0ms) both; }
+html.mode-switch .m-blend, html.mode-switch .m-season { animation: lc-fade 0.5s ease; }
+@keyframes lc-ghost { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+
 @keyframes lc-fade { from { opacity: 0; } }
 @keyframes lc-dot { from { left: 50%; opacity: 0; } }
 @keyframes lc-wipe { from { clip-path: inset(0 50% 0 50%); } }
@@ -60,4 +80,4 @@ html.motion .fold[open] > :not(summary) { animation: lc-rise-in 0.35s cubic-bezi
 @keyframes lc-pop { from { opacity: 0; transform: scale(0.3); } }
 @keyframes lc-grow { from { transform: scaleY(0); } }
 
-@media print { html.motion .rv:not(.seen) { opacity: 1; transform: none; } }
+@media print { html.motion .rv:not(.seen) { opacity: 1; transform: none; } html.motion .sec-head::after { transform: none; } }

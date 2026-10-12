@@ -112,10 +112,14 @@ def _who(season: int) -> dict[int, dict]:
         if f.exists():
             names |= dict(pl.read_parquet(f).select("player_id", "last").iter_rows())
     abbr = {v: k for k, v in team_ids(season).items()}
+    from pipeline.metrics import relevancy
+    stars = relevancy.standouts(season)
     out = {}
     for tid, u in win_model.next_lineups([season]).items():
         team = abbr.get(tid)
         without = [p for p, v in u["missing"] if v >= KEY_PLAYER and (team, p) in out_now]
+        # A star the rating has stopped counting on (out a long time) is still news to a reader.
+        without = without or [p for p, t in stars.items() if (team, p) in out_now]
         back = [p for p, v in u["back"] if v >= KEY_PLAYER and p in u["in"]]
         out[tid] = {"without": names.get(without[0]) if without else None, "back": names.get(back[0]) if back else None,
                     "maybe": bool(without) and out_now[(team, without[0])] == "day"}  # day to day: he may still play
@@ -217,6 +221,7 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
     except Exception:  # no player ratings to value lineups with: show the morning figure only
         df = df.with_columns(lineup=pl.lit(None, pl.Float64))
     rows = {r["game_id"]: r for r in df.iter_rows(named=True)}
+    named = _named_changes(season)
     morning_p = dict(zip(df["game_id"], win_model.predict(m, df)))
     puck = dict(zip(df["game_id"], win_model.predict(m, df.with_columns(pl.col("lineup").fill_null(0.0)), puck_drop=True)))
     out = {}
@@ -247,5 +252,57 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
                         f"We gave {T} {_a(pct)} chance, but {O} had other ideas.")
             sides[team] = {"head": wording.tidy(head), "chance": pct}
         out[g["id"]] = {"p_home": round(ph, 4), "p_home_puck": round(float(puck[g["id"]]), 4) if has_lineup else None,
-                        "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides}
+                        "steps": [{**s, "shift": round(s["shift"], 4)} for s in steps], "sides": sides,
+                        # What each step was made of, per team, so the page can say what every adjustment was for.
+                        "inputs": {t: {"xgd": round(r[f"{k}_xgd"], 2), "b2b": int(r[f"{k}_b2b"]),
+                                       **{c: round(r[f"{k}_{c}"], 3) for c in ("roster", "lineup") if r.get(f"{k}_{c}") is not None}}
+                                   for t, k in ((g["home"], "h"), (g["away"], "a"))},
+                        "players": {t: named(g["id"], t, g["date"]) for t in (g["home"], g["away"])}}
     return out
+
+
+NAMED = 0.03  # expected goals a game a skater's absence or late change must be worth to be named after the game
+BIG = 0.06  # ... and to be called a big loss (about the top tenth of absences)
+
+
+def _named_changes(season: int):
+    """For the post-game reveal: which skaters the lineup steps were about, valued with the same player ratings that
+    moved the chance. `missing`: usual players the morning lineup was without (still with the club: dressed for it this
+    season or on its roster that day); `out` / `in`: who sat out or came in after the morning. Most valuable first."""
+    try:
+        who = win_model.lineup_names([season])
+    except Exception:
+        return lambda gid, team, day: None
+    names: dict[int, str] = {}
+    for s in (season - 1, season):
+        f = TABLES / str(s) / "players.parquet"
+        if f.exists():
+            names |= {q: f"{a} {b}" for q, a, b in pl.read_parquet(f).select("player_id", "first", "last").unique("player_id", keep="last").iter_rows()}
+    path = TABLES / str(season) / "availability.parquet"
+    held = set()
+    if path.exists():
+        av = pl.read_parquet(path).filter(pl.col("status") != "no_club")
+        names |= {q: f"{a} {b}" for q, a, b in av.select("player_id", "first", "last").unique("player_id").iter_rows() if q not in names}
+        held = set(av.select("date", "team", "player_id").iter_rows())
+    ids = team_ids(season)
+    from pipeline.metrics import relevancy
+    stars = relevancy.standouts(season)
+    f = TABLES / str(season) / "player_game.parquet"
+    dressed = set(pl.read_parquet(f).select("game_id", "team_id", "player_id").iter_rows()) if f.exists() else set()
+
+    def one(gid: int, team: str, day: str):
+        w = who.get((gid, ids.get(team)))
+        if not w:
+            return None
+        pick = lambda xs: [{"id": int(q), "name": names[q], "xg": round(float(v), 3), "big": bool(v >= BIG)}
+                           for q, v, *_ in xs if v >= NAMED and q in names][:3]
+        missing = [x for x in w["missing"] if x[2] or (day, team, x[0]) in held]
+        res = {"missing": pick(missing), "out": pick(w["late_out"]), "in": pick(w["late_in"])}
+        # Stars who missed the game but were not named above: the rating had stopped counting on them ("priced", out
+        # a long time, or never seen with this club) or his usual night is worth little by the ratings ("small").
+        # Readers still want to hear he was out.
+        shown = {x["id"] for k in res for x in res[k]}
+        res["stars"] = [{"id": int(q), "name": names[q], "why": "small" if w["worth"].get(q, NAMED) < NAMED else "priced"} for q in stars
+                        if q not in shown and q in names and (day, team, q) in held and (gid, ids.get(team), q) not in dressed][:2]
+        return res
+    return one
