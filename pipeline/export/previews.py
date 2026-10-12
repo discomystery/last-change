@@ -25,7 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 11  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 12  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -34,6 +34,7 @@ RULES_VERSION = 11  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 8: special-teams calls add what each side has been known for over five seasons of real goals; verb agreement fixed
 # 9: shot-quality clashes only top five against bottom five; no turnover clashes (both from a 2023-25 backtest)
 # 11: second round of notes: edges carry stakes, fewer semicolons and "league"s, no rest venue, plainer changed calls
+# 12: third round of notes: hotter goalie-history calls, "chance would suggest", why shots in close matter, "even though" leans, shared Missing items
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -255,15 +256,19 @@ MATCHUP_WORDS = {
 # starts), a goalie's saves above expected against one team in half his meetings predicts the other half not at all
 # (r = -0.02). So a striking record against tonight's opponent is a coincidence, and the call says so.
 HISTORY_MIN_STARTS, HISTORY_MIN_SHOTS, HISTORY_GAP = 5, 120, 0.03  # save-percentage gap from his usual
-HISTORY_HEADS = {"good": ["Does {G} own {O}? Probably not", "{Gp} record against {O} is a coincidence", "Don’t count on {G} to stand on his head again"],
-                 "bad": ["{O} aren’t {Gp} kryptonite", "{Gp} rough record against {O} is a coincidence", "{G} isn’t cursed against {O}"]}
-
-HISTORY_BODIES = [
-    "{G} has been {how} against {O} since 2023-24, {cmp} his usual. It looks like a pattern, "
-    "but across three seasons a goalie’s record against one team told us nothing about the next meeting. Expect the usual {G}.",
-    "Since 2023-24, {G} has been {how} against {O}, {cmp} his usual. Fans love a pattern like this, "
-    "but we checked three seasons of them and they predicted nothing. Expect the usual {G}.",
-]
+HISTORY_HEADS = {"good": ["Don’t buy {Gp} record against {O}", "{Gp} hold on {O} won’t last", "{G} doesn’t own {O}"],
+                 "bad": ["{G} is due against {O}", "Don’t buy {Gp} slump against {O}", "{O} don’t own {G}"]}
+# A hotter take than "it's a coincidence" (Sora, 2026-10-12): say what to expect instead.
+HISTORY_BODIES = {
+    "good": ["{G} has been a wall against {O} since 2023-24, well above his usual. But three seasons of data say a goalie’s record "
+             "against one team tells us nothing about the next meeting, so don’t be surprised if {G} isn’t that wall tonight.",
+             "Since 2023-24, {G} has been a wall against {O}, well above his usual. Fans love a pattern like this, "
+             "but we checked three seasons of them and they predicted nothing. Don’t be surprised if {O} finally get to him."],
+    "bad": ["{G} has been shaky against {O} since 2023-24, well below his usual. But three seasons of data say a goalie’s record "
+            "against one team tells us nothing about the next meeting, so don’t be surprised if he looks like himself tonight.",
+            "Since 2023-24, {G} has been shaky against {O}, well below his usual. Fans love a pattern like this, "
+            "but we checked three seasons of them and they predicted nothing. Don’t be surprised if he’s back to his usual self."],
+}
 PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "rest": 3, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
 MAX_CALLS, MIN_CALLS, MAX_PER_KIND = 4, 2, 2
 
@@ -575,7 +580,7 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
          "Hstar": _star(unit, pts), "Ostar": _star(opp, pts)}
     theirline = "the other team’s top line" if j == 0 else f"opponents’ {ORD[j]} lines"
     group = f"{mine}" if lab == "P" else f"{w['Hstar']}’s line ({mine})"
-    body = (f"At home, {w['H']} keep sending {group} out against opponents’ {ORD[j]} lines, far more often than chance would. "
+    body = (f"At home, {w['H']} keep sending {group} out against opponents’ {ORD[j]} lines, far more often than chance would suggest. "
             f"{why.format(theirline=theirline, Coach=_cap(coach or 'their coach'))} Tonight {w['Op']} {ORD[j]} line is {theirs}.")
     return {
         "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away, "style": style,
@@ -644,7 +649,7 @@ def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, pla
         G = _last(g["name"])
         w = {"G": G, "Gp": _poss(G), **team_words(o, places, "O")}
         fmt = lambda s: f"{s:.3f}".lstrip("0")
-        body = _pick(HISTORY_BODIES, gid, g["id"], "body").format(how="a wall" if good else "shaky", cmp="well above" if good else "well below", **w)
+        body = _pick(HISTORY_BODIES["good" if good else "bad"], gid, g["id"], "body").format(**w)
         out.append({
             "kind": "history", "gap": abs(sv_vs - sv_all) * 1000, "metric": "goalie_sv", "team": t, "opp": o,
             "head": _fmt(_pick(HISTORY_HEADS["good" if good else "bad"], gid, g["id"]), **w),
@@ -731,7 +736,7 @@ EDGE_STAKES = {
     "qualityAllowed": "The more dangerous chances should come at {botp} net.",
     "point": "Watch {topp} defensemen let it go from the blue line.",
     "dShots": "Watch {topp} defensemen jump into the play.",
-    "inClose": "Expect {top} to do more of their damage around the net.",
+    "inClose": "Shots from in close tend to be more dangerous, so expect {top} to do more of their damage around the net.",
     "forecheck": "Expect {top} to win more pucks back deep in {botp} end.",
     "physical": "Expect most of the big hits to come from {top}.",
     "depth": "If this one comes down to the bottom six, that suits {top}.",
@@ -742,6 +747,7 @@ EDGE_FAR = 26  # "about as far apart as two teams get" only for ranks this far a
 EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
 # A filler edge (the widest gap, but not a hot one) is told plainly: the two teams are not at opposite ends of anything.
 EDGE_MILD_HEADS = ["{topp} edge in {name}", "Where {top} have the edge: {name}"]
+EDGE_WHY = {"inClose": " Shots from in close tend to be the more dangerous ones."}  # context for a small gap (Sora, 2026-10-12)
 EDGE_MILD_BODY = "{top} are {wt} for {name}, and {bot} are {wbs}. It’s the widest gap between these two, though not a huge one."
 EDGE_SMALL = 40  # below this percentile gap the widest gap is said to be a small one (Sora, 2026-10-12)
 EDGE_SMALL_BODY = "{top} are {wt} for {name}, and {bot} are {wbs}. That’s the biggest gap between these two, and it isn’t a big one."
@@ -793,7 +799,7 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
         "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
         "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
         "body": _fmt((_pick(EDGE_BODIES, gid, k, "body") + (" They’re about as far apart as two teams get." if abs(rt["rank"] - rb["rank"]) >= EDGE_FAR else "") + " " + EDGE_STAKES.get(k, "Expect that gap to show."))
-                     if hot else EDGE_SMALL_BODY if gap(k) < EDGE_SMALL else EDGE_MILD_BODY, plain=_fmt(EDGE_PLAIN.get(k, ""), **w), **w),
+                     if hot else (EDGE_SMALL_BODY if gap(k) < EDGE_SMALL else EDGE_MILD_BODY) + EDGE_WHY.get(k, ""), plain=_fmt(EDGE_PLAIN.get(k, ""), **w), **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
         "chips": [chip(top, k, rt, places, cite), chip(bot, k, rb, places, cite)] if k in CHIP else [],
         "gist": _fmt(EDGE_PLAIN[k] if hot and k in EDGE_PLAIN else "{top} have the edge over {bot} on {name}.", **w),

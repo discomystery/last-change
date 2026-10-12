@@ -16,7 +16,7 @@ LEVEL = {  # level calls (a strength meeting a soft spot): metric -> verdict -> 
                "missed": ("{Xc} never got the shots going", "{X} took fewer shots than an average NHL team would have.")},
     "quality": {"held": ("{Xc} got their looks", "{Xp} shots were at least as dangerous as usual."),
                 "partly": ("Decent looks, not their best", "{Xp} shots were more dangerous than an average team’s, but not up to their usual."),
-                "missed": (["{Yc} took away the good looks", "No good looks for {X}", "{Yc} kept it harmless"], "{Xp} shots were less dangerous than an average team’s.")},
+                "missed": (["{Yc} took away the best looks", "Fewer good looks than usual for {X}", "{Yc} kept {X} to lesser chances"], "{Xp} shots were less dangerous than an average team’s.")},
     "turnover": {"held": ("{Xc} fed on mistakes", "{X} got their usual share of chances right after winning the puck."),
                  "partly": ("A few turnovers, not many", "{X} got more of their chances off turnovers than an average team, but fewer than they usually do."),
                  "missed": (["{Yc} took care of the puck", "{Yc} kept it clean", "No gifts from {Y}"], "{X} got fewer of their chances off turnovers than an average team.")},

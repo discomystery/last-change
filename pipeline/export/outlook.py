@@ -153,6 +153,9 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
     return ROUTE[k][1], ROUTE[k][2]
 
 
+WEAK_COUNTER = 0.5  # reasons for the other side that add up to under half of the main ones are told as "even though"
+
+
 def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
     """Plain reasons, from the model's own breakdown, as one sentence: the reasons that help one side first (biggest
     first, Sora 2026-10-12: chance control matters more than home ice), then "but" and the ones that help the other.
@@ -189,7 +192,7 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
             lead.setdefault(f[2], len(lead))
         g.sort(key=lambda f: lead[f[2]])
 
-    def clauses(group: list, after: str | None) -> str:
+    def clauses(group: list, after: str | None, joiner: str = ", while ") -> str:
         many = lambda t: places[t].lower().startswith("the ")  # "the Rangers have", not "has"
         parts = []  # one phrase per team: "Edmonton has been ... lately and has home-ice advantage"
         for f in group:
@@ -202,12 +205,21 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         out = [p[1] for p in parts]
         if len(out) == 1:
             return out[0]
-        return ", ".join(out[:-1]) + (", and " if len(out) > 2 or " and " in out[0] else " and ") + out[-1]
+        # two teams' facts that help the same side: "while" (Sora, 2026-10-12: "and" implied they were connected)
+        return ", ".join(out[:-1]) + joiner + out[-1]
 
-    text = clauses(groups[0], None)
-    if groups[1]:
-        text += ", but " + clauses(groups[1], groups[0][-1][2])
-    text += "."
+    if groups[1] and sum(f[0] for f in groups[1]) < WEAK_COUNTER * sum(f[0] for f in groups[0]):
+        # a counterpoint too small to stand as an equal (Sora, 2026-10-12): "Even though Chicago has home-ice advantage, ..."
+        text = "even though " + clauses(groups[1], None) + ", " + clauses(groups[0], None) + "."
+    else:
+        text = clauses(groups[0], None)
+        if groups[1] and ", while " in text:  # no "while ... but" pile-up: the other side gets its own sentence
+            more = clauses(groups[1], None)
+            text += ". " + more[0].upper() + more[1:] + ", though"
+        elif groups[1]:
+            text += ", but " + clauses(groups[1], groups[0][-1][2], " and ")  # a list of counterpoints
+        text += "."
+    text = text[0].upper() + text[1:]
     if abs(chances) < 0.025:
         text = "The two have been about even at out-chancing opponents lately. " + text[0].upper() + text[1:]
     return text

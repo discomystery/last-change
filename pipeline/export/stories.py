@@ -273,14 +273,19 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             team_games = [r["game_id"] for r in res]
             per = this.group_by("player_id").agg(gp=pl.len(), toi=pl.col("sec").mean(), pos=pl.col("pos").first(),
                                                  last=pl.col("game_id").max())
+            gone = {}  # players who missed the same stretch share one item (Sora, 2026-10-12)
             for pos, top in (("F", 6), ("D", 4)):
                 grp = per.filter(pl.col("pos").is_in(["C", "L", "R"]) if pos == "F" else pl.col("pos") == "D").sort("toi", descending=True).head(top)
                 for r in grp.iter_rows(named=True):
                     missed = len(team_games) - 1 - team_games.index(r["last"])
                     if missed >= 1 and r["gp"] >= 2:
-                        when = "latest game" if missed == 1 else f"last {num(missed)} games"
-                        items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
-                                      "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
+                        gone.setdefault(missed, []).append((72 + (top - grp["player_id"].to_list().index(r["player_id"])), r["player_id"]))
+            for missed, who in gone.items():
+                who.sort(key=lambda x: -x[0])
+                when = "latest game" if missed == 1 else f"last {num(missed)} games"
+                names = [N[p] for _, p in who]
+                items.append({"tag": "Missing", "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who],
+                              "text": f"{_and(names)} {'has' if len(names) == 1 else 'have'} missed {W.poss(t)} {when}."})
         if res:
             items += _milestones(t, res[-1], P, N, before)
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
