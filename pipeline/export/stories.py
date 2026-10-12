@@ -189,8 +189,9 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         roster = [p for p, team in cur.items() if team == t]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))
-        # hot streaks
-        for pid, g in this.group_by("player_id"):
+        # hot streaks; teammates on the same run share one item (Sora, 2026-10-12: "Granlund and LaCombe have ...")
+        hot = {}
+        for pid, g in this.sort("player_id").group_by("player_id", maintain_order=True):
             pts = g.sort("date")["pts"].to_list()
             n = 0
             for x in reversed(pts):
@@ -198,8 +199,12 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                     break
                 n += 1
             if n >= 4:
-                text = (f"{N[pid[0]]} has a point in every game this season." if n == len(pts) else f"{N[pid[0]]} has a point in {num(n)} straight games.")
-                items.append({"tag": "Hot streak", "text": text, "score": 60 + n + sum(pts) / 100, "pid": pid[0]})
+                hot.setdefault("every game this season" if n == len(pts) else f"{num(n)} straight games", []).append((60 + n + sum(pts) / 100, pid[0]))
+        for run, who in hot.items():
+            who.sort(key=lambda x: -x[0])
+            names = [N[p] for _, p in who]
+            text = f"{_and(names)} {'has' if len(names) == 1 else 'have'} a point in {run}."
+            items.append({"tag": "Hot streak", "text": text, "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who]})
         # slow start: scored often last season, nothing yet
         last = mine.filter(pl.col("season") == season - 1).group_by("player_id").agg(gp=pl.len(), g=pl.col("g").sum())
         last = last.filter((pl.col("gp") >= 40) & (pl.col("g") / pl.col("gp") >= 0.35))
@@ -268,14 +273,19 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             team_games = [r["game_id"] for r in res]
             per = this.group_by("player_id").agg(gp=pl.len(), toi=pl.col("sec").mean(), pos=pl.col("pos").first(),
                                                  last=pl.col("game_id").max())
+            gone = {}  # players who missed the same stretch share one item (Sora, 2026-10-12)
             for pos, top in (("F", 6), ("D", 4)):
                 grp = per.filter(pl.col("pos").is_in(["C", "L", "R"]) if pos == "F" else pl.col("pos") == "D").sort("toi", descending=True).head(top)
                 for r in grp.iter_rows(named=True):
                     missed = len(team_games) - 1 - team_games.index(r["last"])
                     if missed >= 1 and r["gp"] >= 2:
-                        when = "latest game" if missed == 1 else f"last {num(missed)} games"
-                        items.append({"tag": "Missing", "score": 72 + (top - grp["player_id"].to_list().index(r["player_id"])),
-                                      "pid": r["player_id"], "text": f"{N[r['player_id']]} has missed {W.poss(t)} {when}."})
+                        gone.setdefault(missed, []).append((72 + (top - grp["player_id"].to_list().index(r["player_id"])), r["player_id"]))
+            for missed, who in gone.items():
+                who.sort(key=lambda x: -x[0])
+                when = "latest game" if missed == 1 else f"last {num(missed)} games"
+                names = [N[p] for _, p in who]
+                items.append({"tag": "Missing", "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who],
+                              "text": f"{_and(names)} {'has' if len(names) == 1 else 'have'} missed {W.poss(t)} {when}."})
         if res:
             items += _milestones(t, res[-1], P, N, before)
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
@@ -384,7 +394,7 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
     if kind == "won" and n >= 3:
         return f"{_cap(W.the(t))} have won {num(n)} straight{tail}."
     if kind == "winless" and n >= 3:
-        return f"{_cap(W.the(t))} haven’t won in {num(n)}."
+        return f"{_cap(W.the(t))} are on a {num(n)}-game losing streak."
     if kind == "won" and n >= 2:
         return f"{_cap(W.the(t))} have won two in a row{tail}."
     return None
@@ -421,7 +431,9 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             sents.append(f"The teams have split {num(len(m))} meetings this season.")
     # form
     form = {t: _form_sentence(t, facts["form"][t], W, bool(m)) for t in (home, away)}
-    if any(form.values()):
+    if form[home] and form[away]:  # two streaks: separate sentences, since "but" only fits a real contrast (Sora, 2026-10-12)
+        sents += [form[home], form[away]]
+    elif any(form.values()):
         for t in (home, away):
             if form[t]:
                 sents.append(form[t])
@@ -439,7 +451,10 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             facts["heads"].append((58 + n, f"{_cap(W.the(t))} need a win"))
     # what to look for: the gist of the top calls
     look, kinds = [], set()
+    tired_told = any("back-to-back" in v.get("body", "") for v in (outlook or {}).values())
     for c in claims:  # one per kind of call: two duels or two edges in a row read the same
+        if c["kind"] == "rest" and tired_told:  # the lean already says who played last night
+            continue
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
             look.append(c["gist"])
             kinds.add(c["kind"])
@@ -451,7 +466,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
             continue
         per[i["tag"]] = per.get(i["tag"], 0) + 1
-        seen.add(i.get("pid"))
+        seen.update(i.get("pids") or [i.get("pid")])
         picked.append({"tag": i["tag"], "text": i["text"]})
     for t in (away, home):  # always at least two: each team's leading scorer
         if len(picked) >= MIN_ITEMS:
@@ -714,7 +729,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if t == loser and prev_k == "won" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.poss(t))} {num(prev_n)}-game winning streak is over.", "score": 62 + prev_n})
         if t == loser and k == "winless" and n >= 3:
-            items.append({"tag": "Slump", "text": f"{_cap(W.the(t))} haven’t won in {num(n)}.", "score": 55 + n})
+            items.append({"tag": "Slump", "text": f"{_cap(W.the(t))} are on a {num(n)}-game losing streak.", "score": 55 + n})
         if t == winner and prev_k == "winless" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.the(t))} won for the first time in {num(prev_n + 1)} games.", "score": 58 + prev_n})
     pg = P.filter((pl.col("season") == season) & (pl.col("date") <= r["date"]))

@@ -11,30 +11,30 @@ are worked out here (0 to 100, the better end on the right) so the page only pla
 from pipeline.export import previews
 
 LEVEL = {  # level calls (a strength meeting a soft spot): metric -> verdict -> (title, plain sentence)
-    "volume": {"held": ("{Xc} piled up the shots", "{X} got to their usual volume of shots, as the call said."),
+    "volume": {"held": (["{Xc} piled up the shots", "{Xc} kept the shots coming", "Shots, as promised"], "{X} got to their usual volume of shots, as the call said."),
                "partly": ("More than most, short of their usual", "{X} outshot an average team’s pace, but not their own usual."),
                "missed": ("{Xc} never got the shots going", "{X} took fewer shots than an average NHL team would have.")},
     "quality": {"held": ("{Xc} got their looks", "{Xp} shots were at least as dangerous as usual."),
                 "partly": ("Decent looks, not their best", "{Xp} shots were more dangerous than an average team’s, but not up to their usual."),
-                "missed": ("{Yc} took away the good looks", "{Xp} shots were less dangerous than an average team’s.")},
+                "missed": (["{Yc} took away the best looks", "Fewer good looks than usual for {X}", "{Yc} kept {X} to lesser chances"], "{Xp} shots were less dangerous than an average team’s.")},
     "turnover": {"held": ("{Xc} fed on mistakes", "{X} got their usual share of chances right after winning the puck."),
                  "partly": ("A few turnovers, not many", "{X} got more of their chances off turnovers than an average team, but fewer than they usually do."),
-                 "missed": ("{Yc} took care of the puck", "{X} got fewer of their chances off turnovers than an average team.")},
-    "pp": {"held": ("The power play delivered", "{Xp} power play created at least its usual chances."),
+                 "missed": (["{Yc} took care of the puck", "{Yc} kept it clean", "No gifts from {Y}"], "{X} got fewer of their chances off turnovers than an average team.")},
+    "pp": {"held": (["The power play delivered", "{Xp} power play did its job", "{Xp} power play got going"], "{Xp} power play created at least its usual chances."),
            "partly": ("A decent power play, not their best", "{Xp} power play beat the league average, but not its own usual."),
-           "missed": ("{Yp} kill won that one", "{Xp} power play created less than an average one would have.")},
+           "missed": (["{Yp} kill won that one", "{Yp} kill stood tall", "{Xp} power play went quiet"], "{Xp} power play created less than an average one would have.")},
 }
 DUEL = {  # lean -> verdict -> (title, plain)
-    "offense": {"held": ("{Xc} got theirs", "{X} beat the league average on {oname}, even against {Y}."),
-                "missed": ("{Yc} held the line", "{Y} kept {X} under the league average on {oname}.")},
+    "offense": {"held": (["{Xc} got theirs", "The attack won out", "{Xc} got through anyway"], "{X} beat the league average on {oname}, even against {Y}."),
+                "missed": (["{Yc} held the line", "The defense won out", "{Yc} won the standoff"], "{Y} kept {X} under the league average on {oname}.")},
     "defense": {"held": ("{Yc} held the line", "{Y} kept {X} under the league average on {oname}, as we leaned."),
                 "missed": ("{Xc} broke through", "{X} beat the league average on {oname} anyway.")},
 }
 CHANGED = {"held": ("Still the new {Xn}", "On {name}, {X} looked like this season’s team, not the old one."),
            "missed": ("Back to the old {Xn}", "On {name}, {X} looked more like the team from last season.")}
-EDGE = {"held": ("{topc} had the edge", "{top} came out clearly ahead on {name}, as the gap between these two suggested."),
-        "partly": ("{topc} edged it, barely", "{top} came out ahead on {name}, but by less than the usual gap between these two."),
-        "missed": ("{botc} flipped it", "{bot} came out ahead on {name}, against the run of the season.")}
+EDGE = {"held": (["{topc} had the edge", "{topc} won that battle", "{topc} pulled away", "{topc} came out on top"], "{top} came out clearly ahead on {name}, as the gap between these two suggested."),
+        "partly": (["{topc} edged it, barely", "Closer than the gap said", "{topc} by a nose"], "{top} came out ahead on {name}, but by less than the usual gap between these two."),
+        "missed": (["{botc} flipped it", "{botc} turned it around", "{botc} bucked the trend", "{botc} won that one instead"], "{bot} came out ahead on {name}, against the run of the season.")}
 PACE = {"above": {"held": ("A track meet, as billed", "The game ran faster than either team usually plays."),
                   "partly": ("Quick, but no track meet", "The game moved faster than an average NHL game, just not as fast as {bar} usually plays."),
                   "missed": ("It never took off", "The game ran slower than an average NHL game.")},
@@ -49,7 +49,7 @@ MATCHUP = {"held": ("The matchup happened", "{Hc} sent {group} out against {Op} 
            "missed": ("No sign of the matchup", "{Hc} sent {group} out against {Op} {line} less than they would with no line matching.")}
 HISTORY = {"held": ("The usual {G}", "{G} played like his usual self, not like his record against {O}. Just a coincidence, as we said."),
            "missed": ("The record held up again", "{Gp} night looked more like his record against {O} than his usual. Three seasons of evidence say it’s still a coincidence.")}
-REST = {"held": ("Fresh legs told", "{R} got a bigger share of the chances than they usually do, against a tired {Tn} team."),
+REST = {"held": (["Fresh legs told", "The rested team showed it", "Tired legs showed"], "{R} got a bigger share of the chances than they usually do, against a tired {Tn} team."),
         "missed": ("{Tc} shrugged it off", "{T} held their own despite playing last night.")}
 LINE = {"L1": "first line", "L2": "second line", "L3": "third line", "L4": "fourth line"}
 
@@ -287,6 +287,8 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
                 exp = f", where their blended level would mean about {round(base * sec / 3600)}"
             out["saw"] = lead + exp + (f" · {sog_txt}" if sog_txt else "")
     if title:
+        if isinstance(title, list):  # a pool, picked the same way every run for this call, varied across games
+            title = previews._pick(title, claim.get("id"), verdict)
         out["title"] = _fmt(title, **w).rstrip(".")
         out["plain"] = _fmt(plain, **w)
     return out
