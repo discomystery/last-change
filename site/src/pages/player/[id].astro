@@ -116,7 +116,7 @@ const statRow = (x: any) => (isG ? null : x);
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
     <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats', unplayed && 'unplayed']}>
-      {p.number !== null && <span class="pnum" aria-hidden="true">{p.number}</span>}
+      {p.number !== null && <div class="pnum-box" aria-hidden="true"><span class="pnum">{p.number}</span></div>}
       <header class="team-top">
         <h1>{p.name}</h1>
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
@@ -550,9 +550,15 @@ const statRow = (x: any) => (isG ? null : x);
 <style>
   /* The header stands on a rule like a section heading's; his photo stands on the same rule at the right. */
   .phead { position: relative; overflow: hidden; margin-top: 22px; padding: 0 24px 0 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 16px; isolation: isolate; }
+  /* Everything else in the card sits on a layer above the number. Explicit, rather than a negative z-index on the
+     number, because Safari can lift the rolling digits (moving, clipped layers) above content when they sit below zero. */
+  .phead > :not(.pnum-box), .phead .team-top > * { position: relative; z-index: 1; }
+  /* The number's frame covers the card down to the stats table's top line on phones (the whole card on computers),
+     so the number stands on the same line as the photo and never runs into the table. Only its foot is clipped. */
+  .phead .pnum-box { position: relative; z-index: 0; grid-column: 1 / -1; grid-row: 1 / 4; align-self: stretch; margin: 0 -24px 0 -28px; clip-path: inset(-100vh -100vw 0 -100vw); pointer-events: none; }
   /* Painted under everything else in the card but above its background, big enough to fill the card's right side,
-     its foot cut off by the card's bottom edge. */
-  .phead .pnum { position: absolute; z-index: -1; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
+     its foot cut off by the bottom of its frame. */
+  .phead .pnum { position: absolute; z-index: 0; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
   .phead .pmeta { grid-column: 1; grid-row: 2; }
   .pstats-in { grid-column: 1; grid-row: 3; margin: 22px 0 16px; }
@@ -563,7 +569,8 @@ const statRow = (x: any) => (isG ? null : x);
   @media (max-width: 719px) {
     /* Phones: the name runs the full width over the number; the photo stands on the stats table's top line. */
     .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto; } /* the photo's extra height goes above the team line */
-    .phead .pnum { font-size: 240px; right: 6px; bottom: auto; top: -26px; }
+    .phead .pnum-box { margin: 0 -16px; }
+    .phead .pnum { font-size: 240px; right: 6px; bottom: -46px; }
     .phead .team-top { display: contents; }
     .phead h1 { grid-column: 1 / -1; grid-row: 1; margin-top: 20px; }
     .phead .rec { grid-column: 1; grid-row: 2; margin-top: 6px; align-self: end; }
@@ -574,7 +581,7 @@ const statRow = (x: any) => (isG ? null : x);
     .pstats { width: 100%; }
     .phead.no-stats .pmeta { padding-bottom: 22px; }
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
-    .phead.no-stats .pnum { font-size: 240px; bottom: auto; }
+    .phead.no-stats .pnum { font-size: 240px; bottom: -46px; }
     .pout-tag { display: table; margin: 10px 0 0 !important; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
