@@ -157,7 +157,8 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     and those in it whom its rating has barely seen (`back`), each as (player, expected goals a game). Third, per
     (game, team) for the post-game page, who made the difference: `missing` (skaters the rating counts on, still with
     the club, not in the morning lineup) and `late_out` / `late_in` (morning lineup against who dressed), each as
-    (player, expected goals a game, dressed for this club this season)."""
+    (player, expected goals a game, dressed for this club this season), and `worth`: each skater the rating has seen,
+    valued at his usual night (what he would add if the rating counted on him fully)."""
     have = [s for s in range(min(seasons) - 2, max(seasons) + 1) if (TABLES / str(s) / "player_game.parquet").exists()]
     rate = {s: _rates(s, have) for s in seasons}
     news = _news(seasons)
@@ -217,7 +218,8 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
         keep = lambda xs: sorted(((q, v, q in dressed[tid]) for q, v in xs if v > 0.01), key=lambda x: -x[1])
         return {"missing": keep((q, r.get(q, 0.0) * sec / 3600 / w) for q, sec in seen[tid].items()
                                 if q not in am and team_of.get(q, (tid,))[0] == tid),
-                "late_out": keep((q, worth(q)) for q in am - tonight), "late_in": keep((q, worth(q)) for q in tonight - am)}
+                "late_out": keep((q, worth(q)) for q in am - tonight), "late_in": keep((q, worth(q)) for q in tonight - am),
+                "worth": {q: worth(q) for q in seen[tid]}}
 
     rows = []
     for day in pg.partition_by("date", maintain_order=True):

@@ -28,7 +28,10 @@ type Replays = { share: Record<string, number>; regulation: Record<string, numbe
 type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }>;
     inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }>;
-    players?: Record<string, { missing: Named[]; out: Named[]; in: Named[] } | null> } | null };
+    players?: Record<string, { missing: Named[]; out: Named[]; in: Named[]; stars?: Star[] } | null> } | null };
+// A star who missed the game without moving the number: the rating had stopped counting on him, or rates his 5-on-5
+// play modestly.
+type Star = { id: number; name: string; why: 'priced' | 'small' };
 // A skater a lineup step was about, most valuable first; `big` marks the top tenth of absences.
 type Named = { id: number; name: string; xg: number; big: boolean };
 
@@ -41,6 +44,7 @@ const { away, home } = r;
 const order = [away, home];
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
+const poss = (n: string) => (n.endsWith('s') ? `${n}’` : `${n}’s`);  // "NY Rangers’ lineup"
 const side = (a: string) => (a === away ? 'away' : 'home');
 const colours = matchupColours(away, home);
 // The reveal is told from the visitor's own team's side when it played, otherwise the home team's.
@@ -65,6 +69,13 @@ const names = (xs: Named[] | undefined, big = false) => {
 };
 const named = (t: string, k: 'missing' | 'out' | 'in') => rv?.players?.[t]?.[k] ?? [];
 const without = (big: boolean) => [away, home].filter((t) => named(t, 'missing').length).map((t) => `${place(t)} were without ${names(named(t, 'missing'), big)}.`).join(' ');
+const starsOut = (long: boolean) => [away, home].flatMap((t) => (rv?.players?.[t]?.stars ?? []).map((x) => {
+  const also = named(t, 'missing').length ? ' also' : '';
+  if (!long) return `${x.name} was out for ${place(t)}${also ? ' too' : ''}, ${x.why === 'priced' ? 'but he had been out long enough that it was already in the numbers' : 'though by our ratings that barely moves this'}.`;
+  return x.why === 'priced'
+    ? `${place(t)} were${also} without ${x.name}. He had been out long enough that the rating above had already stopped counting on him, so his absence barely moves this step.`
+    : `${place(t)} were${also} without ${x.name}. Our ratings of his 5-on-5 play are more modest than his name, so his absence barely moves this step.`;
+})).join(' ');
 const late = () => [away, home].flatMap((t) => [
   named(t, 'out').length ? `${names(named(t, 'out'))} sat out for ${place(t)}` : '',
   named(t, 'in').length ? `${names(named(t, 'in'))} ${named(t, 'in').length > 1 ? 'were' : 'was'} in for ${place(t)}` : '',
@@ -88,10 +99,11 @@ const why = (a: string, input: string, pts: number): { short: string; long: stri
   if (input === 'roster') {
     const how = 'We look at who each team dressed in their last game, plus any injury news since, and compare those players with the ones who played in the games behind the rating above.';
     const lost = named(pts > 0 ? o : a, 'missing');
-    if (pts === 0) return { short: without(false) || 'Both teams played their usual players last time out.',
-      long: `${how} ${without(true)} Both teams’ lineups were about as strong as usual, so this step changes nothing.`.replace('  ', ' ') };
-    return { short: lost.length ? `${loser} were without ${names(lost)}.` : `${gainer}’s lineup stacked up better against their usual than ${loser}’s did.`,
-      long: `${how} ${without(true) || `${loser}’s last lineup was weaker than usual (someone important out, or a call-up in).`} That leaves ${loser}’s recent chances flattering them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
+    const extra = (t: string) => (t ? ` ${t}` : '');
+    if (pts === 0) return { short: (without(false) || 'Both teams played their usual players last time out.') + extra(starsOut(false)),
+      long: `${how} ${[without(true), starsOut(true)].filter(Boolean).join(' ')} Both teams’ lineups were about as strong as usual, so this step changes nothing.`.replace('  ', ' ') };
+    return { short: (lost.length ? `${loser} were without ${names(lost)}.` : `${poss(gainer)} lineup stacked up better against their usual than ${poss(loser)} did.`) + extra(starsOut(false)),
+      long: `${how} ${without(true) || `${loser}’s last lineup was weaker than usual (someone important out, or a call-up in).`}${extra(starsOut(true))} That leaves ${loser}’s recent chances flattering them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
   }
   if (input === 'b2b') { const tired = inp ? [a, o].filter((t) => inp[t].b2b) : []; const t = tired.map(place).join(' and ');
     return tired.length ? { short: `${t} played last night, so tired legs.`, long: `${t} played the night before. Teams on the second night of a back-to-back win less often.` }
