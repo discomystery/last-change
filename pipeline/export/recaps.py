@@ -290,6 +290,10 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         return [], {}
     score = {a: g["away_score"], h: g["home_score"], "pp_goals": {t: nums[t]["pp_goals"] for t in (a, h)},
              "pp_opps": {t: nums[t]["pp_opps"] for t in (a, h)}}
+    gg = S.goals.filter(pl.col("game_id") == gid)  # no shootout goals in here
+    score["shootout"] = g["last_period"] == "SO"
+    score["goals"] = {t: gg.filter(pl.col("team_id") == S.team_id[(gid, t)]).height for t in (a, h)}
+    score["non_en"] = {t: gg.filter((pl.col("team_id") == S.team_id[(gid, t)]) & (pl.col("strength") != "EN")).height for t in (a, h)}
     trios = []
     for t in (a, h):
         usual = [set(ids) for ids in usual_lines.get(t, [])]

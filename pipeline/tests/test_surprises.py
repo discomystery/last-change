@@ -55,3 +55,20 @@ def test_reputation_words():
     assert surprises._rep_words([12, 18, 20, 9, 15]) is None
     assert surprises._and(["A has ranked last in four of the last five seasons", "B has ranked first in three of the last five seasons"]) == \
         "A has ranked last in four of the last five seasons, and B has ranked first in three of them"
+
+
+def test_a_goalie_only_steals_one_when_he_saved_more_than_the_winning_margin():
+    places = {"CAR": "Carolina", "PHI": "Philadelphia"}
+    gl = lambda ga, xga: {"team": "CAR", "name": "F. Andersen", "ga": ga, "xga": xga, "gsax": xga - ga, "shots": 30, "started": True}
+    won = {"CAR": True, "PHI": False}
+    # won 7-2 with seven goals at even strength or better: saving 1.5 more than expected stole nothing
+    blowout = {"CAR": 7, "PHI": 2, "goals": {"CAR": 7, "PHI": 2}, "non_en": {"CAR": 7, "PHI": 2}}
+    assert "stole" not in surprises.goalie_night(gl(2, 3.5), places, blowout, won)["head"]
+    # won 2-1 plus an empty-netter (3-1): the margin without it is one goal, so 2.5 saved above expected stole it
+    close = {"CAR": 3, "PHI": 1, "goals": {"CAR": 3, "PHI": 1}, "non_en": {"CAR": 2, "PHI": 1}}
+    c = surprises.goalie_night(gl(1, 3.5), places, close, won)
+    assert c["head"] == "F. Andersen stole one" and "not counting empty-net goals" in c["body"]
+    # no goals against is a shutout, and it is told as one
+    shut = {"CAR": 4, "PHI": 0, "goals": {"CAR": 4, "PHI": 0}, "non_en": {"CAR": 4, "PHI": 0}}
+    s = surprises.goalie_night(gl(0, 1.2), places, shut, won)
+    assert s["head"] == "A shutout for F. Andersen" and "stopped all 30 shots" in s["body"]

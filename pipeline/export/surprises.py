@@ -37,6 +37,7 @@ from pipeline.metrics import adjust, goalies, team_style
 BIG, SMALL = 1.75, 1.0  # scores for a surprise and for a smaller twist
 KNOWN_BONUS = 0.25  # "bad to worse" and "good to better" are a story of their own (Sora, 2026-10-12)
 SHOT_WEIGHT = 0.75  # shot share has to stray further (2.3 spreads) to count as a surprise
+DEPTH_WEIGHT = 0.85  # bottom-six minutes swing with penalties and injuries in the game, so they need a little more too
 MAX_SHOWN, MIN_SHOWN = 4, 2
 TAGS = {"break": "Broke the pattern", "further": "Further than usual", "muted": "Closer than usual",
         "unusual": "Out of character", "rare": "Out of the ordinary", "worse": "Bad to worse", "better": "Good to better"}
@@ -218,7 +219,8 @@ MILD = {"pp": ("have a better power play than most", "have a weaker power play t
         "volume": ("usually shoot more than most teams", "usually shoot less than most teams"),
         "suppression": ("usually allow fewer shots than most teams", "usually allow more shots than most teams")}
 NEUTRAL = {"hits", "depth"}  # style, not quality: never "good to better" or "bad to worse"
-REP = {"pp": ("power play", " in conversion"), "pk": ("penalty kill", "")}
+REP = {"pp": ("most effective power plays", "least effective power plays", "power play"),
+       "pk": ("best penalty kills", "weakest penalty kills", "penalty kill")}
 
 
 def _trait(fp: dict, t: str, dim: str, season: int, places: dict) -> tuple[float, str | None, bool]:
@@ -240,8 +242,14 @@ def _trait(fp: dict, t: str, dim: str, season: int, places: dict) -> tuple[float
         z = 0.5 * z + 0.5 * rz if pct is not None else rz
         rw = _rep_words(ranks)
         if rw and (rz > 0) == (z > 0) and abs(rz) >= EXTREME:
-            what, how = REP[dim]
-            words = f"{T}’s {what} has ranked {rw[0]}{how} {rw[1]}"
+            # said the way the site talks about a habit, not as a list of past ranks (Sora, 2026-10-12)
+            top = rw[0] in ("first in the league", "in the top three")
+            low = rw[0] in ("last in the league", "in the bottom three")
+            what = REP[dim]
+            if top or low:
+                words = f"{T} have had one of the league’s {what[0 if top else 1]} for years"
+            else:
+                words = f"{T}’s {what[2]} has been near the {'top' if rz > 0 else 'bottom'} of the league for years"
             known = True
         elif known and (rz > 0) != (z > 0):
             known = False  # this season and last say one thing, five seasons of goals the other
@@ -270,6 +278,8 @@ def _and(xs: list[str]) -> str:
     for tail in (" of the last five seasons", " of the last four seasons", " of the last three seasons"):
         if a.endswith(tail) and b.endswith(tail) and not b.startswith("in each"):
             b = b[: -len(tail)] + " of them"
+    if a.endswith(" for years") and b.endswith(" for years"):
+        a = a[: -len(" for years")]  # said once, at the end
     return f"{a}, and {b}"
 
 
@@ -406,7 +416,7 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
         short = f"the bottom six played {x:.0f}% of the forwards’ 5-on-5 time, {rest}"
         cat = "lineup"
     body = compose(cls, why, fig, short, rarity(kind, x - e), BRIDGE[kind][0 if up else 1], who=T)
-    return _item(cat, abs(z), cls, head, body, (kind, t, up))
+    return _item(cat, abs(z) * (DEPTH_WEIGHT if kind == "depth" else 1.0), cls, head, body, (kind, t, up))
 
 
 def _conversion(t: str, o: str, season: int) -> tuple[float, float] | None:
@@ -473,22 +483,15 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
     won = {a: score[a] > score[h], h: score[h] > score[a]}
     for gl in glines:
         if not gl["started"] or gl["shots"] < 15:
+            out.append(None)
             continue
-        z = z_of("gsax", gl["gsax"])
-        t = gl["team"]
-        if z > 0:
-            head = f"{gl['name']} stole one" if won[t] and z >= 1.5 else f"A big night for {gl['name']}"
-            body = f"{gl['name']} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on shots worth {gl['xga']:.1f} expected goals, {gl['gsax']:.1f} fewer than expected."
-        else:
-            head = f"A rough night for {gl['name']}"
-            body = f"{gl['name']} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on shots worth {gl['xga']:.1f} expected goals, {-gl['gsax']:.1f} more than expected."
-        n = every("gsax", gl["gsax"])
-        body += f" Starting goalies had a night this {'good' if z > 0 else 'rough'} about once every {n} starts over the last three seasons."
-        out.append(_item("goalie", abs(z), "rare", head, body))
+        out.append(goalie_night(gl, places, score, won))
     for t, names, sec in new_trio:
         if sec < 360:
             continue
-        out.append(_item("lineup", min(2.5, 1.0 + (sec - 360) / 360 * 0.75), "break", f"{places[t]} tried a different line",
+        # early in a season coaches shuffle lines most nights, so a new trio needs real minutes to stand out:
+        # 12:00 together makes a smaller twist, 18:00 a surprise
+        out.append(_item("lineup", min(2.25, 0.75 + (sec - 360) / 360 * 0.5), "break", f"{places[t]} tried a different line",
                          f"{names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, a trio that isn’t one of {places[t]}’s usual lines."))
     if replay:
         w, l = (a, h) if won[a] else (h, a)
@@ -497,6 +500,40 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
             out.append(_item("result", 1.0 + (p - 0.6) * 7.5, "rare", f"{places[w]} won against the run of play",
                              f"With chances like these, {places[l]} would win about {round(100 * p)} games in 100. {places[w]} won anyway."))
     return [c for c in out if c is not None]
+
+
+def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
+    """A starting goalie far from what his shots were worth. He "stole one" only when he saved more goals above
+    expected than his team won by, empty-net goals left out (Sora, 2026-10-12): with an average night in net they would
+    not have won. Zero goals against is a shutout."""
+    z = z_of("gsax", gl["gsax"])
+    t, N = gl["team"], gl["name"]
+    o = next(k for k in won if k != t)
+    goals = score.get("goals", {t: score[t], o: score[o]})
+    non_en = score.get("non_en", goals)
+    blank = gl["ga"] == 0 and goals[o] == 0
+    shutout = blank and not score.get("shootout")  # a 0-0 game settled by a shootout is not called a shutout
+    stole = won[t] and gl["gsax"] > non_en[t] - goals[o]
+    shots = f"{gl['shots']} shots, worth {gl['xga']:.1f} expected goals"
+    if z > 0:
+        if shutout:
+            head = f"{N} stole one with a shutout" if stole else f"A shutout for {N}"
+            body = f"{N} stopped all {shots}."
+        elif blank:
+            head = f"{N} stole one" if stole else f"A big night for {N}"
+            body = f"{N} stopped all {shots}, through overtime."
+        else:
+            head = f"{N} stole one" if stole else f"A big night for {N}"
+            body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
+        if stole:
+            en = non_en[t] < goals[t]
+            body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
+    else:
+        head = f"A rough night for {N}"
+        body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
+    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {every('gsax', gl['gsax'])} starts."
+    score_ = max(abs(z), SMALL) if blank else abs(z)  # a shutout is always worth a mention when nothing bigger happened
+    return _item("goalie", score_, "rare", head, body)
 
 
 # What each kind of preview call predicted, in the surprises' own terms: (figure, team, went up). The shot share is
