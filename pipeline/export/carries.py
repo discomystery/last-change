@@ -79,6 +79,9 @@ def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str], id
     team_pp = now.select("game_id", "team_id", "tpp_sec").unique().group_by("team_id").agg(pl.col("tpp_sec").sum())
     team_pp = dict(zip(team_pp["team_id"], team_pp["tpp_sec"]))
     units = {}  # game_units for both seasons, read only if an idle player needs them
+    f = TABLES / str(season) / "game_units.parquet"
+    units_now = pl.read_parquet(f) if f.exists() else None
+    recent_by = {}
 
     out = {}
     for pid, tid in club.items():
@@ -121,7 +124,11 @@ def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str], id
                 units = {s: pl.read_parquet(TABLES / str(s) / "game_units.parquet") for s in (season - 1, season) if (TABLES / str(s) / "game_units.parquet").exists()}
             nxt = _next_idle(pid, tid, pg, season, units, name)
         else:
-            nxt = _next(pid, tid, per, team_pp.get(tid, 0), lines.get(abbr.get(tid)) or {}, name)
+            if tid not in recent_by:
+                ids = now.filter(pl.col("team_id") == tid).select("game_id", "date").unique().sort("date")["game_id"].tail(RECENT).to_list()
+                recent_by[tid] = (now.filter((pl.col("team_id") == tid) & pl.col("game_id").is_in(ids)),
+                                  units_now.filter((pl.col("team_id") == tid) & pl.col("game_id").is_in(ids)) if units_now is not None else None)
+            nxt = _next(pid, tid, per, team_pp.get(tid, 0), lines.get(abbr.get(tid)) or {}, name, *recent_by[tid])
         out[pid] = {"tiles": tiles, "next": nxt,
                     "fill": fill, "out": _missed(pid, tid, pg, team, season)}
     return out
@@ -143,8 +150,19 @@ def _typical(season: int) -> dict:
     return out
 
 
-def _next(pid: int, tid: int, per: pl.DataFrame, team_pp_sec: float, ln: dict, name: dict) -> dict:
-    """Who already does the most of each thing he does, after him, from this season's ice time."""
+# Tested on 2,445 stretches a top-nine forward or top-four defenseman missed in 2023-26 (who actually took the job
+# while he was out): the usual stand-in on his line named the right player 34% of the time (the next most-used
+# player at his position 10%); the part-timer at his position who has dressed most lately was in the lineup 64% of the
+# time; nothing named the main gainer of his ice time better than chance (his minutes get shared out); for the power
+# play and penalty kill the next most-used player was right 10-17%, so those names are "most likely", not sure things.
+RECENT = 10  # team games for the stand-in and the part-timers
+STAND_IN_SEC = 120  # seconds with his linemates over those games before a stand-in counts (under it: 7% right, below the 10% fallback)
+
+
+def _next(pid: int, tid: int, per: pl.DataFrame, team_pp_sec: float, ln: dict, name: dict, recent: pl.DataFrame | None = None,
+          units: pl.DataFrame | None = None) -> dict:
+    """Who would most likely take each thing he does if he were out. `recent`: the team's player-games over its last
+    RECENT games; `units`: those games' 5-on-5 groups (game_units)."""
     t = per.filter((pl.col("team_id") == tid) & (pl.col("gp") >= 2))
     me = per.filter((pl.col("team_id") == tid) & (pl.col("player_id") == pid))
     if me.is_empty():
@@ -160,14 +178,37 @@ def _next(pid: int, tid: int, per: pl.DataFrame, team_pp_sec: float, ln: dict, n
 
     unit = next((u for u in ln.get("units", []) if pid in u["ids"]), None)
     if unit:
-        same = others.filter(pl.col("pos") == me["pos"]) if not is_d else others
-        nxt = top(same.filter(~pl.col("player_id").is_in(unit["ids"])), "toi")
-        out["line"] = {"pos": POS_WORD.get(me["pos"], "player"), "next": nxt}
+        # The usual stand-in: whoever has played with his linemates without him over the team's last games.
+        partners = {m for m in unit["ids"] if m != pid}
+        sec, games = {}, {}
+        if units is not None and partners:
+            for r in units.filter(pl.col("kind") == ("D" if is_d else "F")).iter_rows(named=True):
+                members = {int(x) for x in r["unit"].split("-")}
+                if partners <= members and pid not in members:
+                    for o in members - partners:
+                        sec[o] = sec.get(o, 0) + r["sec"]
+                        games.setdefault(o, set()).add(r["game_id"])
+        sub = max(sec, key=sec.get) if sec else None
+        if sub and sec[sub] >= STAND_IN_SEC:
+            out["line"] = {"pos": POS_WORD.get(me["pos"], "player"), "stand_in": True,
+                           "next": {"id": sub, "name": name.get(sub, "?"), "sec": round(sec[sub] / len(games[sub])), "games": len(games[sub]),
+                                    "of": recent["game_id"].n_unique() if recent is not None else RECENT}}
+        else:  # no real stand-in yet: the next most-used player at his position
+            same = others.filter(pl.col("pos") == me["pos"]) if not is_d else others
+            out["line"] = {"pos": POS_WORD.get(me["pos"], "player"), "next": top(same.filter(~pl.col("player_id").is_in(unit["ids"])), "toi")}
+    if recent is not None and recent.height:
+        # His place in the lineup: the part-timer at his position who has dressed most over the team's last games.
+        n = recent["game_id"].n_unique()
+        part = recent.filter((pl.col("pos") == "D") == is_d).group_by("player_id").agg(pl.len().alias("gp"), pl.col("date").max()).filter(
+            (pl.col("player_id") != pid) & (pl.col("gp") <= n / 2)).sort("gp", "date", descending=True)
+        if part.height:
+            r = part.row(0, named=True)
+            out["lineup"] = {"id": r["player_id"], "name": name.get(r["player_id"], "?"), "gp": r["gp"], "of": n}
     if me["pp"] >= RELIED_PP:
         mine = {p["id"] for u in (ln.get("special") or {}).get("pp", []) if any(x["id"] == pid for x in u["players"]) for p in u["players"]}
         out["pp"] = {"sec": round(me["pp"]), "share": round(100 * me["pp"] * me["gp"] / team_pp_sec) if team_pp_sec else None,
                      "next": top(t.filter((pl.col("player_id") != pid) & ~pl.col("player_id").is_in(list(mine))), "pp")}
-    out["toi"] = {"sec": round(me["toi"]), "rank": int((others["toi"] > me["toi"]).sum()) + 1, "next": top(others.filter(pl.col("toi") <= me["toi"]), "toi")}
+    out["toi"] = {"sec": round(me["toi"]), "rank": int((others["toi"] > me["toi"]).sum()) + 1, "next": None, "spread": True}
     if me["pk"] >= RELIED_PK:
         out["pk"] = {"sec": round(me["pk"]), "next": top(others.filter(pl.col("pk") <= me["pk"]), "pk")}
     else:
