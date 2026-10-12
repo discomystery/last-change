@@ -44,6 +44,7 @@ class Season:
     """Everything about the finished games of one season that grading needs, loaded once."""
 
     def __init__(self, season: int):
+        self.season = season
         d = TABLES / str(season)
         self.games = {g["game_id"]: g for g in pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).iter_rows(named=True)}
         self.team_id = {}
@@ -289,6 +290,10 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         return [], {}
     score = {a: g["away_score"], h: g["home_score"], "pp_goals": {t: nums[t]["pp_goals"] for t in (a, h)},
              "pp_opps": {t: nums[t]["pp_opps"] for t in (a, h)}}
+    gg = S.goals.filter(pl.col("game_id") == gid)  # no shootout goals in here
+    score["shootout"] = g["last_period"] == "SO"
+    score["goals"] = {t: gg.filter(pl.col("team_id") == S.team_id[(gid, t)]).height for t in (a, h)}
+    score["non_en"] = {t: gg.filter((pl.col("team_id") == S.team_id[(gid, t)]) & (pl.col("strength") != "EN")).height for t in (a, h)}
     trios = []
     for t in (a, h):
         usual = [set(ids) for ids in usual_lines.get(t, [])]
@@ -300,7 +305,7 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
             if ids not in usual:
                 trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"])))
                 break
-    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay), list(calls))
+    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season), list(calls))
     return surprise_rules.pick(cands), beyond
 
 
