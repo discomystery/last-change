@@ -6,6 +6,7 @@ import Base from '../../layouts/Base.astro';
 import Explain from '../../components/Explain.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
+import CallCard from '../../components/CallCard.astro';
 import GameTrail from '../../components/GameTrail.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import Quadrant from '../../components/Quadrant.astro';
@@ -66,7 +67,6 @@ const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-d
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
 const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
-const rawWords: Record<string, string> = { physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60' };
 // Older frozen snapshots can carry a retired trait (point shots); show only traits the site still describes.
 const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
 const gap = (c: any) => Math.abs(c[away].blend.pct - c[home].blend.pct);
@@ -180,15 +180,7 @@ const _ = ordinal;
       </div>
     )}
     <ol class="watch">
-      {snap.claims.map((c) => (
-        <li class="card">
-          <h3>{c.head}</h3>
-          <p>{c.body}</p>
-          {c.call && <p class="call"><span>The call</span> {c.call}</p>}
-          {c.nums && <p class="cite nums">{c.nums}</p>}
-          <p class="cite">{c.cite}</p>
-        </li>
-      ))}
+      {snap.claims.map((c) => <CallCard c={c as any} side={side} />)}
     </ol>
     {!story && notes.length > 0 && (
       <div class="card worth">
@@ -203,7 +195,7 @@ const _ = ordinal;
     <Fragment slot="explain">
       <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
-      <p class="note">Forecheck pressure and physicality are arena-adjusted scores; switch “Hits and takeaways” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+      <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
     <div class="key">
       {order.map((a) => <span class={`t-${side(a)}`}><i></i>{full(a)}</span>)}
@@ -505,10 +497,6 @@ const _ = ordinal;
   .outlook h3 { margin: 4px 0 6px; }
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
-  .watch h3 { font: 600 22px/1.15 var(--display); margin-bottom: 8px; }
-  .watch .cite { margin-top: 8px; }
-  .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
-  .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
   .watch + .worth { margin-top: 16px; }
   .lines-worth { margin: 20px 0 8px; }

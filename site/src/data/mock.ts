@@ -42,11 +42,11 @@ export const teams = Object.fromEntries(
 // ---------- Style fingerprint ----------
 export type Dim = { key: string; label: string; tip: string; CAR: number; EDM: number; neutral?: boolean };
 export const fingerprint: Dim[] = [
-  { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts the team takes per 60 minutes of 5-on-5 play.', CAR: 96, EDM: 71 },
+  { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts a team takes at 5-on-5, as a score where 100 is league average: 120 means 20% more than an average team. Teams that are behind shoot more, so each attempt is weighted for the score and for home ice first. That’s why it’s a score and not a count.', CAR: 96, EDM: 71 },
   { key: 'quality', label: 'Shot quality', tip: 'How dangerous the average shot is: its chance of going in, by expected goals.', CAR: 22, EDM: 88 },
-  { key: 'suppression', label: 'Shot suppression', tip: 'How few shot attempts the team allows. Further right means fewer allowed.', CAR: 94, EDM: 48 },
+  { key: 'suppression', label: 'Shot suppression', tip: 'How many shot attempts a team allows at 5-on-5, as a shots-against score where 100 is league average. Lower is better: 75 means a quarter fewer than an average team. Each attempt is weighted for the score and for home ice, so a team that sat on a lead isn’t punished for it. Further right means fewer allowed.', CAR: 94, EDM: 48 },
   { key: 'qualityAllowed', label: 'Quality allowed', tip: 'How dangerous the average shot against is. Further right means safer shots against.', CAR: 31, EDM: 55 },
-  { key: 'pace', label: 'Pace', tip: 'Total shots both ways per 60. High-pace teams play track meets.', CAR: 78, EDM: 66, neutral: true },
+  { key: 'pace', label: 'Pace', tip: 'How many shots both teams get at 5-on-5 combined (blocked shots left out), as a score where 100 is league average. Each shot is weighted for the score and for home ice, so a game that turned into a chase doesn’t look faster than it was.', CAR: 78, EDM: 66, neutral: true },
   { key: 'rebounds', label: 'Second chances', tip: 'Share of scoring chances that come from rebounds.', CAR: 74, EDM: 52, neutral: true },
   { key: 'turnover', label: 'Off-turnover offense', tip: 'Share of scoring chances within five seconds of forcing a turnover.', CAR: 81, EDM: 63, neutral: true },
   { key: 'dShots', label: 'Shots from defensemen', tip: 'Share of 5-on-5 shot attempts taken by defensemen. Some systems send defensemen deep into the offensive zone; others leave the shooting to the forwards.', CAR: 85, EDM: 30, neutral: true },
@@ -302,22 +302,29 @@ type FpMeta = { group: string; lo: string; hi: string; at0: number; at100: numbe
 const f1 = (v: number) => v.toFixed(1);
 // A chance with its article: "a 6.3%", "an 8.1%".
 const aPct = (v: number) => { const s = `${f1(100 * v)}%`; return (s[0] === '8' || /^1[18]\./.test(s) ? 'an ' : 'a ') + s; };
+// Traits shown as a score (100 is league average) rather than a rate: the arena-adjusted ones, and the shot rates weighted
+// for score and venue (Sora, 2026-10-12). Each carries its rate as recorded for the Raw switch, in these words.
+export const scoreTraits = new Set(['volume', 'suppression', 'pace', 'forecheck', 'physical']);
+export const rawWords: Record<string, string> = {
+  volume: 'shot attempts per 60', suppression: 'shot attempts allowed per 60', pace: 'shots per 60, both teams combined',
+  physical: 'hits recorded per 60', forecheck: 'forecheck plays recorded per 60',
+};
 export const fpGroups = ['Offense', 'Defense', 'Tempo and edge', 'Special teams'];
 const fpMeta: Record<string, FpMeta> = {
-  volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `${f1(v)} shot attempts per 60` },
+  volume: { group: 'Offense', lo: 'Selective', hi: 'Relentless', at0: 48, at100: 68, say: (v) => `shot volume score ${Math.round(v)}` },
   quality: { group: 'Offense', lo: 'Hopeful', hi: 'Dangerous', at0: 0.062, at100: 0.092, say: (v) => `${aPct(v)} chance of scoring on the average shot` },
   rebounds: { group: 'Offense', lo: 'One-and-done', hi: 'Crashers', at0: 5, at100: 13, say: (v) => `${f1(v)}% of chances come from rebounds` },
   turnover: { group: 'Offense', lo: 'Patient', hi: 'Opportunist', at0: 5, at100: 14, say: (v) => `${f1(v)}% of chances come right after a turnover` },
   dShots: { group: 'Offense', lo: 'Forward-led', hi: 'Active D', at0: 26, at100: 40, say: (v) => `${f1(v)}% of shot attempts come from defensemen` },
   inClose: { group: 'Offense', lo: 'From distance', hi: 'In close', at0: 26, at100: 32, say: (v) => `${f1(v)}% of shots come from within 20 feet` },
-  suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `${f1(v)} shot attempts allowed per 60` },
+  suppression: { group: 'Defense', lo: 'Porous', hi: 'Stingy', at0: 66, at100: 48, say: (v) => `shots-against score ${Math.round(v)}` },
   qualityAllowed: { group: 'Defense', lo: 'Exposed', hi: 'Sheltered', at0: 0.092, at100: 0.062, say: (v) => `${aPct(v)} chance of scoring on the average shot against` },
   breakdowns: { group: 'Defense', lo: 'Fire drill', hi: 'Composed', at0: 4.2, at100: 2.0, say: (v) => `${v.toFixed(2)} defensive breakdowns per 60` },
   longShifts: { group: 'Defense', lo: 'Pinned', hi: 'Fresh legs', at0: 27, at100: 17, say: (v) => `${f1(v)}% of shots against come on long shifts` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
-  pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `${f1(v)} shots per 60, both teams combined` },
-  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
-  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)} (100 is league average)`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per 60` },
+  pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `pace score ${Math.round(v)}` },
+  forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)}`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
+  physical: { group: 'Tempo and edge', lo: 'Finesse', hi: 'Bruising', at0: 76, at100: 128, say: (v) => `hit score ${Math.round(v)}`, raw: (p) => `${f1(16 + p * 0.16 - 1.4)} hits recorded per 60` },
   depth: { group: 'Tempo and edge', lo: 'Top-heavy', hi: 'Deep', at0: 28, at100: 40, say: (v) => `${f1(v)}% of forward ice time at 5-on-5 goes to the bottom six` },
   pp: { group: 'Special teams', lo: 'Harmless', hi: 'Lethal', at0: 5.5, at100: 9.6, say: (v) => `${f1(v)} expected goals per 60 on the power play` },
   pk: { group: 'Special teams', lo: 'Leaky', hi: 'Airtight', at0: 9.0, at100: 5.4, say: (v) => `${f1(v)} expected goals allowed per 60 shorthanded` },

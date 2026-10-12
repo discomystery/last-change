@@ -24,6 +24,8 @@
   .fpgrid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
   .fpc { display: grid; gap: 10px; align-content: start; }
   .fpc-name { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; justify-self: start; }
+  .fpc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .fpc-top .corner { font: 500 12px/1 var(--ui); color: var(--ink-3); white-space: nowrap; margin-top: 2px; }
   .ends { display: flex; justify-content: space-between; gap: 8px; font: italic 400 14px var(--body); color: var(--ink-2); margin-bottom: -4px; }
   .lanes { position: relative; padding: 4px 7px; }
   .lanes::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.5; border-radius: 1px; }

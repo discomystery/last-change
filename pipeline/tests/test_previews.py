@@ -124,3 +124,35 @@ def test_goalie_record_call_graded_on_his_usual():
     assert recaps.measure_history(claim, line(27, 30))["verdict"] == "held"  # .900
     assert recaps.measure_history(claim, line(29, 30))["verdict"] == "missed"  # .967
     assert recaps.measure_history(claim, line(29, 30, started=False))["verdict"] == "na"
+
+
+def test_shot_calls_quote_scores_and_what_you_will_see(tmp_path, monkeypatch):
+    """Sora, 2026-10-12: weighted shot rates are told as scores (100 = league average), with recorded counts beside."""
+    monkeypatch.setattr(previews, "SITE_DATA", tmp_path)
+    now = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+    _site(tmp_path, (now + timedelta(hours=8)).isoformat().replace("+00:00", "Z"))
+    previews.run(now)
+    clash = json.loads((tmp_path / "previews" / "1.json").read_text())["claims"][0]
+    assert "shot volume score is at least their usual 116" in clash["call"] and "per 60" not in clash["call"]
+    assert clash["see"].startswith(f"About {previews.per_game(66.0)} shot attempts")
+    assert [c["team"] for c in clash["chips"]] == ["AAA", "BBB"] and clash["chips"][0]["text"] == "3rd shot volume"
+    assert clash["check"]["scale"] == "score" and clash["check"]["baseline"] == 66.0  # graded on the same rates as before
+
+
+def test_graded_shot_call_reads_in_plain_words_with_a_chart():
+    from types import SimpleNamespace
+
+    from pipeline.export import grades, recaps
+    league = 66.0 * 100 / 116
+    claim = {"kind": "clash", "metric": "volume", "team": "AAA", "opp": "BBB",
+             "check": {"metric": "volume", "team": "AAA", "baseline": 66.0, "league": league, "direction": "above", "scale": "score"}}
+    row = {"cf_adj": 80.0, "sec5": 3000.0, "cf5": 61, "ca5": 40, "ff5": 45, "fa5": 30}
+    S = SimpleNamespace(team_id={(1, "AAA"): 10, (1, "BBB"): 20}, rows={(1, 10): row, (1, 20): row}, totals={(1, 10): {"sf": 39}},
+                        games={1: {"away": "AAA", "home": "BBB"}})
+    places = {"AAA": "Aville", "BBB": "Btown"}
+    res = grades.present(S, 1, claim, recaps.measure(S, 1, claim, places, {}), places, {})
+    assert res["verdict"] == "held" and res["title"] and res["plain"]
+    assert res["happened"].startswith("Shot volume score 169, against their usual 116")
+    assert res["lane"]["now"][0] > res["lane"]["usual"][0] > res["lane"]["avg"][0] == 50.0
+    assert res["saw"].startswith("61 shot attempts at 5-on-5") and "39 shots on goal" in res["saw"]
+    assert not any(k.startswith("_") for k in res)

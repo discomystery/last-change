@@ -1,0 +1,163 @@
+---
+// One "What to watch" call, the same card on the preview and the post-game page (Sora, 2026-10-12): headline, write-up,
+// then under a hairline "The call" (the claim, as a score where it's about shots) with what you'll see beside it, and
+// rank chips whose tooltips carry the source. With `graded`, the card gains a second half that mirrors the first: the
+// verdict pill and a short title level with the headline, a plain sentence level with the write-up, and under the same
+// hairline the technical grade, a small gap-lane chart and, for shot calls, what was recorded.
+export type Chip = { team: string; text: string; tip: string };
+export type Lane = { team: string | null; ends: [string, string] | null; avg: [number, string, string] | null; usual: [number, string]; now: [number, string]; ref?: [number, string]; tip: string };
+export type Call = {
+  id: string; kind: string; head: string; body: string; call?: string | null; see?: string; nums?: string | null; cite: string; chips?: Chip[];
+  verdict?: 'held' | 'partly' | 'missed' | 'na' | 'pending' | null; title?: string; plain?: string; happened?: string; beyond?: string; lane?: Lane; saw?: string;
+};
+interface Props { c: Call; side: (abbr: string) => string; graded?: boolean; tag?: string }
+const { c, side, graded = false, tag = 'li' } = Astro.props;
+const Tag = tag as any;
+
+// Score names and "shot attempts" get a tooltip wherever a call uses them.
+const TIPS: [string, string][] = [
+  ['shot volume score', 'How many shot attempts a team takes at 5-on-5, as a score where 100 is league average: 120 means 20% more than an average team. Teams that are behind shoot more, so each attempt is weighted for the score and for home ice first. That’s why it’s a score and not a count.'],
+  ['shots-against score', 'How many shot attempts a team allows at 5-on-5, as a score where 100 is league average. Lower is better: 75 means a quarter fewer than an average team. Each attempt is weighted for the score and for home ice, so a team that sat on a lead isn’t punished for it.'],
+  ['pace score', 'How many shots both teams get at 5-on-5 combined (blocked shots left out), as a score where 100 is league average. Each shot is weighted for the score and for home ice, so a game that turned into a chase doesn’t look faster than it was.'],
+  ['shot attempts', 'Every shot a team tries at 5-on-5: on goal, missed or blocked. The scoreboard only counts shots on goal, in every situation, so it reads lower. The counts in a call are for a normal game, about 49 minutes of 5-on-5.'],
+];
+const pattern = new RegExp(`(${TIPS.map(([t]) => t).join('|')})`, 'i');
+const parts = (text: string) => text.split(pattern).map((p) => ({ p, tip: TIPS.find(([t]) => t.toLowerCase() === p.toLowerCase())?.[1] }));
+const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;
+const mark = { held: '✓', partly: '≈', missed: '✕', na: '–', pending: '…' } as const;
+const v = c.verdict ?? 'na';
+const L = c.lane;
+// Labels under the lane, placed in order (the ring's, the dotted mark's, the average's). Two that would collide are
+// pushed apart, each set flush to its own mark on the outer side; a third that still has no room keeps its mark but
+// drops its words (the chart's tooltip still says it). Near the ends a label sits flush inside the lane.
+const GAP = 19;
+type Lab = { pos: number; anchor: '' | 'l' | 'r' };
+const placed: Lab[] = [];
+const place = (pos: number | undefined): Lab | null => {
+  if (pos === undefined) return null;
+  const me: Lab = { pos, anchor: pos < 12 ? 'l' : pos > 88 ? 'r' : '' };
+  for (const o of placed) {
+    const d = Math.abs(o.pos - pos);
+    if (d >= GAP) continue;
+    const meOut = pos < o.pos ? 'r' : 'l', oOut = pos < o.pos ? 'l' : 'r';
+    if (d < 3 || (o.anchor && o.anchor !== oOut) || (me.anchor && me.anchor !== meOut) || placed.length > 1) return null;
+    o.anchor = oOut; me.anchor = meOut;
+  }
+  placed.push(me);
+  return me;
+};
+const labUsual = L ? place(L.usual[0]) : null;
+const labRef = L?.ref ? place(L.ref[0]) : null;
+const labAvg = L?.avg ? place(L.avg[0]) : null;
+const cls = (l: Lab) => `gl-l${l.anchor ? ' ' + l.anchor : ''}`;
+const teamCls = (t: string | null | undefined) => (t ? `t-${side(t)}` : 't-none');
+---
+<Tag class:list={['card', 'mc', { 'mc-two': graded }]}>
+  <div class="mc-side">
+    <h3>{c.head}</h3>
+    <p class="u-body">{c.body}</p>
+    {(c.call || c.chips?.length || c.nums) && (
+      <div class="mc-tech">
+        {c.call && (
+          <div class="cs">
+            <p class="cs-label">The call</p>
+            <p class="cs-call">{parts(c.call).map(({ p, tip }) => tip ? <span class="term" tabindex="0" data-tip={tip}>{p}</span> : p)}</p>
+            {c.see && <p class="cs-see">{parts(c.see).map(({ p, tip }) => tip ? <span class="term" tabindex="0" data-tip={tip}>{p}</span> : p)}</p>}
+          </div>
+        )}
+        {c.chips?.length ? (
+          <p class="chips">{c.chips.map((ch) => <span class={`rchip term ${teamCls(ch.team)}`} tabindex="0" data-tip={ch.tip}><b>{ch.team}</b>{ch.text}</span>)}</p>
+        ) : (
+          <>
+            {c.nums && <p class="u-nums">{c.nums}</p>}
+            <p class="u-src">{c.cite}</p>
+          </>
+        )}
+      </div>
+    )}
+  </div>
+  {graded && (
+    <div class="mc-side mc-did">
+      <div class="mc-head">
+        <span class:list={['verdict', v]}><span aria-hidden="true">{mark[v]}</span> {label[v]}</span>
+        {c.title && <h3 class="mc-caps">{c.title}</h3>}
+      </div>
+      <div class="mc-plain">
+        <p class="u-body">{c.verdict === null ? 'This call has no rule to check it by.' : c.plain ?? c.happened}</p>
+        {c.beyond && <p class="beyond"><strong>Called it, and then some.</strong> {c.beyond}</p>}
+      </div>
+      {c.plain && c.happened && (
+        <div class="mc-tech">
+          <div class="mc-grade"><p class="cs-label">The grade</p><p class="cs-call">{parts(c.happened).map(({ p, tip }) => tip ? <span class="term" tabindex="0" data-tip={tip}>{p}</span> : p)}</p></div>
+          {L && (
+            <div class={`gl term ${teamCls(L.team)}`} tabindex="0" data-tip={L.tip}>
+              {L.ends && <div class="gl-ends"><span>{L.ends[0]}</span><span>{L.ends[1]}</span></div>}
+              <div class="gl-track">
+                {L.avg && <><span class="gl-avg" style={`--v:${L.avg[0]}`}></span>{labAvg && <em class={cls(labAvg)} style={`--v:${L.avg[0]}`}>{L.avg[1]}{L.avg[2] && <span class="gl-n">{L.avg[2]}</span>}</em>}</>}
+                {L.ref && <><span class="gl-ref" style={`--v:${L.ref[0]}`}></span>{labRef && <em class={cls(labRef)} style={`--v:${L.ref[0]}`}>{L.ref[1]}</em>}</>}
+                <span class="gl-ring" style={`--v:${L.usual[0]}`}></span>{labUsual && <em class={cls(labUsual)} style={`--v:${L.usual[0]}`}>{L.usual[1]}</em>}
+                <span class="gl-gap" style={`--a:${Math.min(L.usual[0], L.now[0])};--b:${Math.max(L.usual[0], L.now[0])}`}></span>
+                <span class="gl-dot" style={`--v:${L.now[0]}`}><b class:list={{ r: L.now[0] > 80, l: L.now[0] < 20 }}>{L.now[1]}</b></span>
+              </div>
+            </div>
+          )}
+          {c.saw && <p class="g-saw"><span>What you saw</span> {c.saw}</p>}
+        </div>
+      )}
+    </div>
+  )}
+</Tag>
+
+<style>
+  .mc { display: grid; gap: 18px; }
+  .mc-plain { display: grid; gap: 8px; align-content: start; }
+  .mc-side { display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .mc h3 { font: 600 22px/1.15 var(--display); margin: 0; }
+  .u-body { font: 400 17px/1.6 var(--body); color: var(--ink); margin: 0; }
+  .mc-tech { padding-top: 12px; border-top: 1px solid var(--rule); display: grid; gap: 10px; align-content: start; container-type: inline-size; }
+  .cs { display: grid; gap: 4px; }
+  .cs-label { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 0; }
+  .cs-call { font: 500 15px/1.45 var(--ui); color: var(--ink); margin: 0; }
+  .cs-see { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 0; }
+  @container (min-width: 420px) { .cs:has(.cs-see) { grid-template-columns: 1fr 1fr; column-gap: 18px; } .cs-label { grid-column: 1 / -1; } }
+  .u-nums { font: 400 13px/1.45 var(--ui); color: var(--ink-3); margin: 0; }
+  .u-src { font: 400 12px/1.45 var(--ui); color: var(--ink-3); margin: -6px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
+  .rchip { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--ui); color: var(--ink-2); background: color-mix(in oklab, var(--team) 12%, transparent); padding: 5px 9px; border-radius: 999px; text-decoration: none; cursor: help; }
+  .rchip b { font: 700 11px/1 var(--ui); letter-spacing: 0.04em; color: var(--ink); background: color-mix(in oklab, var(--team) 30%, transparent); padding: 3px 5px; border-radius: 999px; margin-left: -5px; }
+  .t-none { --team: var(--ink-3); }
+
+  .mc-grade { display: grid; gap: 4px; }
+  .mc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-height: 25px; }
+  .mc .mc-caps { flex: 1 1 12em; min-width: 0; font: 700 12.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); }
+  .verdict { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+  .verdict.held { background: var(--ink); color: var(--sheet); }
+  .verdict.partly { border-color: var(--ink-2); }
+  .verdict.missed, .verdict.na, .verdict.pending { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .beyond { margin: 0; font: 400 15px/1.5 var(--body); color: var(--ink-2); }
+  @media (min-width: 760px) {
+    .mc-two { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; column-gap: 28px; row-gap: 0; }
+    .mc-two .mc-side { grid-row: span 3; grid-template-rows: subgrid; row-gap: 12px; }
+    .mc-two .mc-did { border-left: 1px solid var(--rule); padding-left: 24px; }
+  }
+  @media (max-width: 759px) { .mc-did { border-top: 1px solid var(--rule); padding-top: 18px; } }
+
+  .gl { display: block; cursor: help; text-decoration: none; margin-top: 4px; container-type: inline-size; }
+  .gl-ends { display: flex; justify-content: space-between; font: italic 400 13px/1.2 var(--body); color: var(--ink-3); }
+  .gl-track { position: relative; height: 14px; margin: 26px 7px 24px; }
+  .gl-track::before { content: ''; position: absolute; left: -7px; right: -7px; top: 5px; height: 4px; border-radius: 2px; background: var(--track); }
+  .gl-avg { position: absolute; top: -3px; left: calc(var(--v) * 1%); width: 2px; height: 20px; margin-left: -1px; background: var(--ink); opacity: .5; border-radius: 1px; }
+  .gl-ref { position: absolute; top: -2px; height: 18px; left: calc(var(--v) * 1%); border-left: 2px dotted var(--ink-3); margin-left: -1px; }
+  .gl-ring { position: absolute; top: 1px; left: calc(var(--v) * 1%); width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; border: 2px solid var(--team); background: var(--sheet); z-index: 1; box-sizing: border-box; }
+  .gl-gap { position: absolute; top: 4px; height: 6px; border-radius: 3px; left: calc(var(--a) * 1%); width: calc((var(--b) - var(--a)) * 1%); background: color-mix(in oklab, var(--team) 50%, var(--track)); }
+  .gl-dot { position: absolute; top: 0; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 2; }
+  .gl-dot b { position: absolute; bottom: 20px; left: 50%; translate: -50% 0; font: 700 12px/1 var(--ui); color: var(--ink); white-space: nowrap; }
+  .gl-dot b.r { left: auto; right: -2px; translate: 0 0; }
+  .gl-dot b.l { left: -2px; translate: 0 0; }
+  .gl-l { position: absolute; top: 20px; left: calc(var(--v) * 1%); translate: -50% 0; font: 500 11px/1 var(--ui); font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .gl-l.l { translate: -4px 0; }
+  .gl-l.r { translate: calc(-100% + 4px) 0; }
+  @container (max-width: 440px) { .gl-n { display: none; } }
+  .g-saw { margin: 0; font: 400 13px/1.45 var(--ui); color: var(--ink-2); }
+  .g-saw span { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 6px; }
+</style>

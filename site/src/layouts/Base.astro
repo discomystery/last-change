@@ -90,9 +90,9 @@ const teamList = teams as { abbr: string; name: string }[];
           </div>
         </div>
         <div class="pref">
-          <span class="term" tabindex="0" data-tip="Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Arena-adjusted turns them into a score that corrects for that. Raw shows the numbers exactly as recorded.">Hits and takeaways</span>
-          <div class="mode" role="group" aria-label="Arena-adjusted scores or raw recorded numbers">
-            <button type="button" data-pref="arena" data-value="adjusted">Arena-adjusted</button>
+          <span class="term" tabindex="0" data-tip="Two kinds of numbers are adjusted before they’re shown. Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Shot rates are weighted for the score and home ice, because teams that are behind shoot more. Adjusted shows both as scores, where 100 is league average. Raw shows the numbers exactly as recorded.">Adjusted stats</span>
+          <div class="mode" role="group" aria-label="Adjusted scores or raw recorded numbers">
+            <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
             <button type="button" data-pref="arena" data-value="raw">Raw</button>
           </div>
         </div>
@@ -468,7 +468,7 @@ const teamList = teams as { abbr: string; name: string }[];
   .when-day + p strong { color: var(--ink); font-weight: 600; }
   .a-raw { display: none; }
   html[data-arena='raw'] .a-raw { display: inline; }
-  html[data-arena='raw'] .a-adj { display: none; }
+  html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
   .wordmark { font: 700 26px/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }
   .wordmark-note { font-size: 12px; color: var(--ink-3); }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
