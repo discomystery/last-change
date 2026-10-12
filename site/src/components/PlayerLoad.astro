@@ -35,7 +35,27 @@ const last = (name: string) => name.split(' ').slice(-1)[0];
 const n = c?.next ?? {};
 const line = p.role?.line;
 const pp = p.role?.pp;
-const jobs = [
+// A player who hasn't dressed this season: his load is last season's, and each row names the teammate whose share
+// of that job grew most over last season (who has picked it up), or none when nobody clearly has.
+const idle = !!n.last_season;
+const nextWord = idle ? 'Picked up by' : 'Next in line';
+const lineWord = (r: number) => (isD ? ['top', 'second', 'third'][Math.min(3, Math.ceil(r / 2)) - 1] : ['first', 'second', 'third', 'fourth'][Math.min(4, Math.ceil(r / 3)) - 1]);
+const upFrom = (now: string, was: string) => `${now}, up from ${was} last season`;
+const jobs = (idle ? [
+  n.line && { job: isD ? 'Pair' : 'Line', load: `With ${n.line.partners.map(last).join(' and ')}`, more: `${clock(n.line.sec)} a game together last season`, next: n.line.next,
+    nextMore: n.line.next ? `${clock(n.line.next.sec)} a game beside them in ${n.line.next.games} games${n.line.next.was_rank && lineWord(n.line.next.was_rank) ? `, up from the ${lineWord(n.line.next.was_rank)} ${isD ? 'pair' : 'line'}` : ''}` : '' },
+  n.lineup?.length && { job: 'Lineup spot', load: 'His place in the lineup', more: '', next: n.lineup, word: 'Dressing now',
+    nextMore: n.lineup.map((x: any, k: number) => `${last(x.name)} ${x.gp} of ${x.of} games${k ? '' : ' this season'} (${x.was}%${k ? '' : ' of games last season'})`).join(', ') },
+  n.pp ? { job: 'Power play', load: `${clock(n.pp.sec)} a game last season`, more: `on for ${n.pp.share}% of ${n.club ? place : 'his team'}’s power-play time`, next: n.pp.next,
+    nextMore: n.pp.next ? (n.pp.next.new ? `new to the power play, on for ${n.pp.next.sec}% of it` : `on for ${n.pp.next.sec}% of it, up from ${n.pp.next.was}% last season`) : '' }
+    : { job: 'Power play', load: 'Not a regular', more: 'last season', next: null },
+  n.toi && { job: 'Ice time', load: `${clock(n.toi.sec)} a game last season`, more: `would be the ${most(n.toi.rank)} of any ${place} ${isD ? 'defenseman' : 'forward'} this season`,
+    next: n.toi.next, nextMore: n.toi.next ? upFrom(`${clock(n.toi.next.sec)} a game`, clock(n.toi.next.was)) : '' },
+  n.pk && (n.pk.sec >= 60
+    ? { job: 'Penalty kill', load: `${clock(n.pk.sec)} a game last season`, more: 'killing penalties', next: n.pk.next,
+        nextMore: n.pk.next ? (n.pk.next.new ? `${clock(n.pk.next.sec)} a game, new to the penalty kill` : upFrom(`${clock(n.pk.next.sec)} a game`, clock(n.pk.next.was))) : '' }
+    : { job: 'Penalty kill', load: 'Not used', more: 'no regular shorthanded minutes last season', next: null }),
+] : [
   line && { job: isD ? 'Pair' : 'Line', load: `${line.label}${n.line && !isD ? `, ${n.line.pos}` : ''} with ${line.mates.map((m: any) => last(m.name)).join(' and ')}`,
     more: line.toi_sec ? `${clock(line.toi_sec)} a game together lately` : '', next: n.line?.next, nextMore: n.line?.next ? `${place}’s next most-used ${n.line.pos}` : '' },
   n.pp ? { job: 'Power play', load: pp ? `${pp.label}${pp.both ? ' and the second unit' : ''}${pp.role ? `, as the ${pp.role.toLowerCase()}` : ''}` : `${clock(n.pp.sec)} a game`,
@@ -45,7 +65,7 @@ const jobs = [
   n.pk && (n.pk.sec >= 60
     ? { job: 'Penalty kill', load: `${clock(n.pk.sec)} a game`, more: 'killing penalties', next: n.pk.next, nextMore: n.pk.next ? `${clock(n.pk.next.sec)} a game` : '' }
     : { job: 'Penalty kill', load: 'Not used', more: 'no regular shorthanded minutes', next: null }),
-].filter(Boolean) as any[];
+]).filter(Boolean) as any[];
 const f = c?.fill;
 const fMax = f ? Math.max(f.v, ...f.mates.map((x: any) => x[1]), ...f.ticks.map((x: any) => x[0])) * 1.12 : 1;
 const fAt = (v: number) => Math.min(100, (100 * v) / fMax);
@@ -58,7 +78,7 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
 {c && (
 <Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${place}’s game runs through him, and what they would have to replace without him.`}>
   <Fragment slot="explain">
-    <p class="note">“Next in line” is the teammate who already does the most of that after him this season. It is not a guess at the coach’s choice. Dots in the cards above are his {place} teammates, each over the games they played; hover one for the name.</p>
+    <p class="note">{idle ? '“Picked up by” is the teammate whose share of that job has grown the most since last season: who now plays beside his old linemates, which of last season’s part-timers are dressing, and who gained power-play, penalty-kill or overall ice time. Newcomers are measured against their own last season, wherever they played.' : '“Next in line” is the teammate who already does the most of that after him this season.'} It is not a guess at the coach’s choice. Dots in the cards above are his {place} teammates, each over the games they played; hover one for the name.</p>
   </Fragment>
   {modes.map(([m, mw]) => (
     <div class={`gmode m-${m}`}>
@@ -78,7 +98,7 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
             </li>
           ); })}
         </ul>
-      ) : <p class="note">No games this season yet.</p>}
+      ) : <p class="note">{idle ? 'He hasn’t played this season. Pick “this season and last” in the settings to see what he carried last season.' : 'No games this season yet.'}</p>}
       {m === 'blend' && moved && c.tiles.blend && <p class="note">This season and last includes his games for {moved} last season, counted against {moved}’s goals and shots. Switch to this season for {place} alone.</p>}
     </div>
   ))}
@@ -89,7 +109,7 @@ const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
         <div>
           <dt>{j.job}</dt>
           <dd class="ld-load"><span>{j.load}</span>{j.more && <span class="n">{j.more}</span>}</dd>
-          {j.next ? <dd class="ld-who"><span><span class="ld-nx">Next in line</span> <a class="plink" href={`${base}player/${j.next.id}/`}>{j.next.name}</a></span>{j.nextMore && <span class="n">{j.nextMore}</span>}</dd> : <dd class="ld-who"><span class="n">Nothing to hand over</span></dd>}
+          {j.next ? <dd class="ld-who"><span><span class="ld-nx">{j.word ?? nextWord}</span> {[j.next].flat().map((x: any, k: number) => <>{k > 0 && ' and '}<a class="plink" href={`${base}player/${x.id}/`}>{x.name}</a></>)}</span>{j.nextMore && <span class="n">{j.nextMore}</span>}</dd> : <dd class="ld-who"><span class="n">{idle ? 'Nobody has clearly picked it up' : 'Nothing to hand over'}</span></dd>}
         </div>
       ))}
     </dl>
