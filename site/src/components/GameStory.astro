@@ -46,6 +46,9 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
   .story .tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   @media (max-width: 900px) {
     .story { grid-template-columns: 1fr; grid-template-areas: 'head' 'text' 'list'; grid-template-rows: auto; }
+    /* Stacked, the side box sits under the story (or the post-game bars), never touching it. */
+    .s-text > :global(:last-child) { margin-bottom: 0; }
+    .s-list { margin-top: 22px; }
   }
   @media (max-width: 560px) {
     .story { padding: 18px 16px; }
