@@ -635,3 +635,79 @@ def pk_roles(season: int) -> dict[int, dict]:
         rows.sort(key=lambda x: (order[x["role"]], x["d"], -x["sec"]))
         result[tid] = {"kills": n, "players": rows}
     return result
+
+
+DEPLOY_MIN_DRAWS = 60  # each group's 5-on-5 attacking- or defensive-zone faceoffs before a team is ranked
+
+
+def deployment(season: int) -> dict[int, dict]:
+    """How much a coach shelters his top forwards: the share of 5-on-5 attacking- and defensive-zone faceoffs that the
+    night's three busiest forwards (by 5-on-5 ice time) start in the attacking zone, minus the same share for the bottom six.
+
+    Tested 2023-25: the gap repeats from one half of a season to the other (r 0.80-0.84) and from year to year (0.63-0.70);
+    the league average is about +7 points. Split home and road, since the home coach has the last change.
+    """
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id", "away_id")
+    f = (pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "zone", "is_home", "situation_code", "home_on", "away_on"])
+         .filter((pl.col("type") == "faceoff") & (pl.col("situation_code") == "1551") & (pl.col("zone") != "N"))
+         .join(games, on="game_id")
+         .with_columns(home_oz=(pl.col("zone") == "O") == pl.col("is_home")))  # zone is from the winner's side
+    if f.is_empty():
+        return {}
+    rows = pl.concat([
+        f.select("game_id", pl.col("home_id").alias("team_id"), pl.col("home_on").alias("on"), pl.col("home_oz").alias("oz"), pl.lit(True).alias("home")),
+        f.select("game_id", pl.col("away_id").alias("team_id"), pl.col("away_on").alias("on"), (~pl.col("home_oz")).alias("oz"), pl.lit(False).alias("home")),
+    ]).explode("on").rename({"on": "player_id"})
+    pg = (pl.read_parquet(d / "player_game.parquet", columns=["game_id", "team_id", "player_id", "pos", "sec5"])
+          .filter(~pl.col("pos").is_in(["D", "G"]))
+          .with_columns(rk=pl.col("sec5").rank("ordinal", descending=True).over("game_id", "team_id")))
+    rows = (rows.join(pg.select("game_id", "team_id", "player_id", "rk"), on=["game_id", "team_id", "player_id"])
+            .with_columns(grp=pl.when(pl.col("rk") <= 3).then(pl.lit("top")).when(pl.col("rk") >= 7).then(pl.lit("bottom")).otherwise(None))
+            .drop_nulls("grp"))
+
+    def gaps(df: pl.DataFrame) -> dict[int, dict]:
+        q = df.group_by("team_id", "grp").agg(oz=pl.col("oz").mean(), n=pl.len())
+        out = {}
+        for (tid,), g in q.group_by("team_id"):
+            by = {r["grp"]: r for r in g.iter_rows(named=True)}
+            if "top" in by and "bottom" in by:
+                top, bot = by["top"], by["bottom"]
+                out[tid] = {"top": top["oz"], "bottom": bot["oz"], "gap": top["oz"] - bot["oz"], "n_top": top["n"], "n_bottom": bot["n"]}
+        return out
+
+    every, home, road = gaps(rows), gaps(rows.filter(pl.col("home"))), gaps(rows.filter(~pl.col("home")))
+    games_n = dict(rows.group_by("team_id").agg(pl.col("game_id").n_unique()).iter_rows())
+    ranked = sorted((t for t, v in every.items() if min(v["n_top"], v["n_bottom"]) >= DEPLOY_MIN_DRAWS), key=lambda t: -every[t]["gap"])
+    gaps_ranked = [every[t]["gap"] for t in ranked]
+    median = sorted(gaps_ranked)[len(gaps_ranked) // 2] if gaps_ranked else None
+    result = {}
+    for tid, v in every.items():
+        rank = ranked.index(tid) + 1 if tid in ranked else None
+        result[tid] = {**v, "games": games_n.get(tid, 0), "rank": rank, "of": len(ranked),
+                       "pct": None if rank is None else round(100 * sum(g < v["gap"] for g in gaps_ranked) / max(1, len(gaps_ranked) - 1)),
+                       "median": median, "home": home.get(tid), "road": road.get(tid)}
+    return result
+
+
+DEPLOY_K_GAMES = 10  # games of last season's lean that this season's is pulled toward (split-half r 0.8 over 41 games)
+
+
+def deployment_blend(season: int) -> dict[int, dict]:
+    """This season's lean pulled toward the team's own from last season (year to year r 0.63-0.70), ranked on the blend."""
+    now, before = deployment(season), deployment(season - 1)
+    out = {}
+    for tid, v in now.items():
+        last = before.get(tid)
+        k = DEPLOY_K_GAMES if last else 0
+        blend = (v["games"] * v["gap"] + k * (last["gap"] if last else 0)) / (v["games"] + k)
+        out[tid] = {**v, "last": None if last is None else last["gap"], "blend": blend}
+    order = sorted(out, key=lambda t: -out[t]["blend"])
+    values = sorted(o["blend"] for o in out.values())
+    for i, tid in enumerate(order):
+        out[tid]["blend_rank"] = i + 1
+        out[tid]["blend_pct"] = round(100 * sum(x < out[tid]["blend"] for x in values) / max(1, len(values) - 1))
+    out_median = values[len(values) // 2] if values else None
+    for o in out.values():
+        o["blend_median"] = out_median
+    return out
