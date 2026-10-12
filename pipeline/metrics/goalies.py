@@ -81,8 +81,25 @@ def per_game(season: int) -> pl.DataFrame:
     toi = pl.read_parquet(d / "toi_check.parquet").filter(pl.col("goalie")).select("game_id", pl.col("player_id").alias("goalie_id"), pl.col("shift_toi").alias("sec"))
     team = pl.read_parquet(d / "players.parquet").select("game_id", pl.col("player_id").alias("goalie_id"), "team_id")
     out = agg.join(gaps, on=["game_id", "goalie_id"], how="left").join(toi, on=["game_id", "goalie_id"]).join(team, on=["game_id", "goalie_id"])
-    # The starter is whoever played most of the game for his team.
-    return out.with_columns(started=pl.col("sec") == pl.col("sec").max().over("game_id", "team_id"), season=pl.lit(season))
+    # The starter is whoever was in net at puck drop (first goalie on the shift chart). Most ice time is only the
+    # fallback for a game without one: it named the relief goalie when a starter was pulled early (FLA at BUF
+    # 2026-10-12, both starters pulled).
+    first = _first_in_net(d)
+    out = out.join(first, on=["game_id", "team_id"], how="left")
+    most = pl.col("sec") == pl.col("sec").max().over("game_id", "team_id")
+    started = pl.when(pl.col("first_goalie").is_null().any().over("game_id", "team_id") | ~(pl.col("first_goalie") == pl.col("goalie_id")).any().over("game_id", "team_id"))\
+        .then(most).otherwise(pl.col("goalie_id") == pl.col("first_goalie"))
+    return out.with_columns(started=started, season=pl.lit(season)).drop("first_goalie")
+
+
+def _first_in_net(d) -> pl.DataFrame:
+    """Each team's first goalie in net in each game, from the stints."""
+    st = pl.read_parquet(d / "stints.parquet", columns=["game_id", "period", "start", "home_goalie", "away_goalie"]).sort("game_id", "period", "start")
+    g = pl.read_parquet(d / "games.parquet", columns=["game_id", "home_id", "away_id"])
+    side = [st.filter(pl.col(f"{s}_goalie").is_not_null()).group_by("game_id", maintain_order=True).first()
+            .join(g, on="game_id").select("game_id", pl.col(f"{s}_id").alias("team_id"), pl.col(f"{s}_goalie").alias("first_goalie"))
+            for s in ("home", "away")]
+    return pl.concat(side)
 
 
 def summarise(games: pl.DataFrame, league_sv: dict[int, float]) -> dict:
