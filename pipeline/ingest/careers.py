@@ -1,4 +1,4 @@
-"""NHL career history per player, for the plain-English intros on player pages.
+"""NHL career history per player, for the plain-English intros and the career table on player pages.
 
 From the NHL: the player landing page (season totals by club, draft club) and the regular-season game log of every
 NHL season he played before 2023-24. Finished seasons never change, so each player costs one landing request plus one per
@@ -26,6 +26,13 @@ OWN_FROM = FULL_SEASONS[0]  # seasons from here on come from our own tables, not
 GAME_KEYS = ("gameId", "gameDate", "teamAbbrev", "opponentAbbrev", "homeRoadFlag", "goals", "points",
              "gamesStarted", "decision", "shotsAgainst", "goalsAgainst")  # the last four are goalies' only
 VERSION = 2  # 2: home or road and goalie decisions, for records in a building; older saves are fetched again
+# 2: goalie records and team names in the NHL season totals, plus each season's main club in other leagues, for the
+# career table on player pages. Older saves get a fresh landing (one request each) and keep their game logs.
+LANDING_VERSION = 2
+NHL_KEYS = ("season", "gameTypeId", "leagueAbbrev", "teamName", "sequence", "gamesPlayed", "goals", "assists", "points",
+            "gamesStarted", "wins", "losses", "otLosses", "ties", "shotsAgainst", "goalsAgainst", "timeOnIce", "savePctg", "goalsAgainstAvg")
+OTHER_KEYS = ("season", "gameTypeId", "leagueAbbrev", "teamName", "gamesPlayed", "goals", "assists", "points")
+OTHER_MIN_GP = 15  # other leagues: real seasons with a club, not tournaments (world championships, Olympics, junior events)
 
 
 def _path(pid: int):
@@ -48,15 +55,20 @@ def _write(pid: int, body: dict) -> None:
 def _trim_landing(land: dict) -> dict:
     keep = ("playerId", "firstName", "lastName", "position", "headshot", "birthDate", "draftDetails")
     out = {k: land.get(k) for k in keep}
-    out["seasonTotals"] = [{k: s.get(k) for k in ("season", "gameTypeId", "leagueAbbrev", "teamName", "gamesPlayed", "goals", "assists", "points")}
+    name = lambda v: v.get("default") if isinstance(v, dict) else v
+    out["seasonTotals"] = [{k: (name(s.get(k)) if k == "teamName" else s.get(k)) for k in NHL_KEYS if s.get(k) is not None}
                            for s in land.get("seasonTotals", []) if s.get("leagueAbbrev") == "NHL"]
+    out["otherTotals"] = [{k: (name(s.get(k)) if k == "teamName" else s.get(k)) for k in OTHER_KEYS if s.get(k) is not None}
+                          for s in land.get("seasonTotals", [])
+                          if s.get("leagueAbbrev") != "NHL" and s.get("gameTypeId") == REGULAR and (s.get("gamesPlayed") or 0) >= OTHER_MIN_GP]
     return out
 
 
 def _past_seasons(landing: dict) -> list[int]:
     """NHL regular seasons he played before the ones our own tables cover, as 20212022-style ids."""
     cur = int(f"{OWN_FROM}{OWN_FROM + 1}")
-    return sorted({s["season"] for s in landing["seasonTotals"] if s.get("gameTypeId") == REGULAR and s["season"] < cur})
+    return sorted({s["season"] for s in landing["seasonTotals"]
+                   if s.get("leagueAbbrev", "NHL") == "NHL" and s.get("gameTypeId") == REGULAR and s["season"] < cur})
 
 
 def _priority(season: int) -> list[int]:
@@ -81,14 +93,17 @@ def update(season: int = CURRENT_SEASON, budget: int = BUDGET) -> dict:
         have = read(pid) or {}
         if have.get("version", 1) < VERSION:
             have = {k: v for k, v in have.items() if k != "logs"} | {"logs": {}, "complete": False, "version": VERSION}
-        if have.get("complete"):
+        stale = "landing" in have and have.get("landing_version", 1) < LANDING_VERSION
+        if have.get("complete") and not stale:
             continue
         if used >= budget:
             break
         try:
-            if "landing" not in have:
-                have = {"fetched": date.today().isoformat(), "complete": False, "logs": {}, "version": VERSION,
-                        "landing": _trim_landing(get(f"{NHL_WEB}/v1/player/{pid}/landing").json())}
+            if "landing" not in have or stale:
+                land = _trim_landing(get(f"{NHL_WEB}/v1/player/{pid}/landing").json())
+                if "landing" not in have:
+                    have = {"fetched": date.today().isoformat(), "complete": False, "logs": {}, "version": VERSION}
+                have |= {"landing": land, "landing_version": LANDING_VERSION}
                 used += 1
             for s in _past_seasons(have["landing"]):
                 if str(s) in have["logs"]:

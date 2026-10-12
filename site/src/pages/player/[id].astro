@@ -14,6 +14,7 @@ import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import CareerTable from '../../components/CareerTable.astro';
 import { cardsFor } from '../../lib/reportCards';
 import Intro from '../../components/Intro.astro';
 import { playerIntro, nextGame } from '../../lib/intros';
@@ -105,7 +106,9 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const navBase = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const hasCareer = !!(p.career && (p.career.seasons.length || p.career.before));
+const nav = [...navBase, ...(hasCareer && (isG || s.traits) ? [['career', 'Career']] : [])];
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -146,6 +149,7 @@ const statRow = (x: any) => (isG ? null : x);
         </div>
         <p class="note">He has not played in the NHL this season or last, so there is nothing to rate him on yet. His page fills in once he dresses.</p>
       </Section>
+      <CareerTable p={p} />
     )}
 
     {!isG && s.traits && (
@@ -400,6 +404,7 @@ const statRow = (x: any) => (isG ? null : x);
             </>
           ) : <p class="note">No NHL EDGE tracking data for him yet.</p>}
         </Section>
+        <CareerTable p={p} />
       </>
     )}
 
@@ -472,6 +477,7 @@ const statRow = (x: any) => (isG ? null : x);
             })}
           </div>
         </Section>
+        <CareerTable p={p} />
       </>
     )}
   </div>

@@ -14,7 +14,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
-from pipeline.export import carries
+from pipeline.export import career, carries
 from pipeline.ingest import careers, edge, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
@@ -263,6 +263,7 @@ def run(season: int) -> int:
             if c:
                 stats[key] = {"gp": c["gp"], "g": int(c["g"]), "a": int(c["a"]), "p": int(c["g"] + c["a"]), "sog": int(c["sog"]), "toi": round(c["sec"] / c["gp"]), "pim_pens": int(c["pen_taken"])}
         base["stats"] = stats
+        base["career"] = career.build(pid, row["pos"] == "G")
         if pid in unplayed:
             base["unplayed"] = True
         if row["pos"] == "G":
