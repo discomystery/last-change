@@ -28,6 +28,8 @@ DIMS = {
     "longShifts": (["long_fa"], ["fa5"], 100, False),  # share of 5-on-5 shots against while its skaters are 45 s+ into a shift
     "shotsThrough": (["thru_n"], ["cf5"], 100, True),  # share of 5-on-5 shot attempts that get past the blockers (score and arena adjusted)
     "blocking": (["blk_n"], ["ca5"], 100, True),  # share of opponents' 5-on-5 shot attempts it blocks (score and arena adjusted)
+    "pointAllowed": (["d_ca"], ["ca5"], 100, True),  # share of opponents' 5-on-5 shot attempts taken by their defensemen
+    "icing": (["icing_n"], ["sec5"], 3600, False),  # 5-on-5 icings per 60 (score adjusted)
     "pp": (["pp_xgf"], ["pp_sec"], 3600, True),
     "pk": (["pk_xga"], ["pk_sec"], 3600, False),
     "powerKill": (["pk_xgf"], ["pk_sec"], 3600, True),
@@ -96,7 +98,7 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("ff_adj", s5).alias("ff_adj"), tot("fa_adj", s5).alias("fa_adj"), tot("xgf_adj", s5).alias("xgf_adj"), tot("xga_adj", s5).alias("xga_adj"),
         tot("xgf", s5).alias("xgf5"), tot("cf", s5).alias("cf5"), tot("ca", s5).alias("ca5"), tot("reb_xgf", s5).alias("reb_xgf"),
         tot("to_xgf", s5).alias("to_xgf"), tot("point_cf", s5).alias("point_cf"),
-        tot("d_cf", s5).alias("d_cf"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
+        tot("d_cf", s5).alias("d_cf"), tot("d_ca", s5).alias("d_ca"), tot("close_ff", s5).alias("close_ff"), tot("ff", s5).alias("ff5"),
         tot("long_fa", s5).alias("long_fa"), tot("fa", s5).alias("fa5"),
         tot("sec", pp).alias("pp_sec"), tot("xgf", pp).alias("pp_xgf"), tot("sec", pk).alias("pk_sec"), tot("xga", pk).alias("pk_xga"), tot("xgf", pk).alias("pk_xgf"),
         tot("sec", net).alias("g_sec"), (tot("xga", net) - tot("ga", net)).alias("g_saved"),
@@ -104,7 +106,8 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
     ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).join(
-        stops, on=["game_id", "team_id"], how="left").with_columns(pl.col("thru_n", "blk_n").fill_null(0.0)).sort("team_id", "date", "game_id")
+        stops, on=["game_id", "team_id"], how="left").join(_icings_adjusted(season), on=["game_id", "team_id"], how="left").with_columns(
+        pl.col("thru_n", "blk_n", "icing_n").fill_null(0.0)).sort("team_id", "date", "game_id")
 
 
 def _stops(season: int) -> pl.DataFrame:
@@ -121,6 +124,40 @@ def _stops(season: int) -> pl.DataFrame:
     return t.select("game_id", "team_id", pl.col("score_state").clip(-3, 3), "cf", "ca",
                     ((pl.col("cf") - pl.col("ff")) / pl.col("f_blocks") * opp).alias("stopped_own"),
                     ((pl.col("ca") - pl.col("fa")) / pl.col("f_blocks") * own).alias("stopped_opp"))
+
+
+def _icings(season: int) -> pl.DataFrame:
+    """5-on-5 seconds and icings per team, game and score (from the team's side). The play-by-play does not say who
+    iced it, but the faceoff that follows is always in the icing team's end."""
+    d = TABLES / str(season)
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id", "away_id")
+    e = (pl.read_parquet(d / "events.parquet", columns=["game_id", "sort", "type", "team_id", "reason", "zone", "situation_code", "home_score", "away_score"])
+         .join(g, on="game_id").sort("game_id", "sort"))
+    nxt = lambda c: pl.col(c).shift(-1).over("game_id")
+    ic = (e.with_columns(n_type=nxt("type"), n_zone=nxt("zone"), n_team=nxt("team_id"))
+          .filter((pl.col("type") == "stoppage") & (pl.col("reason") == "icing") & (pl.col("situation_code") == "1551") & (pl.col("n_type") == "faceoff"))
+          .with_columns(team_id=pl.when(pl.col("n_zone") == "D").then(pl.col("n_team"))  # faceoff zone is from the winner's side
+                        .when(pl.col("n_team") == pl.col("home_id")).then(pl.col("away_id")).otherwise(pl.col("home_id")))
+          .with_columns(score_state=pl.when(pl.col("team_id") == pl.col("home_id")).then(pl.col("home_score") - pl.col("away_score"))
+                        .otherwise(pl.col("away_score") - pl.col("home_score")).clip(-3, 3).cast(pl.Int64))
+          .group_by("game_id", "team_id", "score_state").agg(icings=pl.len().cast(pl.Float64)))
+    t = (pl.read_parquet(d / "team_game.parquet", columns=["game_id", "team_id", "strength", "score_state", "sec"]).filter(pl.col("strength") == "5v5")
+         .join(g.select("game_id"), on="game_id").with_columns(pl.col("score_state").clip(-3, 3).cast(pl.Int64))
+         .group_by("game_id", "team_id", "score_state").agg(pl.col("sec").sum()))
+    return t.join(ic, on=["game_id", "team_id", "score_state"], how="left").with_columns(pl.col("icings").fill_null(0.0))
+
+
+@lru_cache
+def _icing_rates() -> pl.DataFrame:
+    """League icings per 5-on-5 second by score: teams protecting a lead ice it more."""
+    a = pl.concat([_icings(s) for s in FULL_SEASONS])
+    return a.group_by("score_state").agg(r_ice=pl.col("icings").sum() / pl.col("sec").sum()).with_columns(r_ice_all=pl.lit(a["icings"].sum() / a["sec"].sum()))
+
+
+def _icings_adjusted(season: int) -> pl.DataFrame:
+    return (_icings(season).join(_icing_rates(), on="score_state", how="left")
+            .with_columns(icing_n=pl.col("icings") - pl.col("sec") * (pl.col("r_ice") - pl.col("r_ice_all")))
+            .group_by("game_id", "team_id").agg(pl.col("icing_n").sum()))
 
 
 @lru_cache
