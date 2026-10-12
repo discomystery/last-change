@@ -345,6 +345,10 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
     ext = team_extras(fp)
     if ext:
         cl = [EXTRA[k][0 if end == "hi" else 1] for k, end in ext]
+        if "rough" in used and fp["dims"]["rough"]["blend"]["pct"] >= 50 and ("discipline", "hi") in ext:
+            # "A lot of scrums" beside "they stay out of the box" reads like a contradiction (Sora, 2026-10-12): both are
+            # true because the other team usually goes to the box at the same whistle, so say that instead.
+            cl[ext.index(("discipline", "hi"))] = "the scrums rarely cost them a power play, since the other team usually goes to the box too"
         joint = " and " if len({end for _, end in ext}) == 1 else ", but "
         out.append(_cap(joint.join(cl)) + ".")
     return {"team": abbr, "name": t["name"], "text": out, "style": used + [k for k, _ in ext]}
