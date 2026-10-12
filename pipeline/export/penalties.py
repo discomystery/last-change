@@ -15,6 +15,8 @@ pen_desc like "roughing" or "fighting", p1 = the player who took it). Shootouts 
   one whistle        every penalty handed out at the same moment of the same game. A line brawl is three or more fights
                      at once (3 times in 3,936 games); a brawl sends six or more players to the box at once (27 times),
                      a scrum four or more players for roughing at once; two fights at once are told as such.
+  fights            every fighting major is told with both players' names (Sora: fighting is part of hockey), on top of
+                     at most one other note; a line brawl names every pair.
   misconducts        game misconducts and match penalties are always named; a ten-minute misconduct is named when it is
                      not part of a scrum already told (scrums at the horn hand them out by the handful). A head coach's
                      game misconduct names the coach from coaches.parquet.
@@ -145,17 +147,24 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
     ws = whistles(p)
     big = [w for w in ws if w["fights"] >= LINE_BRAWL or w["players"] >= BRAWL_PLAYERS or w["roughing"] >= BRAWL_ROUGHING]
     scrum_secs = {w["sec"] for w in big}
+    brawls = {w["sec"] for w in ws if w["fights"] >= LINE_BRAWL}
+    must: list[str] = []  # Sora: every five for fighting is told, whatever else happened
     for w in sorted(big, key=lambda w: (-w["fights"], -w["players"]))[:1]:
         when = _when(w["period"], w["sec"])
-        extra = ([f"{num(w['fights'])} {'fight' if w['fights'] == 1 else 'fights'}"] if w["fights"] and w["fights"] < LINE_BRAWL else []) + \
+        scrap = [f"{name(a)} with {name(b)}" for a, b in _pairs(w)] if w["fights"] < LINE_BRAWL else []
+        extra = ([f"{num(len(scrap))} {'fight' if len(scrap) == 1 else 'fights'} ({', '.join(scrap)})"] if scrap else []) + \
                 ([f"{num(w['misconducts'])} misconducts"] if w["misconducts"] >= 2 else [])
         mis = f", with {_and(extra)}" if extra else ""
         if w["fights"] >= LINE_BRAWL:
-            notes.append((100, f"A line brawl broke out {when}: {num(w['fights'])} fights at once{mis}."))
+            who = _and([f"{name(a)} with {name(b)}" for a, b in _pairs(w)])
+            must.append(f"A line brawl broke out {when}, {num(w['fights'])} fights at once{mis}: {who}.")
         elif w["players"] >= BRAWL_PLAYERS:
-            notes.append((95, f"Things boiled over {when}, when one scrum sent {num(w['players'])} players to the box{mis}."))
+            text = f"Things boiled over {when}, when one scrum sent {num(w['players'])} players to the box{mis}."
+            must.append(text) if scrap else notes.append((95, text))
         else:
-            notes.append((76, f"A scrum {when} sent {num(w['players'])} players to the box{mis}."))
+            text = f"A scrum {when} sent {num(w['players'])} players to the box{mis}."
+            must.append(text) if scrap else notes.append((76, text))
+        brawls.add(w["sec"])  # its fights are told in this sentence
         told.update(pid for pid, _ in w["fighters"])
     # a head coach thrown out
     for r in p.filter(pl.col("pen_desc") == "game-misconduct-head-coach").iter_rows(named=True):
@@ -176,29 +185,18 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
             notes.append((90, f"{who} was thrown out with {what} {_when(r['period'], r['sec'])}."))
         else:
             notes.append((90, f"{_and([n for _, n in ej_names])} were {'both' if len(ej_names) == 2 else 'all'} thrown out of the game."))
-    # fights not already told in a brawl
-    fights = [w for w in ws if w["fights"] and w["sec"] not in scrum_secs]
-    pairs = []
-    for w in fights:
-        by_team: dict[int, list[int]] = {}
-        for pid, tid in w["fighters"]:
-            by_team.setdefault(tid, []).append(pid)
-        sides = list(by_team.values())
-        for i in range(w["fights"]):
-            if len(sides) == 2 and i < min(len(sides[0]), len(sides[1])):
-                pairs.append((w, sides[0][i], sides[1][i]))
-    if pairs:
-        if len(pairs) == 1:
-            w, a, b = pairs[0]
-            verb = ["dropped the gloves", "squared off", "fought"][zlib.crc32(str(gid).encode()) % 3]
-            notes.append((70, f"{name(a)} and {name(b)} {verb} {_when(w['period'], w['sec'])}."))
-        elif len(pairs) == 2:
-            (w1, a1, b1), (w2, a2, b2) = pairs
-            same = w1["sec"] == w2["sec"]
-            notes.append((80, f"There were two fights{' at once' if same else ''}: {name(a1)} with {name(b1)}, and {name(a2)} with {name(b2)}."))
-        else:
-            notes.append((85, f"There were {num(len(pairs))} fights in all."))
-        told.update(x for _, a, b in pairs for x in (a, b))
+    # every other fight, both players named
+    pairs = [(w, a, b) for w in ws if w["fights"] and w["sec"] not in brawls for a, b in _pairs(w)]
+    if len(pairs) == 1:
+        w, a, b = pairs[0]
+        verb = ["dropped the gloves", "squared off", "fought"][zlib.crc32(str(gid).encode()) % 3]
+        must.append(f"{name(a)} and {name(b)} {verb} {_when(w['period'], w['sec'])}.")
+    elif pairs:
+        same = len({w["sec"] for w, _, _ in pairs}) == 1
+        who = _and([f"{name(a)} with {name(b)}" for _, a, b in pairs]) if len(pairs) > 2 else \
+            f"{name(pairs[0][1])} with {name(pairs[0][2])}, and {name(pairs[1][1])} with {name(pairs[1][2])}"
+        must.append(f"There were {num(len(pairs))} fights{' at once' if same else ''}: {who}.")
+    told.update(x for _, a, b in pairs for x in (a, b))
     # how many penalties were called, and who took them
     per = c.filter(pl.col("p1").is_not_null()).group_by("p1").agg(n=pl.len()).sort("n", descending=True)
     busy = per.row(0, named=True) if per.height else None
@@ -231,7 +229,18 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
     elif tens.height >= 3:
         notes.append((72, f"{_cap(num(tens.height))} players picked up ten-minute misconducts."))
     notes.sort(key=lambda n: -n[0])
-    return [t for _, t in notes[:2]]
+    return must + [t for _, t in notes[:max(1, 2 - len(must))]]
+
+
+def _pairs(w: dict) -> list[tuple[int, int]]:
+    """Who fought whom at one whistle: the n-th fighting major on each side, in the order they were given."""
+    by_team: dict[int, list[int]] = {}
+    for pid, tid in w["fighters"]:
+        by_team.setdefault(tid, []).append(pid)
+    sides = list(by_team.values())
+    if len(sides) != 2:
+        return []
+    return list(zip(sides[0], sides[1]))[:w["fights"]]
 
 
 def _and(xs: list[str]) -> str:
