@@ -38,6 +38,7 @@ def run(season: int) -> dict:
     (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
     if OFFLINE:  # keep the saved standings and schedule
         n_teams, n_games = len(json.loads((SITE_DATA / "teams.json").read_text())), len(json.loads((SITE_DATA / "schedule.json").read_text())["games"])
+        add_coaches(season)
     else:
         n_teams, n_games = export_teams_and_schedule(season)
     export_fingerprints(season)
@@ -83,11 +84,24 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
                      "nick": t["teamCommonName"]["default"], "w": t["wins"], "l": t["losses"], "otl": t["otLosses"],
                      "gp": t["gamesPlayed"], "pts": t["points"], "conference": t["conferenceName"], "division": t["divisionName"], "div_rank": t["divisionSequence"]} for t in standings), key=lambda t: t["name"])
     (SITE_DATA / "teams.json").write_text(json.dumps(teams, separators=(",", ":")))
+    add_coaches(season)
     games = [{"id": g["game_id"], "start": g["start_utc"], "date": g["date"], "home": g["home"], "away": g["away"], "venue": g["venue"],
               "final": g["state"] in ("OFF", "FINAL"), "hs": g["home_score"], "as": g["away_score"], "end": g["last_period"]}
              for g in nhl.season_games(season) if g["game_type"] == 2]
     (SITE_DATA / "schedule.json").write_text(json.dumps({"season": season, "games": games}, separators=(",", ":")))
     return len(teams), len(games)
+
+
+def add_coaches(season: int) -> None:
+    """Each team's head coach (and `coach_since` when he took over this season) for the team page's name card."""
+    from pipeline.ingest import coaches
+
+    now = coaches.current(season)
+    teams = json.loads((SITE_DATA / "teams.json").read_text())
+    for t in teams:
+        c = now.get(t["abbr"]) or {}
+        t["coach"], t["coach_since"] = c.get("coach"), c.get("since")
+    (SITE_DATA / "teams.json").write_text(json.dumps(teams, separators=(",", ":")))
 
 
 # Traits whose numbers are checked and ready to show.

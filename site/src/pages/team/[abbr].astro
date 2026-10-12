@@ -133,6 +133,11 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
+// The head coach from the club's latest game; a coach who took over this season says since when.
+const coach: string | null = (team as any).coach ?? null;
+const coachSince = coach && (team as any).coach_since
+  ? new Date(`${(team as any).coach_since}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  : null;
 ---
 <Base section="teams" title={team.name}>
   <AreaShapes />
@@ -143,6 +148,7 @@ const tiText = teamIntro(abbr)?.text ?? [];
       <header class="team-top">
         <h1>{team.name}</h1>
         <p class="rec">{team.w}-{team.l}-{team.otl}</p>
+        {coach && <p class="coach">Head coach <span class="coach-name">{coach}</span>{coachSince && <span class="coach-since"> since {coachSince}</span>}</p>}
         <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
       </header>
     </div>
@@ -594,6 +600,9 @@ const tiText = teamIntro(abbr)?.text ?? [];
   .tcard { position: relative; overflow: hidden; isolation: isolate; margin-top: 4px; padding: 26px 28px 22px; }
   .tcard.joined { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
   .tcard .team-top { margin: 0; }
+  .tcard .coach { margin: 0; font: 500 15px var(--ui); color: var(--ink-3); }
+  .tcard .coach-name { color: var(--ink-2); font-weight: 600; }
+  .tcard .coach-name, .tcard .coach-since { white-space: nowrap; }
   .tcard h1 { margin: 0; font-size: 40px; line-height: 1.1; }
   .tcard .tabbr { position: absolute; z-index: -1; right: 230px; bottom: -48px; font: 700 170px/1 var(--ui); letter-spacing: -0.03em; color: color-mix(in oklab, var(--team) 14%, var(--sheet)); pointer-events: none; user-select: none; }
   .tcard-wrap :global(.tstory) { max-width: none; margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 4px 28px 24px; }
