@@ -1,10 +1,11 @@
 ---
-// Career: every NHL regular season, club by club, newest first, with the basic box score (skaters GP G A P; goalies
-// GP W L OT SV% GAA). A season split between clubs shows its total with one quieter row per club under it. Career
-// highs are bold. Long careers show the latest seasons with the rest behind a fold. Data: `career` in his player JSON
-// (pipeline/export/career.py).
+// Career: every NHL regular season with the basic box score (skaters GP G A P; goalies GP W L OT SV% GAA). Four or
+// more seasons open on a column per season (points, or wins for goalies) coloured by club, with the full table behind a
+// fold; shorter careers show the table. A season split between clubs shows its total with a quieter row per club under
+// it. Career highs are bold. Data: `career` in his player JSON (pipeline/export/career.py).
 import Section from './Section.astro';
 import teams from '../../public/data/teams.json';
+import { teamColour } from '../lib/teams';
 
 interface Props { p: any }
 const { p } = Astro.props;
@@ -28,6 +29,19 @@ const cell = (r: any, k: string) => (k === 'sv' ? svp(r.sv) : k === 'gaa' ? (r.g
 const isHigh = (s: number, k: string) => (highs[k] ?? []).includes(s);
 const lead = isG ? 'Every NHL regular season, club by club: games, record, save percentage and goals-against average.' : 'Every NHL regular season, club by club: games, goals, assists and points.';
 const anyHigh = Object.keys(highs).length > 0;
+// Four or more seasons: a column per season (points, or wins for goalies) coloured by club, with the table behind a fold.
+const chart = rows.length >= 4;
+const key = isG ? 'w' : 'p';
+const old = c?.seasons ?? [];
+const partsOf = (r: any) => r.teams ?? [r];
+const top = Math.max(1, ...old.map((r: any) => r[key] ?? 0));
+// Club labels under the strip: from the first season a spell is most of his games, running until the next label.
+const major = old.map((r: any) => partsOf(r).reduce((a: any, b: any) => (b.gp > a.gp ? b : a)).team);
+const labels: { team: string; col: number; span: number }[] = [];
+major.forEach((t: string, i: number) => { const l = labels[labels.length - 1]; if (l && l.team === t) l.span++; else labels.push({ team: t, col: i + 1, span: 1 }); });
+const yr = (s: number) => `’${String(s).slice(2)}`;
+const tipOf = (r: any) => `${seasonName(r.s)}${r.s === nowSeason ? ' so far' : ''}: ${partsOf(r).map((t: any) => t.team).join(' and ')}, ${r.gp} games, ${isG ? `${num(r.w)}-${num(r.l)}-${num(r.ot)}, ${svp(r.sv)} save %` : `${r.g} goals, ${r.a} assists, ${r.p} points`}${isHigh(r.s, key) ? '. Career high.' : '.'}`;
+const say = (x: any) => (isG ? `${x.gp} games, ${num(x.w)} wins, ${svp(x.sv)} save %` : `${x.gp} games, ${x.g} goals, ${x.a} assists, ${x.p} points`);
 ---
 {c && (
   <Section id="career" title="Career" placeholder={false} takeaway={lead}>
@@ -35,14 +49,42 @@ const anyHigh = Object.keys(highs).length > 0;
       <p class="note">A season split between clubs shows its total first, then each club on its own line. {isG ? 'Career highs in wins, and in save percentage over seasons of 20 or more games, are in bold.' : 'Career highs in goals and points are in bold.'} Seasons from 2023-24 on are counted from the NHL’s own game files; earlier seasons are the NHL’s career totals.</p>
     </Fragment>
     {rows.length > 0 && (
-      <div class="card career">
+      <div class:list={['card career', chart && 'charted']}>
+        {chart && (
+          <>
+            <p class="chart-title">{isG ? 'Wins' : 'Points'} by season</p>
+            <div class="cc" style={`--n:${old.length}`} role="img" aria-label={`${isG ? 'Wins' : 'Points'} in each NHL season, coloured by club.`}>
+              {old.map((r: any) => (
+                <div class:list={['cc-col', r.s === nowSeason && 'now']} tabindex="0" data-tip={tipOf(r)}>
+                  <span class:list={['cc-v', isHigh(r.s, key) && 'hi']}>{num(r[key])}</span>
+                  <span class="cc-bar" style={`height:${(100 * (r[key] ?? 0)) / top}%`}>
+                    {[...partsOf(r)].reverse().map((t: any) => <i style={`flex:${t[key] || 0.001};--team:${teamColour(t.team)}`}></i>)}
+                  </span>
+                  <span class="cc-yr">{yr(r.s)}</span>
+                </div>
+              ))}
+            </div>
+            <div class="cc cc-strip" style={`--n:${old.length}`} aria-hidden="true">
+              {old.map((r: any) => <span>{partsOf(r).map((t: any) => <i style={`flex:${t.gp};--team:${teamColour(t.team)}`}></i>)}</span>)}
+            </div>
+            <div class="cc cc-lab" style={`--n:${old.length}`} aria-hidden="true">
+              {labels.map((l) => <span style={`grid-column:${l.col} / span ${l.span}`}>{l.team}</span>)}
+            </div>
+            {c.career && <p class="n cc-sum">Career: {say(c.career)}.</p>}
+          </>
+        )}
+        {chart ? (
+          <details class="fold car-all">
+            <summary><span class="closed">Show every season</span><span class="opened">Hide the table</span></summary>
+          </details>
+        ) : null}
         <table class:list={['ctab', isG && 'ctab-g']}>
           <thead>
             <tr><th>Season</th><th>Team</th>{cols.map(([, short, tip]) => <th><abbr title={tip}>{short}</abbr></th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r: any, i: number) => {
-              const old = rows.length > SHOWN + 1 && i >= SHOWN;
+              const old = !chart && rows.length > SHOWN + 1 && i >= SHOWN;
               const team = (t: any) => (
                 <>
                   {current.has(t.team) ? <a class="tlink" href={`${base}team/${t.team}/`}><span class="full">{t.name}</span><span class="short">{t.team}</span></a>
@@ -73,7 +115,7 @@ const anyHigh = Object.keys(highs).length > 0;
             </tfoot>
           )}
         </table>
-        {rows.length > SHOWN + 1 && (
+        {!chart && rows.length > SHOWN + 1 && (
           <details class="fold car-more">
             <summary><span class="closed">Show all {rows.length} seasons</span><span class="opened">Show the latest {SHOWN}</span></summary>
           </details>
@@ -92,6 +134,26 @@ const anyHigh = Object.keys(highs).length > 0;
 
 <style>
   .career { padding: 6px 22px 14px; max-width: 760px; }
+  .career.charted { max-width: none; padding: 20px 22px 16px; }
+  .charted .ctab { display: none; margin-top: 6px; max-width: 760px; }
+  .charted:has(.car-all[open]) .ctab { display: table; }
+  .chart-title { margin: 0 0 6px; }
+  .cc { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); column-gap: 4px; }
+  .cc-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 170px; min-width: 0; font: 500 11px var(--ui); color: var(--ink-3); outline-offset: 0; }
+  .cc-v { color: var(--ink-2); margin-bottom: 2px; }
+  .cc-v.hi { color: var(--ink); font-weight: 700; }
+  .cc-bar { width: 100%; max-width: 36px; min-height: 2px; display: flex; flex-direction: column; border-radius: 3px 3px 0 0; overflow: hidden; }
+  .cc-bar i, .cc-strip i { display: block; background: var(--team); }
+  .cc-col.now .cc-bar { opacity: 0.45; }
+  .cc-col:hover .cc-bar, .cc-col:focus-visible .cc-bar { filter: brightness(1.12); }
+  .cc-yr { margin-top: 5px; }
+  .cc-strip { margin-top: 8px; }
+  .cc-strip span { display: flex; height: 4px; border-radius: 2px; overflow: hidden; }
+  .cc-lab { margin-top: 5px; }
+  .cc-lab span { font: 600 11px var(--ui); letter-spacing: 0.04em; color: var(--ink-2); white-space: nowrap; }
+  .cc-sum { margin: 14px 0 0; }
+  .car-all { margin-top: 14px; }
+  @media (prefers-color-scheme: dark) { .cc-bar i, .cc-strip i { background: color-mix(in oklab, var(--team) 55%, white); } }
   .ctab { width: 100%; border-collapse: collapse; font: 400 14px var(--ui); font-variant-numeric: tabular-nums; }
   .ctab th, .ctab td { padding: 9px 10px; text-align: right; white-space: nowrap; }
   .ctab th:first-child { padding-left: 0; text-align: left; }
@@ -116,6 +178,10 @@ const anyHigh = Object.keys(highs).length > 0;
   .car-note { margin-top: 12px; }
   @media (max-width: 719px) {
     .career { padding: 4px 14px 12px; }
+    .career.charted { padding: 16px 14px 12px; }
+    .cc { column-gap: 2px; }
+    .cc-col { height: 140px; font-size: 9px; }
+    .cc-lab span { font-size: 10px; letter-spacing: 0; }
     .ctab { font-size: 13px; }
     .ctab th, .ctab td { padding: 8px 5px; }
     .ctab tr.part .tm { padding-left: 10px; }
