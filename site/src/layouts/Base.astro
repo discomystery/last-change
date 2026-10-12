@@ -518,7 +518,9 @@ const teamList = teams as { abbr: string; name: string }[];
   .skel-line { display: inline-block; width: 14ch; height: 0.8em; border-radius: 8px; }
   html.motion .skel { background: linear-gradient(100deg, var(--track) 40%, color-mix(in oklab, var(--track) 55%, var(--sheet)) 50%, var(--track) 60%) 0 0 / 300% 100%; animation: skel-sheen 1.6s ease-in-out infinite; }
   @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
-  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; }
+  /* The space under the heading's rule lives on the heading itself, so whatever comes next (a card, a picker, a grid
+     of cards, a table) never sits flush against the line. It collapses with the next block's own top margin. */
+  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin-bottom: 18px; }
   .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
   .takeaway { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
@@ -539,8 +541,8 @@ const teamList = teams as { abbr: string; name: string }[];
   .chart-title .xp-q { width: 20px; height: 20px; font-size: 11px; margin-left: 8px; }
   .card .xp { margin: 10px 0 12px; padding: 10px 14px; }
   .card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 18px; padding: 18px; }
-  /* A card straight under a section heading or its explainer line gets the same breathing room everywhere. */
-  .sec-head + .card, .sec-head + .xp + .card { margin-top: 18px; }
+  /* A card straight under a section heading's explainer gets the same breathing room as one under the heading. */
+  .sec-head + .xp + .card { margin-top: 18px; }
   .sec > .takeaway { margin-bottom: 18px; }
   /* A card that is one row in a list (a game, a team, a player): same look, smaller corners and padding. */
   .card.row { border-radius: 14px; padding: 14px 18px; }
