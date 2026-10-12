@@ -44,6 +44,7 @@ class Season:
     """Everything about the finished games of one season that grading needs, loaded once."""
 
     def __init__(self, season: int):
+        self.season = season
         d = TABLES / str(season)
         self.games = {g["game_id"]: g for g in pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).iter_rows(named=True)}
         self.team_id = {}
@@ -300,7 +301,7 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
             if ids not in usual:
                 trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"])))
                 break
-    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay), list(calls))
+    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season), list(calls))
     return surprise_rules.pick(cands), beyond
 
 
