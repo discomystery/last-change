@@ -176,6 +176,7 @@ STYLE = {
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
+    "rough": ("end up in a lot of scrums", "stay out of the scrums"),
     "depth": ("roll all four lines", "lean hard on their top players"),
 }
 # Two traits that read better as one thought: (trait, end, trait, end) -> phrase.

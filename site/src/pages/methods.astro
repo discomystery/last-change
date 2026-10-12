@@ -218,6 +218,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
       <li><strong>Passes before a shot</strong> aren’t in public data, so expected goals can’t see a cross-ice pass. Goalies behind teams that allow those will look worse than they are.</li>
       <li><strong>Rush chances</strong> can’t be picked out from the league’s public data, which records too little between the blue lines. We tried approximating a “rush” shot based on timing, but those shots were inordinately few and somehow scored <em>less</em> than ordinary shots, which would make our information less accurate. Good rush counts come from real-person trackers and cameras we don’t pretend to have access to.</li>
       <li><strong>Defender positions</strong> aren’t tracked publicly, so breakdowns are inferred from dangerous chances within five seconds of a team losing the puck.</li>
+      <li><strong>Which penalties a team takes</strong> is shown for one kind only: rough stuff (roughing, boarding, elbowing and the like). Over three seasons, a team’s hooking, slashing or tripping calls in half its games said almost nothing about the other half, so those counts are mostly bounces and we leave them out.</li>
       <li><strong>Why a player is out</strong> isn’t in the data. When a regular stops dressing, the site says he hasn’t played, never why.</li>
     </ul>
   </Section>
