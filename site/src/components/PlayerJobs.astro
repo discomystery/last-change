@@ -1,4 +1,5 @@
 ---
+import Explain from './Explain.astro';
 import Gloss from './Gloss.astro';
 // Post-game report cards: for each player, the jobs his team relies on him for and the things he does better than
 // most at his position, each graded from this game; then who stood out somewhere new. Data: jobs/{game_id}.json,
@@ -97,6 +98,11 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   return skaters.length > 0 && (
   <Section id="jobs" title="Did they do their job?" placeholder={false}
     takeaway="What each player is relied on for or better than most at, and whether he delivered.">
+    <Fragment slot="explain">
+      <p class="note"><strong>✓</strong> a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
+      <p class="note"><strong>Huge night</strong>: a hat trick or four or more points. <strong>Big night</strong>: two or more points, or a goal from a player who scores in fewer than one game in five on top of doing his jobs. <strong>Rough night</strong>: no points while the other team had 70% or more of the 5-on-5 chances with him on (xGF–xGA). Plus-minus never sets the level. A shorthanded goal counts as two points. Points never fully cover for jobs that went badly: with his jobs off, a huge night reads big and a big night reads mixed.</p>
+      <p class="note">Judged only from games before this one; 5-on-5 rates adjusted for score and venue. One game is a small sample: even a strong player misses a typical night about half the time. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.</p>
+    </Fragment>
     <div class="jpick">
       <span>Show</span>
       <select id="jobs-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
@@ -115,16 +121,13 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
         </div>
       );
     })}
-    <Gloss label="How the cards are graded">
-      <p class="note"><strong>✓</strong> a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
-      <p class="note"><strong>Huge night</strong>: a hat trick or four or more points. <strong>Big night</strong>: two or more points, or a goal from a player who scores in fewer than one game in five on top of doing his jobs. <strong>Rough night</strong>: no points while the other team had 70% or more of the 5-on-5 chances with him on (xGF–xGA). Plus-minus never sets the level. A shorthanded goal counts as two points. Points never fully cover for jobs that went badly: with his jobs off, a huge night reads big and a big night reads mixed.</p>
-      <p class="note">Judged only from games before this one; 5-on-5 rates adjusted for score and venue. One game is a small sample: even a strong player misses a typical night about half the time. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.</p>
-    </Gloss>
 
     {d.stood_out.length > 0 && (
       <>
-        <h3 class="sub">Somewhere new</h3>
-        <p class="sub-take">Things they aren’t known for, far beyond their usual pace.</p>
+        <Explain id="jobs-new" title="Somewhere new">
+          <p class="xp-lead">Things they aren’t known for, far beyond their usual pace.</p>
+          <p class="note">A night this big would happen less than one game in fifty at his usual pace, and is at least twice what an average player at his position would manage.</p>
+        </Explain>
         <ul class="two news">
           {d.stood_out.map((s) => (
             <li class:list={['card', `t-${side(s.team)}`]}>
@@ -133,7 +136,6 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
             </li>
           ))}
         </ul>
-        <p class="note">A night this big would happen less than one game in fifty at his usual pace, and is at least twice what an average player at his position would manage.</p>
       </>
     )}
   </Section>
