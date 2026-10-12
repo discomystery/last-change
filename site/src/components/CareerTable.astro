@@ -7,8 +7,8 @@ import Section from './Section.astro';
 import teams from '../../public/data/teams.json';
 import { teamColour } from '../lib/teams';
 
-interface Props { p: any }
-const { p } = Astro.props;
+interface Props { p: any; plain?: boolean }
+const { p, plain = false } = Astro.props;
 const c = p.career;
 const base = import.meta.env.BASE_URL;
 const isG = p.group === 'G';
@@ -30,7 +30,7 @@ const isHigh = (s: number, k: string) => (highs[k] ?? []).includes(s);
 const lead = isG ? 'Every NHL regular season, club by club: games, record, save percentage and goals-against average.' : 'Every NHL regular season, club by club: games, goals, assists and points.';
 const anyHigh = Object.keys(highs).length > 0;
 // Four or more seasons: a column per season (points, or wins for goalies) coloured by club, with the table behind a fold.
-const chart = rows.length >= 4;
+const chart = !plain && rows.length >= 4;
 const key = isG ? 'w' : 'p';
 const old = c?.seasons ?? [];
 const partsOf = (r: any) => r.teams ?? [r];
