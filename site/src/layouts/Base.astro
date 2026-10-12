@@ -64,7 +64,10 @@ const teamList = teams as { abbr: string; name: string }[];
   <body>
     <header class="site-head">
       <div class="brand">
-        <a class="wordmark" href={base}>Spare Line Change</a>
+        <span class="brand-name">
+          <a class="wordmark" href={base}>Spare Line Change</a>
+          <span class="beta" tabindex="0" data-tip="Spare Line Change is in beta: pages and numbers are still being built and checked, so some may change.">Beta</span>
+        </span>
         <nav class="site-nav" aria-label="Site">
           <a id="my-team-link" class="my-team" href={base} data-base={base} hidden></a>
           {tabs.map((t) => t.soon
@@ -114,7 +117,7 @@ const teamList = teams as { abbr: string; name: string }[];
     </div>
     <footer class="site-foot">
       <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
-      <p>A fan project. Not affiliated with the NHL or any of its teams.</p>
+      <p>A fan project, in beta: pages and numbers may still change. Not affiliated with the NHL or any of its teams.</p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline>
@@ -471,6 +474,9 @@ const teamList = teams as { abbr: string; name: string }[];
   html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
   .wordmark { font: 700 26px/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }
   .wordmark-note { font-size: 12px; color: var(--ink-3); }
+  /* The quiet "Beta" pill beside the wordmark, in the same style as the other small pill tags. */
+  .brand-name { display: inline-flex; align-items: center; gap: 8px; }
+  .beta { font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); background: var(--track); border-radius: 999px; padding: 4px 8px; cursor: help; }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
 
   /* Page titles: one size and spacing on every page, with an optional intro line under them. */
