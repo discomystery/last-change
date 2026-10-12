@@ -43,7 +43,6 @@ ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare
     "quality": ("qualityAllowed", "if they get good looks", "getting good looks"),
     "pp": ("pk", "if their power play gets going", "a power play that gets going"),
     "pk": ("pp", "if their penalty kill holds up", "a penalty kill that holds up"),
-    "turnover": ("breakdowns", "if they pounce on loose pucks", "pouncing on loose pucks"),
     "suppression": ("volume", "if they keep shots to a minimum", "keeping shots to a minimum"),
     "qualityAllowed": ("quality", "if they keep dangerous shots away", "keeping dangerous shots away"),
 }
@@ -155,32 +154,43 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
 
 
 def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
-    """Plain reasons, from the model's own breakdown, told from `team`'s side. `lineups` (by team abbreviation) names
-    a key skater a side will be without or gets back."""
+    """Plain reasons, from the model's own breakdown, told from `team`'s side, as the opening of a sentence that the
+    caveat finishes ("With Vegas out-chancing opponents lately and at home, ..."), so the reasons read as the cause of
+    the verdict rather than a list beside it (Sora, 2026-10-12). `lineups` (by team abbreviation) names a key skater a
+    side will be without or gets back."""
     s = {x["input"]: x["shift"] * (1 if team == home else -1) for x in steps}
     T, O = places[team], places[opp]
     out = []
     chances = s.get("xgd", 0.0)
     if abs(chances) >= 0.08:
-        out.append(f"{T if chances > 0 else O} has controlled the play far better over recent games")
+        out.append(f"{T if chances > 0 else O} out-chancing opponents by a wide margin lately")
     elif abs(chances) >= 0.025:
-        out.append(f"{T if chances > 0 else O} has had more of the chances over recent games")
+        out.append(f"{T if chances > 0 else O} out-chancing opponents lately")
     else:
-        out.append("the two have been about even at controlling the play lately")
+        out.append("the two about even at out-chancing opponents lately")
     for side in (team, opp):
         lu = (lineups or {}).get(side) or {}
         if lu.get("without"):
-            out.append(f"{places[side]} {'may' if lu.get('maybe') else 'will'} be without {lu['without']}")
+            out.append(f"{places[side]} {'possibly ' if lu.get('maybe') else ''}without {lu['without']}")
         if lu.get("back"):
-            out.append(f"{places[side]} should have {lu['back']} back")
+            out.append(f"{places[side]} getting {lu['back']} back")
     if abs(s.get("b2b", 0.0)) >= 0.005:
         tired = opp if s["b2b"] > 0 else team
-        out.append(f"{places[tired]} is playing for the second night in a row")
-    if len(out) == 1 and out[0].startswith(places[home] + " has"):
-        return out[0] + (" and have" if places[home].startswith("the ") else " and has") + " home ice."  # one team has both: name it once
-    out.append(f"{places[home]} has home ice")
-    text = ", ".join(out[:-1]) + (", and " if len(out) > 2 else " and ") + out[-1]
-    return text[0].upper() + text[1:] + "."
+        out.append(f"{places[tired]} on the second night of a back-to-back")
+    if len(out) == 1 and out[0].startswith(places[home] + " out-chancing"):
+        return "With " + out[0] + " and at home,"  # one team has both: name it once
+    out.append(f"{places[home]} at home")
+    return "With " + ", ".join(out[:-1]) + (", and " if len(out) > 2 else " and ") + out[-1] + ","
+
+
+_LOWER_START = ("It’s", "Anything", "The ")
+
+
+def _join(why: str, caveat: str) -> str:
+    """The reasons, then the verdict that follows from them, as one sentence."""
+    if caveat.startswith(_LOWER_START):
+        caveat = caveat[0].lower() + caveat[1:]
+    return f"{why} {caveat}"
 
 
 _PLURAL = {"has": "have", "is": "are", "faces": "face", "starts": "start"}
@@ -205,7 +215,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {"T": places[team], "O": places[opp], "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
-                     "body": _agree(_why(chance["steps"], team, opp, home, places, lineups) + " " + _agree(_pick(caveats, gid, team, "caveat").format(**w)))}
+                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
     return out
 
 

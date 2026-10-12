@@ -384,7 +384,7 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
     if kind == "won" and n >= 3:
         return f"{_cap(W.the(t))} have won {num(n)} straight{tail}."
     if kind == "winless" and n >= 3:
-        return f"{_cap(W.the(t))} haven’t won in {num(n)}."
+        return f"{_cap(W.the(t))} are on a {num(n)}-game losing streak."
     if kind == "won" and n >= 2:
         return f"{_cap(W.the(t))} have won two in a row{tail}."
     return None
@@ -421,7 +421,10 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             sents.append(f"The teams have split {num(len(m))} meetings this season.")
     # form
     form = {t: _form_sentence(t, facts["form"][t], W, bool(m)) for t in (home, away)}
-    if any(form.values()):
+    if form[home] and form[away]:  # two streaks in one sentence: "but" when they run opposite ways (Sora, 2026-10-12)
+        same = facts["form"][home]["streak"][0] == facts["form"][away]["streak"][0]
+        sents.append(form[home][:-1] + (", and " if same else ", but ") + form[away][0].lower() + form[away][1:])
+    elif any(form.values()):
         for t in (home, away):
             if form[t]:
                 sents.append(form[t])
@@ -439,7 +442,10 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             facts["heads"].append((58 + n, f"{_cap(W.the(t))} need a win"))
     # what to look for: the gist of the top calls
     look, kinds = [], set()
+    tired_told = any("back-to-back" in v.get("body", "") for v in (outlook or {}).values())
     for c in claims:  # one per kind of call: two duels or two edges in a row read the same
+        if c["kind"] == "rest" and tired_told:  # the lean already says who played last night
+            continue
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
             look.append(c["gist"])
             kinds.add(c["kind"])
@@ -714,7 +720,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if t == loser and prev_k == "won" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.poss(t))} {num(prev_n)}-game winning streak is over.", "score": 62 + prev_n})
         if t == loser and k == "winless" and n >= 3:
-            items.append({"tag": "Slump", "text": f"{_cap(W.the(t))} haven’t won in {num(n)}.", "score": 55 + n})
+            items.append({"tag": "Slump", "text": f"{_cap(W.the(t))} are on a {num(n)}-game losing streak.", "score": 55 + n})
         if t == winner and prev_k == "winless" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.the(t))} won for the first time in {num(prev_n + 1)} games.", "score": 58 + prev_n})
     pg = P.filter((pl.col("season") == season) & (pl.col("date") <= r["date"]))

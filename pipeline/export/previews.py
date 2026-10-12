@@ -25,7 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 9  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 10  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -33,6 +33,7 @@ RULES_VERSION = 9  # 1: the first rulebook, with ungraded "contrast" notes; 2: e
 # 7: shot volume, shots against and pace quoted as scores, with what they look like as recorded (`see`); ranks as chips
 # 8: special-teams calls add what each side has been known for over five seasons of real goals; verb agreement fixed
 # 9: shot-quality clashes only top five against bottom five; no turnover clashes (both from a 2023-25 backtest)
+# 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
@@ -227,15 +228,15 @@ CHANGED_HEADS_PHYSICAL = {"better": ["{X} are hitting more than you remember", "
 # other team's stars, or going power against power.
 MATCHUP_WORDS = {
     "hunt": (["{H} will hunt a mismatch", "{Hstar}’s line gets the soft minutes", "{H} want {Hstar} away from the big guns"],
-             "That’s {coach} chasing an easier matchup for the team’s scorers."),
+             "{Coach} has been chasing an easier matchup for the team’s scorers."),
     "shadow": (["A shadow job for {mine}", "{H} will send their checkers at {Ostar}", "{Ostar} gets company tonight"],
-               "That’s a checking assignment: {coach} wants this group on {theirline}."),
+               "{Coach} has been using this group as a checking line on {theirline}."),
     "best": (["Best on best: {Hstar} against {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power against power"],
-             "Strength on strength, and {coach} is choosing it."),
+             "{Coach} has been choosing strength on strength."),
     "even": (["{H} like {Hstar}’s line against {Ostar}’s", "Like for like: {Hstar} against {Ostar}"],
-             "Line for line, and {coach} keeps choosing it."),
+             "{Coach} keeps choosing line for line."),
     "pair": (["{mine} get the {Ostar} assignment", "{H} will send {mine} at {Ostar}", "A tough night ahead for {Ostar}"],
-             "That’s {coach} picking a defense pair for {theirline}."),
+             "{Coach} has been picking a defense pair for {theirline}."),
 }
 
 # Goalie records against one team: tested over 2023-24 to 2026-27 (911 goalie-opponent pairs with four or more
@@ -401,7 +402,7 @@ def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[
             words = {**team_words(x, places, "X"), **team_words(y, places, "Y"), "oname": oname, "dname": dname,
                      "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"])}
             lean_txt = _pick((DUEL_LEAN_PP if off == "pp" else DUEL_LEAN)[side], gid, off, x, "lean")
-            body = "{X} are " + standing(o["rank"]) + " for " + oname + ", and {Y} are " + standing(d["rank"]) + " at " + dname + ". " + lean_txt
+            body = "{X} are " + standing(o["rank"]) + " for " + oname + ", but {Y} are " + standing(d["rank"]) + " at " + dname + ". " + lean_txt
             cite = f"Style fingerprint · this season blended with last · {_games(fp[x]['games'], fp[y]['games'])}"
             sc = off in SCORES
             see = None
@@ -421,7 +422,7 @@ def duel_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[
                 "body": _fmt(body, **words), "call": call, **({"see": see} if see else {}),
                 "nums": f"{places[x]} {words['xr']} for {oname} ({words['xv']}) · {places[y]} {words['yr']} for {dname}",
                 "chips": [chip(t_, k_, e_, places, cite) for t_, k_, e_ in ((x, off, o), (y, dfn, d)) if k_ in CHIP],
-                "gist": _fmt("It’s strength against strength: {X} for " + oname + ", {Y} at " + dname + ".", **words),
+                "gist": _fmt("It’s strength against strength: {X} are " + standing(o["rank"]) + " for " + oname + ", but {Y} are " + standing(d["rank"]) + " at " + dname + ".", **words),
                 "cite": cite,
                 "check": {"metric": off, "measure": MEASURE[off], "team": x, "baseline": round(lo, 4), "usual": round(o["v"], 4),
                           "league": round(lo, 4), "direction": "above" if side == "offense" else "below", **({"scale": "score"} if sc else {}),
@@ -562,7 +563,7 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
     theirline = "the other team’s top line" if j == 0 else f"opponents’ {ORD[j]} lines"
     group = f"{mine}" if lab == "P" else f"{w['Hstar']}’s line ({mine})"
     body = (f"At home, {w['H']} keep sending {group} out against opponents’ {ORD[j]} lines, far more often than chance would. "
-            f"{why.format(theirline=theirline, coach=coach or 'their coach')} Tonight {w['Op']} {ORD[j]} line is {theirs}.")
+            f"{why.format(theirline=theirline, Coach=_cap(coach or 'their coach'))} Tonight {w['Op']} {ORD[j]} line is {theirs}.")
     return {
         "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away, "style": style,
         "head": _fmt(_pick(heads, gid, "matchup"), **w),
@@ -691,12 +692,31 @@ EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, 
     "pp": ["One power play bites, one doesn’t", "{topp} power play outclasses {botp}"],
     "pk": ["{top} kill penalties far better than {bot}", "Airtight against leaky on the kill"],
 }
-EDGE_BODIES = ["{top} are {wt} for {name}, at the {hi} end; {bot} are {wb}, at the {lo} end. Expect that gap to show.",
-               "On {name}, {topc} is {wt} and {botc} is {wb}. That’s about as far apart as two teams get."]
+# Each edge told as a plain contrast first (Sora, 2026-10-12: "Vegas' defensemen shoot a lot, LA's not so much"), with
+# "but" so the two halves read as against each other.
+EDGE_PLAIN = {
+    "volume": "{top} shoot a lot, but {bot} don’t.",
+    "quality": "{top} wait for good looks, but {bot} settle for hopeful ones.",
+    "suppression": "{top} keep shots away, but {bot} give up plenty.",
+    "qualityAllowed": "{top} keep dangerous shots away, but {bot} give up a lot of them.",
+    "point": "{top} fire from the point, but {bot} work down low.",
+    "dShots": "{topp} defensemen shoot a lot; {botp}, not so much.",
+    "inClose": "{top} get in close, but {bot} mostly shoot from distance.",
+    "forecheck": "{top} hound the puck, but {bot} sit back.",
+    "physical": "{top} hit a lot, but {bot} mostly don’t.",
+    "depth": "{top} roll four lines, but {bot} lean on their top six.",
+    "pp": "{topp} power play bites, but {botp} doesn’t.",
+    "pk": "{top} kill penalties well, but {bot} don’t.",
+}
+EDGE_BODIES = ["{plain} {topc} is {wt} for {name}; {botc} is {wb}.",
+               "On {name}, {topc} is {wt}, but {botc} is {wb}."]
+EDGE_FAR = 26  # "about as far apart as two teams get" only for ranks this far apart, say 3rd and 29th (Sora, 2026-10-12)
 EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
 # A filler edge (the widest gap, but not a hot one) is told plainly: the two teams are not at opposite ends of anything.
 EDGE_MILD_HEADS = ["{topp} edge in {name}", "Where {top} have the edge: {name}"]
 EDGE_MILD_BODY = "{top} are {wt} for {name}, and {bot} are {wb}. It’s the widest gap between these two."
+EDGE_SMALL = 30  # below this percentile gap the widest gap is said to be a small one (Sora, 2026-10-12)
+EDGE_SMALL_BODY = "{top} are {wt} for {name}, and {bot} are {wb}. That’s the biggest gap between these two, and it isn’t a big one."
 
 
 def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
@@ -744,10 +764,11 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
     return {
         "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
         "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
-        "body": _fmt(_pick(EDGE_BODIES, gid, k, "body") if hot else EDGE_MILD_BODY, **w),
+        "body": _fmt((_pick(EDGE_BODIES, gid, k, "body") + (" That’s about as far apart as two teams get." if abs(rt["rank"] - rb["rank"]) >= EDGE_FAR else " Expect that gap to show."))
+                     if hot else EDGE_SMALL_BODY if gap(k) < EDGE_SMALL else EDGE_MILD_BODY, plain=_fmt(EDGE_PLAIN.get(k, ""), **w), **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
         "chips": [chip(top, k, rt, places, cite), chip(bot, k, rb, places, cite)] if k in CHIP else [],
-        "gist": _fmt(("{top} and {bot} sit at opposite ends for {name}." if hot else "{top} have the edge over {bot} on {name}."), **w),
+        "gist": _fmt(EDGE_PLAIN[k] if hot and k in EDGE_PLAIN else "{top} have the edge over {bot} on {name}.", **w),
         "call": _fmt(EDGE_SCORE_CALL[k] if sc else EDGE_CALL[k], **w),
         **({"see": _fmt(EDGE_SEE[k], d=per_game(abs(rt["v"] - rb["v"])), **w)} if sc else {}),
         "cite": cite,
