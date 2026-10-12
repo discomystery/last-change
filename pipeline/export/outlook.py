@@ -154,51 +154,75 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
 
 
 def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
-    """Plain reasons, from the model's own breakdown, told from `team`'s side, as the opening of a sentence that the
-    caveat finishes ("With Vegas out-chancing opponents lately and at home, ..."), so the reasons read as the cause of
-    the verdict rather than a list beside it (Sora, 2026-10-12). `lineups` (by team abbreviation) names a key skater a
-    side will be without or gets back."""
-    s = {x["input"]: x["shift"] * (1 if team == home else -1) for x in steps}
-    T, O = places[team], places[opp]
-    out = []
+    """Plain reasons, from the model's own breakdown, as one sentence: the reasons that help one side first (biggest
+    first, Sora 2026-10-12: chance control matters more than home ice), then "but" and the ones that help the other.
+    Clauses about the same team share its name once. When the two are even at out-chancing opponents, that is said
+    first on its own. `lineups` (by team abbreviation) names a key skater a side will be without or gets back."""
+    s = {x["input"]: x["shift"] * (1 if team == home else -1) for x in steps}  # > 0 helps `team`
+    other = {team: opp, opp: team}
+    facts = []  # (weight, side it helps, subject, singular predicate, plural predicate)
     chances = s.get("xgd", 0.0)
-    if abs(chances) >= 0.08:
-        out.append(f"{T if chances > 0 else O} out-chancing opponents by a wide margin lately")
-    elif abs(chances) >= 0.025:
-        out.append(f"{T if chances > 0 else O} out-chancing opponents lately")
-    else:
-        out.append("the two about even at out-chancing opponents lately")
+    if abs(chances) >= 0.025:
+        wide = " by a wide margin" if abs(chances) >= 0.08 else ""
+        side = team if chances > 0 else opp
+        facts.append((abs(chances), side, side, f"has been out-chancing opponents{wide} lately",
+                      f"have been out-chancing opponents{wide} lately"))
+    roster = abs(s.get("roster", 0.0)) or 0.01
     for side in (team, opp):
         lu = (lineups or {}).get(side) or {}
         if lu.get("without"):
-            out.append(f"{places[side]} {'possibly ' if lu.get('maybe') else ''}without {lu['without']}")
+            verb = "may be" if lu.get("maybe") else "will be"
+            facts.append((roster, other[side], side, f"{verb} without {lu['without']}", f"{verb} without {lu['without']}"))
         if lu.get("back"):
-            out.append(f"{places[side]} getting {lu['back']} back")
+            facts.append((roster, side, side, f"gets {lu['back']} back", f"get {lu['back']} back"))
     if abs(s.get("b2b", 0.0)) >= 0.005:
         tired = opp if s["b2b"] > 0 else team
-        out.append(f"{places[tired]} on the second night of a back-to-back")
-    if len(out) == 1 and out[0].startswith(places[home] + " out-chancing"):
-        return "With " + out[0] + " and at home,"  # one team has both: name it once
-    out.append(f"{places[home]} at home")
-    return "With " + ", ".join(out[:-1]) + (", and " if len(out) > 2 else " and ") + out[-1] + ","
+        facts.append((abs(s["b2b"]), other[tired], tired, "is on the second night of a back-to-back",
+                      "are on the second night of a back-to-back"))
+    facts.append((abs(s.get("home", 0.0)), home, home, "has home-ice advantage", "have home-ice advantage"))
+    facts.sort(key=lambda f: -f[0])
+    first = facts[0][1]
+    groups = [[f for f in facts if f[1] == first], [f for f in facts if f[1] != first]]
+    for g in groups:  # one team's clauses stay together, in the order of that team's biggest
+        lead = {}
+        for f in g:
+            lead.setdefault(f[2], len(lead))
+        g.sort(key=lambda f: lead[f[2]])
 
+    def clauses(group: list, after: str | None) -> str:
+        parts = []  # one phrase per team: "Edmonton has been ... lately and has home-ice advantage"
+        for f in group:
+            if parts and parts[-1][0] == f[2]:
+                parts[-1][1] += " and " + (f[4] if parts[-1][1].startswith("they ") else f[3])
+            elif not parts and f[2] == after:
+                parts.append([f[2], "they " + f[4]])  # "..., but they are on the second night"
+            else:
+                parts.append([f[2], f"{places[f[2]]} {f[3]}"])
+        out = [p[1] for p in parts]
+        if len(out) == 1:
+            return out[0]
+        return ", ".join(out[:-1]) + (", and " if len(out) > 2 or " and " in out[0] else " and ") + out[-1]
 
-_LOWER_START = ("It’s", "Anything", "The ")
+    text = clauses(groups[0], None)
+    if groups[1]:
+        text += ", but " + clauses(groups[1], groups[0][-1][2])
+    text += "."
+    if abs(chances) < 0.025:
+        text = "The two have been about even at out-chancing opponents lately. " + text[0].upper() + text[1:]
+    return text
 
 
 def _join(why: str, caveat: str) -> str:
-    """The reasons, then the verdict that follows from them, as one sentence."""
-    if caveat.startswith(_LOWER_START):
-        caveat = caveat[0].lower() + caveat[1:]
+    """The reasons, then the verdict, as separate sentences."""
     return f"{why} {caveat}"
 
 
-_PLURAL = {"has": "have", "is": "are", "faces": "face", "starts": "start"}
+_PLURAL = {"has": "have", "is": "are", "faces": "face", "starts": "start", "gets": "get"}
 
 
 def _agree(text: str) -> str:
     """"NY Rangers" reads badly as a place, so the New York teams go by nickname, and nicknames are plural."""
-    text = re.sub(r"\b([Tt]he (?:Rangers|Islanders)) (has|is|faces|starts)\b", lambda m: f"{m[1]} {_PLURAL[m[2]]}", text)
+    text = re.sub(r"\b([Tt]he (?:Rangers|Islanders)) (has|is|faces|starts|gets)\b", lambda m: f"{m[1]} {_PLURAL[m[2]]}", text)
     text = re.sub(r"(Rangers|Islanders)’s\b", r"\1’", text)
     return text[0].upper() + text[1:]
 

@@ -189,8 +189,9 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         roster = [p for p, team in cur.items() if team == t]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))
-        # hot streaks
-        for pid, g in this.group_by("player_id"):
+        # hot streaks; teammates on the same run share one item (Sora, 2026-10-12: "Granlund and LaCombe have ...")
+        hot = {}
+        for pid, g in this.sort("player_id").group_by("player_id", maintain_order=True):
             pts = g.sort("date")["pts"].to_list()
             n = 0
             for x in reversed(pts):
@@ -198,8 +199,12 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                     break
                 n += 1
             if n >= 4:
-                text = (f"{N[pid[0]]} has a point in every game this season." if n == len(pts) else f"{N[pid[0]]} has a point in {num(n)} straight games.")
-                items.append({"tag": "Hot streak", "text": text, "score": 60 + n + sum(pts) / 100, "pid": pid[0]})
+                hot.setdefault("every game this season" if n == len(pts) else f"{num(n)} straight games", []).append((60 + n + sum(pts) / 100, pid[0]))
+        for run, who in hot.items():
+            who.sort(key=lambda x: -x[0])
+            names = [N[p] for _, p in who]
+            text = f"{_and(names)} {'has' if len(names) == 1 else 'have'} a point in {run}."
+            items.append({"tag": "Hot streak", "text": text, "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who]})
         # slow start: scored often last season, nothing yet
         last = mine.filter(pl.col("season") == season - 1).group_by("player_id").agg(gp=pl.len(), g=pl.col("g").sum())
         last = last.filter((pl.col("gp") >= 40) & (pl.col("g") / pl.col("gp") >= 0.35))
@@ -421,9 +426,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             sents.append(f"The teams have split {num(len(m))} meetings this season.")
     # form
     form = {t: _form_sentence(t, facts["form"][t], W, bool(m)) for t in (home, away)}
-    if form[home] and form[away]:  # two streaks in one sentence: "but" when they run opposite ways (Sora, 2026-10-12)
-        same = facts["form"][home]["streak"][0] == facts["form"][away]["streak"][0]
-        sents.append(form[home][:-1] + (", and " if same else ", but ") + form[away][0].lower() + form[away][1:])
+    if form[home] and form[away]:  # two streaks: separate sentences, since "but" only fits a real contrast (Sora, 2026-10-12)
+        sents += [form[home], form[away]]
     elif any(form.values()):
         for t in (home, away):
             if form[t]:
@@ -457,7 +461,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
             continue
         per[i["tag"]] = per.get(i["tag"], 0) + 1
-        seen.add(i.get("pid"))
+        seen.update(i.get("pids") or [i.get("pid")])
         picked.append({"tag": i["tag"], "text": i["text"]})
     for t in (away, home):  # always at least two: each team's leading scorer
         if len(picked) >= MIN_ITEMS:

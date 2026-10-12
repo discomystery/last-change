@@ -37,5 +37,6 @@ def test_a_key_absence_and_return_are_named_in_the_note():
     places = {"AAA": "Alpha", "BBB": "Beta"}
     steps = [{"input": "home", "shift": 0.03}, {"input": "xgd", "shift": 0.0}, {"input": "b2b", "shift": 0.0}]
     body = outlook._why(steps, "BBB", "AAA", "BBB", places, {"AAA": {"without": "Star", "maybe": True}, "BBB": {"back": "Ace"}})
-    assert "Alpha possibly without Star" in body and "Beta getting Ace back" in body and body.startswith("With ")
+    assert "Alpha may be without Star" in body and "gets Ace back" in body
+    assert body.startswith("The two have been about even")
     assert "injur" not in body
