@@ -71,7 +71,10 @@ def update(season: int) -> dict:
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
-    from pipeline.metrics import rapm
+    from pipeline.metrics import drift, rapm
+    rec = drift.check(season)  # has the league changed how it records plays? the workflow opens an issue if so
+    drift.save(rec)
+    out["recording_check"] = rec["status"]
     out["rapm_cache_pruned"] = rapm.prune_cache()
     _save_state(season)
     return out

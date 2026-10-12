@@ -305,9 +305,14 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
 
 
 def replay_block(row: dict, away: str, home: str) -> dict:
-    """Run-it-back shares for the post-game page: replays of regulation chances, level replays split evenly."""
-    return {"share": {away: round(row["away_share"], 3), home: round(row["home_share"], 3)},
-            "regulation": {away: round(row["away_reg_win"], 3), "tie": round(row["reg_tie"], 3), home: round(row["home_reg_win"], 3)},
+    """Run-it-back shares for the post-game page: how often teams with chances like these win (replays.calibrated),
+    level replays split evenly. `raw` keeps the uncorrected replay share."""
+    h = replays.calibrated(row["home_share"])
+    tie = row["reg_tie"]
+    h_reg = min(max(h - tie / 2, 0.0), 1 - tie)
+    return {"share": {away: round(1 - h, 3), home: round(h, 3)},
+            "raw": {away: round(row["away_share"], 3), home: round(row["home_share"], 3)},
+            "regulation": {away: round(1 - tie - h_reg, 3), "tie": round(tie, 3), home: round(h_reg, 3)},
             "xg": {away: round(row["away_xg"], 2), home: round(row["home_xg"], 2)},
             "chances": {away: row["away_chances"], home: row["home_chances"]}}
 

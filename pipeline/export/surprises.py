@@ -228,7 +228,7 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         p = replay["share"][l]
         if p >= 0.6:
             out.append(_item("result", 1.0 + (p - 0.6) * 7.5, "rare", f"{places[w]} won against the run of play",
-                             f"Played out 100 times with these chances, {places[l]} wins {round(100 * p)}. {places[w]} won anyway."))
+                             f"With chances like these, {places[l]} would win about {round(100 * p)} games in 100. {places[w]} won anyway."))
     return [c for c in out if c is not None]
 
 

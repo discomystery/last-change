@@ -210,6 +210,18 @@ def with_without(season: int, rel: pl.DataFrame, before: str | None = None) -> p
 
 GOALIE_SEASON_WEIGHT = (1.0, 0.8, 0.6)  # this season, last, the one before
 GOALIE_SHRINK_SHOTS = 1500  # unblocked shots of average goaltending added to each goalie's own record
+@lru_cache(maxsize=4)
+def standouts(season: int = CURRENT_SEASON, before: str | None = None) -> dict[int, str]:
+    """Skaters a fan would want told about when they are missing (star or franchise tier), by player id. Used only
+    to choose whom pages mention; the tier itself is never shown."""
+    try:
+        r = run(season, before)
+    except Exception as e:  # no ratings yet: nobody is singled out
+        print(f"standouts unavailable: {e!r}")
+        return {}
+    return dict(r.filter(pl.col("tier").is_in(["star", "franchise"])).select("player_id", "tier").iter_rows())
+
+
 GOALIE_TIERS = ((5, "franchise"), (15, "star"), (32, "core"), (64, "regular"))  # by league rank: the top five are the difference makers
 
 

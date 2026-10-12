@@ -27,7 +27,13 @@ type Goalie = { id: number; name: string; team: string; started: boolean; toi: s
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
 type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }>;
-    inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }> } | null };
+    inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }>;
+    players?: Record<string, { missing: Named[]; out: Named[]; in: Named[]; stars?: Star[] } | null> } | null };
+// A star who missed the game without moving the number: the rating had stopped counting on him, or rates his 5-on-5
+// play modestly.
+type Star = { id: number; name: string; why: 'priced' | 'small' };
+// A skater a lineup step was about, most valuable first; `big` marks the top tenth of absences.
+type Named = { id: number; name: string; xg: number; big: boolean };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Recap }>('../../../public/data/recaps/2*.json', { eager: true });
@@ -38,6 +44,7 @@ const { away, home } = r;
 const order = [away, home];
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
+const poss = (n: string) => (n.endsWith('s') ? `${n}’` : `${n}’s`);  // "NY Rangers’ lineup"
 const side = (a: string) => (a === away ? 'away' : 'home');
 const colours = matchupColours(away, home);
 // The reveal is told from the visitor's own team's side when it played, otherwise the home team's.
@@ -55,6 +62,24 @@ const ladder = (a: string) => {
     return { label: s.label, input: s.input, pts, before, end: run, after: Math.round(run) };
   });
 };
+// Who each lineup step was about: "Jordan Staal (a big loss), Seth Jarvis and Sean Walker".
+const names = (xs: Named[] | undefined, big = false) => {
+  const w = (xs ?? []).map((x) => (big && x.big ? `${x.name} (a big loss)` : x.name));
+  return w.length < 2 ? (w[0] ?? '') : `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
+};
+const named = (t: string, k: 'missing' | 'out' | 'in') => rv?.players?.[t]?.[k] ?? [];
+const without = (big: boolean) => [away, home].filter((t) => named(t, 'missing').length).map((t) => `${place(t)} were without ${names(named(t, 'missing'), big)}.`).join(' ');
+const starsOut = (long: boolean) => [away, home].flatMap((t) => (rv?.players?.[t]?.stars ?? []).map((x) => {
+  const also = named(t, 'missing').length ? ' also' : '';
+  if (!long) return `${x.name} was out for ${place(t)}${also ? ' too' : ''}, ${x.why === 'priced' ? 'but he had been out long enough that it was already in the numbers' : 'though by our ratings that barely moves this'}.`;
+  return x.why === 'priced'
+    ? `${place(t)} were${also} without ${x.name}. He had been out long enough that the rating above had already stopped counting on him, so his absence barely moves this step.`
+    : `${place(t)} were${also} without ${x.name}. Our ratings of his 5-on-5 play are more modest than his name, so his absence barely moves this step.`;
+})).join(' ');
+const late = () => [away, home].flatMap((t) => [
+  named(t, 'out').length ? `${names(named(t, 'out'))} sat out for ${place(t)}` : '',
+  named(t, 'in').length ? `${names(named(t, 'in'))} ${named(t, 'in').length > 1 ? 'were' : 'was'} in for ${place(t)}` : '',
+]).filter(Boolean);
 // What each step was for, in a sentence, told from team a's side.
 const other = (a: string) => (a === home ? away : home);
 const xgWord = (v: number) => `${Math.abs(v).toFixed(2)} expected goals a game`;
@@ -71,15 +96,25 @@ const why = (a: string, input: string, pts: number): { short: string; long: stri
       : `${place(gap > 0 ? a : o)} have been getting ${Math.abs(gap) >= 0.8 ? 'much ' : ''}better chances than their opponents lately.`;
     return { short, long: inp ? `Lately, ${recent(a, inp[a].xgd)}, and ${recent(o, inp[o].xgd)}. The latest games count most, and last season still counts a little.` : short };
   }
-  if (input === 'roster') return pts === 0
-    ? { short: 'Both teams played their usual players last time out.', long: 'We look at who each team dressed in their last game and compare those players with the ones who played in the games behind the rating above. Both teams’ last lineups were about as strong as usual.' }
-    : { short: `${loser} have been missing some of their usual players.`,
-        long: `We look at who each team dressed in their last game and compare those players with the ones who played in the games behind the rating above. ${loser}’s last lineup was weaker than usual (someone important out, or a call-up in), so their recent chances flatter them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
+  if (input === 'roster') {
+    const how = 'We look at who each team dressed in their last game, plus any injury news since, and compare those players with the ones who played in the games behind the rating above.';
+    const lost = named(pts > 0 ? o : a, 'missing');
+    const extra = (t: string) => (t ? ` ${t}` : '');
+    if (pts === 0) return { short: (without(false) || 'Both teams played their usual players last time out.') + extra(starsOut(false)),
+      long: `${how} ${[without(true), starsOut(true)].filter(Boolean).join(' ')} Both teams’ lineups were about as strong as usual, so this step changes nothing.`.replace('  ', ' ') };
+    return { short: (lost.length ? `${loser} were without ${names(lost)}.` : `${poss(gainer)} lineup stacked up better against their usual than ${poss(loser)} did.`) + extra(starsOut(false)),
+      long: `${how} ${without(true) || `${loser}’s last lineup was weaker than usual (someone important out, or a call-up in).`}${extra(starsOut(true))} That leaves ${loser}’s recent chances flattering them a little. This way an injury counts straight away, instead of waiting for results to catch up.` };
+  }
   if (input === 'b2b') { const tired = inp ? [a, o].filter((t) => inp[t].b2b) : []; const t = tired.map(place).join(' and ');
     return tired.length ? { short: `${t} played last night, so tired legs.`, long: `${t} played the night before. Teams on the second night of a back-to-back win less often.` }
       : { short: 'Neither team played last night.', long: 'Neither team played the night before, so nothing changes here.' }; }
-  if (input === 'lineup') return { short: `When the lineups came out, ${gainer}’s was stronger than we expected that morning.`,
-    long: `The same check as “Who’s been playing”, done again with the players who actually dressed tonight. It only moves when someone came in or went out after the morning: here ${gainer} looked stronger, or ${loser} weaker, than we had expected.` };
+  if (input === 'lineup') {
+    const gIn = named(pts > 0 ? a : o, 'in'), lOut = named(pts > 0 ? o : a, 'out'), changes = late();
+    return { short: gIn.length ? `When the lineups came out, ${names(gIn)} ${gIn.length > 1 ? 'were' : 'was'} in for ${gainer}.`
+        : lOut.length ? `When the lineups came out, ${loser} were without ${names(lOut)}.`
+        : `When the lineups came out, ${gainer}’s was stronger than we expected that morning.`,
+      long: `The same check as “Who’s been playing”, done again with the players who actually dressed tonight. It only moves when someone came in or went out after the morning: here ${gainer} looked stronger, or ${loser} weaker, than we had expected.${changes.length ? ` ${changes.join('; ')}.` : ''}` };
+  }
   return { short: '', long: '' };
 };
 // The steps for one team's side, ready for the story: start at 50, each input, the morning figure, and the puck-drop
@@ -140,9 +175,9 @@ const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
 const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
   : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
 const replayBody = !dw ? '' : pct(loser) >= 60
-  ? `Played out 100 times with these chances, ${place(loser)} wins ${pct(loser)}. The goals went the other way.`
-  : pct(winner) >= 60 ? `Played out 100 times with these chances, ${place(winner)} wins ${pct(winner)}.`
-  : `Played out 100 times with these chances, ${place(away)} wins ${pct(away)} and ${place(home)} ${pct(home)}, close to a coin flip.`;
+  ? `With chances like these, ${place(loser)} would win about ${pct(loser)} games in 100. The goals went the other way.`
+  : pct(winner) >= 60 ? `With chances like these, ${place(winner)} would win about ${pct(winner)} games in 100.`
+  : `With chances like these, ${place(away)} would win about ${pct(away)} games in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
 const jobFiles = import.meta.glob<{ default: { game_id: number; players: { pos: string }[] } }>('../../../public/data/jobs/2*.json', { eager: true });
@@ -224,7 +259,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           </div>
           <button type="button" class="rp-again" aria-label="Run it again: replay the 100 games" data-tip="Run it again"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M12.6 1.6v3.1H9.5" /></svg></button>
         </div>
-        <div class="replays" role="img" aria-label={`Of 100 replays, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
+        <div class="replays" role="img" aria-label={`Of 100 games like this, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
           {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
         </div>
         <div class="meter-text">
@@ -232,7 +267,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
           <p class="detail">{order.map((a, i) => `${i ? ' ' : ''}${place(a)} had ${dw.chances[a]} chances worth ${dw.xg[a].toFixed(1)} expected goals.`).join('')}</p>
           <Gloss label="How the replays work">
             <p class="note">Every shot in regulation that was on target or missed the net goes in as often as our <span class="term" tabindex="0" data-tip="How often a shot like this one becomes a goal, by this site’s model, judged on where it came from and what happened just before it.">expected-goals</span> model says it should, and the game is played out 100 times. A rebound scramble counts as one chance, and empty-net shots are left out. A replay tied after regulation counts as half a win each, since overtime and shootouts are close to coin flips.</p>
-            <p class="note">It doesn’t know about goalies, finishing skill or passes before a shot. It also favours the team that was chasing, because a team with a lead tends to sit back. Over the last three seasons, teams it gave 80% or more won about two games in three.</p>
+            <p class="note">Played out shot by shot, the team with the better chances wins too often: a team with a lead tends to sit back while the other chases, and the replays don’t know about goalies, finishing skill or passes before a shot. So the share is corrected by how games with chances like these really ended over the last three seasons. Replays that came out 85 to 15 read about 70 to 30, and teams given 60% to 70% have won about 65% of the time.</p>
           </Gloss>
         </div>
       </div>

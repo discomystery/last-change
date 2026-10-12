@@ -168,6 +168,7 @@ STYLE = {
     "suppression": ("give up very few shots", "let the other team shoot a lot"),
     "qualityAllowed": ("keep the other team to hopeful shots", "give up dangerous chances"),
     "breakdowns": ("rarely get burned after losing the puck", "get caught after turnovers too often"),
+    "longShifts": ("rarely get stuck out on long shifts", "get pinned in their own end on long shifts"),
     "pace": ("play fast, wide-open games", "grind games down"),
     "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
@@ -358,6 +359,7 @@ SKILL = {
     "finishing": "finishes better than most",
     "playmaking": "sets up a lot of goals",
     "powerPlay": "is a real threat on the power play",
+    "ppImpact": "makes the power play better whenever he's on it",
     "shThreat": "stays dangerous even while killing penalties",
     "hits": "plays a heavy, physical game",
     "blocks": "throws himself in front of shots",
@@ -373,6 +375,8 @@ def _skills(p: dict) -> list[str]:
         e = (p.get("traits", {}).get(k) or {}).get("blend")
         if e and e.get("ok") and e["pct"] >= 85 and e.get("lo", 0) >= 60:
             found.append((k, e["pct"]))
+    if any(k == "ppImpact" for k, _ in found):  # one power-play line is enough
+        found = [kv for kv in found if kv[0] != "powerPlay"]
     found.sort(key=lambda kv: -kv[1])
     return [SKILL[k] for k, _ in found[:2]]
 

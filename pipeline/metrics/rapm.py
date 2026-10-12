@@ -36,6 +36,17 @@ UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 Z80 = 1.2816
 FIRST_SEASON = 2023  # event timing was recorded differently before 2023-24, so the chain starts there
 CHAIN_LAMBDA = 80000.0
+# Power-play ratings (`power_play`, 2026-10-11): the same method on 5-on-4 play. Each stretch is one row, the power
+# play attacking: +1 for each of its five skaters, +1 for each of the four penalty killers (kept so a unit is not
+# credited for weak killers; their own ratings are not published because they did not predict unseen kills), target
+# the power play's expected goals per 60. Every season since 2023-24 counts equally, and each power-play rating is
+# pulled toward twice the player's 5-on-5 creating rating rather than toward zero (good 5-on-5 creators help a power
+# play too). Tested predicting unseen power plays (weighted error of each stretch's chances; second half of 2024-25,
+# second half of 2025-26, this season so far): this beat each player's own on-ice power-play rate in all three (gains
+# over a league-average guess 2.0 / 2.6 / 3.9 against 1.2 / 1.8 / 2.2) and team-level ratings (0.3 / 0.8 / 1.3).
+# The penalty and the prior's weight were picked from a grid (5-100k s; 0-3x).
+PP_LAMBDA = 15000.0
+PP_FROM_5V5 = 2.0
 
 
 @lru_cache(maxsize=8)
@@ -47,14 +58,7 @@ def stretches(season: int) -> pl.DataFrame:
         (pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null() & (pl.col("duration") > 0))
     st = st.with_row_index("sid").select("sid", "game_id", "start", "end", "duration", "home_skaters", "away_skaters")
     ev = pl.read_parquet(d / "events.parquet").join(games, on="game_id")
-    xg = pl.read_parquet(d / "shots_xg_own.parquet")
-
-    # Expected goals in each stint: an event belongs to the stint with start < t <= end.
-    shots = ev.filter(pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & ~pl.col("situation_code").is_in(list(PENALTY_SHOT))).join(xg, on=["game_id", "event_id"], how="left")
-    shots = shots.select("game_id", (pl.col("sec").cast(pl.Float64) - 1e-6).alias("t"), "sec", "is_home", pl.col("xg").fill_null(0.0)).sort("t")
-    keyed = st.select("game_id", pl.col("start").cast(pl.Float64).alias("t"), "sid", "end").sort("t")
-    hit = shots.join_asof(keyed, on="t", by="game_id", strategy="backward", check_sortedness=False).filter(pl.col("sec") <= pl.col("end"))
-    per = hit.group_by("sid").agg(pl.col("xg").filter(pl.col("is_home")).sum().alias("xg_home"), pl.col("xg").filter(~pl.col("is_home")).sum().alias("xg_away"))
+    per = _stint_xg(season, st, ev)
 
     # Score before the stint, from the home side.
     goals = ev.filter((pl.col("type") == "goal") & pl.col("is_home").is_not_null()).select(
@@ -68,6 +72,16 @@ def stretches(season: int) -> pl.DataFrame:
     fo = fo.with_columns(home_zone=pl.when(pl.col("zone") == "N").then(pl.lit("N")).when((pl.col("zone") == "O") == pl.col("is_home")).then(pl.lit("O")).otherwise(pl.lit("D")))
     out = st.join(per, on="sid", how="left").join(score, on="sid", how="left").join(fo.select("game_id", "start", "home_zone"), on=["game_id", "start"], how="left")
     return out.with_columns(pl.col("xg_home", "xg_away").fill_null(0.0), pl.col("home_state").fill_null(0), pl.col("home_zone").fill_null("F"))
+
+
+def _stint_xg(season: int, st: pl.DataFrame, ev: pl.DataFrame) -> pl.DataFrame:
+    """Expected goals each way in each stint (`sid`): a shot belongs to the stint with start < t <= end."""
+    xg = pl.read_parquet(TABLES / str(season) / "shots_xg_own.parquet")
+    shots = ev.filter(pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & ~pl.col("situation_code").is_in(list(PENALTY_SHOT))).join(xg, on=["game_id", "event_id"], how="left")
+    shots = shots.select("game_id", (pl.col("sec").cast(pl.Float64) - 1e-6).alias("t"), "sec", "is_home", pl.col("xg").fill_null(0.0)).sort("t")
+    keyed = st.select("game_id", pl.col("start").cast(pl.Float64).alias("t"), "sid", "end").sort("t")
+    hit = shots.join_asof(keyed, on="t", by="game_id", strategy="backward", check_sortedness=False).filter(pl.col("sec") <= pl.col("end"))
+    return hit.group_by("sid").agg(pl.col("xg").filter(pl.col("is_home")).sum().alias("xg_home"), pl.col("xg").filter(~pl.col("is_home")).sum().alias("xg_away"))
 
 
 def design(stints: pl.DataFrame, weights: np.ndarray | None = None):
@@ -274,3 +288,48 @@ def competition(seasons: list[int], ratings: pl.DataFrame) -> dict[int, dict[str
                     a[1 if home else 3] += q
     return {p: {"all": (a[1] + a[3]) / (a[0] + a[2]), "home": a[1] / a[0] if a[0] >= 1800 else None, "road": a[3] / a[2] if a[2] >= 1800 else None}
             for p, a in acc.items()}
+
+
+@lru_cache(maxsize=8)
+def pp_stretches(season: int) -> pl.DataFrame:
+    """One row per 5-on-4 stint with both goalies: the power play's skaters, the killers, length and the power play's xG."""
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    st = pl.read_parquet(d / "stints.parquet").join(games, on="game_id").filter(
+        (((pl.col("n_home") == 5) & (pl.col("n_away") == 4)) | ((pl.col("n_home") == 4) & (pl.col("n_away") == 5)))
+        & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null() & (pl.col("duration") > 0))
+    st = st.with_row_index("sid").select("sid", "game_id", "start", "end", "duration", "home_skaters", "away_skaters", "n_home")
+    per = _stint_xg(season, st, pl.read_parquet(d / "events.parquet").join(games, on="game_id"))
+    st = st.join(per, on="sid", how="left").with_columns(pl.col("xg_home", "xg_away").fill_null(0.0))
+    home = pl.col("n_home") == 5
+    return st.select("game_id", "duration", pl.when(home).then("home_skaters").otherwise("away_skaters").alias("pp"),
+                     pl.when(home).then("away_skaters").otherwise("home_skaters").alias("pk"), pl.when(home).then("xg_home").otherwise("xg_away").alias("xg"))
+
+
+def power_play(seasons: list[int], five: pl.DataFrame) -> pl.DataFrame:
+    """Each skater's isolated power-play impact (expected goals per 60 he adds on the power play), with its sd and his
+    5-on-4 seconds in these seasons. `five` holds 5-on-5 ratings (player_id, off) that set where each player starts."""
+    parts = [pp_stretches(s) for s in seasons if (TABLES / str(s) / "stints.parquet").exists()]
+    st = pl.concat(parts) if parts else pl.DataFrame()
+    schema = {"player_id": pl.Int64, "sec_pp": pl.Float64, "pp": pl.Float64, "pp_sd": pl.Float64}
+    if st.is_empty():
+        return pl.DataFrame(schema=schema)
+    players = sorted({p for col in ("pp", "pk") for lst in st[col].to_list() for p in lst})
+    idx = {p: i for i, p in enumerate(players)}
+    n = len(players)
+    rows, cols = [], []
+    for r, (pp, pk) in enumerate(zip(st["pp"].to_list(), st["pk"].to_list())):
+        rows += [r] * (len(pp) + len(pk))
+        cols += [idx[p] for p in pp] + [n + idx[p] for p in pk]
+    X = sparse.csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(st.height, 2 * n))
+    dur = st["duration"].to_numpy().astype(float)
+    off = dict(zip(five["player_id"].to_list(), five["off"].to_list()))
+    prior = np.array([PP_FROM_5V5 * off.get(p, 0.0) for p in players] + [0.0] * n)
+    m = fit(X, 3600 * st["xg"].to_numpy() / dur, dur, PP_LAMBDA, n, prior=prior)
+    secs: dict[int, float] = {}
+    for lst, d_ in zip(st["pp"].to_list(), dur):
+        for p in lst:
+            secs[p] = secs.get(p, 0.0) + d_
+    on = [p for p in players if p in secs]  # killers who never played the power play get no rating
+    return pl.DataFrame({"player_id": on, "sec_pp": [secs[p] for p in on], "pp": [float(m["beta"][idx[p]]) for p in on],
+                         "pp_sd": [float(m["sd"][idx[p]]) for p in on]}, schema=schema)
