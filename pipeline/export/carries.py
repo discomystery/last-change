@@ -3,7 +3,8 @@
 Shares of the team's goals, goals he is in on, power-play goals he is in on and shots on goal, each counted over
 the games he played (this season and last for "blend", this season only for "season"), with his rank among the
 league's regulars and the same share for each teammate on his current club. Who is next in line for each thing he
-does (his line spot, the power play, ice time, the penalty kill), from this season's ice time. Goals he is in on per
+does (his line spot, the power play, ice time, the penalty kill), from this season's ice time; for a player who has not
+dressed this season (`idle`), his own load comes from last season and the teammates are who carry it now. Goals he is in on per
 game against typical forwards or defensemen by ice-time rank on their team. And the team's results in games he
 missed while on the club.
 
@@ -51,9 +52,13 @@ def _shares(pg: pl.DataFrame) -> pl.DataFrame:
 STATS = [("inOn", "p", "tgf"), ("goals", "g", "tgf"), ("pp", "ppi", "tppg"), ("shots", "sog", "tsf")]
 
 
-def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str]) -> dict[int, dict]:
-    """Per skater id: the "carries" block for his player page."""
+def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str], idle: pl.DataFrame | None = None) -> dict[int, dict]:
+    """Per skater id: the "carries" block for his player page. `idle`: players a club holds who have not dressed this
+    season (players.py `_idle`), shaped like `latest`; they get the block from last season's games."""
     pg, team = _frames(season)
+    if idle is not None and idle.height:
+        keep = ["player_id", "team_id", "first", "last"]
+        latest = pl.concat([latest.select(keep), idle.filter(pl.col("pos") != "G").select(keep)], how="vertical_relaxed")
     name = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in latest.iter_rows(named=True)}
     club = dict(zip(latest["player_id"], latest["team_id"]))
     by_mode = {"blend": _shares(pg), "season": _shares(pg.filter(pl.col("season") == season))}
@@ -72,6 +77,10 @@ def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str]) ->
                                                    pl.col("pos").mode().first())
     team_pp = now.select("game_id", "team_id", "tpp_sec").unique().group_by("team_id").agg(pl.col("tpp_sec").sum())
     team_pp = dict(zip(team_pp["team_id"], team_pp["tpp_sec"]))
+    before = pg.filter(pl.col("season") == season - 1)
+    per_last = before.group_by("player_id", "team_id").agg(pl.len().alias("gp"), pl.col("sec").sum(), pl.col("sec_pp").sum(), pl.col("sec_pk").sum(), pl.col("pos").mode().first())
+    pp_last = before.select("game_id", "team_id", "tpp_sec").unique().group_by("team_id").agg(pl.col("tpp_sec").sum())
+    pp_last = dict(zip(pp_last["team_id"], pp_last["tpp_sec"]))
 
     out = {}
     for pid, tid in club.items():
@@ -109,7 +118,11 @@ def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str]) ->
                 "mates": sorted([[name.get(m, "?"), round(rows["blend"][m]["p"] / rows["blend"][m]["gp"], 2)] for m in mates
                                  if m != pid and m in rows["blend"] and rows["blend"][m]["gp"] >= POOL_GAMES["blend"]
                                  and (rows["blend"][m]["pos"] == "D") == (grp == "D")], key=lambda x: -x[1])}
-        out[pid] = {"tiles": tiles, "next": _next(pid, tid, per, team_pp.get(tid, 0), lines.get(abbr.get(tid)) or {}, name),
+        if per.filter((pl.col("player_id") == pid) & (pl.col("team_id") == tid)).is_empty():
+            nxt = _next_idle(pid, tid, per, per_last, pp_last, name)
+        else:
+            nxt = _next(pid, tid, per, team_pp.get(tid, 0), lines.get(abbr.get(tid)) or {}, name)
+        out[pid] = {"tiles": tiles, "next": nxt,
                     "fill": fill, "out": _missed(pid, tid, pg, team, season)}
     return out
 
@@ -159,6 +172,37 @@ def _next(pid: int, tid: int, per: pl.DataFrame, team_pp_sec: float, ln: dict, n
         out["pk"] = {"sec": round(me["pk"]), "next": top(others.filter(pl.col("pk") <= me["pk"]), "pk")}
     else:
         out["pk"] = {"sec": round(me["pk"]), "next": None}
+    return out
+
+
+def _next_idle(pid: int, tid: int, per: pl.DataFrame, per_last: pl.DataFrame, pp_last: dict, name: dict) -> dict:
+    """For a player who has not dressed this season: his load per game last season (for this club if he played for
+    it, else wherever he played most), and the teammates who carry most of it this season."""
+    mine = per_last.filter(pl.col("player_id") == pid)
+    if mine.is_empty():
+        return {}
+    here = mine.filter(pl.col("team_id") == tid)
+    m = (here if here.height else mine.sort("gp", descending=True).head(1)).row(0, named=True)
+    gp = m["gp"]
+    me = {"toi": m["sec"] / gp, "pp": m["sec_pp"] / gp, "pk": m["sec_pk"] / gp, "pos": m["pos"]}
+    t = per.filter((pl.col("team_id") == tid) & (pl.col("gp") >= 2) & (pl.col("player_id") != pid))
+    others = t.filter((pl.col("pos") == "D") == (me["pos"] == "D"))
+
+    def top(df: pl.DataFrame, col: str):
+        df = df.sort(col, descending=True)
+        return {"id": df["player_id"][0], "name": name.get(df["player_id"][0], "?"), "sec": round(df[col][0])} if df.height else None
+
+    def near(df: pl.DataFrame, col: str):  # whoever plays closest to his usual load now
+        df = df.sort((pl.col(col) - me[col]).abs())
+        return {"id": df["player_id"][0], "name": name.get(df["player_id"][0], "?"), "sec": round(df[col][0])} if df.height else None
+
+    out = {"last_season": True, "club": bool(here.height)}
+    if me["pp"] >= RELIED_PP:
+        team_sec = pp_last.get(m["team_id"], 0)
+        out["pp"] = {"sec": round(me["pp"]), "share": round(100 * m["sec_pp"] / team_sec) if team_sec else None, "next": near(t, "pp")}
+    # Rank against this season's teammates: where his usual ice time would sit now.
+    out["toi"] = {"sec": round(me["toi"]), "rank": int((others["toi"] > me["toi"]).sum()) + 1, "next": near(others, "toi")}
+    out["pk"] = {"sec": round(me["pk"]), "next": near(others.filter(pl.col("pk") >= RELIED_PK), "pk") if me["pk"] >= RELIED_PK else None}
     return out
 
 

@@ -169,7 +169,7 @@ def run(season: int) -> int:
     r = rating.run(season, idle={row["player_id"]: row["team_id"] for row in idle.iter_rows(named=True) if row["pos"] != "G"})
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     goalies = json.loads((SITE_DATA / "goalies.json").read_text())
-    carried = carries.run(season, latest, lines, abbr)
+    carried = carries.run(season, latest, lines, abbr, idle)
 
     # Team games played this season, and each skater's ice time rank among teammates at his position.
     team_games = pg.filter(pl.col("season") == season).group_by("team_id").agg(pl.col("game_id").n_unique().alias("n"))
