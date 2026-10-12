@@ -25,13 +25,14 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 8  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 9  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
 # 6: the rest edge (one team on the second night of a back-to-back)
 # 7: shot volume, shots against and pace quoted as scores, with what they look like as recorded (`see`); ranks as chips
 # 8: special-teams calls add what each side has been known for over five seasons of real goals; verb agreement fixed
+# 9: shot-quality clashes only top five against bottom five; no turnover clashes (both from a 2023-25 backtest)
 METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
@@ -100,6 +101,11 @@ def chip(t: str, k: str, e: dict, places: dict, cite: str, text: str | None = No
 
 
 STRONG, WEAK = 70, 35  # league percentiles (higher is better) for a "meets a soft spot" call
+# Shot quality only meets a soft spot as a call at the ends: top five against bottom five held 54% over 2023-25
+# against 49% at the 70/35 bar (Sora chose the higher bar, 2026-10-12). Turnover clashes are not made at all:
+# they held 34% at 70/35 and 29% at the ends, since a team with a big turnover habit rarely beats its own usual.
+CLASH_ENDS = {"quality": 5}
+NO_CLASH = {"turnover"}
 # What the recap will measure for each trait, in the game itself.
 MEASURE = {
     "volume": "5-on-5 shot attempts per 60, adjusted for score and venue",
@@ -338,8 +344,13 @@ def _fmt(text: str, **w) -> str:
 def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[dict]:
     out = []
     for off, dfn, oname, dname in CLASHES:
+        if off in NO_CLASH:
+            continue
         for x, y in ((away, home), (home, away)):
             o, d = fp[x]["dims"][off]["blend"], fp[y]["dims"][dfn]["blend"]
+            ends = CLASH_ENDS.get(off)
+            if ends and not (o["rank"] <= ends and d["rank"] > len(fp) - ends):
+                continue
             if o["pct"] >= STRONG and d["pct"] <= WEAK:
                 words = {**team_words(x, places, "X"), **team_words(y, places, "Y"),
                          "xr": _ordinal(o["rank"]), "yr": _ordinal(d["rank"]), "xv": SAY[off](o["v"]),
