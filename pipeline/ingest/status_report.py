@@ -25,7 +25,6 @@ under), status, injury, timeline, note (the sentence, at most 240 characters), u
 import gzip
 import json
 import re
-import unicodedata
 from datetime import date as Date, timedelta
 from html import unescape
 
@@ -33,6 +32,7 @@ import httpx
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, OFFLINE, PLAYOFFS, RAW, REGULAR, TABLES
+from pipeline.ingest import names
 from pipeline.ingest.client import get
 from pipeline.ingest.rosters import today
 
@@ -116,7 +116,7 @@ def fetch(season: int, day: str) -> dict:
 
 
 def _fold(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)).lower()
+    return names.fold(s)
 
 
 def _sentences(text: str) -> list[str]:

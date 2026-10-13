@@ -49,7 +49,7 @@ const base = import.meta.env.BASE_URL;
   (() => {
     const q = document.getElementById('q'), pos = document.getElementById('pos'), team = document.getElementById('team');
     const rows = [...document.querySelectorAll('.prow')];
-    const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l');
     rows.forEach((r) => { r.dataset.key = fold(r.dataset.name); });
     const mine = window.lcPrefs?.get('team');
     if (mine) team.value = mine;

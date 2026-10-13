@@ -45,15 +45,17 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, nhl, nhl_previews, rosters
+    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
     if season == CURRENT_SEASON:
+        out["wikidata"] = names.fetch_wikidata()  # accented spellings of players' names, refreshed weekly
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
     moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
     out["shift_checks"] = check_saved_shifts(season)
     out["build"] = games.build_season(season)
+    out["names"] = respell(season)
     if season == CURRENT_SEASON:
         out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
         out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
@@ -136,6 +138,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=True)}
     out["build"] = games.build_season(season)
+    out["names"] = respell(season)
     out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
@@ -169,6 +172,13 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     track.run(season)
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
+
+
+def respell(season: int) -> dict:
+    """Accented player names (ingest/names.py) in every saved season's player and roster tables."""
+    from pipeline.ingest import names
+
+    return names.respell(sorted(int(p.name) for p in TABLES.iterdir() if p.name.isdigit()), again=(season,))
 
 
 def availability_update(season: int) -> dict:
@@ -249,6 +259,7 @@ def publish(season: int) -> dict:
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"build": games.build_season(season)}
+    out["names"] = respell(season)
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     refresh_saved(season)
