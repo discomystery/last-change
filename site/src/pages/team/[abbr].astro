@@ -158,7 +158,7 @@ const coachSince = coach && (team as any).coach_since
     </div>
     <Intro text={tiText} colour={teamPaint(abbr)} class="tstory" />
   </div>
-  <SectionNav items={nav as [string, string][]} pinned />
+  <SectionNav items={nav as [string, string][]} />
 
   <section id="next" class="next" data-team={abbr} data-base={base}>
     <div class="tickets" id="tickets"></div>
@@ -239,7 +239,7 @@ const coachSince = coach && (team as any).coach_since
 
   <Section id="lines" title="Lines" placeholder={false} takeaway={ln ? `Who plays together at 5-on-5, and how each group is doing.` : 'No games played yet.'} lead={!ln}>
     <Fragment slot="explain">
-      {ln && <p class="note">Lines and pairs are numbered by 5-on-5 ice time together over the team’s last {linesData.window} games ({ln.games} so far this season), with each older game counting half as much as the one after it, so the latest combinations come first. With so few games, each group’s results are pulled toward the average for its line number.</p>}
+      {ln && <p class="note">Lines and pairs are picked by 5-on-5 ice time together over the team’s last {linesData.window} games ({ln.games} so far this season), with each older game counting half as much as the one after it, so the latest combinations come first. They are numbered by their players’ 5-on-5 and power-play ice time, so the first line is the one the coach leans on most. With so few games, each group’s results are pulled toward the average for its line number.</p>}
     </Fragment>
     {ln && (
       <>

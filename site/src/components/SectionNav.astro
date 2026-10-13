@@ -1,17 +1,17 @@
 ---
-// Section menu for long pages (team, preview, player). Wide screens: a row of section names (pinned while
-// scrolling when `pinned`). Phones: a thin bar pinned to the top of the screen, "Jump to [section]", using the phone's
-// own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
+// Section menu for long pages (team, preview, post-game, player, league, track record, methods), one style on every
+// page (Sora, 2026-10-13). Wide screens: a row of section names pinned while scrolling. Phones: a thin bar pinned to
+// the top of the screen, "Jump to [section]", using the phone's own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
 // pinned elements stick for the whole page, not just inside a short wrapper.
 // Reading line (Sora picked B and D of the section-menu pitches, 2026-10-13): a line with one dot per section runs
 // under the pinned row (under each name) and under the phone bar (evenly spaced); a puck slides along it with the
 // scroll, the line darkens behind it and each dot fills once its section has been reached. Phones add "Next: ...".
 // Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it.
 import PrefSwitches from './PrefSwitches.astro';
-interface Props { items: [string, string][]; pinned?: boolean }
-const { items, pinned = false } = Astro.props;
+interface Props { items: [string, string][] }
+const { items } = Astro.props;
 ---
-{pinned ? <div class="secnav-pin"><nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav><div class="secnav-prefs"><PrefSwitches /></div></div> : <Fragment><nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav></Fragment>}
+<div class="secnav-pin"><nav class="jump secnav-pills pinned" aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}<span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></nav><div class="secnav-prefs"><PrefSwitches /></div></div>
 <div class="secnav-bar">
   <div class="secnav-jumprow">
     <label for="secnav-pick">Jump to</label>

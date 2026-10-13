@@ -64,6 +64,9 @@ def _lineup_tables(tmp_path, monkeypatch):
 
 def test_a_missing_star_counts_at_once_and_fades_from_the_rating(tmp_path, monkeypatch):
     _lineup_tables(tmp_path, monkeypatch)
+    # the league reports him on injured reserve after the first game he missed
+    pl.DataFrame([{"date": "2025-10-05", "player_id": 999, "status": "ir"}]).write_parquet(tmp_path / "2025" / "status_reports.parquet")
+    win_model._lineup_pass.cache_clear()
     lu = win_model.lineups([2025]).filter(pl.col("team_id") == 1).sort("game_id")
     lineup, roster = lu["lineup"].to_list(), lu["roster"].to_list()
     star = win_model.SEC5_PER_GAME / 19 / 3600 * 1.0  # his share of a night's 5v5 time (19 equal skaters), times his rating
@@ -89,3 +92,14 @@ def test_explanation_with_last_lineup_adds_up():
     assert abs(0.5 + sum(s["shift"] for s in steps[:-1]) - morning) < 1e-9
     assert abs(0.5 + sum(s["shift"] for s in steps) - at_drop) < 1e-9
     assert steps[2]["shift"] > 0 > steps[-1]["shift"]
+
+
+def test_a_regular_out_with_nothing_reported_is_expected_back(tmp_path, monkeypatch):
+    """With no report, one or two missed games read "played without him last game", so the morning lineup puts him
+    back; from the third missed game he counts as out."""
+    _lineup_tables(tmp_path, monkeypatch)
+    lu = win_model.lineups([2025]).filter(pl.col("team_id") == 1).sort("game_id")
+    lineup, roster = lu["lineup"].to_list(), lu["roster"].to_list()
+    assert lineup[4] < 0 < roster[4]  # missed one game, nothing reported: expected back
+    assert win_model.next_rosters([2025])[1] > 0  # missed two: still expected back
+    win_model._lineup_pass.cache_clear()

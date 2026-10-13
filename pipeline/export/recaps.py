@@ -13,6 +13,7 @@ import polars as pl
 
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.export import grades, pending, previews, wording
+from pipeline.ingest import game_stats
 from pipeline.export import surprises as surprise_rules
 from pipeline.metrics import adjust, goalies, replays, team_style
 
@@ -30,6 +31,25 @@ BENCHED_SEC = 1800  # a matchup call needs the group on the ice against the oppo
 def clock(sec: float) -> str:
     s = round(sec)
     return f"{s // 60}:{s % 60:02d}"
+
+
+# Seconds of 5-on-3 and 4-on-3 are worth this many seconds of 5-on-4: the league's expected goals per second at each
+# strength over 2023-25 (5-on-4 7.3 per 60, 4-on-3 15.8, 5-on-3 21.6). Counting them this way lets a night with a long
+# 5-on-3 be graded against a team's usual 5-on-4 rate without the 5-on-3 inflating it.
+MAN_UP = {"5v4": 1.0, "4v3": 2.17, "5v3": 2.97}
+MAN_DOWN = {"4v5": 1.0, "3v4": 2.17, "3v5": 2.97}
+
+
+def man_advantage(tg: pl.DataFrame) -> pl.DataFrame:
+    """Per team-game power-play and penalty-kill time (in 5-on-4 seconds) and expected goals, over every man-advantage
+    strength, not only 5-on-4 (eye test, 2026-10-13: Ottawa's call at Boston was "too little to judge" after 1:42 at
+    5-on-3)."""
+    up, down = pl.col("strength").is_in(list(MAN_UP)), pl.col("strength").is_in(list(MAN_DOWN))
+    w_up = pl.col("strength").replace_strict(MAN_UP, default=0.0)
+    w_down = pl.col("strength").replace_strict(MAN_DOWN, default=0.0)
+    return tg.group_by("game_id", "team_id").agg(
+        (pl.col("sec") * w_up).sum().alias("pp_sec"), pl.col("sec").filter(up).sum().alias("pp_clock"), pl.col("xgf").filter(up).sum().alias("pp_xgf"),
+        (pl.col("sec") * w_down).sum().alias("pk_sec"), pl.col("xga").filter(down).sum().alias("pk_xga"))
 
 
 def grade(v: float, base: float, floor: float | None, direction: str) -> str:
@@ -55,6 +75,10 @@ class Season:
             self.team_id[(g["game_id"], g["away"])] = g["away_id"]
         self.rows = {(r["game_id"], r["team_id"]): r for r in team_style.per_game(season, adjust.weights()).iter_rows(named=True)}
         tg = pl.read_parquet(d / "team_game.parquet")
+        for r in man_advantage(tg).iter_rows(named=True):  # power plays and kills graded on all man-advantage time
+            if (row := self.rows.get((r["game_id"], r["team_id"]))) is not None:
+                row |= {k: r[k] for k in ("pp_sec", "pp_clock", "pp_xgf", "pk_sec", "pk_xga")}
+        self.official = game_stats.lookup(season)
         self.totals = {(r["game_id"], r["team_id"]): r for r in tg.group_by("game_id", "team_id").agg(
             pl.col("sf").sum(), pl.col("hits").sum(),
             pl.col("xgf").filter(pl.col("strength") != "EN").sum().alias("xg"),
@@ -69,6 +93,7 @@ class Season:
         self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
+        self.first_game = {(t, p): g for t, p, g in players.group_by("team_id", "player_id").agg(pl.col("game_id").min()).iter_rows()}
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
@@ -129,6 +154,16 @@ class Season:
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
 
+    def pp_record(self, gid: int, team: str) -> tuple[int, int]:
+        """(power-play goals, power-play chances) for a team by abbreviation: the league's own line when it is saved,
+        else our count."""
+        if (gid, team) in self.official:
+            return self.official[(gid, team)]
+        g = self.games[gid]
+        tid = self.team_id[(gid, team)]
+        opp = g["away_id"] if tid == g["home_id"] else g["home_id"]
+        return self.pp_goals(gid, tid), int(self.short.get((gid, opp), 0))
+
 
 def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
     """Tonight's figure for one call, its verdict, and a sentence saying what happened."""
@@ -160,11 +195,11 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             fmt = lambda x: f"{x:.1f}%"
         else:
             if r["pp_sec"] < MIN_PP_SEC:
-                return {"verdict": "na", "happened": f"{team} had only {clock(r['pp_sec'])} of power-play time, too little to judge.",
+                return {"verdict": "na", "happened": f"{team} had only {clock(r.get('pp_clock', r['pp_sec']))} of power-play time, too little to judge.",
                         "usual": f"{base:.1f} per 60", "tonight": "–"}
             v = r["pp_xgf"] / r["pp_sec"] * 3600
-            g = S.pp_goals(gid, tid)
-            txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r['pp_sec'])} of 5-on-4 time, against their usual {base:.1f}, "
+            g = S.pp_record(gid, chk["team"])[0]
+            txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r.get('pp_clock', r['pp_sec']))} of power-play time, against their usual {base:.1f}, "
                    f"and scored {g} {'goal' if g == 1 else 'goals'}.")
             fmt = lambda x: f"{x:.1f} per 60"
         if claim["kind"] == "duel":  # graded against the league average alone: which side of it the attack landed on
@@ -321,8 +356,9 @@ def team_numbers(S: Season, gid: int, abbr: str) -> dict:
     tid = S.team_id[(gid, abbr)]
     t = S.totals.get((gid, tid), {})
     opp = next(a for (g, a) in S.team_id if g == gid and a != abbr)
+    ppg, ppo = S.pp_record(gid, abbr)
     return {"shots": int(t.get("sf", 0)), "xg": round(t.get("xg", 0.0), 2), "cf5": int(t.get("cf5", 0)), "hits": int(t.get("hits", 0)),
-            "pp_goals": S.pp_goals(gid, tid), "pp_opps": int(S.short.get((gid, S.team_id[(gid, opp)]), 0))}
+            "pp_goals": ppg, "pp_opps": ppo}
 
 
 def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
@@ -368,7 +404,9 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
                 break
     left = {t: S.exits(gid, S.team_id[(gid, t)]) for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
-    cands = surprise_rules.forced(cands, left, usual_lines, places)
+    absent = {t: [{"id": p, "name": S.full.get(p, S.name.get(p, "?"))} for p in sorted({p for u in usual_lines.get(t, []) for p in u})
+                  if (gid, p) not in S.dressed and S.first_game.get((S.team_id[(gid, t)], p), gid) < gid] for t in (a, h)}
+    cands = surprise_rules.forced(cands, left, usual_lines, places, absent)
     cands, beyond = surprise_rules.against_calls(cands, list(calls))
     return surprise_rules.pick(cands), beyond
 
@@ -452,6 +490,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
                "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
+        if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
+            gone = [{"id": x["id"], "team": t, "sec": x["sec"]} for t in (g["away"], g["home"])
+                    for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
+            if gone:
+                rec["left"] = sorted(gone, key=lambda x: x["sec"])
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
         index.append({"id": gid, "date": g["date"], "away": g["away"], "home": g["home"], "score": rec["score"], "end": g["last_period"],
