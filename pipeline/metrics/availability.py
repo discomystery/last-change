@@ -7,6 +7,8 @@ daily in data/raw/players/ (offline runs use the cache):
   status_reports.parquet  injury and lineup news read from the NHL.com Status Report
   transactions.parquet    roster moves from ESPN's league-wide list (injured reserve, minors, suspensions), read as
                           reports with report_url null (ingest/transactions.py)
+  injuries.parquet        ESPN's league-wide injury list, saved daily, read as reports with report_url set to ESPN's
+                          injuries page (ingest/injuries.py); a player dropped from the list ("cleared") ends his report
 
 Table data/tables/{season}/availability.parquet, one row per (date, team, player_id), from the season's first game
 day to the run day (Eastern). Columns:
@@ -51,7 +53,7 @@ import httpx
 import polars as pl
 
 from pipeline.config import OFFLINE, PLAYOFFS, RAW, REGULAR, TABLES
-from pipeline.ingest import game_rosters, nhl, rosters, status_report, transactions
+from pipeline.ingest import game_rosters, injuries, nhl, rosters, status_report, transactions
 from pipeline.ingest.rosters import today
 from pipeline.metrics import patterns
 
@@ -103,7 +105,8 @@ def build(season: int, day: str | None = None) -> dict:
     lst = pl.read_parquet(rosters.path(season)) if rosters.path(season).exists() else None
     # NHL.com's daily Status Report, plus league-wide roster moves (injured reserve, sent to the minors, suspensions)
     # read the same way: each is a "report" about a player that stays in effect until a newer one or until he dresses.
-    rep = pl.concat([status_report.load(season), transactions.load(season)])
+    # ESPN's injury list joins them the same way (NHL.com wins a tie on the same date, being listed first).
+    rep = pl.concat([status_report.load(season), transactions.load(season), injuries.load(season)])
     prev = _last_season_regulars(season)
 
     names: dict[int, dict] = {pid: info for pid, (_, info) in prev.items()}
@@ -214,6 +217,8 @@ def build(season: int, day: str | None = None) -> dict:
         for x in reports.get(pid, []):  # newest report on or before today replaces the old one
             if x["date"] <= d and (report is None or x["date"] > report["date"]):
                 report = x
+        if report and report["status"] == "cleared":
+            report = None  # off ESPN's injury list: nothing reported any more
         if report and last_played and last_played > report["date"]:
             report = None  # he has dressed since
         if r["lu"] == "dressed":

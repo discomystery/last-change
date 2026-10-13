@@ -37,7 +37,7 @@ const outLine = out.filter((r) => r.status !== 'not_listed' || r.key);
         ))}
       </div>
       {gone.length > 0 && <p class="note">Regulars here last season whom no NHL club lists now: {gone.map((r) => r.name).join(', ')}.</p>}
-      <p class="note">As of {day(asOf)}. Injury details come from the NHL.com Status Report when it names a player, and from league roster moves (injured reserve, sent to the minors); otherwise we only say what the rosters show.</p>
+      <p class="note">As of {day(asOf)}. Injury details come from the NHL.com Status Report when it names a player, from ESPN’s injury list, and from league roster moves (injured reserve, sent to the minors); otherwise we only say what the rosters show.</p>
     </details>
 </div>
 

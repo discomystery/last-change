@@ -131,10 +131,14 @@ NEWS_OUT = {"season", "long", "ir", "week", "personal", "suspended", "out", "ass
 # Roster moves (ingest/transactions.py) read the same way: injured reserve, suspensions and assignments to the minors
 # take a player out; activation from injured reserve or a suspension puts him back. A recall alone does not.
 MOVE_AS = {"ir": "ir", "long": "long", "suspended": "suspended", "assigned": "assigned", "activated": "playing"}
+# ESPN's injury list (ingest/injuries.py) reads like the Status Report; a player dropped from it is expected back.
+INJURY_AS = {"season": "season", "long": "long", "ir": "ir", "out": "out", "day": "day", "suspended": "suspended",
+             "personal": "personal", "cleared": "playing"}
 
 
 def _news(seasons, moves: bool = True) -> dict[int, list[tuple[str, str]]]:
-    """Each player's Status Report mentions and (with `moves`) roster moves, [(date, status)] in date order, where the
+    """Each player's Status Report mentions and (with `moves`) roster moves and ESPN injury-list entries, [(date,
+    status)] in date order, where the
     tables have been built: the same reports the availability table and the preview wording read."""
     out: dict[int, list[tuple[str, str]]] = defaultdict(list)
     for s in seasons:
@@ -142,11 +146,12 @@ def _news(seasons, moves: bool = True) -> dict[int, list[tuple[str, str]]]:
         if f.exists():
             for d, pid, st in pl.read_parquet(f).select("date", "player_id", "status").iter_rows():
                 out[pid].append((d, st))
-        f = TABLES / str(s) / "transactions.parquet"
-        if moves and f.exists():
-            for d, pid, st in pl.read_parquet(f).drop_nulls("player_id").select("date", "player_id", "status").iter_rows():
-                if st in MOVE_AS:
-                    out[pid].append((d, MOVE_AS[st]))
+        for name, kinds in (("transactions", MOVE_AS), ("injuries", INJURY_AS)):
+            f = TABLES / str(s) / f"{name}.parquet"
+            if moves and f.exists():
+                for d, pid, st in pl.read_parquet(f).drop_nulls("player_id").select("date", "player_id", "status").iter_rows():
+                    if st in kinds:
+                        out[pid].append((d, kinds[st]))
     return {k: sorted(v) for k, v in out.items()}
 
 
