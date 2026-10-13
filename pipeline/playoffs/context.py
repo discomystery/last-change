@@ -143,9 +143,9 @@ def add_to_preview(snap: dict, g: dict, sched: list[dict], season: int) -> dict:
     return snap
 
 
-REGULAR_ONLY = {"Slow start", "Leads the way"}  # "still looking for his first goal of the season" reads wrong in May
+REGULAR_ONLY = {"Slow start", "Leads the way", "Milestone"}  # milestones count regular-season points only; "still looking for his first goal of the season" reads wrong in May
 RESTED = ("latest game", "last two games", "last three games", "last four games")
-NEXT = {1: "the second round", 2: "the conference final", 3: "the Stanley Cup Final", 4: "a Stanley Cup"}
+NEXT = {1: "the second round", 2: "the conference final", 3: "the Stanley Cup Final"}
 GENERIC_HEADS = ("Round two", "come in hot", "need a win")
 
 
@@ -164,7 +164,8 @@ def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int,
             wins = {t: sum(1 for x in reg if (x["hs"] > x["as"]) == (x["home"] == t)) for t in (away, home)}
             if 0 in wins.values():
                 w = home if wins[home] else away
-                sents.append(f"{stories._cap(W.the(w))} won all {NUM.get(len(reg), len(reg))} meetings in the regular season.")
+                every = "both" if len(reg) == 2 else f"all {NUM.get(len(reg), len(reg))}"
+                sents.append(f"{stories._cap(W.the(w))} won {'the only meeting' if len(reg) == 1 else every + ' meetings'} in the regular season.")
             elif wins[away] == wins[home]:
                 sents.append(f"They split {NUM.get(len(reg), len(reg))} meetings in the regular season.")
             else:
@@ -181,15 +182,17 @@ def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int,
         last = st["so_far"][-1]
         lw = last["home"] if last["hs"] > last["as"] else last["away"]
         hi, lo = max(last["hs"], last["as"]), min(last["hs"], last["as"])
-        ot = {0: "", 1: " in overtime", 2: " in double overtime", 3: " in triple overtime"}.get(last.get("ot", 0), " in overtime")
+        # "a 4-3 overtime win in Game 1", never "won Game 1 4-3": two numbers side by side read as one
+        an = "an" if str(hi)[0] == "8" or hi in (11, 18) else "a"  # "an 8-3 win"
+        win = f"{hi}-{lo}" + {0: "", 1: " overtime", 2: " double-overtime", 3: " triple-overtime"}.get(last.get("ot", 0), " overtime") + " win"
         wins = st["wins"]
         if st["leader"]:
             L = st["leader"]
             score = f"{max(wins.values())}-{min(wins.values())}"
             sents.append(f"{stories._cap(W.the(L))} lead the series {score}" +
-                         (f" after winning Game {last['game']} {hi}-{lo}{ot}." if lw == L else f", though {W.the(lw)} took Game {last['game']} {hi}-{lo}{ot}."))
+                         (f" after {an} {win} in Game {last['game']}." if lw == L else f", though {W.the(lw)} took Game {last['game']} with {an} {win}."))
         else:
-            sents.append(f"The series is tied {wins[home]}-{wins[away]} after {W.the(lw)} won Game {last['game']} {hi}-{lo}{ot}.")
+            sents.append(f"The series is tied {wins[home]}-{wins[away]} after {an} {win} for {W.the(lw)} in Game {last['game']}.")
         if last["home"] != home:
             sents.append(f"It moves to {W.place(home)}, where {W.the(home)} have last change.")
         # the series in chances: 5-on-5 expected goals over the games so far
@@ -198,14 +201,17 @@ def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int,
             share = tot[home] / sum(tot.values())
             top = home if share >= 0.5 else away
             pct = round(100 * max(share, 1 - share))
+            one = len(st["so_far"]) == 1
             if pct >= 55:
-                sents.append(f"Over {NUM.get(len(st['so_far']), len(st['so_far']))} games {W.the(top)} have had {pct}% of the 5-on-5 chances.")
+                sents.append(f"In Game 1 {W.the(top)} had {pct}% of the 5-on-5 chances." if one else
+                             f"Over {NUM.get(len(st['so_far']), len(st['so_far']))} games {W.the(top)} have had {pct}% of the 5-on-5 chances.")
             else:
-                sents.append("At 5-on-5 the chances have been close to even so far.")
+                sents.append("The 5-on-5 chances in Game 1 were close to even." if one else "At 5-on-5 the chances have been close to even so far.")
         if st.get("game7"):
-            sents.append(f"Game 7: the winner goes on to {NEXT[g['round']]}.")
+            sents.append("Game 7: the winner lifts the Stanley Cup." if g["round"] == 4 else f"Game 7: the winner goes on to {NEXT[g['round']]}.")
         elif st.get("clinch"):
-            sents.append(f"A win sends {W.the(st['clinch'])} to {NEXT[g['round']]}; {W.the(st['elimination'])} need it to stay alive.")
+            prize = "gives " + W.the(st['clinch']) + " the Stanley Cup" if g["round"] == 4 else f"sends {W.the(st['clinch'])} to {NEXT[g['round']]}"
+            sents.append(f"A win {prize}; {W.the(st['elimination'])} need it to stay alive.")
         if st.get("history"):
             sents.append(st["history"])
     paras = [" ".join(sents)] + story.get("paras", [])[1:]
@@ -247,18 +253,19 @@ def head_options(head: str, st: dict, g: dict, W, claims: list[dict]) -> list[st
     trail = (away if lead == home else home) if lead else None
     tot = {t: sum((x.get("chances") or {}).get(t, {}).get("xgf5", 0) for x in st["so_far"]) for t in (away, home)}
     if lead and sum(tot.values()) > 0 and tot[trail] / sum(tot.values()) >= 0.55:
-        out.append(f"{cap(trail)} have the chances, {W.the(lead)} have the wins")
+        out.append(f"{cap(trail)} have the chances, {W.the(lead)} have the {'win' if hi == 1 else 'wins'}")
     if head and not generic:
         out.append(head)
     last = st["so_far"][-1]
     if last.get("ot"):
-        out.append(f"Game {n} after overtime in Game {last['game']}")
+        kind = {1: "an overtime", 2: "a double-overtime", 3: "a triple-overtime"}.get(last["ot"], "a long overtime")
+        out.append(f"After {kind} Game {last['game']}")
     if lead is None:
         out += [f"All square going into Game {n}", f"Tied {hi}-{lo}, and it’s back {at}" if last["home"] == home else f"Tied {hi}-{lo} as the series moves {at}"]
     elif hi - lo >= 2:
-        out += [f"{cap(trail)} need an answer", f"{cap(lead)} up {hi}-{lo}"]
+        out += [f"{cap(trail)} need an answer", f"{cap(lead)} lead {hi}-{lo}"]
     else:
-        out += [f"{cap(lead)} up {hi}-{lo}", f"{cap(trail)} try to draw level {at}"]
+        out += [f"{cap(lead)} lead {hi}-{lo}", f"{cap(trail)} try to draw level {at}"]
     out += [c["head"] for c in claims if c.get("head")]
     return out
 
@@ -271,11 +278,32 @@ def _family(head: str) -> str:
     return head
 
 
+SAME_PLAYER = {"Haunts them": "vs", "Owns them": "vs"}  # storylines about one player against this opponent
+
+
+def _item_key(i: dict) -> tuple:
+    """Two storylines are the same if they share a tag and their subject: counts move from game to game ("eight goals
+    in ten games", then "nine goals in twelve"), and "haunts them" and "owns them" are one story about one player."""
+    who = i["text"].split(" has ")[0].split(" have ")[0]
+    return (SAME_PLAYER.get(i["tag"], i["tag"]), who if who != i["text"] else i["text"][:28])
+
+
+def _sentences(text: str) -> list[str]:
+    import re
+    return [s for s in re.split(r"(?<=[.!?])\s+", text) if s]
+
+
 def dedupe(sched: list[dict], folder: Path) -> int:
-    """Storylines told before an earlier game of the same series are not told again (only the first few words are
-    compared, since the counts move). Runs over the saved previews in game order; each keeps at most five items."""
+    """Within a series, nothing is told twice. Runs over the saved previews in game order:
+    - headlines: the first option not used before (`head_options`);
+    - storylines: one already shown (same tag and player) is not shown again; the series leader only when his line
+      changed; each preview keeps at most five;
+    - the second paragraph (what to look for): a sentence told before an earlier game is dropped (compared on its
+      first words, so "watch who goes out against the third line" and "... the fourth line" count as one)."""
     told: dict[str, set] = {}
     heads_used: dict[str, set] = {}
+    looks: dict[str, set] = {}
+    leader: dict[str, str] = {}
     n = 0
     for g in sorted((x for x in sched if x.get("type") == 3), key=lambda x: (x["series"], x["game"])):
         f = folder / f"{g['id']}.json"
@@ -289,13 +317,115 @@ def dedupe(sched: list[dict], folder: Path) -> int:
         options = story.get("head_options") or [story.get("head", "")]
         story["head"] = next((h for h in options if _family(h) not in heads), options[0])
         heads.add(_family(story["head"]))
-        keep = [i for i in items if i["tag"] not in REGULAR_ONLY and (i["tag"] == "Series leader" or (i["tag"], i["text"][:28]) not in seen)]
-        seen |= {(i["tag"], i["text"][:28]) for i in items}
+        keep = []
+        for i in items:
+            if i["tag"] in REGULAR_ONLY:
+                continue
+            if i["tag"] == "Series leader":
+                if leader.get(g["series"]) == i["text"]:
+                    continue
+                leader[g["series"]] = i["text"]
+            elif _item_key(i) in seen:
+                continue
+            keep.append(i)
+        keep = keep[:5]
+        seen |= {_item_key(i) for i in keep}
+        paras = story.get("all_paras", story.get("paras", []))
+        if len(paras) > 1:
+            said = looks.setdefault(g["series"], set())
+            fresh = [s for s in _sentences(paras[1]) if s[:45] not in said]
+            said |= {s[:45] for s in _sentences(paras[1])}
+            story["paras"] = [paras[0]] + ([" ".join(fresh)] if fresh else []) + paras[2:]
+        # the lean's closing route ("Boston can tip it if their penalty kill holds up") is the season's style and
+        # doesn't change within a series: told before Game 1 (or the first game it applies), not again
+        lean = story.get("all_lean", story.get("lean") or {})
+        if lean:
+            routes = looks.setdefault(g["series"] + "/lean", set())
+            out = {}
+            for side, text in lean.items():
+                ss = _sentences(text)
+                key = (side, " ".join(ss[-1].rstrip(".").split()[-3:])) if len(ss) > 1 else None
+                out[side] = " ".join(ss[:-1]) if key and key in routes else text
+                if key:
+                    routes.add(key)
+            story["all_lean"], story["lean"] = lean, out
+        story["all_paras"] = paras
         story["all_items"] = items
-        story["items"] = keep[:5]
+        story["items"] = keep
         snap["story"] = story
         f.write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
         n += 1
+    return n
+
+
+def _call_key(c: dict) -> tuple:
+    ch = c.get("check") or {}
+    if c["kind"] == "matchup":
+        return ("matchup", tuple(sorted(ch.get("unit_ids") or [])), ch.get("opp_line"), c.get("team"))
+    if c["kind"] in ("pace", "physical"):  # about the game, not one team
+        return (c["kind"], c.get("metric"))
+    return (c["kind"], c.get("metric"), c.get("team"), c.get("opp"))
+
+
+WORD = {"held": "held up", "partly": "partly held up", "missed": "didn’t hold up"}
+
+
+def _how(verdicts: list[str]) -> str:
+    """How a call went in earlier games, in words: "held up", "held up both times", "held up in two of four games"."""
+    n, k, p = len(verdicts), verdicts.count("held"), verdicts.count("partly")
+    if n == 1:
+        return WORD[verdicts[0]]
+    if k == n:
+        return "held up both times" if n == 2 else "held up every time"
+    if k == 0 and p == 0:
+        return "didn’t hold up either time" if n == 2 else "hasn’t held up yet"
+    if k == 0:
+        return ("partly held up both times" if n == 2 else "partly held up every time") if p == n else \
+            f"only partly held up, in {NUM.get(p, p)} of {NUM.get(n, n)} games"
+    out = f"held up in {NUM.get(k, k)} of {NUM.get(n, n)} games"
+    return out + (f" and partly in {NUM.get(p, p)}" if p else "")
+
+
+REPEAT_OPENERS = ["We made this call {when}, and it {how}.", "We called this {when} too, and it {how}.",
+                  "We’ve said this {when}: it {how}.", "This call also ran {when}, and it {how}."]
+
+
+def repeat_calls(sched: list[dict], previews: Path, recaps: Path) -> int:
+    """A call already made before an earlier game of the series (same kind, trait and team, or the same line
+    matchup) is still made and graded, but told briefly: how it went before, then the call's first sentence. Reads
+    the graded post-game files, so it runs after `recaps.run` (which then runs again to carry the new wording)."""
+    done: dict[str, list] = {}
+    n = 0
+    for g in sorted((x for x in sched if x.get("type") == 3), key=lambda x: (x["series"], x["game"])):
+        f = previews / f"{g['id']}.json"
+        if not f.exists():
+            continue
+        snap = json.loads(f.read_text())
+        past = done.setdefault(g["series"], [])
+        repeat = 0
+        for c in snap.get("claims", []):
+            c["body"] = c.pop("body_first", c["body"])
+            before = [(gm, v) for k, gm, v in past if k == _call_key(c) and v in WORD]
+            if not before:
+                continue
+            games = [str(gm) for gm, _ in before]
+            if len(games) >= 3 and games == [str(x) for x in range(1, g["game"])]:
+                when = "before every game of this series"
+            else:
+                when = f"before Game{'s' if len(games) > 1 else ''} " + (games[0] if len(games) == 1 else ", ".join(games[:-1]) + " and " + games[-1])
+            c["body_first"] = c["body"]
+            # one preview often repeats three or four calls: each opens its own way
+            opener = REPEAT_OPENERS[repeat % len(REPEAT_OPENERS)].format(when=when, how=_how([v for _, v in before]))
+            repeat += 1
+            c["body"] = opener + " " + _sentences(c["body"])[0]
+            n += 1
+        f.write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
+        r = recaps / f"{g['id']}.json"
+        if r.exists():
+            ids = {c["id"]: c for c in snap.get("claims", [])}
+            for c in json.loads(r.read_text()).get("calls") or []:
+                if c.get("id") in ids:
+                    past.append((_call_key(ids[c["id"]]), g["game"], c.get("verdict")))
     return n
 
 

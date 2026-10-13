@@ -235,7 +235,9 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         text += "."
     text = text[0].upper() + text[1:]
     if abs(chances) < 0.025:
-        text = "The two have been about even at out-chancing opponents lately. " + text[0].upper() + text[1:]
+        even = "The two have been about even at out-chancing opponents lately"
+        # one short reason reads better joined on than as a sentence of its own ("..., and Dallas is at home tonight.")
+        text = (f"{even}, and {text}" if text.count(".") == 1 and "," not in text and not text.startswith("Even") else f"{even}. {text}")
     return text
 
 

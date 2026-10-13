@@ -161,7 +161,7 @@ def recap_items(rec: dict, s: dict, g: dict, places: dict) -> list[dict]:
     l = bot if w == top else top
     items = []
     if after[w] == 4:
-        nxt = C.NEXT[s["round"]]
+        nxt = C.NEXT.get(s["round"])
         items.append({"tag": "Series", "text": f"{stories._cap(W.the(w))} win the series {after[w]}-{after[l]} and move on to {nxt}." if s["round"] < 4 else
                       f"{stories._cap(W.the(w))} win the Stanley Cup, {after[w]}-{after[l]} in the Final."})
         items.append({"tag": "Out", "text": f"{stories._cap(W.the(l))} are out of the playoffs."})

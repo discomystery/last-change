@@ -194,7 +194,9 @@ def stage_postgame(season: int) -> None:
     g = pl.read_parquet(TABLES / str(season) / "games.parquet")
     ids = set(g.filter((pl.col("game_type") == 3) & pl.col("state").is_in(["OFF", "FINAL"]))["game_id"].to_list())
     out = {"index": previews.write_index(SITE_DATA / "previews"), "recaps": recaps.run(season), "jobs": jobs.run(season, only=ids),
-           "scores": game_scores.run(season, only=ids), "flow": flow.run(season), "stories": stories.run_recaps(season)}
+           "repeats": context.repeat_calls(json.loads((SITE_DATA / "schedule.json").read_text())["games"], SITE_DATA / "previews", SITE_DATA / "recaps")}
+    out["recaps"] = recaps.run(season)  # again, so the post-game pages carry the repeated calls' wording
+    out |= {"scores": game_scores.run(season, only=ids), "flow": flow.run(season), "stories": stories.run_recaps(season)}
     track.run(season)
     from pipeline.playoffs import pages
     out["series"] = pages.run(season)
