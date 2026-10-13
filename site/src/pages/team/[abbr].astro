@@ -35,6 +35,7 @@ import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../data/mock';
 import FpRow from '../../components/FpRow.astro';
+import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
 import { trendFor } from '../../lib/trend';
 
@@ -214,14 +215,18 @@ const coachSince = coach && (team as any).coach_since
     ))}
     <h3 class="sub">Every trait</h3>
     <p class="note fpr-hint">Tap a trait for the number behind it.</p>
-    <div class="fpr-groups">
-      {fpGroups.map((g) => fp.some((c) => c.group === g) && (
-        <div class="card fpr-grp">
-          <h3>{g}</h3>
-          {fp.filter((c) => c.group === g).map((c) => <FpRow c={{ ...c, [abbr!]: { blend: c.blend, season: c.season } }} sides={[{ abbr: abbr!, cls: 't-one', place: team.place }]} />)}
+    <div class="fpr-groups"><div class="fpr-cols">
+      {twoColumns(fpGroups.map((g) => ({ g, cs: fp.filter((c) => c.group === g) })).filter((x) => x.cs.length), (x) => x.cs.length + 1).map((col) => (
+        <div class="fpr-col">
+          {col.map(({ item: { g, cs }, order }) => (
+            <div class="card fpr-grp" style={`order: ${order}`}>
+              <h3>{g}</h3>
+              {cs.map((c) => <FpRow c={{ ...c, [abbr!]: { blend: c.blend, season: c.season } }} sides={[{ abbr: abbr!, cls: 't-one', place: team.place }]} />)}
+            </div>
+          ))}
         </div>
       ))}
-    </div>
+    </div></div>
   </Section>
 
   <Section id="players" title="Key players" placeholder={false} takeaway={`Who ${team.place} leans on, and what they do best.`}>

@@ -24,6 +24,7 @@ import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
+import { twoColumns } from '../../lib/masonry';
 import { clock as mmss, compared } from '../../lib/format';
 import { matchupPaint } from '../../lib/teams';
 import '../../styles/blocks.css';
@@ -212,14 +213,18 @@ const _ = ordinal;
     <details class="fold">
       <summary><span class="closed">Show all {traits.length} traits</span><span class="opened">Hide the full set</span></summary>
       <p class="note fpr-hint">Tap a trait for the numbers behind it.</p>
-      <div class="fpr-groups">
-        {fpGroups.map((g) => traits.some((c) => c.group === g) && (
-          <div class="card fpr-grp">
-            <h3>{g}</h3>
-            {traits.filter((c) => c.group === g).map((c) => <FpRow c={c} sides={fpSides} />)}
+      <div class="fpr-groups"><div class="fpr-cols">
+        {twoColumns(fpGroups.map((g) => ({ g, cs: traits.filter((c) => c.group === g) })).filter((x) => x.cs.length), (x) => x.cs.length + 1).map((col) => (
+          <div class="fpr-col">
+            {col.map(({ item: { g, cs }, order }) => (
+              <div class="card fpr-grp" style={`order: ${order}`}>
+                <h3>{g}</h3>
+                {cs.map((c) => <FpRow c={c} sides={fpSides} />)}
+              </div>
+            ))}
           </div>
         ))}
-      </div>
+      </div></div>
     </details>
   </Section>
 
