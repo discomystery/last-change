@@ -34,10 +34,10 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   <div class="card tr-run">
     <h3 class="tr-head">{t.head}</h3>
     {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
-    <p class="tr-how"><strong>How to read it:</strong> each dot is one game, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play than the other team; below it, less. The line follows their last {win} games.</p>
+    <p class="tr-how"><strong>How to read it:</strong> each dot is one game, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play than the other team; below it, less. The thick line is a running average: at each game, their share over that game and the {win - 1} before it, so one odd night doesn’t throw it.</p>
     <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <p class="tr-key tr-key2">
-      <span class="k-line">Last {win} games</span><span class="k-dot">One game</span>
+      <span class="k-line">{win}-game average</span><span class="k-dot">One game</span>
       <span class="k-band term" tabindex="0" data-tip={`A ${win}-game line moves up and down even when nothing about the team has changed. Inside the band, the move is small enough to be bounces alone; outside it, something more is going on.`}>Normal ups and downs</span>
       <span class="k-ref">{t.change ? 'Their level before and after the change' : 'Their average each season'}</span>
       {(t.around ?? []).length > 0 && <span class="k-pin">What else happened (listed below)</span>}
