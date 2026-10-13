@@ -585,7 +585,63 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
                     "strength": strength, "hs": hs, "as": as_,
                     # the other side had pulled its goalie for an extra attacker (more skaters than the scorers), not
                     # just left the net during a delayed penalty
-                    "extra": empty and theirs > mine})
+                    "extra": empty and theirs > mine,
+                    # the scorers' own goalie pulled for an extra attacker
+                    "own_extra": ((code[0] == "0") if not home else (code[3] == "0")) and mine > theirs})
+    return out
+
+
+def _blown(goals: list[dict], winner_home: bool) -> str | None:
+    """"5-2" when the winner led by two or more and the other team then drew level or went ahead (eye test, 2026-10-13:
+    Vancouver's 5-2 lead at Edmonton read "The game was tied twice")."""
+    best, at = 0, None
+    for g in goals:
+        mine, theirs = (g["hs"], g["as"]) if winner_home else (g["as"], g["hs"])
+        if mine - theirs > best:
+            best, at = mine - theirs, f"{mine}-{theirs}"
+        if best >= 2 and mine <= theirs:
+            return at
+    return None
+
+
+def _left(g: dict) -> str:
+    s = 1200 - g["sec"]
+    return f"{s} seconds" if s < 60 else f"{s // 60}:{s % 60:02d}"
+
+
+def _shape(goals: list[dict], side, W, name, winner: str, end: str) -> list[str]:
+    """How the goals came (eye test, 2026-10-13): a goal with the goalie pulled that tied the game late, and a burst
+    (one team scoring three in five minutes, or four in a period; about one game in seven)."""
+    out = []
+    for g in goals:
+        if g["own_extra"] and g["hs"] == g["as"] and g["period"] == 3:
+            out.append(f"{name(g['p1'])} tied it with the goalie pulled and {_left(g)} left.")
+            break
+    best = None
+    for t in {side(g) for g in goals}:
+        mine = [g for g in goals if side(g) == t and g["strength"] != "en"]
+        for i in range(len(mine)):
+            for j in range(len(mine) - 1, i + 1, -1):
+                a, b = mine[i], mine[j]
+                span = (b["period"] - a["period"]) * 1200 + b["sec"] - a["sec"]
+                if span <= 300:
+                    n = j - i + 1
+                    if not best or n > best[0]:
+                        best = (n, t, span, a["period"] if a["period"] == b["period"] else None)
+                    break
+        by_p = {}
+        for g in mine:
+            by_p[g["period"]] = by_p.get(g["period"], 0) + 1
+        for p, n in by_p.items():
+            if n >= 4 and p <= 3 and (not best or n > best[0]):
+                best = (n, t, None, p)
+    if best:
+        n, t, span, p = best
+        if span is not None:
+            when = f" of the {PERIODS[p]}" if p in PERIODS else ""
+            out.append(f"{_cap(W.the(t))} scored {num(n)} goals in {span // 60}:{span % 60:02d}{when}.")
+        else:
+            out.append(f"{_cap(W.the(t))} scored {num(n)} times in the {PERIODS[p]} period.")
     return out
 
 
@@ -707,6 +763,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if comeback:
             s1.append(f"{_cap(W.the(winner))} came all the way back." if any(x.endswith("half over.") and "led" in x for x in s1)
                       else f"{_cap(W.the(loser))} led by {num(lead_max[loser])}, but {W.the(winner)} came all the way back.")
+        elif blown := _blown(goals, winner == home):
+            s1.append(f"{_cap(W.the(winner))} led {blown} and let it slip.")
         else:
             ties = [g for g in goals if g["hs"] == g["as"]]
             if len(ties) >= 2:
@@ -718,14 +776,20 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                     s1.append(f"{times} {W.the(t)} answered a {W.nick.get(other, other)} lead.")
                 else:
                     s1.append(f"The game was tied {'twice' if len(ties) == 2 else num(len(ties)) + ' times'}.")
+        s1 += _shape(goals, side, W, name, winner, end)
         if end == "OT":
             ot = next((g for g in goals if g["period"] > 3), None)
             if ot:
                 s1.append(f"{name(ot['p1'])} won it {_when(ot)}.")
         elif end == "REG":  # the winner: the goal that put them one past the loser's final total
             gw = next((g for g in goals if side(g) == winner and (g["hs"] if g["home"] else g["as"]) == ls + 1), None)
+            late = gw and gw["period"] == 3 and gw["sec"] >= 1200 - 300
+            how = {"pp": " on the power play", "sh": " shorthanded"}.get(gw["strength"], "") if gw else ""
+            when = f"with {_left(gw)} left" if late else _when(gw) if gw else ""
             if gw and gw["p1"] not in said and gw is not goals[0] and ws - ls <= 2:
-                s1.append(f"{name(gw['p1'])} scored the winner {_when(gw)}.")
+                s1.append(f"{name(gw['p1'])} scored the winner{how} {when}.")
+            elif gw and late and ws - ls <= 2:
+                s1.append(f"{name(gw['p1'])}’s goal{how} {when} was the winner.")
         elif end == "SO":
             if s1 and s1[-1].endswith("came all the way back."):
                 s1[-1] = s1[-1][:-1] + ", and won it in the shootout."
