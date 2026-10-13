@@ -20,7 +20,7 @@ import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
-import { teamColour } from '../../lib/teams';
+import { teamPaint } from '../../lib/teams';
 import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../data/mock';
 import rosterData from '../../../public/data/roster.json';
@@ -112,7 +112,7 @@ const statRow = (x: any) => (isG ? null : x);
 ---
 <Base section="players" title={`${p.name} · ${p.team}`} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
-  <div class="player" style={`--team:${teamColour(p.team)}`}>
+  <div class="player" style={`--team:${teamPaint(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
         on the stats table's top line), with his jersey number faint behind it. */}
     <div class:list={['card', 'phead', (isG || !hasStats) && 'no-stats', unplayed && 'unplayed']}>
@@ -134,7 +134,7 @@ const statRow = (x: any) => (isG ? null : x);
       )}
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
-    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamColour(p.team)} class="pstory" />
+    <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamPaint(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} pinned />
 
     {!isG && !s.traits && (
@@ -271,7 +271,7 @@ const statRow = (x: any) => (isG ? null : x);
             {s.moved_from && <p class="note m-blend">He played for {(teams.find((t) => t.abbr === s.moved_from)?.name) ?? s.moved_from} last season. Habits that travel with a player (shooting, hitting, penalties) still use that season in full; setting up goals, finishing, faceoffs and power-play chances depend more on linemates and role, so they lean on it less. We measured how much each one carries over for players who change teams.</p>}
             {s.group === 'F' && <p class="note">Shooting volume, creating his own chances, shot blocking, hardest shot and distance skated compare {s.sub === 'C' ? 'centers with centers' : 'wingers with wingers'}, because centers and wingers really differ there. Everything else compares all forwards.</p>}
             {unplayed
-              ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The grey dots show last season.</p>
+              ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The gray dots show last season.</p>
               : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
             <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Adjusted stats” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
           </Fragment>

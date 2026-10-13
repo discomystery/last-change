@@ -23,7 +23,6 @@ const base = import.meta.env.BASE_URL;
 
 <style is:global>
   .gflow { --c0: var(--away); --c1: var(--home); }
-  @media (prefers-color-scheme: dark) { .gflow { --c0: color-mix(in oklab, var(--away) 55%, white); --c1: color-mix(in oklab, var(--home) 55%, white); } }
   .gflow .gf-pick { margin-top: 0; }
   .gf-wait { font: 500 14px var(--ui); color: var(--ink-3); padding: 40px 0; text-align: center; }
   .gf-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
@@ -268,7 +267,7 @@ const base = import.meta.env.BASE_URL;
 
       const keyEl = $('gf-key'); keyEl.replaceChildren();
       const item = (cls: string, label: string, c?: string) => { const sp = document.createElement('span'); if (c) sp.style.setProperty('--c', c); sp.innerHTML = `<i${cls ? ` class="${cls}"` : ''}></i>`; sp.append(label); keyEl.append(sp); };
-      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal, ringed in the scoring team’s colour'); item('hollow', 'Shot at an empty net');
+      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal, ringed in the scoring team’s color'); item('hollow', 'Shot at an empty net');
       for (const s of ['Bigger dot = better chance', 'Shaded = power play']) { const sp = document.createElement('span'); sp.textContent = s; keyEl.append(sp); }
 
       const board = (t: number) => {

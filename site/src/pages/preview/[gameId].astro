@@ -25,7 +25,7 @@ import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
 import { clock as mmss, compared } from '../../lib/format';
-import { matchupColours } from '../../lib/teams';
+import { matchupPaint } from '../../lib/teams';
 import '../../styles/blocks.css';
 import teamsData from '../../../public/data/teams.json';
 import fpAll from '../../../public/data/fingerprints.json';
@@ -62,7 +62,7 @@ const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
 const full = (a: string) => T[a]?.name ?? a;
 const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T[a].otl}` : '');
-const colours = matchupColours(away, home);
+const colours = matchupPaint(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start);
@@ -151,7 +151,7 @@ const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'hom
 const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
-const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
 const _ = ordinal;
 ---
 <Base section="games" title={`${away} at ${home} preview`}>
@@ -378,7 +378,7 @@ const _ = ordinal;
         <div class="g3">
           {[away, null, home].map((a) => a === null ? (
             <div class="card gmid">
-              <p class="chart-title"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Grey dots are every goalie with at least ten starts over this season and last; point at one to see who it is.">Helping, or hung out to dry?</span></p>
+              <p class="chart-title"><span class="term" tabindex="0" data-tip="Higher means the goalie is stopping more than expected. Further right means his team gives up more in front of him. Gray dots are every goalie with at least ten starts over this season and last; point at one to see who it is.">Helping, or hung out to dry?</span></p>
               {lg.length === 0 ? <p class="note">No goalie has played yet this season.</p> : <Quadrant tall league={lg} xDomain={xDom} yDomain={[-yMax, yMax]} xMid={xMid} highlights={order.flatMap((t) => goaliesOf(t).filter((o) => o.blend.xga60 !== null && o.blend.gsax60 !== null).map((o) => ({ team: side(t), name: o.name, probable: o.blend.starts >= goalieData.min_starts.blend, x: o.blend.xga60!, y: o.blend.gsax60! })))} />}
             </div>
           ) : goaliesOf(a).map((g, gi) => {

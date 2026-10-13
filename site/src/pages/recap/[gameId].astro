@@ -19,7 +19,7 @@ import Explain from '../../components/Explain.astro';
 import Gloss from '../../components/Gloss.astro';
 import ChanceStory, { type Beat } from '../../components/ChanceStory.astro';
 import '../../styles/blocks.css';
-import { matchupColours } from '../../lib/teams';
+import { matchupPaint } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
 
@@ -48,7 +48,7 @@ const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
 const poss = (n: string) => (n.endsWith('s') ? `${n}’` : `${n}’s`);  // "NY Rangers’ lineup"
 const side = (a: string) => (a === away ? 'away' : 'home');
-const colours = matchupColours(away, home);
+const colours = matchupPaint(away, home);
 // The reveal is told from the visitor's own team's side when it played, otherwise the home team's.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const rv = r.reveal;
@@ -133,7 +133,7 @@ const beatsFor = (a: string): Beat[] => {
 // delivered." reads "Carolina delivered."
 const outcome = (head: string) => { const t = head.replace(/^We (gave|had) .*?(chance|\)), (and|but) /, ''); return t.charAt(0).toUpperCase() + t.slice(1); };
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
-const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}@media (prefers-color-scheme: dark){.t-away{--team:color-mix(in oklab,var(--away) 55%,white)}.t-home{--team:color-mix(in oklab,var(--home) 55%,white)}}`;
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(r.start));
 const endWord = r.end === 'OT' ? 'Final in overtime' : r.end === 'SO' ? 'Final in a shootout' : 'Final';
 const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;

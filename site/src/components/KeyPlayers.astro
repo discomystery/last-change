@@ -3,22 +3,25 @@
 // how he is used), and what he does better than most at his position as one row each. Detail lives in tooltips.
 import PLink from './PLink.astro';
 import Portrait from './Portrait.astro';
-import { keyPlayers, toughMinutes } from '../lib/keyPlayers';
+import { keyPlayers, keyGoalie, toughMinutes } from '../lib/keyPlayers';
 import { posWord, groupWord, peerWord, ordinal, rankTag, rankTip, topShare, type Mode } from '../lib/players';
 import { clock } from '../lib/format';
 
 interface Props { abbr: string; place: string }
 const { abbr, place } = Astro.props;
 const list = keyPlayers(abbr, place);
+const goalie = keyGoalie(abbr, place);
 const modes: Mode[] = ['blend', 'season'];
 const sayOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.info.raw(it.est.raw) : it.info.say(it.est?.raw !== undefined ? it.est.index ?? 100 : it.v));
 // The rank or percentile opens the skater rankings for that rating, with this player picked out.
 const base = import.meta.env.BASE_URL;
 const vsKey = Object.fromEntries(Object.entries(peerWord).map(([k, w]) => [w, k]));
 const rankHref = (p: any, it: any) => `${base}players/rankings/?t=${it.key}&g=${vsKey[it.vs] ?? p.group}&p=${p.id}`;
+const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
+const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
 const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.est.raw_pct : it.pct);
 ---
-{list.length === 0
+{list.length === 0 && !goalie
   ? <p class="note">Nobody has played enough games yet.</p>
   : (
     <ul class="kp">
@@ -64,6 +67,41 @@ const pctOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.
           </li>
         );
       })}
+      {goalie && (
+        <li class="card kpc">
+          <div class="kp-top">
+            <div class="kp-id">
+              <p class="kp-name"><PLink id={goalie.id} name={goalie.name} /></p>
+              <p class="kp-line">{goalie.number !== null && `#${goalie.number} · `}Goalie · <span class="kp-toi" data-tip={`Games he has started of ${place}’s ${goalie.teamStarts} this season.`} tabindex="0"><strong>{goalie.starts}</strong> of {goalie.teamStarts} starts</span></p>
+              {goalie.season && <p class="kp-line"><span class="kp-toi" tabindex="0" data-tip="Save percentage this season: the share of shots on goal he stopped.">{svp(goalie.season.sv)} save %</span> <span class="kp-ga" tabindex="0" data-tip="Goals saved above expected this season: goals he has prevented compared with an average goalie facing the same shots. Positive is good.">({sgn(goalie.season.gsax)} vs expected)</span></p>}
+            </div>
+            <Portrait id={goalie.id} size={88} class="kp-photo" />
+          </div>
+          <ul class="kp-jobs">
+            {goalie.jobs.map((j) => <li class="chip tag" tabindex="0" data-tip={j.tip}>{j.text}</li>)}
+          </ul>
+          {modes.map((m) => {
+            const { best, worst, few } = goalie.strengths[m];
+            return (
+              <div class={`gmode m-${m}`}>
+                {best.length === 0 && worst.length === 0 && <p class="n kp-none">{few ? `Too few starts ${m === 'season' ? 'this season ' : ''}to rate him yet.` : 'No clear strengths or weak spots yet.'}</p>}
+                <ul class="kp-rows">
+                  {best.map((it) => (
+                    <li tabindex="0" data-tip={`${it.label}: better than ${it.pct}% of goalies. ${it.tip}`}>
+                      <span class="kp-lab">{it.label}</span><a class="kp-pct" href={`${base}player/${goalie.id}/#card`}>{topShare(it.pct)}</a>
+                    </li>
+                  ))}
+                  {worst.map((it) => (
+                    <li class="weak" tabindex="0" data-tip={`${it.label}: behind ${100 - it.pct}% of goalies. ${it.tip}`}>
+                      <span class="kp-lab">{it.label}</span><a class="kp-pct" href={`${base}player/${goalie.id}/#card`}>{topShare(it.pct)}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </li>
+      )}
     </ul>
   )}
 
