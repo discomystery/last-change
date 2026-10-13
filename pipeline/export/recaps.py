@@ -490,6 +490,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
                "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
+        if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
+            gone = [{"id": x["id"], "team": t, "sec": x["sec"]} for t in (g["away"], g["home"])
+                    for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
+            if gone:
+                rec["left"] = sorted(gone, key=lambda x: x["sec"])
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
         graded = [c["verdict"] for c in calls if c.get("verdict") in ("held", "partly", "missed")]
         index.append({"id": gid, "date": g["date"], "away": g["away"], "home": g["home"], "score": rec["score"], "end": g["last_period"],

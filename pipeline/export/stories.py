@@ -35,6 +35,7 @@ import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import penalties, wording
+from pipeline.export import surprises as surprise_rules
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
@@ -637,6 +638,45 @@ def _ps_stopped(gid: int, season: int) -> list[dict]:
             for r in ev.sort("sort").iter_rows(named=True)]
 
 
+WIPED_WHY = {"off-side": "for offside", "goal-interference": "for goalie interference", "missed-stoppage": "because play should have been stopped earlier"}
+
+
+def _overturned(gid: int, season: int) -> list[dict]:
+    """Goals taken off on a coach's or the league's challenge (eye test, 2026-10-13: Montréal's overturned overtime
+    winner at home to Detroit went untold). The NHL deletes the goal from the play-by-play and leaves a stoppage whose
+    reason is "chlg-{hm|vis|league}-{why}". A failed challenge keeps the goal and restarts at center ice; a successful
+    one restarts at a neutral-zone dot outside the blue line where the goal was scored, which says whose goal it was
+    (checked on all 13 challenges of 2026-27 so far, and it names Montréal for the league's overtime review)."""
+    f = RAW / str(season) / "pbp" / f"{gid}.json.gz"
+    if not f.exists():
+        return []
+    plays = json.loads(gzip.open(f).read()).get("plays", [])
+    out = []
+    for i, p in enumerate(plays):
+        why = (p.get("details") or {}).get("reason") or ""
+        if not why.startswith("chlg-") or p.get("typeDescKey") != "stoppage":
+            continue
+        when = p.get("timeInPeriod") or "0:00"
+        same = [x for x in plays if x.get("timeInPeriod") == when and (x.get("periodDescriptor") or {}).get("number") == p["periodDescriptor"]["number"]]
+        if any(x.get("typeDescKey") == "goal" for x in same):
+            continue  # the goal stood
+        fo = next((x for x in plays[i + 1:i + 6] if x.get("typeDescKey") == "faceoff"), None)
+        fx = ((fo or {}).get("details") or {}).get("xCoord")
+        if not fx:
+            continue  # center ice: the goal stood
+        defends = p.get("homeTeamDefendingSide")
+        if defends in ("left", "right"):
+            home_attacks_right = defends == "left"
+            home_goal = (fx > 0) == home_attacks_right
+        else:
+            home_goal = "-vis-" in why
+        kind = why.split("-", 2)[2] if why.count("-") >= 2 else ""
+        m, sec = when.split(":")
+        out.append({"home": home_goal, "why": WIPED_WHY.get(kind, "on a challenge"), "period": p["periodDescriptor"]["number"],
+                    "sec": int(m) * 60 + int(sec), "league": "-league-" in why})
+    return out
+
+
 def _blown(goals: list[dict], winner_home: bool) -> str | None:
     """"5-2" when the winner led by two or more and the other team then drew level or went ahead (eye test, 2026-10-13:
     Vancouver's 5-2 lead at Edmonton read "The game was tied twice")."""
@@ -775,6 +815,19 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     head = max(heads, key=lambda h: h[0])[1]
     # paragraph one: how the goals went
     s1 = []
+    wiped = []
+    gone = _overturned(gid, season)
+    for t in (away, home):
+        mine = [x for x in gone if (home if x["home"] else away) == t]
+        if not mine:
+            continue
+        whys = {x["why"] for x in mine}
+        why = whys.pop() if len(whys) == 1 else "on challenges"
+        if len(mine) == 1:
+            what = "what would have been the winner" if mine[0]["period"] > 3 else "a goal"  # overtime ends on a goal
+            wiped.append(f"{_cap(W.place(t))} had {what} taken off {why} {_when(mine[0])}.")
+        else:
+            wiped.append(f"{_cap(W.place(t))} had {num(len(mine))} goals taken off {why}.")
     told = set()  # penalty-shot goals already told in another sentence
 
     def on_ps(g: dict) -> str:
@@ -848,6 +901,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 s1.append(f"{name(x['goalie'])} stopped {name(x['p1'])} on a penalty shot {_when(x)}.")
             else:
                 s1.append(f"{name(x['p1'])} missed the net on a penalty shot {_when(x)}.")
+        s1 += wiped
         if end == "OT":
             ot = next((g for g in goals if g["period"] > 3), None)
             if ot:
@@ -873,7 +927,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             else:
                 s1.append(f"{_cap(W.the(winner))} won it in the shootout.")
     elif end == "SO" and so_pid:  # scoreless after overtime
-        s1.append(f"Nobody scored through overtime, and {name(so_pid)} scored {so_how} for {W.the(winner)}.")
+        s1 += wiped
+        s1.append(f"{'No goal counted' if wiped else 'Nobody scored'} through overtime, and {name(so_pid)} scored {so_how} for {W.the(winner)}.")
     # A starter was pulled only if a teammate goalie then played: a short night on its own is usually the net left
     # empty for an extra attacker.
     # "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as "pulled" only
@@ -933,6 +988,16 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                         r["game_id"], "en"))
     if ls == 0 and wg:
         s1.append(f"{name(wg['id']) or wg['name']} stopped all {wg['saves']} shots.")
+    # Skaters who left and didn't return (eye test, 2026-10-13: Tanev's exit went untold). Never why: the data can't
+    # say, and most are injuries but some are benchings.
+    teams_left = []
+    for x in (r.get("left") or [])[:2]:
+        if x["id"] not in N:
+            continue
+        also = " also" if x["team"] in teams_left else ""
+        who_ = f"{_cap(W.poss(x['team']))} {name(x['id'])}" if x["id"] not in said and not also else name(x["id"])
+        s1.append(f"{who_}{also} left {surprise_rules.when_left(x['sec'])} and didn’t return.")
+        teams_left.append(x["team"])
     # paragraph two: was it fair, and who stood out
     s2 = []
     if share is not None:
