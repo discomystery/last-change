@@ -7,6 +7,8 @@ our own tables. A player with no landing on file gets no first, rather than a wr
 
 Kinds, most important first (`WEIGHT`):
   first_goal      his first NHL goal ("in his NHL debut" when it was also his first game)
+  milestone       a round hundred reached tonight: his 500th, 600th... game, 100th+ goal, 200th+ assist, 300th+ point
+                  (the same marks previews count down to, so a preview's "one point from 900" is closed after the game)
   debut           his first NHL game (goalies: only when he started)
   return          a regular (14:00 a game for forwards, 18:00 for defensemen, over his last ten) back after missing 10+
                   of his team's games ("his first NHL game since ..." after a long time away); never why he was out
@@ -21,7 +23,7 @@ import polars as pl
 
 from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
 
-WEIGHT = {"first_goal": 90, "debut": 80, "return": 70, "first_point": 65, "club_goal": 60}
+WEIGHT = {"first_goal": 90, "milestone": 85, "debut": 80, "return": 70, "first_point": 65, "club_goal": 60}
 RETURN_GAMES = 10  # team games missed before a return is told
 LONG_AWAY_DAYS = 300  # past this, "his first NHL game since <date>" instead of a count
 GOALIE_RETURN_GAMES = 30  # a goalie back in net: told by the date of his last game, after this many team games
@@ -110,6 +112,13 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         gp, g, pts = base["gp"] + mine.height, base["g"] + int(mine["g"].sum()), base["g"] + base["a"] + int(mine["pts"].sum())
         g_now, pts_now = int(r["g"]), int(r["pts"])
         item = {"pid": pid, "team": t, "goals": g_now}
+        a_now = pts_now - g_now
+        # a round hundred crossed tonight; one per player, goals first, games last
+        for what, have, now, low in (("goal", g, g_now, 100), ("point", pts, pts_now, 300), ("assist", pts - g, a_now, 200), ("game", gp, 1, 500)):
+            mark = (have + now) // 100 * 100
+            if now and mark >= low and have < mark:
+                out.append({**item, "kind": "milestone", "what": what, "mark": mark})
+                break
         if g == 0 and g_now:
             out.append({**item, "kind": "first_goal", "debut": gp == 0})
         elif gp == 0:

@@ -370,6 +370,11 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
                 out.append(f"{_cap(who)} {what} {MONTHS[d.month - 1]} {d.day}, {d.year}.")
             else:
                 out.append(f"{_cap(who)} was back in the lineup after missing {num(x['missed'])} games.")
+        elif k == "milestone":
+            what = {"game": "NHL game", "goal": "NHL goal", "assist": "NHL assist", "point": "NHL point"}[x["what"]]
+            out.append(f"{_cap(who)} played his {x['mark']:,}th {what}." if x["what"] == "game"
+                       else f"It was {_short(pid, P, N, season)}’s {x['mark']:,}th {what}." if known
+                       else f"{_cap(who)} reached {x['mark']:,} career {x['what']}s.")
         elif k == "first_point":
             out.append(f"{_cap(who)} picked up his first NHL point.")
         elif k == "club_goal":
