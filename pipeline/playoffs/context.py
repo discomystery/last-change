@@ -143,6 +143,7 @@ def add_to_preview(snap: dict, g: dict, sched: list[dict], season: int) -> dict:
     return snap
 
 
+REGULAR_ONLY = {"Slow start", "Leads the way"}  # "still looking for his first goal of the season" reads wrong in May
 RESTED = ("latest game", "last two games", "last three games", "last four games")
 NEXT = {1: "the second round", 2: "the conference final", 3: "the Stanley Cup Final", 4: "a Stanley Cup"}
 GENERIC_HEADS = ("Round two", "come in hot", "need a win")
@@ -240,7 +241,7 @@ def dedupe(sched: list[dict], folder: Path) -> int:
         story = snap.get("story") or {}
         items = story.get("all_items", story.get("items", []))
         seen = told.setdefault(g["series"], set())
-        keep = [i for i in items if i["tag"] == "Series leader" or (i["tag"], i["text"][:28]) not in seen]
+        keep = [i for i in items if i["tag"] not in REGULAR_ONLY and (i["tag"] == "Series leader" or (i["tag"], i["text"][:28]) not in seen)]
         seen |= {(i["tag"], i["text"][:28]) for i in items}
         story["all_items"] = items
         story["items"] = keep[:5]

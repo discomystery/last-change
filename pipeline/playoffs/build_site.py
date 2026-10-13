@@ -41,8 +41,41 @@ def build(season: int) -> Path:
     (work / "public" / "CNAME").unlink(missing_ok=True)
     subprocess.run(["npm", "run", "build"], cwd=work, check=True, env={**os.environ, "SITE_BASE": "/"})
     dist = work / "dist"
+    # Only what pages fetch in the browser stays in data/: the rest was read at build time
+    keep = {"teams.json", "schedule.json", "previews/index.json", "recaps/index.json", "xg_grid.json"}
+    for f in list((dist / "data").rglob("*")):
+        rel = f.relative_to(dist / "data").as_posix()
+        if f.is_file() and rel not in keep and not rel.startswith("flow/"):
+            f.unlink()
+    for d in sorted((dist / "data").rglob("*"), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+    rename_assets(dist)
     relative(dist)
     return dist
+
+
+def rename_assets(dist: Path) -> None:
+    """The page host keeps names starting with "_" for itself: _astro/ becomes assets/, and _x.css becomes p_x.css."""
+    old = dist / "_astro"
+    if not old.exists():
+        return
+    new = dist / "assets"
+    old.rename(new)
+    swaps = {"/_astro/": "/assets/"}
+    for f in new.iterdir():
+        if f.name.startswith("_"):
+            swaps[f"/assets/{f.name}"] = f"/assets/p{f.name}"
+            swaps[f"./{f.name}"] = f"./p{f.name}"
+            f.rename(new / f"p{f.name}")
+    for f in list(dist.rglob("*.html")) + list(new.rglob("*.js")) + list(new.rglob("*.css")):
+        t = f.read_text()
+        for a in sorted(swaps, key=len):
+            t = t.replace(a, swaps[a]) if a.startswith("/_astro") else t
+        for a, b in swaps.items():
+            if not a.startswith("/_astro"):
+                t = t.replace(a, b)
+        f.write_text(t)
 
 
 ATTR = re.compile(r'(\s(?:href|src|data-src|data-base|action|poster)=")(/[^"]*)"')
