@@ -28,7 +28,7 @@ other half far better than its real wins do (r 0.67 against 0.50), about as well
 import numpy as np
 import polars as pl
 
-from pipeline.config import TABLES
+from pipeline.config import GAME_TYPES, TABLES
 from pipeline.metrics import adjust
 
 UNBLOCKED = ("shot-on-goal", "missed-shot", "goal")
@@ -103,12 +103,12 @@ def calibrated(share: float) -> float:
     return 1 / (1 + ((1 - s) / s) ** CAL_SLOPE)
 
 
-def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool = True, adjust_score: bool = False) -> pl.DataFrame:
+def season_table(season: int, game_type: int | tuple | None = 2, collapse_flurries: bool = True, adjust_score: bool = False) -> pl.DataFrame:
     """One row per finished game: replay shares, expected goals and the real result."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("state").is_in(["OFF", "FINAL"]))
     if game_type is not None:
-        games = games.filter(pl.col("game_type") == game_type)
+        games = games.filter(pl.col("game_type").is_in(game_type if isinstance(game_type, tuple) else (game_type,)))
     s = shots(season)
     c = chances(score_adjusted(s) if adjust_score else s, collapse_flurries)
     by_game = {

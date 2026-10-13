@@ -1,0 +1,267 @@
+---
+// One page per playoff series (pipeline/playoffs/pages.py): how it went, game by game with each game's chances, how
+// the preview's calls held across the games, what we knew before Game 1 (the series preview), the scorers and goalies.
+// Series history is told as counts of past teams, never as a chance for this series. Pages exist only when the
+// season's data has series (the playoff build); the live regular season builds none.
+import Base from '../../layouts/Base.astro';
+import Section from '../../components/Section.astro';
+import SectionNav from '../../components/SectionNav.astro';
+import GameStory from '../../components/GameStory.astro';
+import '../../styles/blocks.css';
+import { matchupPaint } from '../../lib/teams';
+import { ROUND_SHORT, otLabel } from '../../lib/series';
+import { fpInfo, ordinal } from '../../data/mock';
+import teamsData from '../../../public/data/teams.json';
+
+type Five = { xgf5: number; xga5: number; xgf: number; sf: number };
+type G = { id: number; game: number; date: string; start: string; home: string; away: string; venue: string; final: boolean; hs?: number; as?: number; ot?: number; winner?: string;
+  five?: Record<string, Five> | null; preview: boolean; recap: boolean; calls?: Record<string, number>; replay?: Record<string, number>; star?: { id: number; name: string; team: string; score: number } | null;
+  shots?: Record<string, number>; head?: string; preview_head?: string };
+type Call = { kind: string; metric: string | null; team: string | null; head: string; held: number; partly: number; games: { game: number; id: number; verdict: 'held' | 'partly' | 'missed'; title?: string; happened?: string }[] };
+type Series = { id: string; round: number; round_name: string; conference: string | null; top: string; bottom: string; wins: [number, number]; winner: string | null; loser: string | null;
+  games: G[]; story: { head: string; paras: string[] }; five: Record<string, { xgf5: number }>; replay: Record<string, number> | null; tally: Record<string, number>;
+  scorers: { id: number; name: string; team: string; gp: number; g: number; a: number; p: number }[];
+  goalies: { id: number; name: string; team: string; gp: number; starts: number; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; w: number }[];
+  calls: Call[];
+  before: { records?: Record<string, string>; met?: { year: number; round: number; winner: string }[]; meetings?: { id: number; date: string; home: string; away: string; hs: number; as: number; end: string }[];
+    claims?: { id: string; kind: string; head: string; body: string; team: string | null }[]; projected?: Record<string, { id: number; from: string }> | null;
+    story?: { kicker: string; head: string; paras: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] }; game1?: number;
+    gaps?: ({ trait: string; gap: number } & Record<string, { pct: number; rank: number }>)[] } };
+
+export async function getStaticPaths() {
+  const files = import.meta.glob<{ default: Series }>('../../../public/data/series/2*.json', { eager: true });
+  return Object.values(files).map((f) => ({ params: { id: f.default.id }, props: { s: f.default } }));
+}
+const { s } = Astro.props as { s: Series };
+const base = import.meta.env.BASE_URL;
+const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
+const place = (a: string) => T[a]?.place ?? a;
+const name = (a: string) => T[a]?.name ?? a;
+// Visitors' colours for the team without home ice, as on its Game 1 preview.
+const colours = matchupPaint(s.bottom, s.top);
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
+const cls = (a: string) => (a === s.top ? 't-home' : 't-away');
+const [wt, wb] = s.wins;
+const done = s.games.filter((g) => g.final);
+const day = (d: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
+const longDay = (d: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
+const share = (g: G, t: string) => {
+  const f = g.five?.[t];
+  return f && f.xgf5 + f.xga5 > 0 ? f.xgf5 / (f.xgf5 + f.xga5) : null;
+};
+const totFive = s.five[s.top].xgf5 + s.five[s.bottom].xgf5;
+const topShare = totFive ? s.five[s.top].xgf5 / totFive : null;
+const nCalls = (s.tally.held ?? 0) + (s.tally.partly ?? 0) + (s.tally.missed ?? 0);
+const verdictWord = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
+const b = s.before;
+const roundWord = (r: number) => ({ 1: 'first round', 2: 'second round', 3: 'conference final', 4: 'Stanley Cup Final' } as Record<number, string>)[r];
+const realWins = (t: string) => done.filter((g) => g.winner === t).length;
+const nav: [string, string][] = [['series', 'The series'], ['games', 'Game by game'], ['calls', 'The calls'], ['before', 'Before Game 1'], ['players', 'Scorers and goalies']];
+const title = `${name(s.bottom)} vs. ${name(s.top)}`;
+---
+<Base section="games" title={`${s.bottom} vs ${s.top}: ${ROUND_SHORT[s.round]}`}>
+  <style is:inline set:html={colourCss}></style>
+  <nav class="crumbs" aria-label="Where this series sits"><a href={`${base}playoffs/`}>Playoffs</a><span aria-hidden="true">›</span><span aria-current="page">{ROUND_SHORT[s.round]}{s.conference ? `, ${s.conference}` : ''}</span></nav>
+  <header class="card s-card">
+    <p class="eyebrow">{s.round_name}{s.conference ? ` · ${s.conference} Conference` : ''} · {s.winner ? 'Final' : done.length ? 'In progress' : 'Starts soon'}</p>
+    <div class="s-score">
+      {[s.bottom, s.top].map((t, i) => (
+        <div class:list={['s-side', cls(t), { out: s.loser === t }]}>
+          <a class="s-ab tlink" href={`${base}team/${t}/`}>{t}</a>
+          <span class="s-w">{t === s.top ? wt : wb}</span>
+          <span class="s-name">{place(t)}{t === s.top ? ' · home ice' : ''}</span>
+        </div>
+      ))}
+    </div>
+    <h1 class="s-title">{title}</h1>
+  </header>
+  <SectionNav items={nav} />
+
+  <section class="sec top" id="series" aria-label="The series">
+    <GameStory story={{ kicker: s.winner ? 'How it went' : 'So far', head: s.story.head, paras: s.story.paras, list_head: 'The series in numbers',
+      items: [
+        ...(topShare !== null ? [{ tag: '5-on-5 chances', text: `${s.top} ${Math.round(100 * topShare)}% · ${s.bottom} ${Math.round(100 * (1 - topShare))}%` }] : []),
+        ...(s.replay ? [{ tag: 'Run it back', text: `Replaying each game’s chances: ${s.top} ${s.replay[s.top].toFixed(1)} wins, ${s.bottom} ${s.replay[s.bottom].toFixed(1)}, against the real ${realWins(s.top)}-${realWins(s.bottom)}.` }] : []),
+        ...(nCalls ? [{ tag: 'Preview calls', text: `${s.tally.held ?? 0} of ${nCalls} held up, ${s.tally.partly ?? 0} partly.` }] : []),
+      ] }} />
+  </section>
+
+  <Section id="games" title="Game by game" placeholder={false} takeaway="Each game’s score, the share of 5-on-5 chances each team had (by expected goals), the night’s top Swing, and how the preview’s calls held up. Tap a game for its post-game page.">
+    <ol class="sg-list">
+      {s.games.map((g) => {
+        const sh = share(g, s.top);
+        return (
+          <li class="card sg">
+            <div class="sg-top">
+              <p class="sg-n">Game {g.game}</p>
+              <p class="sg-when">{day(g.date)} · {place(g.home)}</p>
+            </div>
+            <p class="sg-score">
+              {g.final ? <>
+                <span class={cls(g.away)}><span class="ab">{g.away}</span> {g.as}</span><span class="dash">–</span><span class={cls(g.home)}>{g.hs} <span class="ab">{g.home}</span></span>
+                {g.ot ? <span class="ot">{otLabel(g.ot)}</span> : null}
+              </> : <span>{g.away} at {g.home}</span>}
+            </p>
+            {g.head && <p class="sg-head">{g.head}</p>}
+            {sh !== null && (
+              <div class="tug" title={`5-on-5 chances: ${s.top} ${Math.round(100 * sh)}%, ${s.bottom} ${Math.round(100 * (1 - sh))}%`}>
+                <span class="tug-a t-away" style={`flex:${1 - sh}`}>{Math.round(100 * (1 - sh))}%</span>
+                <span class="tug-b t-home" style={`flex:${sh}`}>{Math.round(100 * sh)}%</span>
+              </div>
+            )}
+            <p class="sg-meta">
+              {g.star && <span>Top Swing: {g.star.name} ({g.star.team})</span>}
+              {g.calls && (g.calls.held + g.calls.partly + g.calls.missed > 0) && <span>Calls: {g.calls.held} of {g.calls.held + g.calls.partly + g.calls.missed} held</span>}
+            </p>
+            <p class="sg-links">
+              {g.preview && <a href={`${base}preview/${g.id}/`}>Preview</a>}
+              {g.recap && <a href={`${base}recap/${g.id}/`}>Post-game</a>}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
+    <p class="note">Chances are 5-on-5 expected goals from this site’s own model. The bar is each team’s share of them in that game: a team can win the bar and lose the game, which is part of why a best-of-seven is still a short series.</p>
+  </Section>
+
+  {s.calls.length > 0 && (
+    <Section id="calls" title="The calls across the series" placeholder={false} takeaway="Each preview’s calls, grouped by what they were about. The same edge called before several games is one row, with a mark for each game.">
+      <ul class="cx">
+        {s.calls.map((c) => (
+          <li class="card row cx-row">
+            <p class="cx-head">{c.head}</p>
+            <p class="cx-marks">
+              {c.games.map((g) => <a class:list={['mark', g.verdict]} href={`${base}recap/${g.id}/`} title={`Game ${g.game}: ${verdictWord[g.verdict]}${g.happened ? `. ${g.happened}` : ''}`}>G{g.game}</a>)}
+            </p>
+            <p class="cx-sum">Held up in {c.held} of {c.games.length}{c.partly ? `, partly in ${c.partly}` : ''}</p>
+          </li>
+        ))}
+      </ul>
+      <p class="note">Previews before each game are written from what was known that morning, by the same rules as in the regular season. Calls that couldn’t be checked are left off.</p>
+    </Section>
+  )}
+
+  <Section id="before" title="Before Game 1" placeholder={false} takeaway="What the series looked like going in: the regular season between them, their past playoff meetings, and where their styles differ most.">
+    <div class="bf">
+      <div class="card">
+        <p class="mini-h">The regular season</p>
+        {b.records && <p class="bf-rec">{[s.top, s.bottom].map((t) => <span><strong class={cls(t)}>{t}</strong> {b.records![t]}</span>)}</p>}
+        {b.meetings && b.meetings.length > 0 ? (
+          <ul class="bf-meet">
+            {b.meetings.map((m) => <li><span class="when">{day(m.date)}</span> {m.away} {m.as}, {m.home} {m.hs}{m.end !== 'REG' ? ` (${m.end})` : ''}</li>)}
+          </ul>
+        ) : <p>They didn’t meet in the regular season.</p>}
+      </div>
+      <div class="card">
+        <p class="mini-h">Past playoff meetings</p>
+        {b.met && b.met.length > 0 ? (
+          <ul class="bf-meet">{b.met.map((m) => <li><span class="when">{m.year}</span> {roundWord(m.round)}: <strong class={cls(m.winner)}>{m.winner}</strong> won</li>)}</ul>
+        ) : <p>None since 1998.</p>}
+      </div>
+    </div>
+    {b.gaps && b.gaps.length > 0 && (
+      <div class="card gaps">
+        <p class="mini-h">Where their styles differ most</p>
+        <ul>
+          {b.gaps.map((g) => (
+            <li class="gap">
+              <span class="gap-name">{fpInfo[g.trait]?.label ?? g.trait}</span>
+              <span class="lane" aria-hidden="true">
+                <span class="avg"></span>
+                {[s.bottom, s.top].map((t) => <span class={`dot ${cls(t)}`} style={`left:${g[t].pct}%`}></span>)}
+              </span>
+              <span class="gap-ends"><span>{fpInfo[g.trait]?.lo}</span><span>{fpInfo[g.trait]?.hi}</span></span>
+              <span class="gap-rank">{[s.bottom, s.top].map((t) => <span><strong class={cls(t)}>{t}</strong> {ordinal(g[t].rank)}</span>)}</span>
+            </li>
+          ))}
+        </ul>
+        <p class="note">Regular-season style fingerprint, this season blended with last. The tick is the league average.</p>
+      </div>
+    )}
+    {b.claims && b.claims.length > 0 && b.game1 && (
+      <div class="card">
+        <p class="mini-h">What the Game 1 preview watched for</p>
+        <ul class="bf-claims">{b.claims.map((c) => <li><strong>{c.head}.</strong> {c.body}</li>)}</ul>
+        <p><a href={`${base}preview/${b.game1}/`}>The full Game 1 preview</a></p>
+      </div>
+    )}
+  </Section>
+
+  <Section id="players" title="Scorers and goalies" placeholder={false} takeaway="The series’ leading scorers, and every goalie who played: saves, save percentage, and goals saved above what the chances he faced would expect.">
+    <div class="bf">
+      <div class="card">
+        <p class="mini-h">Leading scorers</p>
+        <table class="tbl">
+          <thead><tr><th>Player</th><th>GP</th><th>G</th><th>A</th><th>P</th></tr></thead>
+          <tbody>{s.scorers.map((p) => <tr><td><span class={cls(p.team)}><strong>{p.team}</strong></span> {p.name}</td><td>{p.gp}</td><td>{p.g}</td><td>{p.a}</td><td><strong>{p.p}</strong></td></tr>)}</tbody>
+        </table>
+      </div>
+      <div class="card">
+        <p class="mini-h">In net</p>
+        <table class="tbl">
+          <thead><tr><th>Goalie</th><th>GP</th><th>Saves</th><th>Sv%</th><th title="Goals saved above expected">GSAx</th></tr></thead>
+          <tbody>{s.goalies.map((g) => <tr><td><span class={cls(g.team)}><strong>{g.team}</strong></span> {g.name}</td><td>{g.gp}</td><td>{g.saves}/{g.shots}</td><td>{g.sv == null ? '–' : g.sv.toFixed(3).replace(/^0/, '')}</td><td>{g.gsax > 0 ? '+' : g.gsax < 0 ? '−' : ''}{Math.abs(g.gsax).toFixed(1)}</td></tr>)}</tbody>
+        </table>
+      </div>
+    </div>
+  </Section>
+</Base>
+
+<style>
+  .s-card { margin-top: 18px; padding: 22px 26px; }
+  .s-score { display: flex; justify-content: space-between; gap: 18px; margin: 10px 0 4px; }
+  .s-side { display: grid; grid-template-columns: auto auto; align-items: baseline; gap: 0 14px; }
+  .s-side.t-home { text-align: right; justify-content: end; }
+  .s-ab { font: 700 clamp(40px, 10vw, 84px)/0.95 var(--ui); letter-spacing: -0.035em; color: var(--team); text-decoration: none; }
+  .s-w { font: 600 clamp(40px, 10vw, 84px)/0.95 var(--display); font-variation-settings: 'SOFT' 100; }
+  .s-side.t-home .s-ab { order: 2; }
+  .s-side.t-home .s-w { order: 1; }
+  .s-name { grid-column: 1 / -1; font: 400 14px var(--ui); color: var(--ink-2); }
+  .s-side.out .s-ab, .s-side.out .s-w { opacity: 0.45; }
+  .s-title { font: 600 22px/1.2 var(--display); margin-top: 8px; }
+  .sg-list { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .sg { display: grid; gap: 6px; }
+  .sg-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .sg-n { font: 700 12.5px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; }
+  .sg-when { font: 400 12px var(--ui); color: var(--ink-3); }
+  .sg-score { font: 600 26px/1.1 var(--display); font-variation-settings: 'SOFT' 100; display: flex; align-items: baseline; gap: 8px; }
+  .sg-score .ab { font: 700 20px var(--ui); color: var(--team); }
+  .sg-score .dash { color: var(--ink-3); }
+  .sg-score .ot { font: 600 12px var(--ui); color: var(--ink-2); margin-left: 4px; }
+  .sg-head { font: 400 15px/1.35 var(--body); }
+  .tug { display: flex; height: 18px; border-radius: 9px; overflow: hidden; font: 600 11px/18px var(--ui); }
+  .tug span { background: var(--team); color: var(--sheet); padding: 0 6px; white-space: nowrap; overflow: hidden; }
+  .tug-b { text-align: right; }
+  .sg-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font: 400 12.5px var(--ui); color: var(--ink-2); }
+  .sg-links { display: flex; gap: 14px; font: 600 14px var(--ui); }
+  .cx { display: grid; gap: 8px; }
+  .cx-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; }
+  .cx-head { font: 600 16px/1.3 var(--body); }
+  .cx-marks { display: flex; gap: 5px; grid-row: span 2; }
+  .cx-sum { font: 400 12.5px var(--ui); color: var(--ink-3); }
+  .mark { font: 700 11px/26px var(--ui); width: 32px; text-align: center; border-radius: 13px; text-decoration: none; border: 1.5px solid var(--ink-3); color: var(--ink-2); }
+  .mark.held { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+  .mark.partly { background: color-mix(in oklab, var(--ink) 30%, var(--sheet)); border-color: transparent; color: var(--ink); }
+  @media (max-width: 560px) { .cx-row { grid-template-columns: 1fr; } .cx-marks { grid-row: auto; flex-wrap: wrap; } }
+  .bf { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); margin-bottom: 14px; }
+  .bf-rec { display: flex; gap: 18px; font: 400 15px var(--ui); margin: 6px 0 10px; }
+  .bf-rec strong, .tbl strong, .bf-meet strong { color: var(--team); }
+  .bf-meet { display: grid; gap: 4px; font: 400 14px var(--ui); margin-top: 8px; }
+  .bf-meet .when { color: var(--ink-3); display: inline-block; min-width: 92px; }
+  .bf-claims { display: grid; gap: 10px; margin: 10px 0; font: 400 15px/1.45 var(--body); }
+  .gaps { margin-bottom: 14px; }
+  .gaps ul { display: grid; gap: 14px; margin-top: 10px; }
+  .gap { display: grid; grid-template-columns: minmax(130px, 200px) 1fr auto; grid-template-areas: 'name lane rank' '. ends .'; gap: 2px 16px; align-items: center; }
+  .gap-name { grid-area: name; font: 600 14px var(--ui); }
+  .lane { grid-area: lane; position: relative; height: 4px; border-radius: 2px; background: var(--track); }
+  .lane .avg { position: absolute; left: 50%; top: -5px; width: 2px; height: 14px; background: color-mix(in oklab, var(--ink) 50%, transparent); }
+  .lane .dot { position: absolute; top: -5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); border: 2px solid var(--sheet); }
+  .gap-ends { grid-area: ends; display: flex; justify-content: space-between; font: 400 11px var(--ui); color: var(--ink-3); }
+  .gap-rank { grid-area: rank; display: flex; gap: 12px; font: 400 13px var(--ui); }
+  .gap-rank strong { color: var(--team); }
+  @media (max-width: 560px) { .gap { grid-template-columns: 1fr auto; grid-template-areas: 'name rank' 'lane lane' 'ends ends'; gap: 8px 12px; } }
+  .tbl { width: 100%; border-collapse: collapse; font: 400 14px var(--ui); margin-top: 8px; }
+  .tbl th { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); text-align: right; padding: 4px 6px; }
+  .tbl th:first-child, .tbl td:first-child { text-align: left; }
+  .tbl td { text-align: right; padding: 5px 6px; border-top: 1px solid var(--rule); }
+</style>

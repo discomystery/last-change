@@ -27,7 +27,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.build.stints import PENALTY_SHOT
-from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, GAME_TYPES, REGULAR, SITE_DATA, TABLES, types_for
 from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rapm
@@ -54,7 +54,7 @@ def special_on_ice(season: int) -> pl.DataFrame:
     """Per player-game, the special-teams events player_game leaves out: chances against on the power play, and goals
     for and against with him on the ice on the power play and on the penalty kill (both goalies in, no penalty shots)."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id")
     xg = pl.read_parquet(d / "shots_xg_own.parquet").select("game_id", "event_id", "xg")
     s = pl.read_parquet(d / "events.parquet").join(games, on="game_id").filter(
         pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & (pl.col("period_type") != "SO")
@@ -105,7 +105,7 @@ def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Per player-game: goal credit and the expected goals of his own unblocked shots at a goalie (shootouts out);
     per goalie-game: expected goals and goals on the unblocked shots he faced."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id")
     ev = pl.read_parquet(d / "events.parquet").join(games, on="game_id")
     xg = pl.read_parquet(d / "shots_xg_own.parquet").select("game_id", "event_id", "xg")
     sh = ev.filter(pl.col("type").is_in(UNBLOCKED) & pl.col("is_home").is_not_null() & (pl.col("period_type") != "SO")).join(
@@ -171,7 +171,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     """Swing for every finished game, or only the games in `only` (the quick game-night pass). Games whose shift
     chart the NHL is still filling in get none yet."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type").is_in(types_for(season))) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}

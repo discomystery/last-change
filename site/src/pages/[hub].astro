@@ -1,0 +1,43 @@
+---
+// The playoffs page: the bracket, then every series with its latest word. Built only when the season's data has
+// playoff series (the playoff build); the live regular season has no such page.
+import Base from '../layouts/Base.astro';
+import Bracket from '../components/Bracket.astro';
+import { seriesIndex, ROUND_SHORT } from '../lib/series';
+import '../styles/blocks.css';
+
+export async function getStaticPaths() {
+  const { seriesIndex: idx } = await import('../lib/series');
+  return idx ? [{ params: { hub: 'playoffs' } }] : [];
+}
+const base = import.meta.env.BASE_URL;
+const idx = seriesIndex!;
+const rounds = [4, 3, 2, 1].map((r) => ({ r, list: idx.series.filter((s) => s.round === r) })).filter((x) => x.list.length);
+const spring = idx.spring;
+---
+<Base section="games" title={`${spring} Stanley Cup Playoffs`}>
+  <h1 class="page-top">{spring} Stanley Cup Playoffs</h1>
+  <p class="lede">Every series, with a preview before each game and a post-game page after it. Tap a series for how it went.</p>
+  <section class="sec top">
+    <Bracket />
+  </section>
+  {rounds.map(({ r, list }) => (
+    <section class="sec">
+      <header class="sec-head"><h2>{ROUND_SHORT[r]}</h2></header>
+      <ul class="hub">
+        {list.map((s) => (
+          <li class="card row go">
+            <a class="go-link hub-t" href={`${base}series/${s.id}/`}>{s.bottom} vs {s.top}</a>
+            <span class="hub-h">{s.head}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Base>
+<style>
+  .hub { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .hub li { display: grid; gap: 2px; }
+  .hub-t { font: 700 18px var(--ui); text-decoration: none; color: var(--ink); }
+  .hub-h { font: 400 15px var(--body); color: var(--ink-2); }
+</style>

@@ -33,11 +33,11 @@ from functools import lru_cache
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, FULL_SEASONS, GAME_TYPES, RAW, REGULAR, SITE_DATA, TABLES, types_for
 from pipeline.export import penalties, wording
 from pipeline.export import surprises as surprise_rules
 
-SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
+SEASONS = sorted({*FULL_SEASONS, CURRENT_SEASON})  # a set: replaying a full season (pipeline/playoffs) would list it twice
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 PERIODS = {1: "first", 2: "second", 3: "third"}
 ORDINAL = {4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}
@@ -83,7 +83,7 @@ def book() -> tuple[pl.DataFrame, pl.DataFrame, dict[int, str]]:
         d = TABLES / str(s)
         if not (d / "games.parquet").exists():
             continue
-        g = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+        g = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type").is_in(types_for(s))) & pl.col("state").is_in(["OFF", "FINAL"]))
         games.append(g.select("game_id", "season", "date", "home", "away", "home_id", "away_id", "home_score", "away_score", "last_period"))
         if (d / "player_game.parquet").exists():
             rows.append(pl.read_parquet(d / "player_game.parquet", columns=["game_id", "player_id", "team_id", "pos", "sec", "g", "a1", "a2"]))

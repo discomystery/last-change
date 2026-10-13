@@ -1,0 +1,34 @@
+{
+ "source": "NHL game lists, every completed best-of-seven 1997-98 to 2025-26 except the 2020 bubble (405 series)",
+ "states": {
+  "1-0": {
+   "leader_won": 270,
+   "series": 405
+  },
+  "2-0": {
+   "leader_won": 174,
+   "series": 203
+  },
+  "2-1": {
+   "leader_won": 208,
+   "series": 310
+  },
+  "3-0": {
+   "leader_won": 93,
+   "series": 95
+  },
+  "3-1": {
+   "leader_won": 169,
+   "series": 188
+  },
+  "3-2": {
+   "leader_won": 203,
+   "series": 256
+  }
+ },
+ "game7_home": {
+  "won": 60,
+  "games": 111
+ },
+ "since": 1998
+}

@@ -8,7 +8,7 @@ weighted to put home and road games on the same footing (see rink_bias).
 import polars as pl
 
 from pipeline.build.stints import PENALTY_SHOT
-from pipeline.config import REGULAR, TABLES
+from pipeline.config import GAME_TYPES, REGULAR, TABLES, types_for
 from pipeline.metrics import adjust, rink_bias
 from pipeline.metrics.team_game import TEAMMATE_BLOCK
 
@@ -23,7 +23,7 @@ def _sum(expr: pl.Expr, cond: pl.Expr) -> pl.Expr:
 
 def build(season: int) -> pl.DataFrame:
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id", "away_id")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id", "home_id", "away_id")
     roster = pl.read_parquet(d / "players.parquet").select("game_id", "player_id", "team_id", "is_home", "pos")
 
     # Ice time by strength, from stints.

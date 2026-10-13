@@ -13,6 +13,8 @@ import GameFlow from '../../components/GameFlow.astro';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
+import SeriesLine from '../../components/SeriesLine.astro';
+import { seriesOf, otWords } from '../../lib/series';
 import CallCard from '../../components/CallCard.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
 import Explain from '../../components/Explain.astro';
@@ -135,7 +137,8 @@ const outcome = (head: string) => { const t = head.replace(/^We (gave|had) .*?(c
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(r.start));
-const endWord = r.end === 'OT' ? 'Final in overtime' : r.end === 'SO' ? 'Final in a shootout' : 'Final';
+const ots = seriesOf(r.game_id)?.g.ot ?? 1;  // playoff overtimes run 20 minutes each, and can go on
+const endWord = r.end === 'OT' ? `Final in ${otWords(Math.max(1, ots))}` : r.end === 'SO' ? 'Final in a shootout' : 'Final';
 const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–', pending: '…' } as const;
 const graded = r.calls.filter((c) => c.verdict && c.verdict !== 'na' && c.verdict !== 'pending');
@@ -202,7 +205,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />
     <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p></GameTrail>
+    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p><SeriesLine id={r.game_id} when="after" /></GameTrail>
   </section>
 
   <SectionNav items={nav as [string, string][]} />

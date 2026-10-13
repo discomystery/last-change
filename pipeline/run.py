@@ -205,7 +205,7 @@ def check_saved_shifts(season: int) -> dict:
     from pipeline.metrics import xg_model
 
     out = {}
-    for s in [*FULL_SEASONS, season]:
+    for s in sorted({*FULL_SEASONS, season}):
         fetched = nhl.check_saved(s)
         out[s] = len(fetched)
         if fetched and s != season:

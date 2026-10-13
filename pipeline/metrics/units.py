@@ -8,7 +8,7 @@ from collections import defaultdict
 import polars as pl
 
 from pipeline.build.stints import penalty_shot
-from pipeline.config import REGULAR, TABLES
+from pipeline.config import PLAYOFFS, REGULAR, TABLES, types_for
 
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
 WINDOW_GAMES = 10
@@ -19,7 +19,7 @@ DECAY = 0.5  # weight of each older game when choosing lines; tested on 2024-25 
 def game_units(season: int) -> pl.DataFrame:
     """One row per (game, team, forward trio or defense pair): 5v5 seconds together and what happened."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season)))
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
     pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
     acc: dict[tuple, dict] = defaultdict(lambda: defaultdict(float))
@@ -109,9 +109,33 @@ def _by_role(chosen: list[dict], weight: dict[str, tuple[float, float]]) -> list
     return sorted(chosen, key=key)
 
 
+def rest_games(season: int) -> set[tuple[int, int]]:
+    """Only when a season's tables hold playoff games (the playoff test build): regular-season games among a club's
+    last five in which three or more of its 13 busiest skaters sat out. Clubs that have clinched rest their regulars,
+    and those nights are not the lines they will play in the playoffs. Spring 2026: Pittsburgh's final game had none of
+    Crosby, Malkin, Letang, Karlsson or Rust, and its lines had no Crosby in them."""
+    if PLAYOFFS not in types_for(season):
+        return set()
+    d = TABLES / str(season)
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    pg = pl.read_parquet(d / "player_game.parquet", columns=["game_id", "player_id", "team_id", "pos", "sec"]).filter(
+        (pl.col("pos") != "G") & pl.col("game_id").is_in(g["game_id"].to_list()))
+    out = set()
+    for (tid,), t in pg.group_by("team_id"):
+        top = set(t.group_by("player_id").agg(pl.col("sec").sum()).sort("sec", descending=True).head(13)["player_id"].to_list())
+        for gid in sorted(t["game_id"].unique().to_list())[-5:]:
+            dressed = set(t.filter(pl.col("game_id") == gid)["player_id"].to_list())
+            if len(top - dressed) >= 3:
+                out.add((gid, tid))
+    return out
+
+
 def usual(season: int) -> dict[int, dict]:
     """Per team: numbered lines and pairs over the recent window, the last game's groups, and peer ratings."""
     gu = pl.read_parquet(TABLES / str(season) / "game_units.parquet")
+    rested = rest_games(season)
+    if rested:
+        gu = gu.join(pl.DataFrame(list(rested), schema=["game_id", "team_id"], orient="row").cast(gu.select("game_id", "team_id").schema), on=["game_id", "team_id"], how="anti")
     teams = {}
     for (tid,), t in gu.group_by("team_id"):
         dates = t.select("game_id", "date").unique().sort("date", "game_id")
@@ -333,14 +357,15 @@ def special_units(season: int) -> dict[int, dict]:
     """
     seasons = [season - 1, season]
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season)))
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
     stints = pl.read_parquet(d / "stints.parquet")
     have = set(stints["game_id"].unique().to_list())
+    rested = rest_games(season)
     recent = {}
     for tid in set(games["home_id"]) | set(games["away_id"]):
         mine = games.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid)).sort("date", "game_id")["game_id"].to_list()
-        recent[tid] = set([g for g in mine if g in have][-WINDOW_GAMES:])
+        recent[tid] = set([g for g in mine if g in have and (g, tid) not in rested][-WINDOW_GAMES:])
 
     is_d = {r["player_id"]: r["pos"] == "D" for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
     spans = defaultdict(list)  # (team, kind) -> [(seconds, skaters)]
@@ -527,7 +552,7 @@ def matchups(season: int, usual_units: dict[int, dict]) -> dict[int, dict]:
     home coach changes last and so chooses the matchups.
     """
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season)))
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
     pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
     sets = {tid: {u["label"]: {int(x) for x in u["unit"].split("-")} for u in e["units"]} for tid, e in usual_units.items()}
@@ -596,14 +621,15 @@ def pk_roles(season: int) -> dict[int, dict]:
     Spot duty: in 10-40% of kills, at 20+ seconds a kill. "Takes the draw": wins or loses the opening faceoff in at least half the kills he starts.
     """
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season)))
     ids = {g["game_id"]: (g["home_id"], g["away_id"]) for g in games.iter_rows(named=True)}
     stints = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(list(ids))).sort("game_id", "start")
     have = set(stints["game_id"].unique().to_list())
+    rested = rest_games(season)
     recent = {}
     for tid in set(games["home_id"]) | set(games["away_id"]):
         mine = games.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid)).sort("date", "game_id")["game_id"].to_list()
-        recent[tid] = set([g for g in mine if g in have][-WINDOW_GAMES:])
+        recent[tid] = set([g for g in mine if g in have and (g, tid) not in rested][-WINDOW_GAMES:])
     pos = {(r["game_id"], r["player_id"]): r["pos"] for r in pl.read_parquet(d / "players.parquet").iter_rows(named=True)}
     draws = {}
     for e in pl.read_parquet(d / "events.parquet").filter(pl.col("type") == "faceoff").iter_rows(named=True):

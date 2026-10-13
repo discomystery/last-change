@@ -10,7 +10,7 @@ from functools import lru_cache
 import numpy as np
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
+from pipeline.config import GAME_TYPES, CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES, types_for
 from pipeline.metrics import adjust, rink_bias
 
 # name -> (numerator columns, denominator columns, multiplier, higher is "more/better" for the percentile)
@@ -59,7 +59,7 @@ MAX_K = 400.0
 def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     """One row per team per regular-season game with every sum the fingerprint needs."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date", "home_id", "away_id")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id", "date", "home_id", "away_id")
     arena = _arena().select(pl.col("team_id").alias("home_id"), pl.col("hits").alias("f_hits"), pl.col("gives").alias("f_gives"), pl.col("takes").alias("f_takes"))
     games = games.join(arena, on="home_id", how="left").with_columns(pl.col("f_hits", "f_gives", "f_takes").fill_null(1.0))
     stops = _stops(season).join(_stop_rates(), on="score_state", how="left").with_columns(
@@ -116,7 +116,7 @@ def _stops(season: int) -> pl.DataFrame:
     """5-on-5 rows with the attempts that did not get through, each side, put on a common arena footing (some
     buildings record more blocked shots, and home teams are credited with slightly fewer)."""
     d = TABLES / str(season)
-    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id")
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id", "home_id")
     f = _arena().select(pl.col("team_id").alias("home_id"), pl.col("blocks").alias("f_blocks"))
     w = rink_bias.home_road()["blocks"]
     t = (pl.read_parquet(d / "team_game.parquet", columns=["game_id", "team_id", "is_home", "strength", "score_state", "cf", "ff", "ca", "fa"])
@@ -132,7 +132,7 @@ def _icings(season: int) -> pl.DataFrame:
     """5-on-5 seconds and icings per team, game and score (from the team's side). The play-by-play does not say who
     iced it, but the faceoff that follows is always in the icing team's end."""
     d = TABLES / str(season)
-    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id", "away_id")
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id", "home_id", "away_id")
     e = (pl.read_parquet(d / "events.parquet", columns=["game_id", "sort", "type", "team_id", "reason", "zone", "situation_code", "home_score", "away_score"])
          .join(g, on="game_id").sort("game_id", "sort"))
     nxt = lambda c: pl.col(c).shift(-1).over("game_id")
@@ -176,7 +176,7 @@ def _rough(season: int) -> pl.DataFrame:
     0.86-0.94 at three or more), but weighting each call for it ranked teams the same (r 0.99 with the plain rate,
     2025-26) and made the trait less repeatable (split halves r 0.63 against 0.68), so the plain rate is shown."""
     d = TABLES / str(season)
-    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id")
     p = (pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "period_type", "team_id", "pen_type", "pen_desc"])
          .filter((pl.col("type") == "penalty") & (pl.col("period_type") != "SO") & pl.col("pen_type").is_in(["MIN", "MAJ", "MAT"]) & pl.col("pen_desc").is_in(ROUGH))
          .join(g, on="game_id").group_by("game_id", "team_id").agg(rough_n=pl.len().cast(pl.Float64)))

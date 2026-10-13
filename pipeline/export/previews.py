@@ -611,7 +611,7 @@ def _goalie_history() -> "object | None":
         from pipeline.config import CURRENT_SEASON, FULL_SEASONS, TABLES
         from pipeline.metrics import goalies
         fr = []
-        for s in [*FULL_SEASONS, CURRENT_SEASON]:
+        for s in sorted({*FULL_SEASONS, CURRENT_SEASON}):
             if not (TABLES / str(s) / "events.parquet").exists():
                 continue
             g = goalies.per_game(s).filter(pl.col("started"))

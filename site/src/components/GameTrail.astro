@@ -5,6 +5,7 @@ import schedule from '../../public/data/schedule.json';
 import teams from '../../public/data/teams.json';
 import recapIndex from '../../public/data/recaps/index.json';
 import previewIndex from '../../public/data/previews/index.json';
+import { seriesOf, otLabel, ROUND_SHORT } from '../lib/series';
 
 // `part` picks the trail back to the day's games (above the rink) or each team's previous and next game (below it).
 interface Props { id: number; part: 'crumbs' | 'around' }
@@ -17,22 +18,29 @@ const previews = new Set(previewIndex.map((x) => x.id));
 const place = Object.fromEntries(teams.map((t) => [t.abbr, t.place]));
 const day = (d: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(new Date(d + 'T12:00:00Z'));
 const href = (x: (typeof games)[number]) => (x.final && recaps.has(x.id) ? `${base}recap/${x.id}/` : !x.final && previews.has(x.id) ? `${base}preview/${x.id}/` : `${base}games/#${x.date}`);
-const label = (x: (typeof games)[number], me: string) => {
+// Playoff games carry their game number and overtimes ("G3 at OTT, W 3-2 (2OT)").
+type Row = (typeof games)[number] & { game?: number; ot?: number };
+const label = (x: Row, me: string) => {
   const opp = x.home === me ? x.away : x.home;
-  const where = x.home === me ? 'vs' : 'at';
+  const where = (x.game ? `G${x.game} ` : '') + (x.home === me ? 'vs' : 'at');
   if (x.final) {
     const [mine, theirs] = x.home === me ? [x.hs, x.as] : [x.as, x.hs];
-    return `${where} ${opp}, ${mine! > theirs! ? 'W' : 'L'} ${mine}–${theirs}${x.end && x.end !== 'REG' ? ` (${x.end})` : ''}`;
+    const end = x.end === 'OT' && (x.ot ?? 0) > 1 ? otLabel(x.ot!) : x.end;
+    return `${where} ${opp}, ${mine! > theirs! ? 'W' : 'L'} ${mine}–${theirs}${end && end !== 'REG' ? ` (${end})` : ''}`;
   }
   return `${where} ${opp}, ${day(x.date, { weekday: 'short', month: 'short', day: 'numeric' })}`;
 };
+const ser = seriesOf(id);
 const around = [g.away, g.home].map((me) => {
   const mine = games.filter((x) => x.home === me || x.away === me);
   const i = mine.findIndex((x) => x.id === id);
   return { me, prev: mine[i - 1], next: mine[i + 1] };
 });
 ---
-{g && part === 'crumbs' && (
+{g && part === 'crumbs' && ser && (
+  <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}playoffs/`}>Playoffs</a><span aria-hidden="true">›</span><a href={`${base}series/${ser.s.id}/`}>{ROUND_SHORT[ser.s.round]}: {ser.s.top} vs {ser.s.bottom}</a><span aria-hidden="true">›</span><span aria-current="page">Game {ser.g.game}</span></nav>
+)}
+{g && part === 'crumbs' && !ser && (
   <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav>
 )}
 {g && part === 'around' && (
@@ -43,7 +51,7 @@ const around = [g.away, g.home].map((me) => {
         <a class="who tlink" href={`${base}team/${me}/`}>{me}</a>
         <span class="pills">
           {prev ? <a class="pill" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="pill none">First game</span>}
-          {next ? <a class="pill" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="pill none">Last game</span>}
+          {next ? <a class="pill" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="pill none">{ser && ser.s.loser === me && ser.g.id === ser.s.games[ser.s.games.length - 1].id ? 'Season over' : 'Last game'}</span>}
         </span>
       </nav>
     ))}

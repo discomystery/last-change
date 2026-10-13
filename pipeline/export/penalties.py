@@ -29,7 +29,7 @@ from functools import lru_cache
 
 import polars as pl
 
-from pipeline.config import FULL_SEASONS, REGULAR, TABLES
+from pipeline.config import FULL_SEASONS, GAME_TYPES, REGULAR, TABLES, types_for
 
 CALLED = ["MIN", "MAJ", "BEN", "MAT"]
 NOT_CALLED = ["fighting", "instigator"]  # ride along with a fight
@@ -55,7 +55,7 @@ def rows(season: int) -> pl.DataFrame:
     d = TABLES / str(season)
     if not (d / "events.parquet").exists():
         return pl.DataFrame()
-    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+    g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id")
     return (pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "period", "period_type", "sec", "team_id", "p1",
                                                            "pen_type", "pen_desc", "pen_min"])
             .filter((pl.col("type") == "penalty") & (pl.col("pen_type") != "PS") & (pl.col("period_type") != "SO"))

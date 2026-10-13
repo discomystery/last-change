@@ -68,7 +68,7 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
     is worked out the morning of the game or after it."""
     ids = team_ids(season)
     abbr = {v: k for k, v in ids.items()}
-    played = win_model.team_games(FULL_SEASONS + [season])
+    played = win_model.team_games(sorted({*FULL_SEASONS, season}))
     m, out = model(), {}
     try:  # who each team has been dressing: a finished game's own previous lineup, otherwise the latest one
         done = win_model.lineups([season]).select("game_id", "team_id", pl.col("roster").alias("r"))
@@ -273,7 +273,7 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
     ids = team_ids(season)
     say = wording.places(places)
     m = model()
-    df = win_model.pregame(win_model.team_games(FULL_SEASONS + [season])).filter(pl.col("season") == season)
+    df = win_model.pregame(win_model.team_games(sorted({*FULL_SEASONS, season}))).filter(pl.col("season") == season)
     try:
         df = win_model.with_lineups(df, win_model.lineups([season]))
     except Exception:  # no player ratings to value lineups with: show the morning figure only
