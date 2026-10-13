@@ -63,11 +63,12 @@ const title = `${name(s.bottom)} vs. ${name(s.top)}`;
 // together; under 0.6 wins apart it is told as close to even.
 const replayText = (r: Record<string, number>) => {
   const [a, b] = [s.top, s.bottom].sort((x, y) => r[y] - r[x]);
-  const real = `${realWins(s.top)}-${realWins(s.bottom)}`;
   const ahead = s.winner ?? (realWins(s.top) === realWins(s.bottom) ? null : realWins(s.top) > realWins(s.bottom) ? s.top : s.bottom);
-  if (r[a] - r[b] < 0.6) return `Replay every game’s chances and this series comes out close to even (${a} ${r[a].toFixed(1)} wins, ${b} ${r[b].toFixed(1)}); the real games went ${real}.`;
-  if (ahead === null || ahead === a) return `Replay every game’s chances and ${a} still come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, against the real ${real}.`;
-  return `Replay every game’s chances and ${a} come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, but ${ahead} won the games that counted (${real}).`;
+  const hiW = Math.max(realWins(s.top), realWins(s.bottom)), loW = Math.min(realWins(s.top), realWins(s.bottom));
+  const real = ahead ? `${ahead} ${s.winner ? 'won' : 'lead'} ${hiW}-${loW}` : `${hiW}-${loW}`;
+  if (r[a] - r[b] < 0.6) return `Replay every game’s chances and this series comes out close to even (${a} ${r[a].toFixed(1)} wins, ${b} ${r[b].toFixed(1)}); in the real games ${real}.`;
+  if (ahead === null || ahead === a) return `Replay every game’s chances and ${a} still come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, while in the real games ${real}.`;
+  return `Replay every game’s chances and ${a} come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, but ${ahead} won the games that counted: ${real}.`;
 };
 ---
 <Base section="games" title={`${s.bottom} vs ${s.top}: ${ROUND_SHORT[s.round]}`}>
