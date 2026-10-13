@@ -25,6 +25,7 @@ History starts in 2023-24, so records against a team say "since 2023-24".
 
 Everything a preview story reads is from before the game's date, so a rebuilt preview tells it as a live one would.
 """
+import gzip
 import json
 import zlib
 from datetime import date as Date
@@ -32,12 +33,13 @@ from functools import lru_cache
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import penalties, wording
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
 WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 PERIODS = {1: "first", 2: "second", 3: "third"}
+ORDINAL = {4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}
 LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
 
@@ -578,17 +580,61 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
         home = r["team_id"] == home_id
         a_sk, h_sk = int(code[1]), int(code[2])
         mine, theirs = (h_sk, a_sk) if home else (a_sk, h_sk)
-        empty = (code[3] == "0") if not home else (code[0] == "0")  # the other side's goalie off
-        strength = "en" if empty else "pp" if mine > theirs else "sh" if mine < theirs else "ev"
+        ps = code in ("1010", "0101")  # a penalty shot: one shooter against one goalie
+        empty = not ps and ((code[3] == "0") if not home else (code[0] == "0"))  # the other side's goalie off
+        strength = "ps" if ps else "en" if empty else "pp" if mine > theirs else "sh" if mine < theirs else "ev"
         hs, as_ = hs + home, as_ + (not home)
         out.append({"period": r["period"], "sec": r["sec"] - 1200 * (r["period"] - 1), "home": home, "p1": r["p1"], "p2": r["p2"], "p3": r["p3"],
                     "strength": strength, "hs": hs, "as": as_,
                     # the other side had pulled its goalie for an extra attacker (more skaters than the scorers), not
                     # just left the net during a delayed penalty
                     "extra": empty and theirs > mine,
+                    "goalie": r["p1"] in (r["home_goalie"], r["away_goalie"]), "zone": r["zone"],
                     # the scorers' own goalie pulled for an extra attacker
                     "own_extra": ((code[0] == "0") if not home else (code[3] == "0")) and mine > theirs})
     return out
+
+
+def _shootout(gid: int, season: int) -> list[dict]:
+    """Every shootout attempt in order, from the raw play-by-play (our tables leave the shootout out): team id, shooter,
+    scored."""
+    f = RAW / str(season) / "pbp" / f"{gid}.json.gz"
+    if not f.exists():
+        return []
+    out = []
+    for p in json.loads(gzip.open(f).read()).get("plays", []):
+        if (p.get("periodDescriptor") or {}).get("periodType") != "SO":
+            continue
+        d, kind = p.get("details") or {}, p.get("typeDescKey")
+        if kind in ("goal", "shot-on-goal", "missed-shot", "failed-shot-attempt"):
+            pid = d.get("scoringPlayerId") if kind == "goal" else d.get("shootingPlayerId")
+            if pid and d.get("eventOwnerTeamId"):
+                out.append({"tid": d["eventOwnerTeamId"], "pid": pid, "scored": kind == "goal"})
+    return out
+
+
+def _so_winner(tries: list[dict], winner_id: int) -> tuple[int | None, str]:
+    """The shooter of the winner's last shootout goal, and how to tell it: "the only goal of the shootout", "the
+    shootout winner in the seventh round" past the usual three rounds (a round = one shot a side), or "the shootout
+    winner"."""
+    goals = [t for t in tries if t["scored"]]
+    mine = [t for t in goals if t["tid"] == winner_id]
+    if not mine:
+        return None, ""
+    if len(goals) == 1:
+        return mine[-1]["pid"], "the only goal of the shootout"
+    rounds = max(sum(t["tid"] == x for t in tries) for x in {t["tid"] for t in tries})
+    if rounds > 3:
+        return mine[-1]["pid"], f"the shootout winner in the {ORDINAL.get(rounds, f'{rounds}th')} round"
+    return mine[-1]["pid"], "the shootout winner"
+
+
+def _ps_stopped(gid: int, season: int) -> list[dict]:
+    """Penalty shots that did not go in: shooter, goalie, period, seconds into it."""
+    ev = pl.read_parquet(TABLES / str(season) / "events.parquet").filter(
+        (pl.col("game_id") == gid) & pl.col("type").is_in(["shot-on-goal", "missed-shot"]) & pl.col("situation_code").cast(pl.Utf8).is_in(["1010", "0101"]))
+    return [{"p1": r["p1"], "goalie": r["goalie_id"], "period": r["period"], "sec": r["sec"] - 1200 * (r["period"] - 1), "type": r["type"]}
+            for r in ev.sort("sort").iter_rows(named=True)]
 
 
 def _blown(goals: list[dict], winner_home: bool) -> str | None:
@@ -693,10 +739,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         lead_max[away] = max(lead_max[away], -d)
     comeback = lead_max[loser] >= 2
     gl = {x["team"]: x for x in r.get("goalies", []) if x.get("started")}
+    so_pid, so_how = _so_winner(_shootout(gid, season), row["home_id"][0] if winner == home else row["away_id"][0]) if end == "SO" else (None, "")
+    keeper_goals = [g for g in goals if g["goalie"]]  # a goalie scoring: a handful a decade, always the lead
     rb = r.get("replays") or {}
     share = (rb.get("share") or {}).get(winner)
     # headline
     heads = []
+    if keeper_goals:
+        heads.append((98, f"Goalie {last(keeper_goals[0]['p1'])} scores"))
     if hat:
         pid, gs = max(hat, key=lambda x: len(x[1]))
         kinds = {g["strength"] for g in gs}
@@ -717,13 +767,21 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         heads.append((88, f"{_cap(W.the(winner))} come back from {num(lead_max[loser])} down"))
     if end in ("OT", "SO"):
         ot = next((g for g in goals if g["period"] > 3), None)
-        heads.append((80, f"{last(ot['p1'])} wins it in overtime" if ot and end == "OT" else f"{_cap(W.the(winner))} win it in a shootout"))
+        heads.append((80, f"{last(ot['p1'])} wins it in overtime" if ot and end == "OT"
+                      else f"{last(so_pid)} wins it in a shootout" if so_pid else f"{_cap(W.the(winner))} win it in a shootout"))
     if ws - ls >= 4:
         heads.append((75, f"{_cap(W.the(winner))} roll past {W.the(loser)}"))
     heads.append((10, f"{_cap(W.the(winner))} beat {W.the(loser)}"))
     head = max(heads, key=lambda h: h[0])[1]
     # paragraph one: how the goals went
     s1 = []
+    told = set()  # penalty-shot goals already told in another sentence
+
+    def on_ps(g: dict) -> str:
+        if g["strength"] != "ps":
+            return ""
+        told.add(id(g))
+        return " on a penalty shot"
     if goals:
         first = goals[0]
         early3 = next((g for g in goals if abs(g["hs"] - g["as"]) >= 3), None)
@@ -732,11 +790,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             s1.append(f"{_cap(W.the(winner))} had this one put away early.")
         if first["period"] <= 3:  # a lone overtime goal is told once, as the winner
             if first["p1"] in twice:
-                s1.append(f"{name(first['p1'])} scored twice, opening the scoring {_when(first)}.")
+                s1.append(f"{name(first['p1'])} scored twice, opening the scoring{on_ps(first)} {_when(first)}.")
             elif side(first) == loser:  # the headline names the winner, so say whose goal this was
-                s1.append(f"{_cap(W.poss(loser))} {name(first['p1'])} opened the scoring {_when(first)}.")
+                s1.append(f"{_cap(W.poss(loser))} {name(first['p1'])} opened the scoring{on_ps(first)} {_when(first)}.")
             else:
-                s1.append(f"{name(first['p1'])} opened the scoring {_when(first)}.")
+                s1.append(f"{name(first['p1'])} opened the scoring{on_ps(first)} {_when(first)}.")
         pp_two = [pid for pid in twice if all(g["strength"] == "pp" for g in by[pid])]
         more = [p for p in twice if p != first["p1"]][:2]
         if len(more) == 2:
@@ -754,7 +812,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             s1.append(f"{_cap(num(len(scorers)))} different {W.nick.get(winner, winner)} scored.")
         if hat:
             pid, gs = max(hat, key=lambda x: len(x[1]))
-            kinds = [{"ev": "at even strength", "pp": "on the power play", "sh": "shorthanded", "en": "into an empty net"}[g["strength"]] for g in gs]
+            kinds = [{"ev": "at even strength", "pp": "on the power play", "sh": "shorthanded", "en": "into an empty net",
+                      "ps": "on a penalty shot"}[g["strength"]] for g in gs]
             if len(set(kinds)) == len(kinds):
                 s1.append(f"{name(pid)} scored {num(len(gs))}: {_and(['one ' + k for k in kinds])}.")
             else:
@@ -777,14 +836,28 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 else:
                     s1.append(f"The game was tied {'twice' if len(ties) == 2 else num(len(ties)) + ' times'}.")
         s1 += _shape(goals, side, W, name, winner, end)
+        for g in goals:  # penalty shots (eye test, 2026-10-13: Eichel's tying penalty-shot goal went untold)
+            if g["strength"] == "ps" and id(g) not in told and not g["goalie"]:
+                if g["period"] > 3 and end == "OT":
+                    continue  # told as the overtime winner below
+                tied = " to tie it" if g["hs"] == g["as"] else ""
+                s1.append(f"{name(g['p1'])} scored on a penalty shot {_when(g)}{tied}.")
+                told.add(id(g))
+        for x in _ps_stopped(gid, season):
+            if x["type"] == "shot-on-goal" and x["goalie"]:
+                s1.append(f"{name(x['goalie'])} stopped {name(x['p1'])} on a penalty shot {_when(x)}.")
+            else:
+                s1.append(f"{name(x['p1'])} missed the net on a penalty shot {_when(x)}.")
         if end == "OT":
             ot = next((g for g in goals if g["period"] > 3), None)
             if ot:
-                s1.append(f"{name(ot['p1'])} won it {_when(ot)}.")
+                s1.append(f"{name(ot['p1'])} won it{on_ps(ot)} {_when(ot)}.")
         elif end == "REG":  # the winner: the goal that put them one past the loser's final total
             gw = next((g for g in goals if side(g) == winner and (g["hs"] if g["home"] else g["as"]) == ls + 1), None)
             late = gw and gw["period"] == 3 and gw["sec"] >= 1200 - 300
-            how = {"pp": " on the power play", "sh": " shorthanded"}.get(gw["strength"], "") if gw else ""
+            how = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty shot"}.get(gw["strength"], "") if gw else ""
+            if gw and gw["strength"] == "ps":
+                told.add(id(gw))
             when = f"with {_left(gw)} left" if late else _when(gw) if gw else ""
             if gw and gw["p1"] not in said and gw is not goals[0] and ws - ls <= 2:
                 s1.append(f"{name(gw['p1'])} scored the winner{how} {when}.")
@@ -793,8 +866,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         elif end == "SO":
             if s1 and s1[-1].endswith("came all the way back."):
                 s1[-1] = s1[-1][:-1] + ", and won it in the shootout."
+                if so_pid:
+                    s1.append(f"{name(so_pid)} scored {so_how}.")
+            elif so_pid:
+                s1.append(f"{name(so_pid)} scored {so_how} for {W.the(winner)}.")
             else:
                 s1.append(f"{_cap(W.the(winner))} won it in the shootout.")
+    elif end == "SO" and so_pid:  # scoreless after overtime
+        s1.append(f"Nobody scored through overtime, and {name(so_pid)} scored {so_how} for {W.the(winner)}.")
     # A starter was pulled only if a teammate goalie then played: a short night on its own is usually the net left
     # empty for an extra attacker.
     # "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as "pulled" only
@@ -839,7 +918,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             else:
                 s1.append(f"{who(rl)} took over from {who(f)} in net for {W.place(t)}{period_of(rl)}.")
     # Pulling the goalie for an extra attacker and giving up an empty-net goal: name whoever was last in net.
-    en = [g for g in goals if g.get("extra") and side(g) == winner]
+    for g in keeper_goals:  # a goalie's goal is its own sentence, never one of the "made them pay" empty-netters
+        kept = f"{W.nick.get(side(g), side(g))} goalie {name(g['p1'])}"
+        s1.append(f"{kept} scored {'into the empty net ' if g['strength'] == 'en' else ''}{_when(g)}{', shooting it the length of the ice' if g['zone'] == 'D' else ''}.")
+    en = [g for g in goals if g.get("extra") and side(g) == winner and not g["goalie"]]
     if en:
         mine = [x for x in in_net if x["team"] == loser]
         pulled = next((x for x in mine if not x.get("started") and _secs(x.get("toi")) > 0 and not (x.get("came_in") or {}).get("back")), None) \
