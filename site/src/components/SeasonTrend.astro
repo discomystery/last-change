@@ -123,11 +123,24 @@ const levels: { v: number; words: string }[] = t.change
     if (!svg || !src) return;
     const d = JSON.parse(src.textContent || '{}');
     const g: any[] = d.games, n = g.length, win: number = d.window, brk = d.change;
-    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 250 : 280, pinRow = (d.around || []).length > 0;
+    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 250 : 280;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.style.height = `${H}px`;
-    const nt = d.notes || {}, L = 38, R = 10, T = pinRow ? 74 : 48, B = 24, LO = 25, HI = 75;
+    const nt = d.notes || {}, L = 38, R = 10, B = 24, LO = 25, HI = 75;
     const x = (i: number) => L + ((W - L - R) * (i + 0.5)) / n;
+    // Numbered pins (what happened around the change) are fanned out in one row so they never overlap. That row
+    // shares the line with the season names when no pin would touch them, and drops below them when one would.
+    const ar: any[] = d.around || [], gap = 24;
+    const want = ar.map((e) => x(e.i) - (x(1) - x(0)) / 2);
+    const at = want.slice();
+    for (let j = 1; j < at.length; j++) at[j] = Math.max(at[j], at[j - 1] + gap);
+    for (let j = at.length - 1; j >= 0; j--) at[j] = Math.min(at[j], (j === at.length - 1 ? W - R - 10 : at[j + 1] - gap));
+    const cutAt = g.findIndex((r) => r[8] === d.season);
+    const lastRows = nt.last ? [sn(d.season - 1), nt.last.result || ''] : [];
+    const nowRows = cutAt > 0 && nt.now ? [sn(d.season), `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`] : [];
+    const wide = (rows: string[]) => Math.max(0, ...rows.map((r) => r.length * 6.6));
+    const clear = at.every((p) => p - 9 > L + wide(lastRows) + 8 && p + 9 < W - R - wide(nowRows) - 8);
+    const T = !ar.length || clear ? 48 : 74, py = clear ? 22 : T - 18;
     const y = (v: number) => T + ((H - T - B) * (HI - Math.max(LO, Math.min(HI, v)))) / (HI - LO);
     const share = (i: number, j: number) => { let f = 0, a = 0; for (let k = i; k < j; k++) { f += g[k][6]; a += g[k][7]; } return f + a ? (100 * f) / (f + a) : 50; };
     const level = (i: number) => (brk ? (i < brk.k ? brk.before : brk.after) : share(0, n));
@@ -155,11 +168,11 @@ const levels: { v: number; words: string }[] = t.change
     const head = (x0: number, anchor: string, rows: string[]) => rows.forEach((r, j) => {
       if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 17}" text-anchor="${anchor}">${r}</text>`;
     });
-    if (nt.last) head(L, 'start', [sn(d.season - 1), nt.last.result || '']);
+    if (lastRows.length) head(L, 'start', lastRows);
     if (cut > 0) {
       const cx = (x(cut - 1) + x(cut)) / 2;
       o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T}" y2="${H - B}"/>`;
-      if (nt.now) head(W - R, 'end', [sn(d.season), `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
+      if (nowRows.length) head(W - R, 'end', nowRows);
     }
     // Bounces alone: the band around the team's level (before and after the change, when there is one).
     if (n >= win) {
@@ -184,11 +197,6 @@ const levels: { v: number; words: string }[] = t.change
     if (pts.length > 1) o += `<polyline class="tr-line" pathLength="1" points="${pts.join(' ')}"/>`;
     // Numbered pins for what happened around the change, in one row above the plot (fanned out so they never overlap),
     // each with a thin leader down to its date. They match the list under the chart.
-    const ar: any[] = d.around || [], gap = 24, py = T - 18;
-    const want = ar.map((e) => x(e.i) - (x(1) - x(0)) / 2);
-    const at = want.slice();
-    for (let j = 1; j < at.length; j++) at[j] = Math.max(at[j], at[j - 1] + gap);
-    for (let j = at.length - 1; j >= 0; j--) at[j] = Math.min(at[j], (j === at.length - 1 ? W - R - 10 : at[j + 1] - gap));
     let pins = '';
     ar.forEach((e, j) => {
       o += `<path class="tr-pinl" d="M${at[j].toFixed(1)},${py + 9} L${want[j].toFixed(1)},${T} L${want[j].toFixed(1)},${H - B}"/>`;
