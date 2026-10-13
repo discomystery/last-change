@@ -76,19 +76,8 @@
   .fpr .r-s { display: none; }
   html[data-mode='season'] .fpr .r-s { display: inline; }
   html[data-mode='season'] .fpr .r-b { display: none; }
-  .fpr-scale { grid-column: 1 / -1; display: grid; grid-template-columns: 6.2em minmax(0, 1fr) 6.2em; gap: 0 10px; align-items: center; }
-  .fpr-lo, .fpr-hi { font: italic 400 13px/1.2 var(--body); color: var(--ink-2); }
-  /* On wide screens each trait is one line (name, scale, rank) and the groups stack one per row, so the scale keeps its length. */
-  @media (min-width: 900px) {
-    .fpr-groups { grid-template-columns: 1fr; }
-    .fpr > summary { grid-template-columns: 13em minmax(0, 1fr) auto; grid-template-areas: 'name scale rk'; align-items: center; padding: 9px 0; }
-    .fpr-name { grid-area: name; }
-    .fpr-scale { grid-area: scale; grid-column: auto; grid-template-columns: 9.2em minmax(0, 1fr) 9.2em; }
-    .fpr-lo, .fpr-hi { white-space: nowrap; }
-    .fpr-rk { grid-area: rk; justify-content: flex-end; min-width: 3.4em; }
-    /* Two teams (previews): a fixed rank column so every row's scale lines up. */
-    .fpr > summary:has(.fpr-rk > span + span) { grid-template-columns: 13em minmax(0, 1fr) 8.6em; }
-  }
+  .fpr-scale { grid-column: 1 / -1; display: grid; grid-template-columns: 7em minmax(0, 1fr) 7em; gap: 0 10px; align-items: center; }
+  .fpr-lo, .fpr-hi { font: italic 400 13px/1.2 var(--body); color: var(--ink-2); white-space: nowrap; }
   .fpr-lo { text-align: right; }
   .fpr .lanes { display: grid; gap: 5px; padding: 3px 7px; }
   .fpr .lane { display: block; }
@@ -101,7 +90,7 @@
   html[data-mode='season'] .fpr .no-season :is(.dot, .whisk) { visibility: hidden; }
   @media (max-width: 560px) {
     .fpr-grp { padding: 14px 16px 6px; }
-    .fpr-scale { grid-template-columns: 5.4em minmax(0, 1fr) 5.4em; gap: 0 6px; }
+    .fpr-scale { grid-template-columns: 6.7em minmax(0, 1fr) 6.7em; gap: 0 6px; }
     .fpr-lo, .fpr-hi { font-size: 12px; }
   }
   .units2 { align-items: start; }
