@@ -77,7 +77,15 @@
   html[data-mode='season'] .fpr .r-s { display: inline; }
   html[data-mode='season'] .fpr .r-b { display: none; }
   .fpr-scale { grid-column: 1 / -1; display: grid; grid-template-columns: 6.2em minmax(0, 1fr) 6.2em; gap: 0 10px; align-items: center; }
-  .fpr-lo, .fpr-hi { font: italic 400 13px/1.2 var(--body); color: var(--ink-2); }
+  .fpr-lo, .fpr-hi { font: italic 400 13px/1.2 var(--body); color: var(--ink-2); white-space: nowrap; }
+  /* Mock-up: each trait on one line on wide screens (name, scale, rank), one group per row. */
+  @media (min-width: 900px) {
+    html.oneline .fpr-groups { grid-template-columns: 1fr; }
+    html.oneline .fpr > summary { grid-template-columns: 13em minmax(0, 1fr) 3.4em; grid-template-areas: 'name scale rk'; align-items: center; padding: 9px 0; }
+    html.oneline .fpr-name { grid-area: name; }
+    html.oneline .fpr-scale { grid-area: scale; grid-column: auto; }
+    html.oneline .fpr-rk { grid-area: rk; justify-content: flex-end; }
+  }
   .fpr-lo { text-align: right; }
   .fpr .lanes { display: grid; gap: 5px; padding: 3px 7px; }
   .fpr .lane { display: block; }
@@ -90,7 +98,7 @@
   html[data-mode='season'] .fpr .no-season :is(.dot, .whisk) { visibility: hidden; }
   @media (max-width: 560px) {
     .fpr-grp { padding: 14px 16px 6px; }
-    .fpr-scale { grid-template-columns: 5.4em minmax(0, 1fr) 5.4em; gap: 0 6px; }
+    .fpr-scale { grid-template-columns: 6em minmax(0, 1fr) 6em; gap: 0 6px; }
     .fpr-lo, .fpr-hi { font-size: 12px; }
   }
   .units2 { align-items: start; }
