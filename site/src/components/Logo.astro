@@ -1,0 +1,14 @@
+---
+// The Spare Line Change logo, drawn inline so it follows the page's own ink colors in light and dark mode.
+import full from '../assets/logo/full.svg?raw';
+import icon from '../assets/logo/icon.svg?raw';
+interface Props { mark?: boolean; class?: string }
+const { mark = false, class: cls } = Astro.props;
+---
+<span class:list={['logo', mark ? 'logo-mark' : 'logo-full', cls]} set:html={mark ? icon : full} />
+<style is:global>
+  .logo { display: inline-block; line-height: 0; }
+  .logo svg { display: block; height: 100%; width: auto; }
+  .logo .lg-ink { fill: var(--ink); }
+  .logo .lg-soft { fill: var(--ink-3); }
+</style>
