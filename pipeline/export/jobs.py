@@ -28,7 +28,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
-from pipeline.export import pending
+from pipeline.export import pending, wording
 from pipeline.metrics import players as P
 from pipeline.metrics import rink_bias
 
@@ -57,8 +57,8 @@ COUNTS = {
 }
 # What the numbers on a card measure, in words (shown under each job's label).
 UNIT = {"shooting": "shot attempts at 5-on-5", "chances": "expected goals from his own shots at 5-on-5", "hits": "hits", "blocks": "blocked shots",
-        "takeaways": "takeaways", "faceoffs": "faceoffs won", "offImpact": "expected goals per 60 with him on at 5-on-5",
-        "defImpact": "expected goals per 60 allowed with him on at 5-on-5", "pp": "expected goals per 60 on the power play",
+        "takeaways": "takeaways", "faceoffs": "faceoffs won", "offImpact": "his team's expected goals per 60 during his 5-on-5 shifts",
+        "defImpact": "expected goals per 60 allowed during his 5-on-5 shifts", "pp": "expected goals per 60 on the power play",
         "pk": "expected goals per 60 allowed on the penalty kill"}
 RAW_COL = {"hits": "hits", "blocks": "blocks", "takeaways": "takes"}
 LABEL = {"shooting": "Shooting", "chances": "Getting to dangerous spots", "hits": "Hitting", "blocks": "Blocking shots",
@@ -151,10 +151,18 @@ RARE_GOAL = 0.2  # a goal counts as a good night only for a player who scores in
 ROUGH_SHARE, ROUGH_XGA = 0.3, 0.8  # no points while the other team had 70%+ of the 5-on-5 chances, and plenty of them
 
 
-def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> tuple[str | None, str | None]:
+def outchanced(win: str, lose: str, hi: float, lo: float) -> str:
+    """"Carolina outchanced Chicago 1.4 to 0.3 during his 5-on-5 shifts" (Sora, 2026-10-13: "with him on" read as
+    unnatural, and "the chances" never said whose)."""
+    return f"{win} outchanced {lose} {hi:.1f} to {lo:.1f} during his 5-on-5 shifts"
+
+
+def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0,
+               us: str = "his team", them: str = "the other team") -> tuple[str | None, str | None]:
     """What he put on the scoresheet, apart from his usual jobs. A shorthanded goal counts as two points.
     huge: a hat trick or 4+ points. big: 2+ points. good: a goal from a player who rarely scores. rough: no points
-    while the other team had 70%+ of the 5-on-5 chances with him on (0.8+ expected goals against, 10+ minutes).
+    while the other team had 70%+ of the 5-on-5 chances during his shifts (0.8+ expected goals against, 10+ minutes).
+    `us` and `them` name the clubs in the sentence ("Carolina", "Chicago").
     Plus-minus is left out: it counts goals he was on the ice for, however they happened; chances say more."""
     goals = box["g"]
     pts = goals + box["a"] + box.get("sh", 0)
@@ -168,12 +176,15 @@ def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> 
             bits.append({3: "a hat trick"}.get(goals, f"{goals} goals") + (f" ({', '.join(split)})" if len(split) > 1 or box.get("sh") else ""))
     if box["a"]:
         bits.append(f"{box['a']} {'assist' if box['a'] == 1 else 'assists'}")
-    if pts and xg_share is not None and xg_share >= 0.7:
-        bits.append(f"{round(100 * xg_share)}% of the 5-on-5 chances with him on")
+    chances = bool(pts and xg_share is not None and xg_share >= 0.7)
+    if chances:
+        bits.append(outchanced(us, them, box.get("xgf", 0), box.get("xga", 0)))
     rare = goals and pts < 2 and scoring_odds < RARE_GOAL
     if rare:
         bits[0] += f" from a player who scores in about 1 game in {round(1 / scoring_odds)}"
     why = ", ".join(bits)
+    if chances and len(bits) > 1:  # "a goal, 1 assist, and Carolina outchanced Chicago ..."
+        why = ", ".join(bits[:-1]) + ", and " + bits[-1]
     if goals >= 3 or pts >= 4:
         return "huge", why
     if pts >= 2:
@@ -181,7 +192,7 @@ def scoresheet(box: dict, xg_share: float | None, scoring_odds: float = 1.0) -> 
     if rare:
         return "good", why
     if pts == 0 and xg_share is not None and xg_share <= ROUGH_SHARE and box.get("xga", 0) >= ROUGH_XGA:
-        return "rough", f"No points, and {round(100 * (1 - xg_share))}% of the 5-on-5 chances went the other way with him on"
+        return "rough", "No points, and " + outchanced(them, us, box.get("xga", 0), box.get("xgf", 0))
     return None, None
 
 
@@ -387,6 +398,8 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
+    tj = SITE_DATA / "teams.json"
+    places = wording.places({t["abbr"]: t["place"] for t in json.loads(tj.read_text())}) if tj.exists() else {}
     names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
     now = _table(season).join(games.select("game_id", "date", "home_id"), on="game_id").sort("player_id", "date", "game_id")
@@ -431,8 +444,11 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
                 card["box"] |= extras.get((e["game_id"], pid), {"pm": 0, "ev": 0, "pp": 0, "sh": 0})
                 f, a = float(m[i][P.C["on_xgf_adj"]]), float(m[i][P.C["on_xga_adj"]])
                 share = f / (f + a) if m[i][P.C["sec5"]] >= 600 and f + a > 0 else None
-                card["box"] |= {"xgf": round(f, 2), "xga": round(a, 2)}  # 5-on-5, with him on, score-and-venue adjusted
-                card["night"], card["night_why"] = scoresheet(card["box"], share, card.pop("odds"))
+                card["box"] |= {"xgf": round(f, 2), "xga": round(a, 2)}  # 5-on-5, during his shifts, score-and-venue adjusted
+                g = info[e["game_id"]]
+                us = abbr[e["team_id"]]
+                them = g["away"] if us == g["home"] else g["home"]
+                card["night"], card["night_why"] = scoresheet(card["box"], share, card.pop("odds"), places.get(us, us), places.get(them, them))
                 card["pill"] = GRID[card["night"]][card["summary"]]
                 cards[e["game_id"]].append(card)
 
@@ -570,8 +586,8 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
         off = 3600 * (T(team_col) - T(col)) / off_sec
         verb = "created" if higher else "allowed"
         jobs.append(job | {"verdict": grade(v, usual, off, higher), "tonight": f"{v:.1f}", "usual": f"{usual:.1f}", "bench": f"{off:.1f}", "bench_is": "Without him",
-                           "text": f"His team {verb} {v:.1f} expected goals per 60 with him on at 5-on-5. Typical with him on: {usual:.1f}. "
-                                   f"With him off the ice in this game: {off:.1f}."})
+                           "text": f"His team {verb} {v:.1f} expected goals per 60 during his 5-on-5 shifts. His usual: {usual:.1f}. "
+                                   f"With him on the bench in this game: {off:.1f}."})
 
     order = {"pp": 0, "pk": 1}
     jobs.sort(key=lambda j: (j["verdict"] == "na", order.get(j["key"], 2), -(j.get("pct") or 0)))
@@ -586,7 +602,7 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
 
 
 def special_job(key: str, e: dict, sec: float, xg: float, sec_before: float, xg_before: float, league: float, per_game: float, ratio: float) -> dict:
-    """Power play (chances created with him on, higher is better) or penalty kill (chances allowed, lower is better)."""
+    """Power play (chances created during his shifts, higher is better) or penalty kill (chances allowed, lower is better)."""
     pp = key == "pp"
     job = {"key": key, "label": LABEL[key], "why": "role", "pct": None, "per_game": clock(per_game)}
     if sec < MIN_SPECIAL:
@@ -597,10 +613,10 @@ def special_job(key: str, e: dict, sec: float, xg: float, sec_before: float, xg_
     v = 3600 * xg / sec
     if pp:
         text = (f"His team created {v:.1f} expected goals per 60 in his {clock(sec)} on the power play. "
-                f"Typical with him on: {usual:.1f}. Typical power play: {typ_league:.1f}.")
+                f"His usual: {usual:.1f}. Typical power play: {typ_league:.1f}.")
     else:
         text = (f"The other team created {v:.1f} expected goals per 60 in his {clock(sec)} killing penalties. "
-                f"Typical with him on: {usual:.1f}. Against a typical penalty kill: {typ_league:.1f}.")
+                f"His usual: {usual:.1f}. Against a typical penalty kill: {typ_league:.1f}.")
     return job | {"verdict": grade(v, usual, typ_league, pp), "tonight": f"{v:.1f}", "usual": f"{usual:.1f}", "bench": f"{typ_league:.1f}", "bench_is": "League", "text": text}
 
 

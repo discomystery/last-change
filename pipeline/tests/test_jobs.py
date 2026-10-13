@@ -83,6 +83,10 @@ def test_scoresheet_levels():
     assert scoresheet({**box(), "xga": 0.4}, 0.2) == (None, None)  # too few chances either way to call it
     assert scoresheet({**box(a=1), "xga": 1.2}, 0.2) == (None, None)
     assert scoresheet(box(a=1, pm=2), 0.9) == (None, None)
+    # the clubs are named, never "with him on" (Sora, 2026-10-13)
+    big = {**box(g=1, a=1, pp=0), "xgf": 1.4, "xga": 0.3}
+    assert scoresheet(big, 0.83, 1.0, "Carolina", "Chicago") == ("big", "a goal, 1 assist, and Carolina outchanced Chicago 1.4 to 0.3 during his 5-on-5 shifts")
+    assert scoresheet({**box(), "xgf": 0.2, "xga": 1.2}, 0.14, 1.0, "Carolina", "Chicago")[1] == "No points, and Chicago outchanced Carolina 1.2 to 0.2 during his 5-on-5 shifts"
 
 
 def test_grid_never_fully_bails_out_missed_jobs():
