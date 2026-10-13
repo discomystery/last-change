@@ -38,6 +38,15 @@ const base = import.meta.env.BASE_URL;
   @keyframes gf-bump { 0% { transform: scale(1); } 30% { transform: scale(1.7); } 100% { transform: scale(1); } }
   .gf-pp { font: 800 10px var(--ui); letter-spacing: 0.08em; color: #fff; background: var(--c); border-radius: 4px; padding: 2px 5px; opacity: 0; transform: scale(0.6); transition: opacity 0.25s, transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
   .gf-pp.on { opacity: 1; transform: none; }
+  /* Phones: the clock and score share one row with the play button, so everything tightens to fit 360 px. */
+  @media (max-width: 480px) {
+    .gf-bar, .gf-board { gap: 8px; }
+    .gf-board { font-size: 13.5px; min-width: 0; }
+    .gf-clk { width: 5.9em; }
+    .gf-sc { gap: 5px; }
+    .gf-n { font-size: 20px; }
+    .gf-pp { font-size: 9px; padding: 2px 4px; letter-spacing: 0.05em; }
+  }
   .gf-calls { height: 28px; margin-top: 10px; display: flex; gap: 6px; align-items: center; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
   .gf-chip { flex: none; max-width: 340px; overflow: hidden; white-space: nowrap; font: 600 13px var(--ui); padding: 4px 11px; border-radius: 999px; background: var(--track); color: var(--ink); transition: opacity 0.4s; animation: gf-chipin 0.5s cubic-bezier(0.25, 1.2, 0.4, 1); }
   .gf-chip.old { opacity: 0.55; }
