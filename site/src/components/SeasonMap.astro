@@ -1,0 +1,138 @@
+---
+// Results and schedule on the team page: a map that plays the season so far, the next road trip, a trip abroad or the
+// full season (on a globe), beside a list of every game that scrolls in its own box and opens at today. Games are
+// placed where they are played (lib/flights.ts), so the Global Series games land in Europe. Drawn in the browser by
+// lib/seasonMap.ts; the list is there as soon as the page loads, the map once its shapes arrive.
+import teams from '../../public/data/teams.json';
+import schedule from '../../public/data/schedule.json';
+import { teamGames, ELSEWHERE, TEAM_LL, milesRanking, unknownVenues } from '../lib/flights';
+import { teamPaint, matchupPaint } from '../lib/teams';
+
+interface Props { abbr: string; recaps: number[]; previews: number[] }
+const { abbr, recaps, previews } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const team = teams.find((t) => t.abbr === abbr)!;
+const games = teamGames(abbr, schedule.games).map(({ id, date, start, home, away, venue, final, hs, as, end, place }) => ({ id, date, start, home, away, venue, final, hs, as, end, place }));
+const places: Record<string, { ll: [number, number]; city?: string; country: string }> = {};
+for (const t of teams) if (TEAM_LL[t.abbr]) places[t.abbr] = { ll: TEAM_LL[t.abbr], country: 'United States' };
+for (const g of games) if (g.place.startsWith('@')) { const v = ELSEWHERE[g.place.slice(1)]; places[g.place] = { ll: v.ll, city: v.city, country: v.country }; }
+const ranking = milesRanking(teams.map((t) => t.abbr), schedule.games);
+const opp = Object.fromEntries(teams.filter((t) => t.abbr !== abbr).map((t) => [t.abbr, matchupPaint(t.abbr, abbr).away]));
+const data = {
+  team: abbr, place: team.place, base, games, places, opp, recaps, previews,
+  names: Object.fromEntries(teams.map((t) => [t.abbr, t.name])),
+  teamPlaces: Object.fromEntries(teams.map((t) => [t.abbr, t.place])),
+  rank: { n: ranking.findIndex((r) => r.team === abbr) + 1, of: ranking.length },
+};
+// A neutral-site venue we don't know would be drawn at the home club's arena: say so once per build.
+if (abbr === teams[0].abbr) for (const v of unknownVenues(schedule.games)) console.warn(`[season map] venue not in src/data/arenas.json, drawn at the home arena: ${v}`);
+---
+<div class="smap-root" style={`--tc: ${teamPaint(abbr)}`}>
+  <div class="smap"><div class="card sm-list sm-wait"><p class="mini-h">Loading the schedule</p></div></div>
+  <p class="smap-hint">Point at or tap a game to find it on the map. Opponent names open the post-game or the preview.</p>
+  <script type="application/json" set:html={JSON.stringify(data)}></script>
+</div>
+
+<script>
+  import { mountSeasonMap } from '../lib/seasonMap';
+  document.querySelectorAll('.smap-root').forEach((r) => mountSeasonMap(r));
+</script>
+
+<style is:global>
+  .smap-root {
+    container-type: inline-size;
+    --water: light-dark(#e3ebf2, #0b141d); --land: light-dark(#ffffff, #172431); --coast: light-dark(#c3cfda, #2b3b4a);
+  }
+  .smap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 16px; align-items: stretch; }
+  .smap .card { padding: 0; }
+  .smap .sm-map { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
+  .smap .sm-map .pick { margin: 0; flex-wrap: nowrap; }
+  .smap .sm-map .pick select { min-width: 0; flex: 0 1 auto; text-overflow: ellipsis; }
+  .smap .again { margin-left: auto; flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--track); color: var(--ink-2); cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .smap .again:hover { color: var(--ink); background: var(--rule); }
+  .smap .again svg { width: 12px; height: 12px; }
+  .smap .maps { display: grid; }
+  .smap .maps > * { grid-area: 1 / 1; }
+  .smap .maps svg, .smap .map-wait { display: block; width: 100%; aspect-ratio: 1.5; border-radius: 10px; }
+  .smap .map-wait { background: var(--water); }
+  .smap svg.globe { display: none; }
+  .smap .globe-on svg.flat { visibility: hidden; }
+  .smap .globe-on svg.globe { display: block; }
+  .smap .sm-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .smap .sm-stat { background: var(--ice); border-radius: 10px; padding: 8px 10px; display: grid; gap: 1px; min-width: 0; align-content: start; }
+  .smap .sm-stat b { font: 700 19px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+  .smap .sm-stat span { font: 500 12px/1.3 var(--ui); color: var(--ink-3); }
+  .smap .mode-note { font: 500 14px/1.45 var(--ui); color: var(--ink-2); padding: 0 2px; min-height: 2.9em; margin: 0; }
+  .smap .mode-note b { color: var(--ink); }
+
+  .smap .sm-list { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; }
+  .smap .sm-wait { display: block; padding: 18px; grid-column: 1 / -1; }
+  .smap .sl-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--rule); }
+  .smap .sl-h h3 { margin: 0; font-size: 18px; }
+  .smap .sl-h button { font: 600 12.5px var(--ui); color: var(--ink-2); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--rule); }
+  .smap .sl { overflow-y: auto; max-height: 640px; overscroll-behavior: contain; scrollbar-width: thin; position: relative; }
+  .smap .sl ol { list-style: none; margin: 0; padding: 0 6px 10px; }
+  .smap .mo { position: sticky; top: 0; z-index: 2; background: var(--sheet); font: 700 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink); padding: 10px 8px 6px; border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; }
+  .smap .mo span { color: var(--ink-3); font-weight: 600; letter-spacing: 0.02em; text-transform: none; font-size: 12px; }
+  .smap .trip-h { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); padding: 9px 8px 3px; display: flex; gap: 8px; align-items: center; }
+  .smap .trip-h::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+  .smap .r { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 0 10px; align-items: baseline; padding: 6px 8px; border-radius: 8px; font: 500 14px/1.35 var(--ui); }
+  .smap .r .d { color: var(--ink-3); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .smap .r .who { min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; }
+  .smap .r .who .va { color: var(--ink-3); }
+  .smap .r .who a { font-weight: 650; color: var(--oc); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; text-decoration-color: var(--rule); }
+  .smap .r .who a:hover { text-decoration-color: var(--ink-3); }
+  .smap .r .res { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; text-align: right; white-space: nowrap; }
+  .smap .r .res b { color: var(--ink); }
+  .smap .r.road { box-shadow: inset 2px 0 0 color-mix(in oklab, var(--tc) 45%, transparent); border-radius: 0 8px 8px 0; }
+  .smap .r.past { color: var(--ink-2); }
+  .smap .r:hover, .smap .r.hl { background: color-mix(in oklab, var(--tc) 8%, var(--sheet)); }
+  .smap .r.inmode { background: color-mix(in oklab, var(--tc) 5%, var(--sheet)); }
+  .smap .r.now { background: var(--ice); }
+  .smap .today { display: flex; align-items: center; gap: 8px; font: 700 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--tc); padding: 6px 8px; }
+  .smap .today::after { content: ''; height: 1.5px; flex: 1; background: var(--tc); opacity: 0.5; }
+  .smap .pill { font: 600 10px/1 var(--ui); letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 6px 2px; border-radius: 999px; background: var(--track); color: var(--ink-2); white-space: nowrap; }
+  .smap .pill.tn { background: var(--tc); color: var(--sheet); }
+  .smap .pill.vn { background: none; box-shadow: inset 0 0 0 1px var(--rule); }
+  .smap-hint { font: 500 13px var(--ui); color: var(--ink-3); margin: 10px 2px 0; }
+
+  .smap .water { fill: var(--water); }
+  .smap .land { fill: var(--land); stroke: var(--coast); stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-width: 0.8; }
+  .smap .border { fill: none; stroke: var(--coast); }
+  .smap .lg-dot { fill: var(--ink-3); opacity: 0.3; }
+  .smap .leg { fill: none; stroke: var(--tc); stroke-linecap: round; opacity: 0.16; }
+  .smap .leg.fut { opacity: 0.2; }
+  .smap .trail { fill: none; stroke: var(--tc); stroke-linecap: round; }
+  .smap svg.full .trail.fut { opacity: 0.3; }
+  .smap .hl-leg { fill: none; stroke: var(--ink); stroke-linecap: round; opacity: 0; transition: opacity 0.15s; }
+  .smap .hl-leg.on { opacity: 0.85; }
+  .smap .city circle { fill: var(--sheet); stroke: var(--oc, var(--ink-2)); stroke-width: 2; }
+  .smap .city.home circle { fill: var(--tc); stroke: var(--sheet); stroke-width: 2.5; }
+  .smap .city text { font: 700 12px var(--ui); fill: var(--oc, var(--ink)); paint-order: stroke; stroke: var(--land); stroke-width: 4px; stroke-linejoin: round; }
+  .smap .city.home text { fill: var(--tc); }
+  .smap .city.off { opacity: 0.28; }
+  .smap .city.off text { display: none; }
+  .smap .city.on circle { fill: var(--oc, var(--tc)); }
+  .smap .city.on text { font-size: 14px; }
+  .smap .city { transition: opacity 0.3s; }
+  .smap .inset-frame { fill: none; stroke: var(--ink-3); opacity: 0.55; }
+  .smap .inset-border { fill: none; stroke: var(--ink-3); stroke-width: 0.4; opacity: 0.5; }
+  .smap .inset-label { font: 600 7px var(--ui); letter-spacing: 0.07em; fill: var(--ink-3); }
+  .smap .plane path { fill: var(--tc); stroke: var(--sheet); stroke-width: 1.2; }
+  .smap .g-sky { fill: var(--ice); }
+  .smap .g-sphere { fill: var(--water); stroke: var(--coast); stroke-width: 1; }
+  .smap .g-grat { fill: none; stroke: var(--ink-3); stroke-width: 0.5; opacity: 0.14; }
+  .smap .g-land { fill: var(--land); stroke: var(--coast); stroke-width: 0.6; stroke-linejoin: round; }
+  .smap .g-leg { fill: none; stroke: var(--tc); stroke-linecap: round; opacity: 0.25; stroke-dasharray: 2 5; }
+  .smap .g-trail { fill: none; stroke: var(--tc); stroke-linecap: round; }
+  .smap .g-trail.fut { opacity: 0.3; }
+  .smap svg.globe:has(.g-hl) .g-trail { opacity: 0.35; }
+  .smap .g-hl { fill: none; stroke: var(--ink); stroke-linecap: round; opacity: 0.85; }
+
+  @container (max-width: 700px) {
+    .smap { grid-template-columns: minmax(0, 1fr); }
+    .smap .maps svg, .smap .map-wait { aspect-ratio: 1.35; }
+    .smap .sm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .smap .sl { max-height: 460px; }
+  }
+</style>
