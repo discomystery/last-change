@@ -174,7 +174,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
 def availability_update(season: int) -> dict:
     """Game-day rosters and scratches, NHL.com injury news, then who was available to each club each day. Last
     season's game rosters and reports are filled in once, so absences can be studied over a full season."""
-    from pipeline.ingest import game_rosters, status_report, transactions
+    from pipeline.ingest import game_rosters, injuries, status_report, transactions
     from pipeline.metrics import availability
 
     out = {}
@@ -184,6 +184,7 @@ def availability_update(season: int) -> dict:
         if s == season or not status_report.path(s).exists():
             out[f"status_{s}"] = status_report.update(s)
     out["transactions"] = transactions.update(season)  # injured reserve, minors, suspensions: all 32 clubs
+    out["injuries"] = injuries.update(season)  # ESPN's injury list as it stands today, saved day by day
     out["table"] = availability.build(season)
     return out
 

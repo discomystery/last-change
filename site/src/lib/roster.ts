@@ -1,12 +1,13 @@
 // Full rosters and who is out, from roster.json (pipeline/export/roster.py). Words for each status live here so the
-// team page, previews and post-game pages say the same thing. We never say why a player is out unless NHL.com or a
-// roster move did.
+// team page, previews and post-game pages say the same thing. We never say why a player is out unless NHL.com, a
+// roster move or ESPN's injury list did.
 import data from '../../public/data/roster.json';
 
 const files = import.meta.glob('../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
 const byId = new Map<number, any>(Object.values(files).filter((p: any) => p?.id).map((p: any) => [p.id, p]));
 
-// A report with no url is a roster move from the league-wide transactions list (pipeline/ingest/transactions.py).
+// A report with no url is a roster move from the league-wide transactions list (pipeline/ingest/transactions.py); one
+// whose url is ESPN's injuries page comes from ESPN's injury list (pipeline/ingest/injuries.py).
 export type Report = { status: string; injury: string | null; timeline: string | null; date: string; url: string | null };
 export type RosterPlayer = { id: number; name: string; pos: string | null; number: number | null; key?: boolean; status: string; missed: number; last: string | null; report: Report | null };
 export type Row = RosterPlayer & { group: 'F' | 'D' | 'G'; out: boolean; tag: string; tip: string; line: string; toi: number | null; page: boolean };
@@ -26,7 +27,7 @@ const games = (n: number) => `${n} game${n === 1 ? '' : 's'}`;
 export function describe(p: RosterPlayer): { tag: string; tip: string; out: boolean } {
   const r = p.report;
   const missed = (p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '') + (p.last ? ` Last played ${day(p.last)}.` : p.status !== 'no_club' ? ' Has not played this season.' : '');
-  const said = r ? (r.url ? ` NHL.com Status Report, ${day(r.date)}.` : ` Roster move, ${day(r.date)}.`) : '';
+  const said = r ? (!r.url ? ` Roster move, ${day(r.date)}.` : r.url.includes('espn.com') ? ` ESPN injury report, ${day(r.date)}.` : ` NHL.com Status Report, ${day(r.date)}.`) : '';
   // Sent to the minors (a roster move), for a player the club holds but does not list.
   const minors = r?.status === 'assigned' && r.timeline ? r.timeline.replace(/^to /, '') : null;
   switch (p.status) {
