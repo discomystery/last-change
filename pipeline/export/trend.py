@@ -333,7 +333,6 @@ def around(abbr: str, mine: pl.DataFrame, brk: dict | None, lineups: pl.DataFram
     for the club, regulars who missed a long stretch, new regulars, and coaching changes. Never why, never "because"."""
     if not brk:
         return []
-    place = teams.get(abbr, {}).get("place", abbr)
     ids = mine["game_id"].to_list()
     dates = mine["date"].to_list()
     seasons = mine["season"].to_list()
@@ -391,10 +390,16 @@ def around(abbr: str, mine: pl.DataFrame, brk: dict | None, lineups: pl.DataFram
     for j, who in left.items():
         names = [f"{nm} (now with {pl_})" if pl_ else nm for nm, pl_ in who]
         add(j, f"Not back this season: {_and(names)}" if seasons[j] != seasons[j - 1]
-            else f"Played {'their' if len(names) > 1 else 'his'} last game for {place}: {_and(names)}")
+            else f"First game without {_and(names)}")
     for j, who in out_.items():
         for nm, miss, rest in who:
-            add(j, f"{nm} out of the lineup for {'the last ' if rest else ''}{miss} games")
+            # Pinned on the first game he missed, so the words count forward from here.
+            if not rest:
+                add(j, f"First game without {nm}, who missed {miss} in a row")
+            elif seasons[j] == seasons[-1]:
+                add(j, f"First game without {nm}, who has missed every game since ({miss} so far)")
+            else:
+                add(j, f"First game without {nm}, who missed the rest of the season ({miss} games)")
     for j, who in new.items():
         add(j, f"New in the lineup: {_and(who)}")
     if coaches is not None:
