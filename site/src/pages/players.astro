@@ -5,7 +5,7 @@ import teams from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
 import Portrait from '../components/Portrait.astro';
 
-type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null; unplayed?: boolean };
+type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
 const players = [...(index as P[])].sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
 const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 const base = import.meta.env.BASE_URL;
@@ -37,7 +37,7 @@ const base = import.meta.env.BASE_URL;
     {players.map((p) => (
       <li class="card row prow go" data-name={`${p.name} ${p.number ?? ''}`.toLowerCase()} data-team={p.team} data-pos={p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F'}>
         <a class="pname go-link" href={`${base}player/${p.id}/`}>{p.name}</a>
-        <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a>{p.unplayed && ' · Hasn’t played this season'}</span>
+        <span class="pmeta n">{p.number !== null && `#${p.number} · `}{({ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' } as Record<string, string>)[p.pos]} · <a class="tlink" href={`${base}team/${p.team}/`}>{p.team}</a></span>
         <Portrait id={p.id} size={72} class="prow-photo" />
       </li>
     ))}
