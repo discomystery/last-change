@@ -200,7 +200,7 @@ const _ = ordinal;
     <Fragment slot="explain">
       <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
-      <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
+      <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
     <div class="key">
       {order.map((a) => <span class={`t-${side(a)}`}><i></i>{full(a)}</span>)}

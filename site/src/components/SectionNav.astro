@@ -7,17 +7,18 @@
 // under the pinned row (under each name) and under the phone bar (evenly spaced); a puck slides along it with the
 // scroll, the line darkens behind it and each dot fills once its section has been reached. Phones add "Next: ...".
 // Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it.
+import PrefSwitches from './PrefSwitches.astro';
 interface Props { items: [string, string][]; pinned?: boolean }
 const { items, pinned = false } = Astro.props;
 ---
-<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav>
+{pinned ? <div class="secnav-pin"><nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav><div class="secnav-prefs"><PrefSwitches /></div></div> : <Fragment><nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav></Fragment>}
 <div class="secnav-bar">
   <div class="secnav-jumprow">
     <label for="secnav-pick">Jump to</label>
     <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
   </div>
   <div class="secnav-dots"><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></div>
-  <p class="secnav-next" aria-hidden="true"></p>
+  <div class="secnav-foot"><PrefSwitches /><p class="secnav-next" aria-hidden="true"></p></div>
 </div>
 
 <script is:inline>
@@ -105,10 +106,17 @@ const { items, pinned = false } = Astro.props;
   .jump.secnav-pills a { font-weight: 600; color: var(--ink-3); border: 0; background: none; padding: 5px 10px; transition: color 0.2s; }
   .jump.secnav-pills a:hover { color: var(--ink); }
   .jump.secnav-pills a.here { color: var(--ink); }
-  .secnav-pills.pinned {
-    position: sticky; top: 0; z-index: 15; padding-block: 8px 18px;
+  /* The pinned row sits in a frosted strip with the two settings switches at its right once the settings strip at the
+     top of the page has scrolled away (Sora, 2026-10-13). */
+  .secnav-pin {
+    position: sticky; top: 0; z-index: 15; display: flex; align-items: flex-start; gap: 12px; margin: 14px -16px 0; padding-right: 16px;
     background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
+  .secnav-pin .jump.secnav-pills { flex: 1; min-width: 0; margin: 0; padding-block: 8px 18px; }
+  .secnav-prefs { display: none; flex: none; padding-top: 8px; }
+  html.prefs-away .secnav-prefs { display: block; }
+  html.motion.prefs-away .secnav-prefs { animation: secnav-in 0.25s ease-out; }
+  @keyframes secnav-in { from { opacity: 0; translate: 6px 0; } }
   .secnav-line, .secnav-fill { position: absolute; bottom: 7px; height: 2px; border-radius: 1px; background: var(--rule); pointer-events: none; }
   .secnav-fill { background: var(--ink); width: 0; }
   .secnav-tick { position: absolute; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--sheet); box-shadow: inset 0 0 0 1.5px var(--rule); pointer-events: none; }
@@ -118,7 +126,8 @@ const { items, pinned = false } = Astro.props;
   html.motion .secnav-tick { transition: background 0.25s, box-shadow 0.25s; }
   .secnav-bar { display: none; }
   @media (max-width: 719px) {
-    .jump.secnav-pills { display: none; }  /* beats the shared .jump row style, whichever loads last */
+    .jump.secnav-pills { display: none; }
+    .secnav-pin { display: none; }  /* beats the shared .jump row style, whichever loads last */
     .secnav-bar {
       display: block; position: sticky; top: 0; z-index: 15;
       margin: 14px -16px 0; padding: 9px 16px 0; border-bottom: 1px solid transparent; transition: border-color 0.2s;
@@ -132,8 +141,11 @@ const { items, pinned = false } = Astro.props;
       border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer;
     }
     .secnav-dots { position: relative; height: 18px; margin: 4px 4px 0; }
-    .secnav-next { margin: 0; padding: 0 2px 6px; min-height: 1.5em; font: 500 12px var(--ui); color: var(--ink-3); text-align: right; }
-    main [id] { scroll-margin-top: 104px; }
+    /* Switches at the left, "Next" at the right when there is room for it beside them (wider phones). */
+    .secnav-foot { display: flex; align-items: center; gap: 10px; padding: 2px 0 8px; container-type: inline-size; }
+    .secnav-next { flex: 1; min-width: 0; margin: 0; font: 500 12px var(--ui); color: var(--ink-3); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @container (max-width: 400px) { .secnav-next { display: none; } }
+    main [id] { scroll-margin-top: 128px; }
   }
   @media (prefers-reduced-motion: reduce) { .secnav-bar, .jump.secnav-pills a { transition: none; } }
 </style>
