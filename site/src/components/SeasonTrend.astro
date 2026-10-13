@@ -6,6 +6,7 @@
 // last season (open ring) against this season (filled dot), and the franchise's history since 1997-98 behind a fold.
 // The two-season chart is drawn in the browser so its labels stay readable at any width.
 import { fpInfo, ordinal } from '../data/mock';
+import Explain from './Explain.astro';
 interface Props { abbr: string; colour: string; place: string; t: any; window: number; band: [number, number]; season: number }
 const { abbr, colour, place, t, window: win, band, season } = Astro.props;
 const sn = (s: number) => `${s}-${String(s + 1).slice(-2)}`;
@@ -33,27 +34,33 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   <div class="card tr-run">
     <h3 class="tr-head">{t.head}</h3>
     {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
+    <p class="tr-how"><strong>How to read it:</strong> each dot is one game, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play than the other team; below it, less. The line follows their last {win} games.</p>
     <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <p class="tr-key tr-key2">
-      <span class="k-line">Last {win} games</span><span class="k-dot">Each game</span><span class="k-band">What bounces alone do</span><span class="k-avg">Even</span>
-      <span class="k-ref">{t.change ? 'Before and after the change' : 'Each season so far'}</span>
+      <span class="k-line">Last {win} games</span><span class="k-dot">One game</span>
+      <span class="k-band term" tabindex="0" data-tip={`A ${win}-game line moves up and down even when nothing about the team has changed. Inside the band, the move is small enough to be bounces alone; outside it, something more is going on.`}>Normal ups and downs</span>
+      <span class="k-ref">{t.change ? 'Their level before and after the change' : 'Their average each season'}</span>
+      {(t.around ?? []).length > 0 && <span class="k-pin">What else happened (listed below)</span>}
     </p>
     {(t.around ?? []).length > 0 && (
       <div class="tr-around">
-        <p class="mini-h">Around the same time</p>
+        <p class="mini-h">What else happened around {day(t.games[t.change.k][0])}</p>
         <ol>
           {(t.around as { i: number; date: string; text: string[] }[]).map((e, n) => (
             <li><span class="tr-pin">{n + 1}</span><span class="tr-when">{day(e.date)}</span><span>{e.text.join('. ')}.</span></li>
           ))}
         </ol>
-        <p class="tr-caveat">Things that happened near the change date. The numbers can’t say which of them, if any, moved the play.</p>
+        <p class="tr-caveat">These happened near the date the play changed. The numbers can’t say which of them, if any, caused it.</p>
       </div>
     )}
-    <script type="application/json" id="tr-data" set:html={JSON.stringify({ games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
+    <script type="application/json" id="tr-data" set:html={JSON.stringify({ place, games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
   </div>
 
   {traits.length > 0 && <>
-    <h3 class="sub">Then and now</h3>
+    <Explain id="tr-then" title="Then and now">
+      <p>Each card is one part of their style. The open ring is where they ranked last season, the filled dot where they rank this season, and the short tick in the middle is the league average.</p>
+      <p><strong>New this season</strong> means the move is bigger than a few games of bounces would explain. <strong>Carried over</strong> means one of last season’s strongest habits is still there.</p>
+    </Explain>
     <ul class="tr-traits">
       {traits.map((r) => {
         const info = fpInfo[r.key];
@@ -160,13 +167,14 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const seg = (i: number, j: number) => { if (j > i) o += `<line class="tr-ref" x1="${x(i)}" x2="${x(j - 1)}" y1="${y(share(i, j))}" y2="${y(share(i, j))}"/>`; };
       seg(0, lastN);
       if (cut > 0) seg(cut, n);
+      if (lastN > 4) o += `<text class="tr-rl" x="${x(0)}" y="${y(share(0, lastN)) + (share(0, lastN) >= 50 ? -7 : 15)}">${narrow ? '' : `${sn(d.season - 1)} average: `}${Math.round(share(0, lastN))}%</text>`;
     }
     if (brk) {
       const lab = (v: number, words: string, x0: number, x1: number, end: boolean, below: boolean) =>
         `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-rl" x="${end ? x1 : x0}" y="${y(v) + (below ? 15 : -7)}" text-anchor="${end ? 'end' : 'start'}">${words}</text>`;
       const down = brk.after < brk.before;
-      o += lab(brk.before, `${Math.round(brk.before)}% before`, x(0), x(brk.k - 1), false, !down);
-      o += lab(brk.after, `${Math.round(brk.after)}% since ${day(g[brk.k][0])}`, x(brk.k), x(n - 1), true, down);
+      o += lab(brk.before, `Before: ${Math.round(brk.before)}%`, x(0), x(brk.k - 1), false, !down);
+      o += lab(brk.after, `Since ${day(g[brk.k][0])}: ${Math.round(brk.after)}%`, x(brk.k), x(n - 1), true, down);
     }
     const pts: string[] = [];
     for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
@@ -193,6 +201,16 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const tip = `${day(r[0])} ${r[2] ? 'vs' : 'at'} ${r[1]}, ${res} ${r[3]}-${r[4]}: ${t ? Math.round((100 * r[6]) / t) : 50}% of the chances${i >= win - 1 ? `; ${Math.round(share(i - win + 1, i + 1))}% over the last ${win}` : ''}`;
       o += `<rect class="tr-hit" x="${(L + step * i).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${H - T - B}" data-tip="${tip}"/>`;
     });
+    // Which way is good, written into the chart: up means more of the play, down less (the 50% line says Even). The
+    // top label moves to the right end, or goes, when the numbered pins would sit on it.
+    const dir = (txt: string, v: number, avoid: number[]) => {
+      const w = txt.length * 6.6, fits = (a: number, b: number) => !avoid.some((q) => q > a - 12 && q < b + 12);
+      if (fits(L + 6, L + 6 + w)) o += `<text class="tr-dir" x="${L + 6}" y="${y(v) + 4}">${txt}</text>`;
+      else if (fits(W - R - 6 - w, W - R - 6)) o += `<text class="tr-dir" x="${W - R - 6}" y="${y(v) + 4}" text-anchor="end">${txt}</text>`;
+    };
+    dir(narrow ? '▲ They had more' : `▲ ${d.place} had more of the chances`, 72, placed.map(([q]) => q));
+    dir('▼ The other team had more', 28, []);
+    o += `<text class="tr-rl tr-evl" x="${W - R}" y="${y(50) - 6}" text-anchor="end">Even</text>`;
     o += pins;
     svg.innerHTML = o;
   }
@@ -224,6 +242,10 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-ax { display: flex; justify-content: space-between; margin: 6px 0 0; font: 500 12px var(--ui); color: var(--ink-3); }
   .tr-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
   .tr-key > span { white-space: nowrap; }
+  .k-pin::before { content: '1'; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 6px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 9.5px var(--ui); vertical-align: 1px; }
+  .tr-how { font: 400 15px/1.5 var(--ui); color: var(--ink-2); margin: 0 0 14px; max-width: 80ch; }
+  .tr-how strong { color: var(--ink); font-weight: 600; }
+  .tr-svg .tr-dir { font: 600 10.5px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--ink-3); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
   :is(.k-miss, .k-made, .k-deep, .k-cup, .k-line)::before { content: ''; display: inline-block; vertical-align: -1px; margin-right: 6px; }
   :is(.k-miss, .k-made, .k-deep)::before { width: 10px; height: 12px; border-radius: 2px 2px 0 0; }
   .k-miss::before { background: var(--track); }
@@ -231,6 +253,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .k-deep::before { background: var(--team); }
   .k-cup::before { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); vertical-align: 1px; }
   .k-line::before { width: 20px; height: 3px; border-radius: 2px; background: var(--team); vertical-align: 3px; }
+  .tr-key2 .k-ref::before { width: 18px; height: 0; border-left: 0; border-top: 2px dotted var(--ink); vertical-align: 3px; }
   .tr-key2 .k-dot::before { opacity: 0.35; width: 8px; height: 8px; }
   /* The two-season chart. */
   .tr-run { padding: 22px 24px 16px; }
