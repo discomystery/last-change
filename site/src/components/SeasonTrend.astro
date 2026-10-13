@@ -203,7 +203,6 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
 
 <style is:global>
   .trend { --team: var(--tc); }
-  @media (prefers-color-scheme: dark) { .trend { --team: color-mix(in oklab, var(--tc) 55%, white); } }
     .tr-head { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 10px; text-wrap: balance; }
   .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; max-width: 70ch; }
   .tr-hist { margin-top: 26px; }

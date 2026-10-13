@@ -177,7 +177,7 @@ const coachSince = coach && (team as any).coach_since
         <p>Then and now puts each style trait last season beside this season. A trait counts as new once the season has enough games to read it, the two are at least 25 percentile points apart, and last season sits outside this season’s likely range. Tested on 2024-25 and 2025-26, about three in four changes flagged seven games in were still there at the end of the season.</p>
         <p>The history columns are every season since 1997-98 from the NHL’s records: how many of the available points the franchise took, and how far it went in the playoffs.</p>
       </Fragment>
-      <SeasonTrend abbr={abbr!} colour={teamColour(abbr!)} place={team.place} t={trend.t} window={trend.window} band={trend.band} season={trend.season} />
+      <SeasonTrend abbr={abbr!} colour={teamPaint(abbr!)} place={team.place} t={trend.t} window={trend.window} band={trend.band} season={trend.season} />
     </Section>
   )}
 
