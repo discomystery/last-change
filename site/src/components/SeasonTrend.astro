@@ -29,11 +29,15 @@ const ariaLong = `${place}: playoffs in ${made} of ${hist.length} seasons since 
 type Trait = { key: string; tag: 'new' | 'kept'; then: { pct: number; rank: number }; now: { pct: number; rank: number } };
 const traits = (t.traits as Trait[]).filter((r) => fpInfo[r.key]);
 const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
+// The chart's two levels as plain figures under it, so the plot itself carries no number labels.
+const levels: { v: number; words: string }[] = t.change
+  ? [{ v: Math.round(t.change.before), words: `of the chances before ${day(t.games[t.change.k][0])}` }, { v: Math.round(t.change.after), words: 'since then' }]
+  : [t.notes?.last && { v: Math.round(t.notes.last.share), words: `of the chances in ${sn(season - 1)}` }, t.notes?.now && { v: Math.round(t.notes.now.share), words: `so far in ${sn(season)}` }].filter(Boolean) as any;
 ---
 <div class="trend" style={`--tc:${colour}`}>
   <div class="card tr-run">
     <Explain id="tr-how" title={t.head} class="tr-head">
-      <p><strong>Dots:</strong> one game each, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play; below it, the other team did.</p>
+      <p><strong>Dots</strong> (on wider screens)<strong>:</strong> one game each, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play; below it, the other team did.</p>
       <p><strong>Thick line:</strong> a running average, their share over each game and the {win - 1} before it, so one odd night doesn’t throw it.</p>
       <p><strong>Hatched band:</strong> how far that average wanders on bounces alone. Inside it, nothing has to have changed.</p>
       <p><strong>Dotted lines:</strong> their level before and after the play changed, or each season’s average when it didn’t.</p>
@@ -41,8 +45,9 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     </Explain>
     {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
     <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
+    <div class="tr-levels">{levels.map((l) => <p><strong>{l.v}%</strong><span>{l.words}</span></p>)}</div>
     <p class="tr-key tr-key2">
-      <span class="k-line">{win}-game average</span><span class="k-dot">One game</span>
+      <span class="k-line">{win}-game average</span><span class="k-dot tr-wide">One game</span>
       <span class="k-band term" tabindex="0" data-tip={`How far a ${win}-game average wanders on bounces alone. Inside it, nothing has to have changed.`}>Bounce range</span>
       <span class="k-ref">{t.change ? 'Before and after' : 'Season average'}</span>
     </p>
@@ -118,10 +123,10 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     if (!svg || !src) return;
     const d = JSON.parse(src.textContent || '{}');
     const g: any[] = d.games, n = g.length, win: number = d.window, brk = d.change;
-    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 230 : 270;
+    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 250 : 280, pinRow = (d.around || []).length > 0;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.style.height = `${H}px`;
-    const nt = d.notes || {}, L = 38, R = 10, T = 48, B = 24, LO = 25, HI = 75;
+    const nt = d.notes || {}, L = 38, R = 10, T = pinRow ? 74 : 48, B = 24, LO = 25, HI = 75;
     const x = (i: number) => L + ((W - L - R) * (i + 0.5)) / n;
     const y = (v: number) => T + ((H - T - B) * (HI - Math.max(LO, Math.min(HI, v)))) / (HI - LO);
     const share = (i: number, j: number) => { let f = 0, a = 0; for (let k = i; k < j; k++) { f += g[k][6]; a += g[k][7]; } return f + a ? (100 * f) / (f + a) : 50; };
@@ -129,7 +134,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     let o = `<defs><pattern id="tr-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect class="tr-hatch" width="3" height="6"/></pattern></defs>`;
     for (const v of [30, 50, 70]) {
       if (v !== 50) o += `<line class="tr-grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
-      o += `<text class="tr-yl" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}%</text>`;
+      o += `<text class="tr-yl${v === 50 ? ' tr-ye' : ''}" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v === 50 ? 'Even' : `${v}%`}</text>`;
     }
     // Months along the bottom, thinned on phones; the season break as a dotted line with each season named above.
     let lastM = '', lastX = -99;
@@ -153,7 +158,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     if (nt.last) head(L, 'start', [sn(d.season - 1), nt.last.result || '']);
     if (cut > 0) {
       const cx = (x(cut - 1) + x(cut)) / 2;
-      o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T - 6}" y2="${H - B}"/>`;
+      o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T}" y2="${H - B}"/>`;
       if (nt.now) head(W - R, 'end', [sn(d.season), `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
     }
     // Bounces alone: the band around the team's level (before and after the change, when there is one).
@@ -163,40 +168,31 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       o += `<polygon class="tr-band" points="${top.concat(bot).join(' ')}"/>`;
     }
     o += `<line class="tr-even" x1="${L}" x2="${W - R}" y1="${y(50)}" y2="${y(50)}"/>`;
-    g.forEach((r, i) => { const t = r[6] + r[7]; if (t > 0) o += `<circle class="tr-g" cx="${x(i).toFixed(1)}" cy="${y((100 * r[6]) / t).toFixed(1)}" r="${narrow ? 2.5 : 3}"/>`; });
+    if (!narrow) g.forEach((r, i) => { const t = r[6] + r[7]; if (t > 0) o += `<circle class="tr-g" cx="${x(i).toFixed(1)}" cy="${y((100 * r[6]) / t).toFixed(1)}" r="${narrow ? 2.5 : 3}"/>`; });
     if (!brk) {
       // No change found: each season's level as a dotted line, the number it stands for written at the top.
       const seg = (i: number, j: number) => { if (j > i) o += `<line class="tr-ref" x1="${x(i)}" x2="${x(j - 1)}" y1="${y(share(i, j))}" y2="${y(share(i, j))}"/>`; };
       seg(0, lastN);
       if (cut > 0) seg(cut, n);
-      const avg = (i: number, j: number, end: boolean) => { const v = share(i, j); o += `<text class="tr-rl" x="${end ? x(j - 1) : x(i)}" y="${y(v) + (v >= 50 ? -7 : 15)}" text-anchor="${end ? 'end' : 'start'}">${pct(v)}</text>`; };
-      if (lastN > 4) avg(0, lastN, false);
-      if (cut > 0 && n - cut > 0) avg(cut, n, true);
     }
     if (brk) {
-      const lab = (v: number, words: string, x0: number, x1: number, end: boolean, below: boolean) =>
-        `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-rl" x="${end ? x1 : x0}" y="${y(v) + (below ? 15 : -7)}" text-anchor="${end ? 'end' : 'start'}">${words}</text>`;
-      const down = brk.after < brk.before;
-      o += lab(brk.before, `Before ${Math.round(brk.before)}%`, x(0), x(brk.k - 1), false, !down);
-      o += lab(brk.after, `Since ${day(g[brk.k][0])} ${Math.round(brk.after)}%`, x(brk.k), x(n - 1), true, down);
+      const ref = (v: number, x0: number, x1: number) => `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/>`;
+      o += ref(brk.before, x(0), x(brk.k - 1)) + ref(brk.after, x(brk.k), x(n - 1));
     }
     const pts: string[] = [];
     for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
     if (pts.length > 1) o += `<polyline class="tr-line" pathLength="1" points="${pts.join(' ')}"/>`;
-    // Numbered pins for what happened around the change, matching the list under the chart.
-    (d.around || []).forEach((e: any, j: number) => {
-      const px = x(e.i) - (x(1) - x(0)) / 2;
-      o += `<line class="tr-pinl" x1="${px}" x2="${px}" y1="${T}" y2="${H - B}"/>`;
-    });
+    // Numbered pins for what happened around the change, in one row above the plot (fanned out so they never overlap),
+    // each with a thin leader down to its date. They match the list under the chart.
+    const ar: any[] = d.around || [], gap = 24, py = T - 18;
+    const want = ar.map((e) => x(e.i) - (x(1) - x(0)) / 2);
+    const at = want.slice();
+    for (let j = 1; j < at.length; j++) at[j] = Math.max(at[j], at[j - 1] + gap);
+    for (let j = at.length - 1; j >= 0; j--) at[j] = Math.min(at[j], (j === at.length - 1 ? W - R - 10 : at[j + 1] - gap));
     let pins = '';
-    const placed: [number, number][] = [];
-    (d.around || []).forEach((e: any, j: number) => {
-      const px = x(e.i) - (x(1) - x(0)) / 2;
-      let stack = 0; // pins close together stack downward, each on the first free level
-      while (placed.some(([q, l]) => l === stack && Math.abs(q - px) < 20)) stack++;
-      placed.push([px, stack]);
-      const py = T + 10 + stack * 21;
-      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${px}" cy="${py}" r="9"/><text x="${px}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
+    ar.forEach((e, j) => {
+      o += `<path class="tr-pinl" d="M${at[j].toFixed(1)},${py + 9} L${want[j].toFixed(1)},${T} L${want[j].toFixed(1)},${H - B}"/>`;
+      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${at[j].toFixed(1)}" cy="${py}" r="9"/><text x="${at[j].toFixed(1)}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
     });
     // One tall hover target per game, read by the site's tooltip.
     const step = (W - L - R) / n;
@@ -205,16 +201,9 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const tip = `${day(r[0])} ${r[2] ? 'vs' : 'at'} ${r[1]}, ${res} ${r[3]}-${r[4]}: ${t ? Math.round((100 * r[6]) / t) : 50}% of the chances${i >= win - 1 ? `; ${Math.round(share(i - win + 1, i + 1))}% over the last ${win}` : ''}`;
       o += `<rect class="tr-hit" x="${(L + step * i).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${H - T - B}" data-tip="${tip}"/>`;
     });
-    // Which way is good, written into the chart: up means more of the play, down less (the 50% line says Even). The
-    // top label moves to the right end, or goes, when the numbered pins would sit on it.
-    const dir = (txt: string, v: number, avoid: number[]) => {
-      const w = txt.length * 6.6, fits = (a: number, b: number) => !avoid.some((q) => q > a - 12 && q < b + 12);
-      if (fits(L + 6, L + 6 + w)) o += `<text class="tr-dir" x="${L + 6}" y="${y(v) + 4}">${txt}</text>`;
-      else if (fits(W - R - 6 - w, W - R - 6)) o += `<text class="tr-dir" x="${W - R - 6}" y="${y(v) + 4}" text-anchor="end">${txt}</text>`;
-    };
-    dir(narrow ? '▲ Their edge' : `▲ ${d.place}’s edge`, 72, placed.map(([q]) => q));
-    dir('▼ Opponents’ edge', 28, []);
-    o += `<text class="tr-rl tr-evl" x="${W - R}" y="${y(50) - 6}" text-anchor="end">Even</text>`;
+    // Which way is good, written into the chart: up means more of the play, down less, and the 50% line is even.
+    o += `<text class="tr-dir" x="${L + 6}" y="${y(72) + 4}">▲ ${narrow ? 'Their' : `${d.place}’s`} edge</text>`;
+    o += `<text class="tr-dir" x="${L + 6}" y="${y(28) + 4}">▼ Opponents’ edge</text>`;
     o += pins;
     svg.innerHTML = o;
   }
@@ -266,6 +255,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-svg .tr-sl { font: 700 12px var(--ui); letter-spacing: 0.07em; fill: var(--ink); }
   .tr-svg .tr-note { font: 500 12px var(--ui); fill: var(--ink-2); }
   .tr-svg .tr-rl { font: 600 12px var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
+  .tr-svg .tr-ye { font-weight: 700; fill: var(--ink-2); }
   .tr-grid { stroke: var(--rule); stroke-width: 1; }
   .tr-even { stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 2; }
   .tr-break { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 1.5 4; stroke-linecap: round; }
@@ -275,10 +265,13 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-line { fill: none; stroke: var(--team); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
   .tr-ref { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 1.5 5; stroke-linecap: round; }
   .tr-hit { fill: transparent; }
-  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.16; stroke-width: 1; }
+  .tr-pinl { fill: none; stroke: var(--ink); stroke-opacity: 0.2; stroke-width: 1; }
   .tr-pinm circle { fill: var(--ink); }
   .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
   .tr-pinm { cursor: default; }
+  .tr-levels { display: flex; flex-wrap: wrap; gap: 8px 36px; margin: 14px 0 0; }
+  .tr-levels p { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 400 14px/1.35 var(--ui); color: var(--ink-2); }
+  .tr-levels strong { font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); }
   .tr-around { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
   .tr-around .mini-h { margin: 0 0 10px; }
   .tr-around ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -302,7 +295,12 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-note { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
   @media (max-width: 719px) {
     .tr-long { padding: 18px 16px; }
-    .tr-run { padding: 14px 12px 12px; }
+    .tr-run { padding: 16px 14px 14px; }
+    .tr-wide { display: none; }
+    .tr-levels { gap: 6px 24px; }
+    .tr-around li { grid-template-columns: 22px 1fr; font-size: 14.5px; }
+    .tr-around .tr-when { grid-column: 2; }
+    .tr-around li > span:last-child { grid-column: 2; }
     .tr-cols { height: 120px; gap: 1px; }
   }
 </style>
