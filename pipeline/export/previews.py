@@ -1042,7 +1042,7 @@ def projected_starters(g: dict, likely: dict, rebuilt: bool = False) -> dict[str
     else our own guess when it is fairly sure ("model"). Never the chance itself."""
     from pipeline.config import CURRENT_SEASON
     from pipeline.ingest import nhl_previews
-    nhl = nhl_previews.projected(CURRENT_SEASON, g["id"], g["date"] if rebuilt else None)
+    nhl = nhl_previews.projected(CURRENT_SEASON, g["id"], _iso(g["start"]) if rebuilt else None)
     out = {}
     for t in (g["away"], g["home"]):
         ranked = likely.get(t) or []
@@ -1063,7 +1063,7 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     away, home = g["away"], g["home"]
     fp = site["fingerprints"]["teams"]
     if likely is None:
-        likely = _likely([g], g["date"]).get(g["id"]) or {}
+        likely = _likely([g], g["date"], nhl_before=_iso(g["start"])).get(g["id"]) or {}
     rest = rest_days(sched, g)
     rested = [t for t in (away, home) if rest.get(t, {}).get("days", 0) >= 1 and any(rest.get(o, {}).get("days") == 0 for o in (away, home) if o != t)]
     # date-based cuts take the game's local date: a late start falls on the next UTC day, and the start's date would
@@ -1107,11 +1107,20 @@ def write_index(out_dir) -> int:
     return len(index)
 
 
-def _likely(games: list[dict], before: str | None = None) -> dict[int, dict]:
-    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them."""
+def _iso(start: str) -> str:
+    """A schedule start ("2026-10-10T23:00:00Z") in the form NHL.com finds are stamped with ("...+00:00")."""
+    return start.replace("Z", "+00:00")
+
+
+def _likely(games: list[dict], before: str | None = None, nhl_before: str | None = None) -> dict[int, dict]:
+    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them.
+    A rebuilt preview may use an NHL.com projection found before the game's puck drop (`nhl_before`), as a live
+    preview that morning would have (eye test, 2026-10-13: it had Woll, Varlamov, Fowler, Ersson, Murashov and Talbot
+    right where our own guess missed)."""
     try:
         from pipeline.metrics import starters
-        return starters.upcoming(games, before=before)
+        nhl = starters.nhl_picks(games, before=nhl_before) if nhl_before else None
+        return starters.upcoming(games, before=before, nhl=nhl)
     except Exception as e:
         print(f"likely starters unavailable: {e!r}")
         return {}
