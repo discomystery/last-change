@@ -162,7 +162,8 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
 WEAK_COUNTER = 0.5  # reasons for the other side that add up to under half of the main ones are told as "even though"
 
 
-def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
+def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None,
+         playoff: bool = False) -> str:
     """Plain reasons, from the model's own breakdown, as one sentence: the reasons that help one side first (biggest
     first, Sora 2026-10-12: chance control matters more than home ice), then "but" and the ones that help the other.
     Clauses about the same team share its name once. When the two are even at out-chancing opponents, that is said
@@ -193,7 +194,9 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         tired = opp if s["b2b"] > 0 else team
         facts.append((abs(s["b2b"]), other[tired], tired, "is on the second night of a back-to-back",
                       "are on the second night of a back-to-back"))
-    facts.append((abs(s.get("home", 0.0)), home, home, "has home-ice advantage", "have home-ice advantage"))
+    # in a series "home-ice advantage" reads as the series' home ice, which may be the other team's: say tonight's building
+    facts.append((abs(s.get("home", 0.0)), home, home, *(("is at home tonight", "are at home tonight") if playoff else
+                                                         ("has home-ice advantage", "have home-ice advantage"))))
     facts.sort(key=lambda f: -f[0])
     first = facts[0][1]
     groups = [[f for f in facts if f[1] == first], [f for f in facts if f[1] != first]]
@@ -263,7 +266,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {"T": places[team], "O": places[opp], "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
-                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
+                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, str(gid)[4:6] == "03"), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
     return out
 
 

@@ -15,7 +15,7 @@ from functools import lru_cache
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, RAW, REGULAR, TABLES
+from pipeline.config import CURRENT_SEASON, RAW, REGULAR, TABLES, types_for
 from pipeline.ingest import careers
 
 OWN_FROM = careers.OWN_FROM
@@ -25,11 +25,11 @@ GOOD = (6, 0.75)  # starts and win share before "is 7-1-1 there"
 
 
 def _box_starts(season: int) -> list[dict]:
-    """Every regular-season start in our saved boxscores for one season."""
+    """Every start in our saved boxscores for one season (regular season; playoffs too in a playoff build)."""
     d = TABLES / str(season) / "games.parquet"
     if not d.exists():
         return []
-    games = pl.read_parquet(d).filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+    games = pl.read_parquet(d).filter(pl.col("game_type").is_in(types_for(season)) & pl.col("state").is_in(["OFF", "FINAL"]))
     out = []
     for g in games.iter_rows(named=True):
         p = RAW / str(season) / "box" / f"{g['game_id']}.json.gz"

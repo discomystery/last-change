@@ -58,6 +58,17 @@ const roundWord = (r: number) => ({ 1: 'first round', 2: 'second round', 3: 'con
 const realWins = (t: string) => done.filter((g) => g.winner === t).length;
 const nav: [string, string][] = [['series', 'The series'], ['games', 'Game by game'], ['calls', 'The calls'], ['before', 'Before Game 1'], ['players', 'Scorers and goalies']];
 const title = `${name(s.bottom)} vs. ${name(s.top)}`;
+// Run it back over a series, in words: each game's replay share summed into wins. One game's replay is pulled toward
+// even (a team that has 85% of a game's chances wins it about 70% of the time), so a series' totals sit close
+// together; under 0.6 wins apart it is told as close to even.
+const replayText = (r: Record<string, number>) => {
+  const [a, b] = [s.top, s.bottom].sort((x, y) => r[y] - r[x]);
+  const real = `${realWins(s.top)}-${realWins(s.bottom)}`;
+  const ahead = s.winner ?? (realWins(s.top) === realWins(s.bottom) ? null : realWins(s.top) > realWins(s.bottom) ? s.top : s.bottom);
+  if (r[a] - r[b] < 0.6) return `Replay every game’s chances and this series comes out close to even (${a} ${r[a].toFixed(1)} wins, ${b} ${r[b].toFixed(1)}); the real games went ${real}.`;
+  if (ahead === null || ahead === a) return `Replay every game’s chances and ${a} still come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, against the real ${real}.`;
+  return `Replay every game’s chances and ${a} come out ahead, about ${r[a].toFixed(1)} wins to ${r[b].toFixed(1)}, but ${ahead} won the games that counted (${real}).`;
+};
 ---
 <Base section="games" title={`${s.bottom} vs ${s.top}: ${ROUND_SHORT[s.round]}`}>
   <style is:inline set:html={colourCss}></style>
@@ -81,7 +92,7 @@ const title = `${name(s.bottom)} vs. ${name(s.top)}`;
     <GameStory story={{ kicker: s.winner ? 'How it went' : 'So far', head: s.story.head, paras: s.story.paras, list_head: 'The series in numbers',
       items: [
         ...(topShare !== null ? [{ tag: '5-on-5 chances', text: `${s.top} ${Math.round(100 * topShare)}% · ${s.bottom} ${Math.round(100 * (1 - topShare))}%` }] : []),
-        ...(s.replay ? [{ tag: 'Run it back', text: `Replaying each game’s chances: ${s.top} ${s.replay[s.top].toFixed(1)} wins, ${s.bottom} ${s.replay[s.bottom].toFixed(1)}, against the real ${realWins(s.top)}-${realWins(s.bottom)}.` }] : []),
+        ...(s.replay ? [{ tag: 'Run it back', text: replayText(s.replay) }] : []),
         ...(nCalls ? [{ tag: 'Preview calls', text: `${s.tally.held ?? 0} of ${nCalls} held up, ${s.tally.partly ?? 0} partly.` }] : []),
       ] }} />
   </section>

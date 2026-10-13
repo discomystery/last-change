@@ -139,7 +139,7 @@ def add_to_preview(snap: dict, g: dict, sched: list[dict], season: int) -> dict:
     # The header's records stay the regular season's; the series score is shown beside them.
     snap["pregame"]["records"] = regular_records(sched, (g["away"], g["home"]))
     if snap.get("story"):
-        snap["story"] = series_story(snap["story"], st, g, sched, season)
+        snap["story"] = series_story(snap["story"], st, g, sched, season, snap.get("claims"))
     return snap
 
 
@@ -149,7 +149,7 @@ NEXT = {1: "the second round", 2: "the conference final", 3: "the Stanley Cup Fi
 GENERIC_HEADS = ("Round two", "come in hot", "need a win")
 
 
-def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int) -> dict:
+def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int, claims: list[dict] | None = None) -> dict:
     """The regular-season story, retold for a series: the first paragraph (meetings and form this season) becomes
     the series so far; storylines told in an earlier game of the series are not told again."""
     from pipeline.config import SITE_DATA
@@ -215,23 +215,67 @@ def series_story(story: dict, st: dict, g: dict, sched: list[dict], season: int)
     lead = series_leader(season, [x["id"] for x in st["so_far"]], W)
     if lead:
         items.insert(0, lead)
-    head = story.get("head", "")
-    if st.get("game7"):
-        head = f"Game 7 {W.at(home)}"
-    elif st.get("clinch"):
-        head = f"{stories._cap(W.the(st['clinch']))} can close it out {W.at(home)}" if st["clinch"] == home else \
-            f"{stories._cap(W.the(st['elimination']))} face elimination"
-    elif n == 1 and any(h in head for h in GENERIC_HEADS):
-        head = f"{stories._cap(W.the(away))} and {W.the(home)} open the {ROUND_WORDS[g['round']]}"
+    options = head_options(story.get("head", ""), st, g, W, claims or [])
+    head = options[0]
     kicker = f"{st['round_name']}, Game {n}"
     # every storyline is kept here; `dedupe` (run once all previews exist) drops those told earlier in the series
-    return {**story, "kicker": kicker, "head": head, "paras": paras, "items": items}
+    return {**story, "kicker": kicker, "head": head, "head_options": options, "paras": paras, "items": items}
+
+
+def head_options(head: str, st: dict, g: dict, W, claims: list[dict]) -> list[str]:
+    """Headlines for a playoff preview, best first; `dedupe` takes the first one not used earlier in the series
+    (Sora's test build: "Suzuki's favorite opponent" ran before four straight games). A Game 7 or a clinching game
+    always leads with that; regular-season form ("come in hot") is replaced by the series itself."""
+    from pipeline.export import stories
+    cap = lambda t: stories._cap(W.the(t))
+    away, home, n = g["away"], g["home"], g["game"]
+    at = W.at(home)
+    if st.get("game7"):
+        return [f"Game 7 {at}", "One game for the series"]
+    if st.get("clinch"):
+        c, e = st["clinch"], st["elimination"]
+        if c == home:
+            return [f"{cap(c)} can close it out {at}", f"{cap(c)} get another chance to close it out", f"{cap(e)} face elimination again"]
+        return [f"{cap(e)} face elimination", f"{cap(e)} face elimination again", f"{cap(e)} have to win {at} again"]
+    generic = any(h in head for h in GENERIC_HEADS)
+    if n == 1:
+        opener = f"{cap(away)} and {W.the(home)} open the {ROUND_WORDS[g['round']]}"
+        return [opener] if generic or not head else [head, opener]
+    out = []
+    wins, lead = st["wins"], st["leader"]
+    hi, lo = max(wins.values()), min(wins.values())
+    trail = (away if lead == home else home) if lead else None
+    tot = {t: sum((x.get("chances") or {}).get(t, {}).get("xgf5", 0) for x in st["so_far"]) for t in (away, home)}
+    if lead and sum(tot.values()) > 0 and tot[trail] / sum(tot.values()) >= 0.55:
+        out.append(f"{cap(trail)} have the chances, {W.the(lead)} have the wins")
+    if head and not generic:
+        out.append(head)
+    last = st["so_far"][-1]
+    if last.get("ot"):
+        out.append(f"Game {n} after overtime in Game {last['game']}")
+    if lead is None:
+        out += [f"All square going into Game {n}", f"Tied {hi}-{lo}, and it’s back {at}" if last["home"] == home else f"Tied {hi}-{lo} as the series moves {at}"]
+    elif hi - lo >= 2:
+        out += [f"{cap(trail)} need an answer", f"{cap(lead)} up {hi}-{lo}"]
+    else:
+        out += [f"{cap(lead)} up {hi}-{lo}", f"{cap(trail)} try to draw level {at}"]
+    out += [c["head"] for c in claims if c.get("head")]
+    return out
+
+
+def _family(head: str) -> str:
+    """Headlines of one kind count as the same headline within a series."""
+    for k in ("favorite opponent", "come in hot", "need a win"):
+        if k in head:
+            return k
+    return head
 
 
 def dedupe(sched: list[dict], folder: Path) -> int:
     """Storylines told before an earlier game of the same series are not told again (only the first few words are
     compared, since the counts move). Runs over the saved previews in game order; each keeps at most five items."""
     told: dict[str, set] = {}
+    heads_used: dict[str, set] = {}
     n = 0
     for g in sorted((x for x in sched if x.get("type") == 3), key=lambda x: (x["series"], x["game"])):
         f = folder / f"{g['id']}.json"
@@ -241,6 +285,10 @@ def dedupe(sched: list[dict], folder: Path) -> int:
         story = snap.get("story") or {}
         items = story.get("all_items", story.get("items", []))
         seen = told.setdefault(g["series"], set())
+        heads = heads_used.setdefault(g["series"], set())
+        options = story.get("head_options") or [story.get("head", "")]
+        story["head"] = next((h for h in options if _family(h) not in heads), options[0])
+        heads.add(_family(story["head"]))
         keep = [i for i in items if i["tag"] not in REGULAR_ONLY and (i["tag"] == "Series leader" or (i["tag"], i["text"][:28]) not in seen)]
         seen |= {(i["tag"], i["text"][:28]) for i in items}
         story["all_items"] = items
@@ -275,3 +323,89 @@ def regular_records(sched: list[dict], teams) -> dict[str, str]:
         rec.setdefault(win, [0, 0, 0])[0] += 1
         rec.setdefault(lose, [0, 0, 0])[1 if g["end"] == "REG" else 2] += 1
     return {t: "-".join(map(str, rec.get(t, [0, 0, 0]))) for t in teams}
+
+
+SERIES_MIN_MINUTES = 5  # a group's 5-on-5 time against the opponent in this series' home games before its habit counts
+
+
+def series_matching(season: int, home: str, home_id: int, hosted: list[int], h_units: list[dict], a_units: list[dict]) -> dict:
+    """Who tonight's home lines and pairs faced in the home team's earlier home games of this series, as the same
+    block `units.matchups` gives for a whole season ({games, rows: [{label, minutes, share, expected}]}). Groups are
+    tonight's lines on both sides (two of three forwards, or one of two defensemen, make a group that line)."""
+    from collections import defaultdict
+    d = TABLES / str(season)
+    pos = {(r["game_id"], r["player_id"]): r["pos"] for r in
+           pl.read_parquet(d / "players.parquet").filter(pl.col("game_id").is_in(hosted)).iter_rows(named=True)}
+    own = {u["label"]: set(u["ids"]) for u in h_units if u["label"][0] in "LP"}
+    opp = {u["label"]: set(u["ids"]) for u in a_units if u["label"][0] == "L"}
+
+    def label(sets: dict, players: set, kind: str) -> str | None:
+        best = max(((len(m & players), lab) for lab, m in sets.items() if lab[0] == kind), default=(0, None))
+        return best[1] if best[0] >= (2 if kind == "L" else 1) else None
+
+    cells = defaultdict(float)
+    st = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(hosted))
+    for s in st.iter_rows(named=True):
+        if not (s["n_home"] == 5 and s["n_away"] == 5 and s["home_goalie"] and s["away_goalie"]):
+            continue
+        gid = s["game_id"]
+        fwd = lambda sk: {p for p in sk if pos.get((gid, p)) in ("C", "L", "R")}
+        hf, hd, af = fwd(s["home_skaters"]), {p for p in s["home_skaters"] if pos.get((gid, p)) == "D"}, fwd(s["away_skaters"])
+        o = label(opp, af, "L") if len(af) == 3 else None
+        if o is None:
+            continue
+        for mine in (label(own, hf, "L") if len(hf) == 3 else None, label(own, hd, "P") if len(hd) == 2 else None):
+            if mine:
+                cells[(mine, o)] += s["duration"]
+    cols = ["L1", "L2", "L3", "L4"]
+    rows = []
+    for kind, labels in (("L", cols), ("P", ["P1", "P2", "P3"])):
+        total = sum(v for (m, _), v in cells.items() if m[0] == kind)
+        expected = [sum(v for (m, c2), v in cells.items() if m[0] == kind and c2 == c) / total * 100 if total else 0.0 for c in cols]
+        for r in labels:
+            sec = sum(cells.get((r, c), 0.0) for c in cols)
+            rows.append({"label": r, "minutes": round(sec / 60, 1), "seconds": round(sec),
+                         "share": [round(100 * cells.get((r, c), 0.0) / sec) if sec else None for c in cols], "expected": [round(x) for x in expected]})
+    return {"games": len(hosted), "rows": rows}
+
+
+def series_matchup_claim(regular, g: dict, sched: list[dict], season: int, tids: dict[str, int]):
+    """A stand-in for `previews.matchup_claim` in playoff previews. Before the home team has hosted this opponent in
+    the series, the call is the regular-season home habit, as before. Once it has, the call reads only what the coach
+    did in this series' home games (Sora, 2026-10-13: regular-season habits held 31 of 66); when no line was matched
+    there, there is no matchup call."""
+    from pipeline.export import previews
+
+    def claim(gid, away, home, lines, places, pts=None, coach=None):
+        hosted = [x["id"] for x in sched if x.get("series") == g["series"] and x["final"] and x["home"] == home and x["game"] < g["game"]]
+        if not hosted or not lines.get(home) or not lines.get(away):
+            return regular(gid, away, home, lines, places, pts, coach)
+        block = series_matching(season, home, tids[home], hosted, lines[home]["units"], lines[away]["units"])
+        mine = {**lines, home: {**lines[home], "matchups": {**lines[home].get("matchups", {}), "home": block}}}
+        keep = previews.MIN_HOME_GAMES, previews.MIN_MINUTES
+        previews.MIN_HOME_GAMES, previews.MIN_MINUTES = 1, SERIES_MIN_MINUTES
+        try:
+            c = regular(gid, away, home, mine, places, pts, coach)
+        finally:
+            previews.MIN_HOME_GAMES, previews.MIN_MINUTES = keep
+        if not c:
+            return None
+        k = len(hosted)
+        where = previews.team_words(home, places, "H")["Hc"]
+        games = "the one game" if k == 1 else f"the {NUM.get(k, k)} games"
+        first, _, rest = c["body"].partition(". ")
+        share, exp = c["check"]["baseline"], c["check"]["threshold"]
+        ordn = previews.ORD[int(c["check"]["opp_line"][1:]) - 1]
+        opp_w = previews.team_words(away, places, "O")
+        group = c["call"].split(" spends ")[0]
+        group = group[0].lower() + group[1:] if group.startswith("The ") else group
+        c["body"] = (f"In {games} in {where} this series, {group} spent {share}% of its 5-on-5 time against "
+                     f"{opp_w['Op']} {ordn} line, where about {exp}% would be normal with no line matching. {rest}")
+        c["body"] = c["body"][0].upper() + c["body"][1:]
+        c["nums"] = f"This series in {where}: {share}% of this group’s 5-on-5 time against the {ordn} line, about {exp}% with no line matching"
+        c["gist"] = f"In {where} this series, {coach or 'their coach'} has been picking matchups: watch who goes out against {opp_w['Op']} {ordn} line."
+        c["cite"] = f"Who plays against whom · {where} home games in this series · {k} game{'' if k == 1 else 's'}, {c['cite'].split(', ')[-1]}"
+        c["check"]["series"] = True
+        c["check"]["rule"] = "held if the share is at or above what the coach did earlier in the series; partly if above the no-matching level; otherwise didn't happen"
+        return c
+    return claim
