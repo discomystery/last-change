@@ -723,14 +723,30 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             return {10: "every time", 9: "nine in ten", 8: "about four in five", 7: "about seven in ten", 6: "about six in ten",
                     5: "about half the time", 4: "about four in ten", 3: "about three in ten", 2: "about one in five",
                     1: "about one in ten", 0: "almost never"}[round(p * 10)]
-        if share >= 0.7:
+        nums = r.get("numbers") or {}
+        sw, sl = (nums.get(winner) or {}).get("shots"), (nums.get(loser) or {}).get("shots")
+        outshot = f", outshooting {W.the(loser)} {sw}-{sl}" if sw and sl and sw - sl >= 5 else ""
+        extra = {"OT": "overtime", "SO": "a shootout"}.get(end)
+        # Bands on the calibrated replay share (eye test, 2026-10-13: 60-70% used to read "close to even", so Columbus
+        # outshooting Pittsburgh 45-22 was "could have gone either way"). 45-55% is close, as in the win-chance reveal.
+        if share >= 0.6 and extra:
+            s2.append(f"{_cap(W.the(winner))} carried the play{outshot}, but needed {extra} to win it.")
+            if share >= 0.7:
+                s2.append(f"Replay this game’s chances a hundred times and {W.the(winner)} win in regulation {tenths(share)}.")
+        elif share >= 0.7:
             s2.append(f"The score was fair. Replay this game’s chances a hundred times and {W.the(winner)} win {tenths(share)}.")
+        elif share >= 0.6:
+            s2.append(f"{_cap(W.the(winner))} carried the play{outshot}, and got the result to match.")
+        elif share >= 0.55:
+            s2.append(f"{_cap(W.the(winner))} had the better of the chances{outshot}.")
         elif share <= 0.4:
             g = gl.get(winner)
             lead = f"The score flatters {W.the(winner)}: {W.the(loser)} had the better of the play." if ws - ls >= 3 else f"{_cap(W.the(loser))} had the better of the play."
             s2.append(f"{lead} Replay the chances a hundred times and {W.the(loser)} win {tenths(1 - share)}.")
             if g and (g.get("gsax") or 0) >= 1:
                 s2.append(f"{name(g['id']) if g.get('id') in N else g['name']} made the difference in net, stopping {g['saves']} of {g['shots']}.")
+        elif share <= 0.45:
+            s2.append(f"{_cap(W.the(loser))} had a little more of the play, but {W.the(winner)} made their chances count.")
         elif ws - ls >= 3:
             s2.append("The chances were closer than the score.")
         else:
