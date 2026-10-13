@@ -262,7 +262,7 @@ def _ordinal(n: int) -> str:
 
 
 def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[dict], full: list[dict]) -> dict:
-    """A headline, a one- or two-sentence lede about style, the history sentence (kept for the fold under the chart)
+    """A headline, a one- or two-sentence lede about style (shown with Then and now), the history sentence (kept for the fold under the chart)
     and the notes the chart writes on itself: last season's level and how it ended, this season's level so far, and
     the change date."""
     X, key = _the(t), (abbr, "trend")
@@ -274,11 +274,10 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
     lede = []
     if new:
         moves = [MOVE[r["key"]][0 if r["now"]["pct"] > r["then"]["pct"] else 1] for r in new]
-        lead = "One thing has changed" if len(new) == 1 else "What’s new"
-        lede.append(f"{lead}: they’re {_and(moves)}, by more than {'early-season ' if len(now) < 20 else ''}bounces would explain.")
+        lede.append(f"This season they’re {_and(moves)}.")
     if kept:
         habits = [KNOWN[r["key"]][0 if r["then"]["pct"] > 50 else 1] for r in kept[:2]]
-        lede.append(f"{'Otherwise they' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
+        lede.append(f"{'They' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
     notes: dict = {}
     if len(last):
         s = 100 * _share(last["xgf_adj"].to_numpy(), last["xga_adj"].to_numpy())

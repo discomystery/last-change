@@ -43,9 +43,8 @@ const levels: { v: number; words: string }[] = t.change
       <p><strong>Dotted lines:</strong> their level before and after the play changed, or each season’s average when it didn’t.</p>
       {(t.around ?? []).length > 0 && <p><strong>Numbered pins:</strong> other things that happened around the change. The numbers can’t say which of them, if any, caused it.</p>}
     </Explain>
-    {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
-    <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <div class="tr-levels">{levels.map((l) => <p><strong>{l.v}%</strong><span>{l.words}</span></p>)}</div>
+    <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <p class="tr-key tr-key2">
       <span class="k-line">{win}-game average</span><span class="k-dot tr-wide">One game</span>
       <span class="k-band term" tabindex="0" data-tip={`How far a ${win}-game average wanders on bounces alone. Inside it, nothing has to have changed.`}>Bounce range</span>
@@ -70,6 +69,7 @@ const levels: { v: number; words: string }[] = t.change
       <p><strong>New this season</strong> means the move is bigger than a few games of bounces would explain. <strong>Carried over</strong> means one of last season’s strongest habits is still there.</p>
       <p>{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
     </Explain>
+    {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
     <ul class="tr-traits">
       {traits.map((r) => {
         const info = fpInfo[r.key];
@@ -223,7 +223,7 @@ const levels: { v: number; words: string }[] = t.change
 <style is:global>
   .trend { --team: var(--tc); }
     .tr-head { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 10px; text-wrap: balance; }
-  .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; max-width: 70ch; }
+  .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; }
   .tr-hist { margin-top: 26px; }
   .tr-long { padding: 22px 24px; }
   .tr-htext { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 16px; }
@@ -277,7 +277,7 @@ const levels: { v: number; words: string }[] = t.change
   .tr-pinm circle { fill: var(--ink); }
   .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
   .tr-pinm { cursor: default; }
-  .tr-levels { display: flex; flex-wrap: wrap; gap: 8px 36px; margin: 14px 0 0; }
+  .tr-levels { display: flex; flex-wrap: wrap; gap: 8px 36px; margin: 8px 0 18px; }
   .tr-levels p { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 400 14px/1.35 var(--ui); color: var(--ink-2); }
   .tr-levels strong { font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); }
   .tr-around { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
