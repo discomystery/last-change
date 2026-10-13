@@ -35,13 +35,13 @@ def test_places_for_where_a_game_was_played():
 
 
 def test_nickname_once_is_sparing():
-    places = {"Rangers": "NY Rangers", "Lightning": "Tampa Bay"}
-    sents = ["The Rangers won the first meeting, 5-1 in New York.", "The Rangers are 5-2-0.", "The Lightning have won four straight.",
-             "The Rangers’ best way to tip it is a power play."]
+    places = {"Hurricanes": "Carolina", "Lightning": "Tampa Bay"}
+    sents = ["The Hurricanes won the first meeting, 5-1 in Carolina.", "The Hurricanes are 5-2-0.", "The Lightning have won four straight.",
+             "The Hurricanes’ best way to tip it is a power play."]
     out = wording.nickname_once(sents, "x", places=places)
     changed = [i for i, (a, b) in enumerate(zip(sents, out)) if a != b]
     assert len(changed) == 1 and changed[0] != 0  # one swap, never the first mention
-    assert "Blueshirts" in out[changed[0]]
+    assert "Canes" in out[changed[0]]
     assert sents[2] == out[2]  # the Lightning are named once: no nickname
     # never in a sentence that also has the full name or the place
     assert wording.nickname_once(["The Hurricanes won.", "The Hurricanes beat Carolina’s rivals."], "k",
@@ -51,3 +51,4 @@ def test_nickname_once_is_sparing():
     assert wording.nickname_para("The Oilers won. The Oilers’ kill held.", "k") == "The Oilers won. The Oil’s kill held."
     # a club with no common nickname keeps its name
     assert wording.nickname_para("The Kings won. The Kings scored.", "k") == "The Kings won. The Kings scored."
+    assert wording.nickname_para("The Rangers won. The Rangers scored.", "k") == "The Rangers won. The Rangers scored."

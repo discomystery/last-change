@@ -39,11 +39,12 @@ def places(ps: dict[str, str]) -> dict[str, str]:
 
 
 # What fans call their club in conversation (Sora, 2026-10-13: "the Canes", "the Bolts"). Only where a nickname is
-# widely used; clubs without one (Ducks, Kings, Wild, Jets...) always go by their name. Plural verbs, like the names.
+# widely used in plain talk; clubs without one (Ducks, Kings, Wild, Jets...) always go by their name. Not the Rangers:
+# "Blueshirts" is rarer and longer than the name, and "Rags" is tongue in cheek (Sora, 2026-10-13). Plural verbs, like the names.
 SHORT = {"Hurricanes": "Canes", "Lightning": "Bolts", "Maple Leafs": "Leafs", "Canadiens": "Habs", "Senators": "Sens",
          "Penguins": "Pens", "Capitals": "Caps", "Blue Jackets": "Jackets", "Islanders": "Isles", "Predators": "Preds",
          "Avalanche": "Avs", "Blackhawks": "Hawks", "Red Wings": "Wings", "Golden Knights": "Knights", "Panthers": "Cats",
-         "Oilers": "Oil", "Rangers": "Blueshirts"}
+         "Oilers": "Oil"}
 _SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9“\"])")
 
 
