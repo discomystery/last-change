@@ -174,12 +174,7 @@ def stage_previews(season: int, day: str) -> None:
     import polars as pl
     n = pl.read_parquet(TABLES / str(season) / "games.parquet").height
     through = max((g["date"] for g in sched if g["final"] and g["date"] < day), default=None)
-    gm = pl.read_parquet(TABLES / str(season) / "games.parquet")
-    tids = dict(zip(gm["home"], gm["home_id"])) | dict(zip(gm["away"], gm["away_id"]))
-    regular = previews.matchup_claim
     for g in todo:
-        # once the home team has hosted this series, its matchup call reads the series' home games, not the season's
-        previews.matchup_claim = context.series_matchup_claim(regular, g, sched, season, tids)
         now = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
         snap = previews.snapshot(g, site, places, sched, now, chances.get(g["id"]), rebuilt=True, games_before=n,
                                  data_through=through, methods=previews.METHODS)
