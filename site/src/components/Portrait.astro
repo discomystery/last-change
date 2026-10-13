@@ -14,8 +14,8 @@ const src = photoOf(id);
   .portrait { display: block; flex: none; object-fit: contain; object-position: 50% 100%; user-select: none; pointer-events: none; }
   /* The NHL's studio shots read dark on the site, so lift them a little (user picked "A, Lighter" of three strengths). */
   .portrait { filter: var(--portrait-filter, brightness(1.1) contrast(1.03)); }
-  /* Drawn 30% bigger than its box without changing the box (Sora picked "Moderate", 2026-10-13): zoomed from near the
-     top of his head so the head stays in, the lower chest is trimmed at the line he stands on, and the shoulders may
-     spread a little past the box's sides. Bottom inset = (100% - 14%) x (1 - 1/1.3). */
-  .portrait { transform: scale(1.3); transform-origin: 50% 14%; clip-path: inset(-60% -60% 19.85% -60%); }
+  /* Drawn 30% bigger than its box without changing the box (Sora picked "Moderate", 2026-10-13), grown up from the
+     line he stands on so his head sits higher (Sora, same day). The NHL's cut-outs leave empty space above the head,
+     so the growth mostly fills that; the shoulders may spread a little past the box's sides. */
+  .portrait { transform: scale(1.3); transform-origin: 50% 100%; }
 </style>
