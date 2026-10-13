@@ -1,0 +1,20 @@
+{
+  "_note": "Where games are played, for the team page's season map. teams: each club's home arena [lat, lon]. elsewhere: venues that are not a club's usual arena, by the venue name in the NHL schedule; one more than 75 miles from the home club's arena is drawn as its own city. A neutral-site venue missing here is drawn at the home club's arena (the build warns).",
+  "teams": {
+    "ANA": [33.808, -117.877], "BOS": [42.366, -71.062], "BUF": [42.875, -78.876], "CGY": [51.037, -114.052],
+    "CAR": [35.803, -78.722], "CHI": [41.881, -87.674], "COL": [39.749, -105.008], "CBJ": [39.969, -83.006],
+    "DAL": [32.790, -96.810], "DET": [42.341, -83.055], "EDM": [53.547, -113.498], "FLA": [26.158, -80.326],
+    "LAK": [34.043, -118.267], "MIN": [44.945, -93.101], "MTL": [45.496, -73.569], "NSH": [36.159, -86.778],
+    "NJD": [40.734, -74.171], "NYI": [40.712, -73.726], "NYR": [40.750, -73.993], "OTT": [45.297, -75.927],
+    "PHI": [39.901, -75.172], "PIT": [40.439, -79.989], "SJS": [37.333, -121.901], "SEA": [47.622, -122.354],
+    "STL": [38.627, -90.203], "TBL": [27.943, -82.452], "TOR": [43.643, -79.379], "UTA": [40.768, -111.901],
+    "VAN": [49.278, -123.109], "VGK": [36.103, -115.178], "WSH": [38.898, -77.021], "WPG": [49.893, -97.144]
+  },
+  "elsewhere": {
+    "Veikkaus Arena": { "city": "Helsinki", "country": "Finland", "ll": [60.205, 24.929] },
+    "PSD Bank Dome": { "city": "Düsseldorf", "country": "Germany", "ll": [51.273, 6.733] },
+    "AT&T Stadium": { "city": "Arlington", "country": "United States", "ll": [32.747, -97.094] },
+    "Rice-Eccles Stadium": { "city": "Salt Lake City", "country": "United States", "ll": [40.760, -111.849] },
+    "Princess Auto Stadium": { "city": "Winnipeg", "country": "Canada", "ll": [49.808, -97.143] }
+  }
+}

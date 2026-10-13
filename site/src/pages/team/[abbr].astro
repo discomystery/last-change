@@ -37,6 +37,7 @@ import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } fro
 import FpRow from '../../components/FpRow.astro';
 import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
+import SeasonMap from '../../components/SeasonMap.astro';
 import { trendFor } from '../../lib/trend';
 
 export function getStaticPaths() {
@@ -164,11 +165,11 @@ const coachSince = coach && (team as any).coach_since
     <div class="tickets" id="tickets"></div>
   </section>
 
-  <Section id="form" title="Results and schedule" placeholder={false}>
-    <div class="cols">
-      <div><h3 class="sub">Recent results</h3><ul class="games" id="recent"></ul></div>
-      <div><h3 class="sub">Coming up</h3><ul class="games" id="upcoming"></ul></div>
-    </div>
+  <Section id="form" title="Results and schedule" placeholder={false} takeaway={`Every game of ${team.place}’ season beside a map of where it’s played. The map plays the season so far, the next road trip, a trip abroad or the full season; the list opens at today.`}>
+    <Fragment slot="explain">
+      <p>Each game is placed where it’s played, so a game abroad, like the Global Series in Europe, gets its own city even when the league lists it as a home game. Distances are straight-line flights between arenas: from home to the first game, game to game, and back home at the end of a trip or the season. A road trip is a run of games away from home. A back-to-back is a game the day after another one.</p>
+    </Fragment>
+    <SeasonMap abbr={abbr!} recaps={recapIds} previews={previewIds} />
   </Section>
 
   {trend && (
@@ -515,7 +516,6 @@ const coachSince = coach && (team as any).coach_since
     const MC = JSON.parse(document.getElementById('mcol').textContent);
     const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-    const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
     const RECAPS = new Set(JSON.parse(document.getElementById('team-recaps').textContent));
     const PREVIEWS = Object.fromEntries(JSON.parse(document.getElementById('team-previews').textContent).map((id) => [id, 'Preview']));
@@ -537,23 +537,6 @@ const coachSince = coach && (team as any).coach_since
     }
     if (tickets.length) document.getElementById('tickets').replaceChildren(...tickets);
     else document.getElementById('tickets').replaceWith(el('p', 'next-meta', 'No upcoming games on the schedule.'));
-    // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
-    const row = (g) => {
-      const li = el('li', 'card row game go');
-      const opp = g.home === me ? g.away : g.home;
-      const title = el('a', 'g-title go-link', `${g.home === me ? 'vs' : 'at'} ${names[opp] ?? opp}`);
-      title.href = g.final && RECAPS.has(g.id) ? `${base}recap/${g.id}/` : !g.final && PREVIEWS[g.id] ? `${base}preview/${g.id}/` : `${base}games/#${g.date}`;
-      li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), title);
-      if (g.final) {
-        const s = g.home === me ? [g.hs, g.as] : [g.as, g.hs];
-        li.append(el('span', 'g-score', `${s[0] > s[1] ? 'W' : 'L'} ${s[0]}–${s[1]}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`));
-        if (RECAPS.has(g.id)) li.title = 'How the game went, and how the preview held up';
-      } else if (PREVIEWS[g.id]) li.append(el('span', 'g-link', `${PREVIEWS[g.id]} ›`));
-      else li.append(el('span', 'g-soon', g.venue ?? ''));
-      return li;
-    };
-    document.getElementById('recent').replaceChildren(...games.filter((g) => g.final).slice(-5).reverse().map(row));
-    document.getElementById('upcoming').replaceChildren(...games.filter((g) => !g.final && g !== next).slice(0, 5).map(row));
   })();
 </script>
 
