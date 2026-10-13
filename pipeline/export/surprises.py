@@ -392,10 +392,14 @@ HEADS = {  # kind -> (went up, went down): class -> headline, {T} the team whose
 
 
 def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, league: float | None, places: dict,
-              expected: float | None = None, fp: dict | None = None, season: int = CURRENT_SEASON) -> dict | None:
+              expected: float | None = None, fp: dict | None = None, season: int = CURRENT_SEASON, goals: int | None = None) -> dict | None:
     """`usual` is the team's own level, `expected` what the matchup predicted (their level against tonight's
-    opponent; the same as usual when the opponent does not matter)."""
+    opponent; the same as usual when the opponent does not matter). For the power play, `goals` is how many it
+    scored: a power play that scored was not shut down, and one that didn't score did not come alive, whatever its
+    chances said (eye test, 2026-10-13)."""
     if x is None or usual is None or league is None:
+        return None
+    if kind == "pp" and goals is not None and (goals > 0) != (x > (usual if expected is None else expected)):
         return None
     e = usual if expected is None else expected
     z = z_of(kind, x - e)
@@ -490,7 +494,7 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         u, lg = level(t, "quality")
         out.append(team_stat("quality", t, o, _quality(r), u, lg, places, against(u, lg, "qualityAllowed"), fp, season))
         u, lg = level(t, "pp")
-        out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season))
+        out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season, score["pp_goals"][t]))
         u, lg = level(t, "physical")
         out.append(team_stat("hits", t, o, _hits(r), u, lg, places, None, fp, season))
         u, lg = level(t, "depth")
@@ -649,7 +653,8 @@ def left_clause(who: list[dict]) -> str:
     return "After " + _names([f"{x['name']} {'was ejected' if x['ejected'] else 'left'} {when_left(x['sec'])}" for x in who])
 
 
-def forced(cands: list[dict], exits: dict[str, list[dict]], usual_lines: dict, places: dict) -> list[dict]:
+def forced(cands: list[dict], exits: dict[str, list[dict]], usual_lines: dict, places: dict,
+           absent: dict[str, list[dict]] | None = None) -> list[dict]:
     """Lineup surprises a skater leaving the game can explain, told as something the team had to do rather than chose
     (Sora, 2026-10-13: "Minnesota shortened their bench" on a night Nick Sturm left in the first period and did not
     return). `exits` comes from recaps.Season.exits: skaters with no shift over the game's last 20 minutes or more.
@@ -658,6 +663,11 @@ def forced(cands: list[dict], exits: dict[str, list[dict]], usual_lines: dict, p
                      the other way is not explained by it, so it is left alone.
       new line       a forward who belongs to one of the team's usual lines left, and the new trio has one of his
                      usual linemates in it: his line had to be filled in.
+      missing        the same for a top-six forward (first two usual lines) who didn't dress at all (`absent`, ids
+                     and names): "With Frank Nazar out of the lineup, ...". Never why he was out.
+      top six        a new trio built only from players on the team's top two usual lines reads as a reshuffle of the
+                     top six, not a new line (eye test, 2026-10-13: four such "different line" surprises were the line
+                     NHL.com projected as the first line).
     The figure, its rarity and its score stay as they are; the "why" about what the team is usually known for is
     dropped (the night wasn't about their habits) and the tag becomes "Out of the ordinary". Defensemen leaving
     explain nothing here (no surprise is about defense pairs); goalie changes are told by the goalie surprise."""
@@ -680,11 +690,17 @@ def forced(cands: list[dict], exits: dict[str, list[dict]], usual_lines: dict, p
             usual = [set(u) for u in usual_lines.get(t, [])]
             gone = [x for x in exits.get(t, []) if x["pos"] in FORWARDS
                     and any(x["id"] in u and (u - {x["id"]}) & ids for u in usual)]
-            if gone:
-                T = places[t]
+            top6 = usual[0] | usual[1] if len(usual) >= 2 else set()
+            out_ = [x for x in (absent or {}).get(t, []) if x["id"] in top6 and any(x["id"] in u and (u - {x["id"]}) & ids for u in usual)]
+            T = places[t]
+            if gone or out_:
+                lead = left_clause(gone) if gone else f"With {_names([x['name'] for x in out_])} out of the lineup"
                 c = {**c, "tag": TAGS["rare"], "head": f"{T} had to shuffle their lines", "forced": True,
-                     "body": f"{left_clause(gone)}, {names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, "
+                     "body": f"{lead}, {names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, "
                              f"a trio that isn’t one of {T}’s usual lines."}
+            elif len(usual) >= 2 and ids <= usual[0] | usual[1]:
+                c = {**c, "head": f"{T} reshuffled their top six",
+                     "body": f"{names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, a new mix of {T}’s top two lines."}
         out.append(c)
     return out
 

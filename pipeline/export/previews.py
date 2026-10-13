@@ -25,7 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 12  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 13  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -35,8 +35,9 @@ RULES_VERSION = 12  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 9: shot-quality clashes only top five against bottom five; no turnover clashes (both from a 2023-25 backtest)
 # 11: second round of notes: edges carry stakes, fewer semicolons and "league"s, no rest venue, plainer changed calls
 # 12: third round of notes: hotter goalie-history calls, "chance would suggest", why shots in close matter, "even though" leans, shared Missing items
+# 13: softer leans at the ends ("should be favored", "work cut out"; no "miracle" or "surprise")
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
-METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
+METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -576,6 +577,9 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
     lab, n = r["label"][0], int(r["label"][1:])
     style = ("pair" if lab == "P" else "best" if n == 1 and j == 0 else "hunt" if n < j + 1 else "shadow" if n > j + 1 else "even")
     heads, why = MATCHUP_WORDS[style]
+    if style == "shadow" and n < 3:  # a second line on a first line is a tough-minutes job, not a checking line
+        heads = [h for h in heads if "checkers" not in h]
+        why = "{Coach} has been giving this group the hard job of facing {theirline}."
     w = {**team_words(home, places, "H"), **team_words(away, places, "O"), "mine": mine, "theirs": theirs,
          "Hstar": _star(unit, pts), "Ostar": _star(opp, pts)}
     theirline = "the other team’s top line" if j == 0 else f"opponents’ {ORD[j]} lines"
@@ -1038,7 +1042,7 @@ def projected_starters(g: dict, likely: dict, rebuilt: bool = False) -> dict[str
     else our own guess when it is fairly sure ("model"). Never the chance itself."""
     from pipeline.config import CURRENT_SEASON
     from pipeline.ingest import nhl_previews
-    nhl = nhl_previews.projected(CURRENT_SEASON, g["id"], g["date"] if rebuilt else None)
+    nhl = nhl_previews.projected(CURRENT_SEASON, g["id"], _iso(g["start"]) if rebuilt else None)
     out = {}
     for t in (g["away"], g["home"]):
         ranked = likely.get(t) or []
@@ -1059,12 +1063,15 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     away, home = g["away"], g["home"]
     fp = site["fingerprints"]["teams"]
     if likely is None:
-        likely = _likely([g], g["date"]).get(g["id"]) or {}
+        likely = _likely([g], g["date"], nhl_before=_iso(g["start"])).get(g["id"]) or {}
     rest = rest_days(sched, g)
     rested = [t for t in (away, home) if rest.get(t, {}).get("days", 0) >= 1 and any(rest.get(o, {}).get("days") == 0 for o in (away, home) if o != t)]
-    rest_usual = usual_share(rested[0], g["start"]) if rested else None
+    # date-based cuts take the game's local date: a late start falls on the next UTC day, and the start's date would
+    # let a rebuilt preview see the game itself
+    day = g.get("date") or g["start"][:10]
+    rest_usual = usual_share(rested[0], day) if rested else None
     claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
-                   {**call_extras(site, g["start"]), "likely": likely, "rest": rest, "rest_usual": rest_usual})
+                   {**call_extras(site, day), "likely": likely, "rest": rest, "rest_usual": rest_usual})
     from pipeline.export import surprises, wording
     for c in claims:
         rep = special_teams_record(c, wording.places(places), surprises)
@@ -1084,7 +1091,7 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
-        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
+        out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out
@@ -1100,11 +1107,20 @@ def write_index(out_dir) -> int:
     return len(index)
 
 
-def _likely(games: list[dict], before: str | None = None) -> dict[int, dict]:
-    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them."""
+def _iso(start: str) -> str:
+    """A schedule start ("2026-10-10T23:00:00Z") in the form NHL.com finds are stamped with ("...+00:00")."""
+    return start.replace("Z", "+00:00")
+
+
+def _likely(games: list[dict], before: str | None = None, nhl_before: str | None = None) -> dict[int, dict]:
+    """Likely starting goalies for these games (pipeline/metrics/starters.py). Previews still work without them.
+    A rebuilt preview may use an NHL.com projection found before the game's puck drop (`nhl_before`), as a live
+    preview that morning would have (eye test, 2026-10-13: it had Woll, Varlamov, Fowler, Ersson, Murashov and Talbot
+    right where our own guess missed)."""
     try:
         from pipeline.metrics import starters
-        return starters.upcoming(games, before=before)
+        nhl = starters.nhl_picks(games, before=nhl_before) if nhl_before else None
+        return starters.upcoming(games, before=before, nhl=nhl)
     except Exception as e:
         print(f"likely starters unavailable: {e!r}")
         return {}

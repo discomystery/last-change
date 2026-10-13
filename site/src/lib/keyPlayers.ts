@@ -32,7 +32,7 @@ function jobs(p: Skater, place: string): Job[] {
   const grp = p.group === 'D' ? 'defensemen' : 'forwards';
   if (r.toi && r.toi_rank && r.toi_rank <= 2)
     out.push({ text: r.toi_rank === 1 ? 'Most ice time' : '2nd in ice time', tip: `${r.toi_rank === 1 ? 'The most' : 'The second-most'} ice time a game of ${place}’s ${grp} who have played at least half the games.` });
-  if (r.line) out.push({ text: `${r.line.label} · ${r.line.mates.map((m) => lastName(m.name)).join(', ')}`, tip: `${lineName(r.line.label)[0].toUpperCase()}${lineName(r.line.label).slice(1)} at 5-on-5, numbered by ice time together over the last ten games.` });
+  if (r.line) out.push({ text: `${r.line.label} · ${r.line.mates.map((m) => lastName(m.name)).join(', ')}`, tip: `${lineName(r.line.label)[0].toUpperCase()}${lineName(r.line.label).slice(1)} at 5-on-5, picked by ice time together over the last ten games and numbered by its players’ ice time.` });
   if (r.pp) out.push({ text: r.pp.label, tip: `${r.pp.label === 'PP1' ? 'First' : 'Second'} power-play unit.${r.pp.role ? ' ' + roleTip[r.pp.role] : ''}` });
   if (r.pk?.role === 'starter' || r.pk?.role === 'second')
     out.push({ text: 'Kills penalties', tip: r.pk.role === 'starter'

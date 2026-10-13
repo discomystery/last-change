@@ -1,6 +1,7 @@
 """Forward lines, defense pairs and special-teams usage across a season.
 
-Lines are numbered by 5-on-5 ice time together over a team's last ten games (fewer early in a season).
+Lines are chosen by 5-on-5 ice time together over a team's last ten games (fewer early in a season), then numbered
+by what each line is: its players' average 5-on-5 and power-play ice time a game (see `_by_role`).
 """
 from collections import defaultdict
 
@@ -76,6 +77,38 @@ def _pick(units: pl.DataFrame, count: int, by: str = "sec") -> list[dict]:
     return chosen
 
 
+def _player_weight(season: int, tid: int, age: dict[int, int]) -> dict[str, tuple[float, float]]:
+    """Each player's average 5-on-5 plus power-play ice time a game over the window (older games counting less, as for
+    the lines) and points a game this season, for numbering lines. Penalty-kill time is left out: it lifted checking
+    lines. Against NHL.com's projected first lines in 102 previews (2026-10-04 to 10-12), this numbering matched 81;
+    all-strength ice time 66, 5-on-5 alone 69, points 69, minutes together (the old rule) 57. Our four lines held
+    NHL.com's first line 99 times, so the misses are the order of two close top lines. Empty when the player table is
+    not built."""
+    p = TABLES / str(season) / "player_game.parquet"
+    if not p.exists():
+        return {}
+    pg = pl.read_parquet(p, columns=["game_id", "team_id", "player_id", "sec5", "sec_pp", "g", "a1", "a2"]).filter(pl.col("team_id") == tid)
+    pts = pg.group_by("player_id").agg(((pl.col("g") + pl.col("a1") + pl.col("a2")).sum() / pl.len()).alias("ppg"))
+    w = pg.filter(pl.col("game_id").is_in(list(age))).with_columns(w=DECAY ** pl.col("game_id").replace_strict(age))
+    toi = w.group_by("player_id").agg((((pl.col("sec5") + pl.col("sec_pp")) * pl.col("w")).sum() / pl.col("w").sum()).alias("toi"))
+    pts = dict(pts.iter_rows())
+    return {str(pid): (t, pts.get(pid, 0.0)) for pid, t in toi.iter_rows()}
+
+
+def _by_role(chosen: list[dict], weight: dict[str, tuple[float, float]]) -> list[dict]:
+    """Number the chosen lines (or pairs) by their players' average ice time a game (`_player_weight`), then points: the first line
+    is the one the coach leans on most, as fans and NHL.com number them. Ranking by minutes together put a new top line
+    that had played one game at L4 and a long-running checking line at L1 (eye test, 2026-10-13: 11 of 32 teams' L1
+    was not the line whose players played most)."""
+    if not weight:
+        return chosen
+    def key(u):
+        ps = u["unit"].split("-")
+        vals = [weight.get(p, (0.0, 0.0)) for p in ps]
+        return (-sum(v[0] for v in vals) / len(vals), -sum(v[1] for v in vals) / len(vals))
+    return sorted(chosen, key=key)
+
+
 def usual(season: int) -> dict[int, dict]:
     """Per team: numbered lines and pairs over the recent window, the last game's groups, and peer ratings."""
     gu = pl.read_parquet(TABLES / str(season) / "game_units.parquet")
@@ -98,19 +131,22 @@ def usual(season: int) -> dict[int, dict]:
             pl.exclude("game_id", "date", "team_id", "proper").sum(), gp=pl.col("proper").sum(), sec_gp=pl.col("sec").filter(pl.col("proper")).sum(),
             in_last=(pl.col("proper") & (pl.col("game_id") == last)).any())
         in_last = t.filter(pl.col("game_id") == last)
+        weight = _player_weight(season, tid, age)
         entry = {"games": len(window), "last_game": last, "units": [], "last": [], "settled": {}}
         for kind, count, tag in (("F", 4, "L"), ("D", 3, "P")):
             pool = recent.filter(pl.col("kind") == kind)
-            # Lines are chosen and numbered by recent ice time together, each older game counting half as much as the
-            # one after it: coaches change lines, and the latest combinations are the best guess for the next game.
-            for i, u in enumerate(_pick(pool, count, by="wsec")):
+            # Lines are chosen by recent ice time together, each older game counting half as much as the one after it:
+            # coaches change lines, and the latest combinations are the best guess for the next game. They are then
+            # numbered by their players' ice time (`_by_role`).
+            for i, u in enumerate(_by_role(_pick(pool, count, by="wsec"), weight)):
                 u["sec_pg"] = u["sec_gp"] / u["gp"] if u["gp"] else None
                 u["new"] = len(window) > 1 and u["gp"] == 1 and u["in_last"]  # a line for the first time last game
                 entry["units"].append({"label": f"{tag}{i + 1}", **u})
             # How settled the lineup is: the four most-used groups' share of all the team's 5v5 time in trios (or pairs).
             total = pool["sec"].sum()
             entry["settled"][kind] = sum(u["sec"] for u in _pick(pool, count)) / total if total else None
-            entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"]} for i, u in enumerate(_pick(in_last.filter(pl.col("kind") == kind), count))]
+            entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"]}
+                              for i, u in enumerate(_by_role(_pick(in_last.filter(pl.col("kind") == kind), count), weight))]
         teams[tid] = entry
 
     # Rate each unit against the same-numbered unit on other teams, after pulling small samples toward that group's average.

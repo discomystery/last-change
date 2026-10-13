@@ -45,7 +45,7 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import careers, coaches, edge, history, moneypuck, nhl, nhl_previews, rosters
+    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, nhl, nhl_previews, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
@@ -56,6 +56,7 @@ def update(season: int) -> dict:
     out["build"] = games.build_season(season)
     if season == CURRENT_SEASON:
         out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
+        out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
         out["availability"] = availability_update(season)
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
     shot_features.build(season)
@@ -129,12 +130,13 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     the next full update."""
     from pipeline.build import games, shot_features
     from pipeline.export import flow, game_scores, jobs, pending, previews, recaps, roster, site_json, stories, track
-    from pipeline.ingest import game_rosters, nhl, nhl_previews, rosters, status_report, transactions
+    from pipeline.ingest import game_rosters, game_stats, nhl, nhl_previews, rosters, status_report, transactions
     from pipeline.metrics import availability, player_game, team_game, units, xg_model
     import polars as pl
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=True)}
     out["build"] = games.build_season(season)
+    out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     team_game.build(season)

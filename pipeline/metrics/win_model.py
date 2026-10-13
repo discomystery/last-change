@@ -12,9 +12,12 @@ Lineups shift each team's chance rating, in the same expected-goals-per-game uni
 skater is valued by his isolated 5v5 impact (rapm.py, fitted on earlier seasons only) times his usual 5v5 ice time,
 and a lineup is compared with the lineups behind the team's rating, so the model does not wait for results to show
 that a star is missing or back.
-  - roster (morning): the lineup the team used in its previous game, changed by NHL.com Status Report news since
-    then (a player reported out leaves it, one reported as playing comes back). Catches players already out or
-    back, and tonight's news where the league reported it.
+  - roster (morning): the lineup the team used in its previous game, changed by news since then (NHL.com Status
+    Report and roster moves: a player reported out leaves it, one reported as playing or activated comes back), and
+    with any regular who sat out the last game or two with nothing reported put back, as the preview words it
+    ("played without him last game", not "will be without"; Sora, 2026-10-13). Backtest morning log loss with both
+    changes, 2024-25 / 2025-26 / 2026-27 so far: 0.6593 -> 0.6597 / 0.6833 -> 0.6829 / 0.6259 -> 0.6271 (89 games),
+    so the words and the numbers now agree at no measurable cost over two full seasons.
   - lineup (puck drop): tonight's dressed skaters, which also catches tonight's changes.
 Backtest 2024-25 to 2026-27: in the 37% of games where a team's lineup was clearly weaker (0.15 expected goals a
 game) than the lineups behind its rating, the model without lineups gave it 46%, the morning figure 42%, the
@@ -53,6 +56,8 @@ class Params:
     decay: float = 0.95  # weight kept per game played since (half-life about 14 games)
     carry: float = 0.8  # extra weight kept on last season's games when a new season starts
     prior_games: float = 4.0  # phantom league-average games added to every rating
+    short_back: int = 2  # a regular who missed up to this many games with nothing reported is expected back (0: off)
+    transactions: bool = True  # roster moves (ESPN) count as news beside the NHL.com Status Report
 
 
 def team_games(seasons: list[int]) -> pl.DataFrame:
@@ -122,18 +127,27 @@ def _rates(season: int, have: list[int]) -> dict[int, float]:
 
 # Status Report news that takes a player out of the expected lineup (ingest/status_report.py); "day" (day to day,
 # game-time decision) is left as is, "playing" puts a player back in.
-NEWS_OUT = {"season", "long", "ir", "week", "personal", "suspended", "out"}
+NEWS_OUT = {"season", "long", "ir", "week", "personal", "suspended", "out", "assigned"}
+# Roster moves (ingest/transactions.py) read the same way: injured reserve, suspensions and assignments to the minors
+# take a player out; activation from injured reserve or a suspension puts him back. A recall alone does not.
+MOVE_AS = {"ir": "ir", "long": "long", "suspended": "suspended", "assigned": "assigned", "activated": "playing"}
 
 
-def _news(seasons) -> dict[int, list[tuple[str, str]]]:
-    """Each player's Status Report mentions, [(date, status)] in date order, where the table has been built."""
+def _news(seasons, moves: bool = True) -> dict[int, list[tuple[str, str]]]:
+    """Each player's Status Report mentions and (with `moves`) roster moves, [(date, status)] in date order, where the
+    tables have been built: the same reports the availability table and the preview wording read."""
     out: dict[int, list[tuple[str, str]]] = defaultdict(list)
     for s in seasons:
         f = TABLES / str(s) / "status_reports.parquet"
         if f.exists():
-            for d, pid, st in pl.read_parquet(f).sort("date").select("date", "player_id", "status").iter_rows():
+            for d, pid, st in pl.read_parquet(f).select("date", "player_id", "status").iter_rows():
                 out[pid].append((d, st))
-    return out
+        f = TABLES / str(s) / "transactions.parquet"
+        if moves and f.exists():
+            for d, pid, st in pl.read_parquet(f).drop_nulls("player_id").select("date", "player_id", "status").iter_rows():
+                if st in MOVE_AS:
+                    out[pid].append((d, MOVE_AS[st]))
+    return {k: sorted(v) for k, v in out.items()}
 
 
 @lru_cache(maxsize=4)
@@ -161,7 +175,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     valued at his usual night (what he would add if the rating counted on him fully)."""
     have = [s for s in range(min(seasons) - 2, max(seasons) + 1) if (TABLES / str(s) / "player_game.parquet").exists()]
     rate = {s: _rates(s, have) for s in seasons}
-    news = _news(seasons)
+    news = _news(seasons, p.transactions)
     pg = pl.concat([
         pl.read_parquet(TABLES / str(s) / "player_game.parquet").filter(pl.col("pos") != "G").select("game_id", "player_id", "team_id", "pos", "sec5")
         .join(pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date"), on="game_id")
@@ -172,6 +186,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     seen: dict[int, dict[int, float]] = defaultdict(lambda: defaultdict(float))  # per team: decayed 5v5 seconds per skater
     seen_w: dict[int, float] = defaultdict(float)  # per team: decayed game count, as in pregame
     last: dict[int, tuple[list, list, str]] = {}  # per team: skaters, positions and date of its latest game
+    recent: dict[int, list[tuple[set, str]]] = defaultdict(list)  # per team: its last few lineups and their dates
     team_of: dict[int, tuple[int, str]] = {}  # per skater: his latest team and position
     dressed: dict[int, set] = defaultdict(set)  # per team: skaters who have dressed for it this season
     who: dict[tuple[int, int], dict] = {}
@@ -199,6 +214,24 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
         back = sorted((q for q, (t, _) in team_of.items() if t == tid and q not in ids and latest(q, prev_day, day) == "playing"),
                       key=lambda q: -(tx[q] / tw[q] if tw[q] else 0))
         zero = set(out)
+        # A regular who sat out the last game or two with nothing reported is expected back: the preview only says
+        # "played without him last game" then (Sora, 2026-10-13: the numbers should assume what the words do).
+        # Regular = dressed in three of the team's five games before he went missing.
+        if p.short_back:
+            hist = recent[tid]
+            have = set(back) | set(ids)
+            for k in range(1, p.short_back + 1):
+                if len(hist) < k + 3:
+                    break
+                gone_since = hist[-k - 1][1]  # the last game he dressed for
+                before = hist[-k - 6:-k] if len(hist) > k + 5 else hist[:-k]
+                for q in hist[-k - 1][0]:
+                    if q in have or team_of.get(q, (None,))[0] != tid or any(q in x[0] for x in hist[-k:]):
+                        continue
+                    if sum(q in x[0] for x in before[-5:]) < 3 or latest(q, gone_since, day) is not None:
+                        continue
+                    back.append(q)
+                    have.add(q)
         for q in back:
             group = team_of[q][1] == "D"
             slots = [i for i, x in enumerate(ids) if (pos[i] == "D") == group]
@@ -252,6 +285,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
             for q, sec in zip(ids, sh):
                 seen[tid][q] += sec
             last[tid] = (ids, pos, d0)
+            recent[tid] = (recent[tid] + [(set(ids), d0)])[-8:]
             dressed[tid].update(ids)
             for q, x in zip(ids, pos):
                 team_of[q] = (tid, x)

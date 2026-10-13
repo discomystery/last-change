@@ -130,6 +130,43 @@ def _unavailable(season: int, team: str, day: str) -> tuple[set[int], set[int]] 
     return set(t.filter(pl.col("status").is_in(list(OUT)))["player_id"].to_list()), set(t["player_id"].to_list())
 
 
+def _listed_goalies(season: int, team: str, day: str) -> set[int]:
+    """Goalies with the club and not out, from the latest availability rows on or before `day`."""
+    from pipeline.metrics import availability
+
+    t = availability.load(season)
+    if t.is_empty():
+        return set()
+    t = t.filter((pl.col("team") == team) & (pl.col("date") <= day) & (pl.col("pos") == "G"))
+    if t.is_empty():
+        return set()
+    t = t.filter(pl.col("date") == t["date"].max())
+    return set(t.filter(~pl.col("status").is_in(list(OUT)))["player_id"].to_list())
+
+
+def _newcomer(pid: int, team_starts: list[tuple], goalie_starts: dict, st: pl.DataFrame, day: str, season: int) -> dict:
+    """A feature row for a goalie with the club who has not started for it lately (a new backup, say), so the
+    back-to-back rule has someone to turn to (eye test, 2026-10-13: Vladar was picked for the second night of a
+    back-to-back after allowing seven because his new partner had no starts with the club). His share of starts is
+    his own share with whatever club he started for last season."""
+    prev = st.filter((pl.col("season") == season - 1))
+    mine = prev.filter(pl.col("player_id") == pid)
+    if mine.height:
+        club = mine["team"].mode()[0]
+        share = mine.filter(pl.col("team") == club).height / max(1, prev.filter(pl.col("team") == club).height)
+    else:
+        share = 0.0
+    today = Date.fromisoformat(day)
+    h = team_starts
+    prev_start = h[-1] if h else None
+    b2b = int(prev_start is not None and (today - Date.fromisoformat(prev_start[0])).days == 1)
+    own = [x for x in goalie_starts.get(pid, []) if x[0] < day]
+    hot = sum(v for _, v in own[-3:] if v is not None and v == v)
+    return {"cand": pid, "last": 0, "streak": 0, "sh5": 0.0, "sh10": 0.0, "shs": share, "b2b": b2b, "last_b2b": 0,
+            "hot": hot, "last_hot": 0, "rest": min(10, (today - Date.fromisoformat(own[-1][0])).days) if own else 10,
+            "ncur": min(len([x for x in h if x[1] == season]), 10)}
+
+
 def _promote(ranked: list[tuple[int, float]], pick: int) -> list[tuple[int, float]]:
     """NHL.com's projected starter first with NHL_CHANCE, the model's other goalies sharing the rest in their order."""
     rest = [(p, q) for p, q in ranked if p != pick]
@@ -171,7 +208,10 @@ def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None
             if got:
                 out_now, listed = got
                 drop = out_now | {c for c in {x[2] for x in team[t][-POOL:]} if c not in listed}
-            ranked = _score(_rows(team[t], gl, g["date"], season), drop)
+            rows = _rows(team[t], gl, g["date"], season)
+            known = {x["cand"] for x in rows}
+            rows += [_newcomer(q, team[t], gl, st, g["date"], season) for q in sorted(_listed_goalies(season, t, g["date"]) - known - drop)]
+            ranked = _score(rows, drop)
             pick = (nhl.get(g["id"]) or {}).get(t)
             if pick and pick not in drop:
                 ranked = _promote(ranked, pick)

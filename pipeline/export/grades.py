@@ -136,9 +136,12 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
                                    "between the league-average tick and the ring is partly; short of the tick, it didn’t happen.")
             if scaled:
                 name = previews.SCORES[m].capitalize()
-                out["happened"] = (f"{name} {f(sc(v))}, against their usual {f(sc(base))}." if verdict == "held" else
-                                   f"{name} {f(sc(v))}, short of their usual {f(sc(base))} but above the league average." if verdict == "partly" else
-                                   f"{name} {f(sc(v))}, below the league average of 100 (their usual is {f(sc(base))}).")
+                tv, ub = f(sc(v)), f(sc(base))  # compared as shown: "123, short of their usual 123" read as a bug
+                out["happened"] = (f"{name} {tv}, against their usual {ub}." if verdict == "held" else
+                                   (f"{name} {tv}, a hair under their usual" if tv == ub else f"{name} {tv}, short of their usual {ub}")
+                                   + " but above the league average." if verdict == "partly" else
+                                   f"{name} {tv}, a hair under the league average of 100 (their usual is {ub})." if tv == "100" else
+                                   f"{name} {tv}, below the league average of 100 (their usual is {ub}).")
                 out |= {"usual": f"score {f(sc(base))}", "tonight": f"score {f(sc(v))}", "league": "score 100"}
         elif kind == "duel":
             lean = claim.get("lean") or ("offense" if chk.get("direction") == "above" else "defense")
@@ -223,10 +226,18 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
                            tip=f"The game’s pace tonight (the filled dot) against {places.get(bar_team, bar_team)}’s usual (the ring). Past the ring holds the "
                                "call; between the league-average tick and the ring is partly; otherwise it didn’t happen.")
         if scaled:
-            short = "short of" if (verdict != "held") else "against"
-            out["happened"] = (f"Pace score {f(sc(v))}, {short} {places.get(bar_team, bar_team)}’s usual {f(sc(base))}"
-                               + ("." if verdict == "held" else f" but {'above' if chk['direction'] == 'above' else 'below'} the league average." if verdict == "partly"
-                                  else f", and {'below' if chk['direction'] == 'above' else 'above'} the league average of 100."))
+            up = chk["direction"] == "above"
+            tv, ub, B = f(sc(v)), f(sc(base)), places.get(bar_team, bar_team)
+            if verdict == "held":
+                rel = f"against {B}’s usual {ub}"
+            elif tv == ub:  # compared as shown, never "100, below the league average of 100"
+                rel = f"a hair {'under' if up else 'over'} {B}’s usual {ub}"
+            else:
+                rel = f"{'short of' if up else 'above'} {B}’s usual {ub}"
+            out["happened"] = (f"Pace score {tv}, {rel}"
+                               + ("." if verdict == "held" else f" but {'above' if up else 'below'} the league average." if verdict == "partly"
+                                  else ", and right at the league average of 100." if tv == "100"
+                                  else f", and {'below' if up else 'above'} the league average of 100."))
             out |= {"usual": f"score {f(sc(base))}", "tonight": f"score {f(sc(v))}", "league": "score 100"}
         rows = [row(g["away"]), row(g["home"])]
         if all(rows):
@@ -286,12 +297,65 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
             else:
                 exp = f", where their blended level would mean about {round(base * sec / 3600)}"
             out["saw"] = lead + exp + (f" · {sog_txt}" if sog_txt else "")
+    if title and m in ("pp", "pk") and kind in ("clash", "duel", "edge", "contrast"):
+        title, plain = _pp_goals(S, gid, claim, chk, verdict, title, plain, w, places)
     if title:
         if isinstance(title, list):  # a pool, picked the same way every run for this call, varied across games
             title = previews._pick(title, claim.get("id"), verdict)
         out["title"] = _fmt(title, **w).rstrip(".")
         out["plain"] = _fmt(plain, **w)
     return out
+
+
+def _record(team: str, g: int, n: int, places: dict) -> str:
+    return f"{places.get(team, team)} {g} for {n}"
+
+
+def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: str, w: dict, places: dict):
+    """Special-teams calls are graded on chances, the fair test, but the goals are what a fan saw (eye test,
+    2026-10-13: "shut down" a power play that scored twice, "got theirs" after 0-for-3). Adds the goals to the plain
+    sentence, and when they point the other way from the grade, says so and swaps a title that would deny them."""
+    kind, m = claim["kind"], claim["metric"]
+    if kind in ("edge", "contrast"):
+        top, bot = chk["team"], chk["opp"]
+        if m == "pp":  # whose power play did better tonight
+            (gt, nt), (gb, nb) = S.pp_record(gid, top), S.pp_record(gid, bot)
+            facts = f"On the scoreboard: {_record(top, gt, nt, places)}, {_record(bot, gb, nb, places)} on the power play."
+            better_top, better_bot = gt > gb, gb > gt
+        else:  # whose kill did better: fewer goals allowed
+            (gt, nt), (gb, nb) = S.pp_record(gid, bot), S.pp_record(gid, top)  # top's kill faced bot's power play
+            facts = (f"On the scoreboard, {places.get(top, top)} killed {nt - gt} of {nt} penalties and {places.get(bot, bot)} {nb - gb} of {nb}."
+                     if nt or nb else "")
+            better_top, better_bot = gt < gb, gb < gt
+        favoured_top = verdict in ("held", "partly")
+        if (favoured_top and better_bot) or (not favoured_top and better_top):
+            title = "{topc} won the chances, {botc} the goals" if favoured_top else "{botc} won the chances, {topc} the goals"
+            what = "power play" if m == "pp" else "penalty kill"
+            won, lost = ("{top}", "{bot}") if favoured_top else ("{bot}", "{top}")
+            plain = (f"{won} made the better chances on the {what}, but {lost} came out ahead where it counts." if m == "pp" else
+                     f"{won} gave up less on the {what}, but {lost} allowed fewer goals.")
+            return title, _fmt(plain, **w) + " " + facts
+        elif favoured_top and not better_top and (nt or nb):  # ahead on chances, level on goals
+            title = "{topc} had the better chances" if m == "pp" else "{topc} gave up less"
+            plain = (f"{{top}} made the better chances on the power play, as the gap between these two suggested, but the goals came out even."
+                     if m == "pp" else f"{{top}} gave up less on the penalty kill, as the gap between these two suggested, but the goals came out even.")
+            return title, _fmt(plain, **w) + " " + facts
+        return title, (plain + " " + facts).strip()
+    # clash, duel: one power play against one kill; does the verdict say the power play did well?
+    pp_team = claim["team"]
+    g, n = S.pp_record(gid, pp_team)
+    lean = claim.get("lean") or ("offense" if chk.get("direction") == "above" else "defense")
+    pp_did_well = verdict in ("held", "partly") if kind == "clash" or lean == "offense" else verdict == "missed"
+    T = places.get(pp_team, pp_team)
+    if pp_did_well and g == 0 and n:
+        title = "Chances, but no goal"
+        plain += f" They didn’t score on it, though: 0 for {n}."
+    elif not pp_did_well and g:
+        title = "{Xp} power play scored anyway" if "X" in w else title
+        plain += f" {T} still went {g} for {n} on the power play."
+    elif n:
+        plain += f" {T} went {g} for {n} on the power play."
+    return title, plain
 
 
 def _clock(sec: float) -> str:
