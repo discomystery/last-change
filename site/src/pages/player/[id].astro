@@ -105,7 +105,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots faced']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'What he carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on for'], ['recent', 'Recent games']] : []), ['standout', 'Where he stands out'], ['ratings', 'All ratings'], ['shots', 'Shots'], ['edge', 'Skating and shot']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);

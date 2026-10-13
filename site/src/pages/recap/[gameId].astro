@@ -192,8 +192,8 @@ const story = r.story;
 // How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
 const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it went']] : []), ['preview', 'The preview'],
-  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it unfolded']] : []), ['preview', 'What the preview said'],
+  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Did they do their job?']] : []), ['goalies', 'In net'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
