@@ -1,0 +1,281 @@
+---
+// Season trend on team pages (pipeline/export/trend.py): where a team has come from and whether this season's team
+// is a new version of it. A headline and a line on style over last season and this one game by game (ten-game line,
+// a hatched band for what bounces alone do, the date the play changed when one passes the reshuffle test), with the
+// story written onto the chart: each season's share of the chances and how last season ended. Then each style trait
+// last season (open ring) against this season (filled dot), and the franchise's history since 1997-98 behind a fold.
+// The two-season chart is drawn in the browser so its labels stay readable at any width.
+import { fpInfo, ordinal } from '../data/mock';
+interface Props { abbr: string; colour: string; place: string; t: any; window: number; band: [number, number]; season: number }
+const { abbr, colour, place, t, window: win, band, season } = Astro.props;
+const sn = (s: number) => `${s}-${String(s + 1).slice(-2)}`;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const day = (d: string) => `${MONTHS[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}`;
+const ROUND = ['Missed the playoffs', 'Out in the first round', 'Out in the second round', 'Out in the conference final', 'Lost in the Final', 'Won the Stanley Cup'];
+// Every season since 1997-98, with the lockout year left empty so the gap shows.
+type H = [number, number | null, number];
+const hist = (t.history as H[]);
+const first = hist.length ? hist[0][0] : season - 1;
+const cols: (H | null)[] = [];
+for (let s = first; s < season; s++) cols.push(hist.find((h) => h[0] === s) ?? null);
+const LO = 0.3, HI = 0.8; // points percentage at the bottom and top of the columns
+const height = (p: number) => Math.max(4, Math.min(100, (100 * (p - LO)) / (HI - LO)));
+const depth = (r: number) => (r === 0 ? 'miss' : r >= 3 ? 'deep' : 'made');
+const pts = (p: number) => p.toFixed(3).replace(/^0/, '');
+const made = hist.filter((h) => h[2] > 0).length;
+const cups = hist.filter((h) => h[2] === 5).map((h) => sn(h[0]));
+const ariaLong = `${place}: playoffs in ${made} of ${hist.length} seasons since ${sn(first)}${cups.length ? `, Stanley Cup in ${cups.join(' and ')}` : ''}.`;
+type Trait = { key: string; tag: 'new' | 'kept'; then: { pct: number; rank: number }; now: { pct: number; rank: number } };
+const traits = (t.traits as Trait[]).filter((r) => fpInfo[r.key]);
+const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
+---
+<div class="trend" style={`--tc:${colour}`}>
+  <div class="card tr-run">
+    <h3 class="tr-head">{t.head}</h3>
+    {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
+    <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
+    <p class="tr-key tr-key2">
+      <span class="k-line">Last {win} games</span><span class="k-dot">Each game</span><span class="k-band">What bounces alone do</span><span class="k-avg">Even</span>
+      <span class="k-ref">{t.change ? 'Before and after the change' : 'Each season so far'}</span>
+    </p>
+    {(t.around ?? []).length > 0 && (
+      <div class="tr-around">
+        <p class="mini-h">Around the same time</p>
+        <ol>
+          {(t.around as { i: number; date: string; text: string[] }[]).map((e, n) => (
+            <li><span class="tr-pin">{n + 1}</span><span class="tr-when">{day(e.date)}</span><span>{e.text.join('. ')}.</span></li>
+          ))}
+        </ol>
+        <p class="tr-caveat">Things that happened near the change date. The numbers can’t say which of them, if any, moved the play.</p>
+      </div>
+    )}
+    <script type="application/json" id="tr-data" set:html={JSON.stringify({ games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
+  </div>
+
+  {traits.length > 0 && <>
+    <h3 class="sub">Then and now</h3>
+    <ul class="tr-traits">
+      {traits.map((r) => {
+        const info = fpInfo[r.key];
+        return (
+          <li class="card tr-trait">
+            <div class="tr-th"><span class="tr-name">{info.label}</span><span class:list={['tr-tag', r.tag]}>{r.tag === 'new' ? 'New this season' : 'Carried over'}</span></div>
+            <div class="ends"><span>{info.lo}</span><span>{info.hi}</span></div>
+            <div class="lanes">
+              <span class="lane" style={`--a:${r.then.pct};--b:${r.now.pct}`} data-tip={`${sn(season - 1)}: ${ordinal(r.then.rank)} of 32. This season: ${ordinal(r.now.rank)}.`}>
+                <span class="gap"></span><span class="ring" style={`--v:${r.then.pct}`}></span><span class="dot" style={`--v:${r.now.pct}`}></span>
+              </span>
+            </div>
+            <p class="tr-ranks"><span class="k-ring">{ordinal(r.then.rank)} in {sn(season - 1)}</span><span class="k-dot">{ordinal(r.now.rank)} this season</span></p>
+          </li>
+        );
+      })}
+    </ul>
+    <p class="tr-note">{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
+  </>}
+
+  {hist.length > 0 && (
+    <details class="fold tr-hist">
+      <summary><span class="closed">Show their history since {sn(first)}</span><span class="opened">Hide their history</span></summary>
+      <figure class="card tr-long" role="img" aria-label={ariaLong}>
+        {t.history_text && <p class="tr-htext">{t.history_text}</p>}
+        <p class="mini-h">Points each season</p>
+        <div class="tr-cols" style={`--half:${height(0.5)}%`}>
+          {cols.map((h, i) => h && h[1] !== null
+            ? <span class:list={['tr-col', depth(h[2])]} style={`--h:${height(h[1])}%;--i:${i}`} data-tip={`${sn(h[0])}: ${pts(h[1])} of the points available. ${ROUND[h[2]]}.`}>{h[2] === 5 && <i class="tr-cup"></i>}</span>
+            : <span class="tr-col none" title={h ? '' : 'No season (lockout)'}></span>)}
+        </div>
+        <p class="tr-ax"><span>{sn(first)}</span><span>{sn(season - 1)}</span></p>
+        <p class="tr-key">
+          <span class="k-miss">Missed the playoffs</span><span class="k-made">Made them</span><span class="k-deep">Conference final or further</span>
+          {cups.length > 0 && <span class="k-cup">Won the Cup</span>}<span class="k-ref">Half the points</span>
+        </p>
+      </figure>
+    </details>
+  )}
+</div>
+
+<script>
+  // Last season and this one, game by game: each game's share of the 5-on-5 chances as a faint dot, the ten-game line,
+  // a hatched band for how far ten games drift on bounces alone, and the before/after levels when the play changed.
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = (s: string) => { const [, m, d] = s.split('-'); return `${MON[+m - 1]} ${+d}`; };
+  const sn = (s: number) => `${s}-${String(s + 1).slice(-2)}`;
+  const NS = 'http://www.w3.org/2000/svg';
+  function draw() {
+    const svg = document.getElementById('tr-svg') as SVGSVGElement | null;
+    const src = document.getElementById('tr-data');
+    if (!svg || !src) return;
+    const d = JSON.parse(src.textContent || '{}');
+    const g: any[] = d.games, n = g.length, win: number = d.window, brk = d.change;
+    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 230 : 270;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.height = `${H}px`;
+    const nt = d.notes || {}, L = 38, R = 10, T = 62, B = 24, LO = 25, HI = 75;
+    const x = (i: number) => L + ((W - L - R) * (i + 0.5)) / n;
+    const y = (v: number) => T + ((H - T - B) * (HI - Math.max(LO, Math.min(HI, v)))) / (HI - LO);
+    const share = (i: number, j: number) => { let f = 0, a = 0; for (let k = i; k < j; k++) { f += g[k][6]; a += g[k][7]; } return f + a ? (100 * f) / (f + a) : 50; };
+    const level = (i: number) => (brk ? (i < brk.k ? brk.before : brk.after) : share(0, n));
+    let o = `<defs><pattern id="tr-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect class="tr-hatch" width="3" height="6"/></pattern></defs>`;
+    for (const v of [30, 40, 50, 60, 70]) {
+      if (v !== 50) o += `<line class="tr-grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
+      o += `<text class="tr-yl" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}%</text>`;
+    }
+    // Months along the bottom, thinned on phones; the season break as a dotted line with each season named above.
+    let lastM = '', lastX = -99;
+    g.forEach((r, i) => {
+      const m = r[0].slice(5, 7);
+      if (m === lastM) return;
+      lastM = m;
+      if (narrow && +m % 2 === 0) return;
+      if (x(i) - lastX < (narrow ? 30 : 36)) return; // a month with a game or two (a September opener) would crowd the next
+      lastX = x(i);
+      o += `<text class="tr-xl" x="${x(i)}" y="${H - 6}">${MON[+m - 1].toUpperCase()}</text>`;
+    });
+    // Each season named at the top, with the story written under it: its share of the chances and how last season
+    // ended (with the streak it extends). This season's notes hang from the right edge.
+    const cut = g.findIndex((r) => r[8] === d.season);
+    const lastN = cut > 0 ? cut : n;
+    const pct = (v: number) => `${Math.round(v)}%`;
+    const head = (x0: number, anchor: string, rows: string[]) => rows.forEach((r, j) => {
+      if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 16}" text-anchor="${anchor}">${r}</text>`;
+    });
+    if (nt.last) head(L, 'start', [sn(d.season - 1), `${pct(nt.last.share)} of the chances${narrow ? '' : ` · ${nt.last.words}`}`,
+      [nt.last.result, narrow ? '' : nt.last.streak].filter(Boolean).join(' · ')]);
+    if (cut > 0) {
+      const cx = (x(cut - 1) + x(cut)) / 2;
+      o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T - 6}" y2="${H - B}"/>`;
+      if (nt.now) head(W - R, 'end', [sn(d.season), `${pct(nt.now.share)} so far`, `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
+    }
+    // Bounces alone: the band around the team's level (before and after the change, when there is one).
+    if (n >= win) {
+      const top: string[] = [], bot: string[] = [];
+      for (let i = win - 1; i < n; i++) { top.push(`${x(i).toFixed(1)},${y(level(i) + d.band[1]).toFixed(1)}`); bot.unshift(`${x(i).toFixed(1)},${y(level(i) + d.band[0]).toFixed(1)}`); }
+      o += `<polygon class="tr-band" points="${top.concat(bot).join(' ')}"/>`;
+    }
+    o += `<line class="tr-even" x1="${L}" x2="${W - R}" y1="${y(50)}" y2="${y(50)}"/>`;
+    g.forEach((r, i) => { const t = r[6] + r[7]; if (t > 0) o += `<circle class="tr-g" cx="${x(i).toFixed(1)}" cy="${y((100 * r[6]) / t).toFixed(1)}" r="${narrow ? 2.5 : 3}"/>`; });
+    if (!brk) {
+      // No change found: each season's level as a dotted line, the number it stands for written at the top.
+      const seg = (i: number, j: number) => { if (j > i) o += `<line class="tr-ref" x1="${x(i)}" x2="${x(j - 1)}" y1="${y(share(i, j))}" y2="${y(share(i, j))}"/>`; };
+      seg(0, lastN);
+      if (cut > 0) seg(cut, n);
+    }
+    if (brk) {
+      const lab = (v: number, words: string, x0: number, x1: number, end: boolean, below: boolean) =>
+        `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-rl" x="${end ? x1 : x0}" y="${y(v) + (below ? 15 : -7)}" text-anchor="${end ? 'end' : 'start'}">${words}</text>`;
+      const down = brk.after < brk.before;
+      o += lab(brk.before, `${Math.round(brk.before)}% before`, x(0), x(brk.k - 1), false, !down);
+      o += lab(brk.after, `${Math.round(brk.after)}% since ${day(g[brk.k][0])}`, x(brk.k), x(n - 1), true, down);
+    }
+    const pts: string[] = [];
+    for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
+    if (pts.length > 1) o += `<polyline class="tr-line" pathLength="1" points="${pts.join(' ')}"/>`;
+    // Numbered pins for what happened around the change, matching the list under the chart.
+    (d.around || []).forEach((e: any, j: number) => {
+      const px = x(e.i) - (x(1) - x(0)) / 2;
+      o += `<line class="tr-pinl" x1="${px}" x2="${px}" y1="${T}" y2="${H - B}"/>`;
+    });
+    let pins = '';
+    const placed: [number, number][] = [];
+    (d.around || []).forEach((e: any, j: number) => {
+      const px = x(e.i) - (x(1) - x(0)) / 2;
+      let stack = 0; // pins close together stack downward, each on the first free level
+      while (placed.some(([q, l]) => l === stack && Math.abs(q - px) < 20)) stack++;
+      placed.push([px, stack]);
+      const py = T + 10 + stack * 21;
+      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${px}" cy="${py}" r="9"/><text x="${px}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
+    });
+    // One tall hover target per game, read by the site's tooltip.
+    const step = (W - L - R) / n;
+    g.forEach((r, i) => {
+      const t = r[6] + r[7], res = r[3] > r[4] ? 'W' : r[5] === 'OT' || r[5] === 'SO' ? 'OTL' : 'L';
+      const tip = `${day(r[0])} ${r[2] ? 'vs' : 'at'} ${r[1]}, ${res} ${r[3]}-${r[4]}: ${t ? Math.round((100 * r[6]) / t) : 50}% of the chances${i >= win - 1 ? `; ${Math.round(share(i - win + 1, i + 1))}% over the last ${win}` : ''}`;
+      o += `<rect class="tr-hit" x="${(L + step * i).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${H - T - B}" data-tip="${tip}"/>`;
+    });
+    o += pins;
+    svg.innerHTML = o;
+  }
+  draw();
+  let rt = 0;
+  addEventListener('resize', () => { cancelAnimationFrame(rt); rt = requestAnimationFrame(draw); });
+</script>
+
+<style is:global>
+  .trend { --team: var(--tc); }
+    .tr-head { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 10px; text-wrap: balance; }
+  .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; max-width: 70ch; }
+  .tr-hist { margin-top: 26px; }
+  .tr-long { padding: 22px 24px; }
+  .tr-htext { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 16px; }
+  .tr-long { margin: 0; min-width: 0; }
+  .tr-long .mini-h { margin: 0 0 22px; }
+  /* Every season as a column: missed seasons faint, playoff seasons in the team colour, deep runs in full colour. */
+  .tr-cols { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 150px; border-bottom: 1px solid var(--rule); }
+  .tr-cols::after { content: ''; position: absolute; left: 0; right: 0; bottom: var(--half); border-top: 2px dotted var(--ink-3); opacity: 0.8; pointer-events: none; }
+  .tr-col { position: relative; flex: 1 1 0; min-width: 0; height: var(--h, 0); border-radius: 3px 3px 0 0; background: var(--track); cursor: default; }
+  .tr-col.made { background: color-mix(in oklab, var(--team) 50%, var(--sheet)); }
+  .tr-col.deep { background: var(--team); }
+  .tr-col.none { height: 0; }
+  .tr-col:hover { filter: brightness(0.92); }
+  .tr-cup { position: absolute; left: 50%; top: -11px; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: var(--ink); }
+  html.motion .seen .tr-col { animation: tr-rise 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 120ms + var(--i, 0) * 18ms); transform-origin: bottom; }
+  @keyframes tr-rise { from { transform: scaleY(0); } }
+  .tr-ax { display: flex; justify-content: space-between; margin: 6px 0 0; font: 500 12px var(--ui); color: var(--ink-3); }
+  .tr-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .tr-key > span { white-space: nowrap; }
+  :is(.k-miss, .k-made, .k-deep, .k-cup, .k-line)::before { content: ''; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+  :is(.k-miss, .k-made, .k-deep)::before { width: 10px; height: 12px; border-radius: 2px 2px 0 0; }
+  .k-miss::before { background: var(--track); }
+  .k-made::before { background: color-mix(in oklab, var(--team) 50%, var(--sheet)); }
+  .k-deep::before { background: var(--team); }
+  .k-cup::before { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); vertical-align: 1px; }
+  .k-line::before { width: 20px; height: 3px; border-radius: 2px; background: var(--team); vertical-align: 3px; }
+  .tr-key2 .k-dot::before { opacity: 0.35; width: 8px; height: 8px; }
+  /* The two-season chart. */
+  .tr-run { padding: 22px 24px 16px; }
+  .tr-svg { display: block; width: 100%; overflow: visible; }
+  .tr-svg text { font: 500 11px var(--ui); fill: var(--ink-3); }
+  .tr-svg .tr-sl { font: 700 12px var(--ui); letter-spacing: 0.07em; fill: var(--ink); }
+  .tr-svg .tr-note { font: 500 12px var(--ui); fill: var(--ink-2); }
+  .tr-svg .tr-rl { font: 600 12px var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
+  .tr-grid { stroke: var(--rule); stroke-width: 1; }
+  .tr-even { stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 2; }
+  .tr-break { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 1.5 4; stroke-linecap: round; }
+  .tr-hatch { fill: var(--luck); }
+  .tr-band { fill: url(#tr-hatch); stroke: var(--luck); stroke-width: 1; stroke-opacity: 0.6; }
+  .tr-g { fill: var(--team); fill-opacity: 0.28; }
+  .tr-line { fill: none; stroke: var(--team); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+  .tr-ref { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 1.5 5; stroke-linecap: round; }
+  .tr-hit { fill: transparent; }
+  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.3; stroke-width: 1; }
+  .tr-pinm circle { fill: var(--ink); }
+  .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
+  .tr-pinm { cursor: default; }
+  .tr-around { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .tr-around .mini-h { margin: 0 0 10px; }
+  .tr-around ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tr-around li { display: grid; grid-template-columns: 22px 58px 1fr; gap: 0 8px; align-items: baseline; font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
+  .tr-pin { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 11px var(--ui); transform: translateY(3px); }
+  .tr-when { font-weight: 600; color: var(--ink); }
+  .tr-caveat { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
+  .tr-hit:hover { fill: color-mix(in oklab, var(--ink) 6%, transparent); }
+  html.motion .seen .tr-line { stroke-dasharray: 1; animation: tr-draw 1.2s cubic-bezier(0.3, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--rv-delay, 0ms) + 200ms); }
+  @keyframes tr-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  /* Then and now: last season as an open ring, this season as the dot, the move as a bar between them. */
+  .tr-traits { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); }
+  .tr-trait { display: grid; gap: 10px; align-content: start; }
+  .tr-th { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .tr-name { font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
+  .tr-tag { font: 600 11px var(--ui); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--ink-2); }
+  .tr-tag.new { background: var(--ink); color: var(--sheet); }
+  .tr-trait .lanes { display: block; }
+  .tr-trait .lane { display: block; cursor: default; --team: inherit; }
+  .tr-ranks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin: 0; font: 400 14px var(--ui); color: var(--ink-2); }
+  .tr-note { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
+  @media (max-width: 719px) {
+    .tr-long { padding: 18px 16px; }
+    .tr-run { padding: 14px 12px 12px; }
+    .tr-cols { height: 120px; gap: 1px; }
+  }
+</style>
