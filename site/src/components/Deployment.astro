@@ -8,31 +8,26 @@ export interface Deploy { top: number; bottom: number; gap: number; last: number
 interface Props { d: Deploy; title?: string; tonight?: 'home' | 'road'; cls?: string }
 const { d, title, tonight, cls = '' } = Astro.props;
 
-const top = (n: number) => `${n}%`;
-// Verdict from the ranked figure (both seasons, this one weighing more); the numbers below are this season's.
+const nums = (t: number, b: number) => `their top forwards start there <strong>${t}%</strong> of the time, the bottom six <strong>${b}%</strong>`;
+// Verdict from the ranked figure (both seasons, this one weighing more); the numbers are this season's.
 const verdict = d.pct >= 70
-  ? 'They lean on that more than most teams.'
+  ? 'They do it more than most'
   : d.pct <= 30
-    ? d.gap < 0
-      ? 'They do the opposite so far: the bottom six start in the offensive zone more often than the top forwards.'
-      : 'They lean on it less than most teams and spread the offensive-zone draws around.'
-    : 'They do it about as much as most teams.';
-const split = (s: Split) => `top forwards ${top(s.top)}, bottom six ${top(s.bottom)}`;
+    ? d.gap < 0 ? 'They do the opposite' : 'They do it less than most'
+    : 'They do it about as much as most';
+const split = (s: Split) => `top forwards ${s.top}%, bottom six ${s.bottom}%`;
 const homeRoad = d.home && d.road
   ? tonight === 'road'
     ? ` On the road, where the home coach has the last change: ${split(d.road)}. At home: ${split(d.home)}.`
     : ` At home, where they have the last change: ${split(d.home)}. On the road: ${split(d.road)}.`
   : '';
 const lastBit = d.last === null ? '' : ` Last season their top forwards' number was ${d.last > 0 ? `${d.last} higher than the bottom six's` : d.last < 0 ? `${-d.last} lower than the bottom six's` : 'the same as the bottom six\'s'}.`;
-const tip = `Each game, the three forwards with the most 5-on-5 ice time count as the top forwards and the six with the least as the bottom six. Only 5-on-5 faceoffs in the offensive or defensive zone count; center-ice draws are left out. The slider ranks all ${d.of} teams on the difference between the two groups, counting last season too, with this season weighing more as games are played.${lastBit}`;
+const tip = `The percentages are how often each group starts in the offensive zone this season, counting only 5-on-5 faceoffs in the two ends (not center ice). Top forwards are each game's three forwards with the most 5-on-5 ice time; the bottom six are the six with the least. On a typical team the top forwards' number is about ${d.median} higher.${homeRoad}${lastBit} The slider ranks all ${d.of} teams on the gap between the two groups, counting last season too.`;
 ---
 <div class={`card deploy ${cls}`}>
   <p class="mini-h">{title ?? 'Who gets the offensive-zone faceoffs'}</p>
   <p class="deploy-say">
-    Coaches tend to send their top scorers out for faceoffs in the offensive zone and save their checkers for draws in their own end. {verdict}
-  </p>
-  <p class="deploy-say">
-    This season their three busiest forwards each night have started <strong>{d.top}%</strong> of their offensive- and defensive-zone faceoffs in the offensive zone, the bottom six <strong>{d.bottom}%</strong>. On a typical team the top forwards' number is about {d.median} higher.{homeRoad}
+    Most coaches give their top line the faceoffs in the offensive zone. {verdict}: <Fragment set:html={nums(d.top, d.bottom)} />.
   </p>
   <div class="deploy-scale">
     <span class="lo">Spread around</span>
