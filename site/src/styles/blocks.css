@@ -61,14 +61,13 @@
   /* Compact fingerprint rows (FpRow): name and rank, then the scale with its end words at either side; tap for the stat in words. */
   .fpr-hint { margin: -6px 0 12px; }
   .fold .fpr-hint { margin: 18px 0 12px; }
-  /* Trait groups: one column, in reading order; two columns (packed by height at build time, lib/masonry.ts) once both fit at 470px, the last card in each stretched so the columns end flush. */
+  /* Trait groups: one column, in reading order; two columns (packed by height at build time, lib/masonry.ts) once both fit at 470px so the columns end close to flush. */
   .fpr-groups { container-type: inline-size; }
   .fpr-cols { display: flex; flex-direction: column; gap: 14px; }
   .fpr-col { display: contents; }
   @container (min-width: 954px) {
-    .fpr-cols { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
+    .fpr-cols { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
     .fpr-col { display: flex; flex-direction: column; gap: 14px; }
-    .fpr-col > .fpr-grp:last-child { flex-grow: 1; }
   }
   .fpr-grp { padding: 16px 22px 8px; }
   .fpr-grp > h3 { font: 600 20px/1.15 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 2px; }
