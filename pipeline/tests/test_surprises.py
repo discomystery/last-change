@@ -72,3 +72,24 @@ def test_a_goalie_only_steals_one_when_he_saved_more_than_the_winning_margin():
     shut = {"CAR": 4, "PHI": 0, "goals": {"CAR": 4, "PHI": 0}, "non_en": {"CAR": 4, "PHI": 0}}
     s = surprises.goalie_night(gl(0, 1.2), places, shut, won)
     assert s["head"] == "A shutout for F. Andersen" and "stopped all 30 shots" in s["body"]
+
+
+def test_a_skater_leaving_turns_a_short_bench_or_a_new_line_into_something_the_team_had_to_do():
+    places = {"MIN": "Minnesota", "VGK": "Vegas"}
+    depth = surprises.team_stat("depth", "MIN", "VGK", 36.0, 42.0, 42.0, places)
+    trio = {"kind": "lineup", "score": 1.2, "tag": "Broke the pattern", "head": "Vegas tried a different line", "body": "",
+            "_trio": ("VGK", "A, B, D", 600, {1, 2, 4})}
+    sturm = {"id": 9, "name": "Nico Sturm", "pos": "C", "sec": 1066, "ejected": False}
+    top = {"id": 3, "name": "C Three", "pos": "R", "sec": 1500, "ejected": False}
+    out = surprises.forced([dict(depth), dict(trio)], {"MIN": [sturm], "VGK": [top]}, {"VGK": [[1, 2, 3]]}, places)
+    assert out[0]["head"] == "Minnesota had to shorten their bench" and out[0]["tag"] == "Out of the ordinary"
+    assert out[0]["body"].startswith("After Nico Sturm left late in the first period, Minnesota’s bottom-six forwards played 36%")
+    assert "about once every" in out[0]["body"] and out[0]["score"] == depth["score"]
+    assert out[1]["head"] == "Vegas had to shuffle their lines" and "_trio" not in out[1]
+    assert out[1]["body"].startswith("After C Three left in the second period, A, B, D played 10:00")
+    # a defenseman leaving explains no bench; nobody leaving leaves the card as it was
+    d = {**sturm, "pos": "D"}
+    assert surprises.forced([dict(depth)], {"MIN": [d]}, {}, places)[0]["head"] == "Minnesota shortened their bench"
+    assert surprises.forced([dict(trio)], {}, {"VGK": [[1, 2, 3]]}, places)[0]["head"] == "Vegas tried a different line"
+    assert surprises.when_left(2400) == "after the second period" and surprises.when_left(100) == "early in the first period"
+    assert surprises.left_clause([{**sturm, "ejected": True}]) == "After Nico Sturm was ejected late in the first period"
