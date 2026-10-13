@@ -132,6 +132,10 @@ def slump(t: str, res: list[dict], n: int, W) -> str:
     return f"{_cap(W.the(t))} are on a {num(n)}-game losing streak."
 
 
+def ORDINAL_N(n: int) -> str:
+    return {2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}.get(n, f"{n}th")
+
+
 def record(res: list[dict]) -> str:
     w = sum(r["win"] for r in res)
     otl = sum(not r["win"] and r["end"] != "REG" for r in res)
@@ -1068,10 +1072,33 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             items.append({"tag": "Streak", "text": f"{_cap(num(n))} straight wins for {W.the(t)}.", "score": 60 + n})
         if t == loser and prev_k == "won" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.poss(t))} {num(prev_n)}-game winning streak is over.", "score": 62 + prev_n})
-        if t == loser and k == "winless" and n >= 3:
+        if t == loser and k == "winless" and n >= 3 and not (len(res) >= 4 and n == len(res)):  # else told as the start
             items.append({"tag": "Slump", "text": slump(t, res, n, W), "score": 55 + n})
         if t == winner and prev_k == "winless" and prev_n >= 3:
-            items.append({"tag": "Snapped", "text": f"{_cap(W.the(t))} won for the first time in {num(prev_n + 1)} games.", "score": 58 + prev_n})
+            first_win = prev_n == len(res) - 1
+            items.append({"tag": "Snapped", "text": f"{_cap(W.the(t))} won for the first time this season, in their {ORDINAL_N(len(res))} game."
+                          if first_win else f"{_cap(W.the(t))} won for the first time in {num(prev_n + 1)} games.", "score": 58 + prev_n})
+        # how the season has started (eye test, 2026-10-13: wire recaps lead with these; ours never did)
+        regl = [x for x in res if not x["win"] and x["end"] == "REG"]
+        if len(res) >= 4 and not regl and not (k == "won" and n == len(res)):
+            items.append({"tag": "Start", "text": f"{_cap(W.the(t))} are {record(res)}, still without a regulation loss.", "score": 56})
+        elif len(res) >= 4 and k == "won" and n == len(res):
+            items.append({"tag": "Start", "text": f"{_cap(W.the(t))} are {record(res)}, perfect so far.", "score": 66 + n})
+        elif len(res) >= 4 and not any(x["win"] for x in res):
+            items.append({"tag": "Start", "text": f"{_cap(W.the(t))} are {record(res)}, still looking for their first win.", "score": 64 + len(res)})
+    home_games = [x for x in results(G.filter(pl.col("date") <= r["date"]), home, season) if x["home"]]
+    if len(home_games) == 1 and home_games[0]["game_id"] == gid:
+        items.append({"tag": "Home opener", "text": f"{_cap(W.the(home))} {'won' if winner == home else 'lost'} their home opener.", "score": 57})
+    meet = [x for x in results(G.filter(pl.col("date") <= r["date"]), winner, season) if x["opp"] == loser]
+    if len(meet) >= 2:
+        w_ = sum(x["win"] for x in meet)
+        l_ = len(meet) - w_
+        text = (f"{_cap(W.the(winner))} have won all {num(len(meet))} meetings this season." if not l_ and len(meet) > 2 else
+                f"{_cap(W.the(winner))} have won both meetings this season." if not l_ else
+                f"The season series is even at {w_}-{l_}." if w_ == l_ else
+                f"{_cap(W.the(winner))} lead the season series {w_}-{l_}." if w_ > l_ else
+                f"{_cap(W.the(loser))} still lead the season series {l_}-{w_}.")
+        items.append({"tag": "Season series", "text": text, "score": 35})
     pg = P.filter((pl.col("season") == season) & (pl.col("date") <= r["date"]))
     tonight = pg.filter(pl.col("game_id") == gid)
     for pr in tonight.filter(pl.col("pts") > 0).iter_rows(named=True):
