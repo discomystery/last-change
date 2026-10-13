@@ -93,6 +93,7 @@ def morning(season: int, games: list[dict]) -> dict[int, dict]:
     return out
 
 
+SURE_MISSED = 3  # games in a row missed, with nothing reported, before a preview says a team "will be without" him
 KEY_PLAYER = 0.04  # expected goals a game a missing or returning skater adds to his team's rating to be named
 
 
@@ -104,7 +105,7 @@ def _who(season: int) -> dict[int, dict]:
         return {}
     av = pl.read_parquet(path)
     av = av.filter(pl.col("date") == av["date"].max())
-    out_now = {(r["team"], r["player_id"]): r["report_status"] for r in av.filter(pl.col("status").is_in(["injured", "suspended", "personal", "scratched", "off_roster"])).iter_rows(named=True)}
+    out_now = {(r["team"], r["player_id"]): r for r in av.filter(pl.col("status").is_in(["injured", "suspended", "personal", "scratched", "off_roster"])).iter_rows(named=True)}
     names = {}
     for s in (season - 1, season):
         f = TABLES / str(s) / "players.parquet"
@@ -120,8 +121,12 @@ def _who(season: int) -> dict[int, dict]:
         # A star the rating has stopped counting on (out a long time) is still news to a reader.
         without = without or [p for p, t in stars.items() if (team, p) in out_now]
         back = [p for p, v in u["back"] if v >= KEY_PLAYER and p in u["in"]]
+        r = out_now[(team, without[0])] if without else {}
         out[tid] = {"without": names.get(without[0]) if without else None, "back": names.get(back[0]) if back else None,
-                    "maybe": bool(without) and out_now[(team, without[0])] == "day"}  # day to day: he may still play
+                    "maybe": r.get("report_status") == "day",  # day to day: he may still play
+                    # "will be without" needs a report or a run of missed games (eye test, 2026-10-13: five of 43 named
+                    # players who played); otherwise only that he missed their last game
+                    "sure": r.get("status") in ("injured", "suspended", "personal") or (r.get("games_missed") or 0) >= SURE_MISSED}
     return out
 
 
@@ -174,8 +179,13 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
     for side in (team, opp):
         lu = (lineups or {}).get(side) or {}
         if lu.get("without"):
-            verb = "may be" if lu.get("maybe") else "will be"
-            facts.append((roster, other[side], side, f"{verb} without {lu['without']}", f"{verb} without {lu['without']}"))
+            if lu.get("maybe"):
+                pred = pred_p = f"may be without {lu['without']}"
+            elif lu.get("sure", True):
+                pred = pred_p = f"will be without {lu['without']}"
+            else:
+                pred, pred_p = f"played without {lu['without']} last game", f"played without {lu['without']} last game"
+            facts.append((roster, other[side], side, pred, pred_p))
         if lu.get("back"):
             facts.append((roster, side, side, f"gets {lu['back']} back", f"get {lu['back']} back"))
     if abs(s.get("b2b", 0.0)) >= 0.005:
