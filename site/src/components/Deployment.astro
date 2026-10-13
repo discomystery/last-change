@@ -2,19 +2,26 @@
 // "Who gets the offensive-zone faceoffs": how much a coach sends his busiest forwards out for attacking-zone faceoffs and leaves the
 // defensive-zone draws to the bottom six. A habit, not good or bad, so it uses the neutral slider.
 import Marker from './Marker.astro';
+import teams from '../../public/data/teams.json';
 
 interface Split { top: number; bottom: number; gap: number }
 export interface Deploy { top: number; bottom: number; gap: number; last: number | null; games: number; blend: number; rank: number; of: number; pct: number; median: number; home: Split | null; road: Split | null }
-interface Props { d: Deploy; title?: string; tonight?: 'home' | 'road'; cls?: string }
-const { d, title, tonight, cls = '' } = Astro.props;
+interface Props { d: Deploy; abbr: string; title?: string; tonight?: 'home' | 'road'; cls?: string }
+const { d, abbr, title, tonight, cls = '' } = Astro.props;
+// Name who decides it: the head coach when we know him, else the team (plural verbs, as everywhere).
+const team = (teams as any[]).find((t) => t.abbr === abbr);
+const coach: string | null = team?.coach ?? null;
+const who = coach ?? team?.place ?? abbr;
+const does = coach ? 'does' : 'do';
+const their = coach ? 'his' : 'their';
 
-const nums = (t: number, b: number) => `their top forwards start there <strong>${t}%</strong> of the time, the bottom six <strong>${b}%</strong>`;
+const nums = (t: number, b: number) => `${their} top forwards start there <strong>${t}%</strong> of the time, the bottom six <strong>${b}%</strong>`;
 // Verdict from the ranked figure (both seasons, this one weighing more); the numbers are this season's.
-const verdict = d.pct >= 70
-  ? 'They do it more than most'
+const verdict = `${who} ${does} ${d.pct >= 70
+  ? 'it more than most'
   : d.pct <= 30
-    ? d.gap < 0 ? 'They do the opposite' : 'They do it less than most'
-    : 'They do it about as much as most';
+    ? d.gap < 0 ? 'the opposite' : 'it less than most'
+    : 'it about as much as most'}`;
 const split = (s: Split) => `top forwards ${s.top}%, bottom six ${s.bottom}%`;
 const homeRoad = d.home && d.road
   ? tonight === 'road'

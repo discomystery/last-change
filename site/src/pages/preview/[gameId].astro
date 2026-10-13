@@ -270,7 +270,7 @@ const _ = ordinal;
 
     {((LN[away] as any)?.deploy || (LN[home] as any)?.deploy) && (
       <div class="two deploy2">
-        {[away, home].map((a) => (LN[a] as any)?.deploy && <Deployment d={(LN[a] as any).deploy} title={`Offensive-zone faceoffs: ${place(a)}`} tonight={a === home ? 'home' : 'road'} cls={`t-${side(a)}`} />)}
+        {[away, home].map((a) => (LN[a] as any)?.deploy && <Deployment d={(LN[a] as any).deploy} abbr={a} title={`Offensive-zone faceoffs: ${place(a)}`} tonight={a === home ? 'home' : 'road'} cls={`t-${side(a)}`} />)}
       </div>
     )}
 
