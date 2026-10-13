@@ -120,6 +120,15 @@ def streak(res: list[dict]) -> tuple[str, int]:
     return ("won" if kind else "winless"), n
 
 
+def slump(t: str, res: list[dict], n: int, W) -> str:
+    """"The Flyers are on a four-game losing streak", or "winless in four (0-3-1)" when an overtime or shootout loss is
+    in it: writers don't call a run with a point in it a losing streak (eye test, 2026-10-13)."""
+    run = res[-n:]
+    if any(r["end"] != "REG" for r in run):
+        return f"{_cap(W.the(t))} are winless in {num(n)} ({record(run)})."
+    return f"{_cap(W.the(t))} are on a {num(n)}-game losing streak."
+
+
 def record(res: list[dict]) -> str:
     w = sum(r["win"] for r in res)
     otl = sum(not r["win"] and r["end"] != "REG" for r in res)
@@ -399,7 +408,7 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
     if kind == "won" and n >= 3:
         return f"{_cap(W.the(t))} have won {num(n)} straight{tail}."
     if kind == "winless" and n >= 3:
-        return f"{_cap(W.the(t))} are on a {num(n)}-game losing streak."
+        return slump(t, res, n, W)
     if kind == "won" and n >= 2:
         return f"{_cap(W.the(t))} have won two in a row{tail}."
     return None
@@ -609,6 +618,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if first["period"] <= 3:  # a lone overtime goal is told once, as the winner
             if first["p1"] in twice:
                 s1.append(f"{name(first['p1'])} scored twice, opening the scoring {_when(first)}.")
+            elif side(first) == loser:  # the headline names the winner, so say whose goal this was
+                s1.append(f"{_cap(W.poss(loser))} {name(first['p1'])} opened the scoring {_when(first)}.")
             else:
                 s1.append(f"{name(first['p1'])} opened the scoring {_when(first)}.")
         pp_two = [pid for pid in twice if all(g["strength"] == "pp" for g in by[pid])]
@@ -787,7 +798,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if t == loser and prev_k == "won" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.poss(t))} {num(prev_n)}-game winning streak is over.", "score": 62 + prev_n})
         if t == loser and k == "winless" and n >= 3:
-            items.append({"tag": "Slump", "text": f"{_cap(W.the(t))} are on a {num(n)}-game losing streak.", "score": 55 + n})
+            items.append({"tag": "Slump", "text": slump(t, res, n, W), "score": 55 + n})
         if t == winner and prev_k == "winless" and prev_n >= 3:
             items.append({"tag": "Snapped", "text": f"{_cap(W.the(t))} won for the first time in {num(prev_n + 1)} games.", "score": 58 + prev_n})
     pg = P.filter((pl.col("season") == season) & (pl.col("date") <= r["date"]))

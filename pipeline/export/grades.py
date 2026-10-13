@@ -136,9 +136,12 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
                                    "between the league-average tick and the ring is partly; short of the tick, it didn’t happen.")
             if scaled:
                 name = previews.SCORES[m].capitalize()
-                out["happened"] = (f"{name} {f(sc(v))}, against their usual {f(sc(base))}." if verdict == "held" else
-                                   f"{name} {f(sc(v))}, short of their usual {f(sc(base))} but above the league average." if verdict == "partly" else
-                                   f"{name} {f(sc(v))}, below the league average of 100 (their usual is {f(sc(base))}).")
+                tv, ub = f(sc(v)), f(sc(base))  # compared as shown: "123, short of their usual 123" read as a bug
+                out["happened"] = (f"{name} {tv}, against their usual {ub}." if verdict == "held" else
+                                   (f"{name} {tv}, a hair under their usual" if tv == ub else f"{name} {tv}, short of their usual {ub}")
+                                   + " but above the league average." if verdict == "partly" else
+                                   f"{name} {tv}, a hair under the league average of 100 (their usual is {ub})." if tv == "100" else
+                                   f"{name} {tv}, below the league average of 100 (their usual is {ub}).")
                 out |= {"usual": f"score {f(sc(base))}", "tonight": f"score {f(sc(v))}", "league": "score 100"}
         elif kind == "duel":
             lean = claim.get("lean") or ("offense" if chk.get("direction") == "above" else "defense")
@@ -223,10 +226,18 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
                            tip=f"The game’s pace tonight (the filled dot) against {places.get(bar_team, bar_team)}’s usual (the ring). Past the ring holds the "
                                "call; between the league-average tick and the ring is partly; otherwise it didn’t happen.")
         if scaled:
-            short = "short of" if (verdict != "held") else "against"
-            out["happened"] = (f"Pace score {f(sc(v))}, {short} {places.get(bar_team, bar_team)}’s usual {f(sc(base))}"
-                               + ("." if verdict == "held" else f" but {'above' if chk['direction'] == 'above' else 'below'} the league average." if verdict == "partly"
-                                  else f", and {'below' if chk['direction'] == 'above' else 'above'} the league average of 100."))
+            up = chk["direction"] == "above"
+            tv, ub, B = f(sc(v)), f(sc(base)), places.get(bar_team, bar_team)
+            if verdict == "held":
+                rel = f"against {B}’s usual {ub}"
+            elif tv == ub:  # compared as shown, never "100, below the league average of 100"
+                rel = f"a hair {'under' if up else 'over'} {B}’s usual {ub}"
+            else:
+                rel = f"{'short of' if up else 'above'} {B}’s usual {ub}"
+            out["happened"] = (f"Pace score {tv}, {rel}"
+                               + ("." if verdict == "held" else f" but {'above' if up else 'below'} the league average." if verdict == "partly"
+                                  else ", and right at the league average of 100." if tv == "100"
+                                  else f", and {'below' if up else 'above'} the league average of 100."))
             out |= {"usual": f"score {f(sc(base))}", "tonight": f"score {f(sc(v))}", "league": "score 100"}
         rows = [row(g["away"]), row(g["home"])]
         if all(rows):
