@@ -2,7 +2,7 @@
 
 The user is against sports betting, so the win chance is never shown, exported or saved before the game, in any
 file (the repo and the data branch are public). Before the game it only picks the wording of a short note written
-from one team's side ("a tough test", "might need a miracle"). After the game the post-game page works the chance out
+from one team's side ("a tough test", "should be favored"). After the game the post-game page works the chance out
 again from the same pre-game inputs (win_model uses only earlier days) and reveals it with its breakdown.
 
 Each note is written for both teams; the page shows the visitor's own team's version if it is playing, otherwise the
@@ -21,8 +21,10 @@ from pipeline.metrics import win_model
 # (upper bound on the team's chance, headline, caveat). Bands are for wording only and are never published.
 # Over 2025-26 the model's chances ran from about 38% to 70% for nine games in ten.
 BANDS = [
-    (0.30, ["A steep climb for {T}", "{T} has their work cut out", "Everything points away from {T}"],
-     ["{T} could still pull it off {how}, but they might need a miracle.", "{T}’s best hope is {how_bare}, plus a big night in goal."]),
+    # The two outer bands say "favored" and "work cut out", never "miracle" or "surprise" (eye test, 2026-10-13: of 19
+    # games told that way, the favorite lost about one in five, and Washington had won in Raleigh days earlier).
+    (0.30, ["A steep climb for {T}", "{T} has their work cut out", "{O} should be favored"],
+     ["{T} can still win it {how}, but a lot has to go their way.", "{T}’s best hope is {how_bare}, plus a big night in goal."]),
     (0.42, ["A tough matchup for {T}", "{T} faces a real test", "Not an easy night for {T}"],
      ["{T} can pull it off {how}.", "{T}’s best way through is {how_bare}."]),
     (0.48, ["A slightly uphill night for {T}", "{T} starts a half-step behind", "Close, but {O} has the slight edge"],
@@ -33,9 +35,8 @@ BANDS = [
      ["It’s still close, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
     (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} has a lot going for them"],
      ["{O} can make it interesting {how_o}.", "{O}’s way back in is {how_o_bare}."]),
-    (1.01, ["{T} has nearly everything going for them", "A big edge for {T}", "This one sets up well for {T}"],
-     ["Anything short of a win would be a surprise, though {O} can make a game of it {how_o}.",
-      "{O}’s only real way in is {how_o_bare}, and they would need a near-perfect night."]),
+    (1.01, ["{T} should be favored", "A big edge for {T}", "This one sets up well for {T}"],
+     ["It’s on {O} to make it a game, and they can {how_o}.", "{O}’s best way in is {how_o_bare}."]),
 ]
 # A team's way to win, from its strongest trait against the matching trait of the other team.
 ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare phrase)
