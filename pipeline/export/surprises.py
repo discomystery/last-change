@@ -392,10 +392,14 @@ HEADS = {  # kind -> (went up, went down): class -> headline, {T} the team whose
 
 
 def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, league: float | None, places: dict,
-              expected: float | None = None, fp: dict | None = None, season: int = CURRENT_SEASON) -> dict | None:
+              expected: float | None = None, fp: dict | None = None, season: int = CURRENT_SEASON, goals: int | None = None) -> dict | None:
     """`usual` is the team's own level, `expected` what the matchup predicted (their level against tonight's
-    opponent; the same as usual when the opponent does not matter)."""
+    opponent; the same as usual when the opponent does not matter). For the power play, `goals` is how many it
+    scored: a power play that scored was not shut down, and one that didn't score did not come alive, whatever its
+    chances said (eye test, 2026-10-13)."""
     if x is None or usual is None or league is None:
+        return None
+    if kind == "pp" and goals is not None and (goals > 0) != (x > (usual if expected is None else expected)):
         return None
     e = usual if expected is None else expected
     z = z_of(kind, x - e)
@@ -490,7 +494,7 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         u, lg = level(t, "quality")
         out.append(team_stat("quality", t, o, _quality(r), u, lg, places, against(u, lg, "qualityAllowed"), fp, season))
         u, lg = level(t, "pp")
-        out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season))
+        out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season, score["pp_goals"][t]))
         u, lg = level(t, "physical")
         out.append(team_stat("hits", t, o, _hits(r), u, lg, places, None, fp, season))
         u, lg = level(t, "depth")

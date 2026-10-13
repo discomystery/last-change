@@ -129,6 +129,13 @@ class Season:
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
 
+    def pp_record(self, gid: int, team: str) -> tuple[int, int]:
+        """(power-play goals, power-play chances) for a team by abbreviation."""
+        g = self.games[gid]
+        tid = self.team_id[(gid, team)]
+        opp = g["away_id"] if tid == g["home_id"] else g["home_id"]
+        return self.pp_goals(gid, tid), int(self.short.get((gid, opp), 0))
+
 
 def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
     """Tonight's figure for one call, its verdict, and a sentence saying what happened."""
