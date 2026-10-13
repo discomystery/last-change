@@ -170,7 +170,7 @@ const statRow = (x: any) => (isG ? null : x);
                 <dd>
                   {role.line ? (
                     <>
-                      <p><span class="chip tag" tabindex="0" data-tip={`${role.line.label}: ${s.group === 'D' ? 'pairs' : 'lines'} are numbered by recent 5-on-5 time together, with the latest games counting most. Taken from who has actually played together lately, not the announced lineup.`}>{role.line.label}</span> with {role.line.mates.map(nameLink).map((m, i) => <>{i > 0 && ' and '}{m.href ? <a class="plink" href={m.href}>{m.name}</a> : m.name}</>)}{role.line.toi_sec != null && <span class="n"> · {clock(role.line.toi_sec)} a game together</span>}</p>
+                      <p><span class="chip tag" tabindex="0" data-tip={`${role.line.label}: ${s.group === 'D' ? 'pairs' : 'lines'} are picked by recent 5-on-5 time together, with the latest games counting most, and numbered by their players’ ice time. Taken from who has actually played together lately, not the announced lineup.`}>{role.line.label}</span> with {role.line.mates.map(nameLink).map((m, i) => <>{i > 0 && ' and '}{m.href ? <a class="plink" href={m.href}>{m.name}</a> : m.name}</>)}{role.line.toi_sec != null && <span class="n"> · {clock(role.line.toi_sec)} a game together</span>}</p>
                     </>
                   ) : (
                     <p>Not part of one of the team’s usual {s.group === 'D' ? 'pairs' : 'lines'} over the last {Math.min(role.team_games, 10)} games{role.gp !== undefined ? `; has played ${role.gp} of the team’s ${role.team_games} games this season` : ''}.</p>
