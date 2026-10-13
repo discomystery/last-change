@@ -155,6 +155,11 @@ class Words:
         p = self.places.get(t, t)
         return self.the(t) if p.startswith("NY ") else p  # "NY Rangers" reads badly as a place
 
+    def at(self, t: str) -> str:
+        """Where a team's home games are, after a verb: "in Carolina", but "in New York" and "on Long Island" for the
+        New York clubs ("5-1 in the Rangers" read badly)."""
+        return {"NYR": "in New York", "NYI": "on Long Island"}.get(t, f"in {self.place(t)}")
+
 
 # --- preview -------------------------------------------------------------------------------------------------------
 
@@ -402,7 +407,8 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
 
 def preview_story(gid: int, away: str, home: str, start: str, places: dict, claims: list[dict],
                   outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
-    """The story for one preview, from data before the game and the calls already chosen for it."""
+    """The story for one preview, from data before the game and the calls already chosen for it. `start` is the game's
+    local date: games are dated locally, so a late start's UTC date would count the game itself."""
     W = Words(places)
     facts = preview_facts(away, home, start, W, season, likely)
     _, _, N = book()
@@ -412,14 +418,13 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     if len(m) == 1:
         r = m[0]
         winner = home if r["win"] else away
-        where = W.place(r["home"] and home or away) if r["home"] else W.place(away)
-        place = W.place(home) if r["home"] else W.place(away)
+        at = W.at(home) if r["home"] else W.at(away)
         if winner == away and r["home"]:
-            sents.append(f"{_cap(W.the(away))} already came to {place} once this season and left with a {score_text(r, win=True)}.")
+            sents.append(f"{_cap(W.the(away))} already played {at} once this season and left with a {score_text(r, win=True)}.")
         else:
-            sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} in {place}.")
+            sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} {at}.")
         if r["home"]:
-            facts["heads"].append((70, f"Round two in {W.place(home)}"))
+            facts["heads"].append((70, f"Round two {W.at(home)}"))
         else:
             facts["heads"].append((65, "Round two"))
     elif len(m) > 1:

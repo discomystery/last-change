@@ -36,7 +36,7 @@ RULES_VERSION = 12  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 11: second round of notes: edges carry stakes, fewer semicolons and "league"s, no rest venue, plainer changed calls
 # 12: third round of notes: hotter goalie-history calls, "chance would suggest", why shots in close matter, "even though" leans, shared Missing items
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
-METHODS = 1  # bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
+METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
 CLASHES = [
     ("volume", "suppression", "shot volume", "shot suppression"),
@@ -1062,9 +1062,12 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
         likely = _likely([g], g["date"]).get(g["id"]) or {}
     rest = rest_days(sched, g)
     rested = [t for t in (away, home) if rest.get(t, {}).get("days", 0) >= 1 and any(rest.get(o, {}).get("days") == 0 for o in (away, home) if o != t)]
-    rest_usual = usual_share(rested[0], g["start"]) if rested else None
+    # date-based cuts take the game's local date: a late start falls on the next UTC day, and the start's date would
+    # let a rebuilt preview see the game itself
+    day = g.get("date") or g["start"][:10]
+    rest_usual = usual_share(rested[0], day) if rested else None
     claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
-                   {**call_extras(site, g["start"]), "likely": likely, "rest": rest, "rest_usual": rest_usual})
+                   {**call_extras(site, day), "likely": likely, "rest": rest, "rest_usual": rest_usual})
     from pipeline.export import surprises, wording
     for c in claims:
         rep = special_teams_record(c, wording.places(places), surprises)
@@ -1084,7 +1087,7 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
-        out["story"] = stories.preview_story(g["id"], away, home, g["start"], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
+        out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out
