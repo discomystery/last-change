@@ -93,6 +93,7 @@ class Season:
         self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
+        self.first_game = {(t, p): g for t, p, g in players.group_by("team_id", "player_id").agg(pl.col("game_id").min()).iter_rows()}
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
@@ -403,7 +404,9 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
                 break
     left = {t: S.exits(gid, S.team_id[(gid, t)]) for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
-    cands = surprise_rules.forced(cands, left, usual_lines, places)
+    absent = {t: [{"id": p, "name": S.full.get(p, S.name.get(p, "?"))} for p in sorted({p for u in usual_lines.get(t, []) for p in u})
+                  if (gid, p) not in S.dressed and S.first_game.get((S.team_id[(gid, t)], p), gid) < gid] for t in (a, h)}
+    cands = surprise_rules.forced(cands, left, usual_lines, places, absent)
     cands, beyond = surprise_rules.against_calls(cands, list(calls))
     return surprise_rules.pick(cands), beyond
 

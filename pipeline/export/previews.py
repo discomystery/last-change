@@ -576,6 +576,9 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
     lab, n = r["label"][0], int(r["label"][1:])
     style = ("pair" if lab == "P" else "best" if n == 1 and j == 0 else "hunt" if n < j + 1 else "shadow" if n > j + 1 else "even")
     heads, why = MATCHUP_WORDS[style]
+    if style == "shadow" and n < 3:  # a second line on a first line is a tough-minutes job, not a checking line
+        heads = [h for h in heads if "checkers" not in h]
+        why = "{Coach} has been giving this group the hard job of facing {theirline}."
     w = {**team_words(home, places, "H"), **team_words(away, places, "O"), "mine": mine, "theirs": theirs,
          "Hstar": _star(unit, pts), "Ostar": _star(opp, pts)}
     theirline = "the other team’s top line" if j == 0 else f"opponents’ {ORD[j]} lines"
