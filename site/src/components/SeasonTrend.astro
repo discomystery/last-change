@@ -32,15 +32,19 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
 ---
 <div class="trend" style={`--tc:${colour}`}>
   <div class="card tr-run">
-    <h3 class="tr-head">{t.head}</h3>
+    <Explain id="tr-how" title={t.head} class="tr-head">
+      <p><strong>Dots:</strong> one game each, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play; below it, the other team did.</p>
+      <p><strong>Thick line:</strong> a running average, their share over each game and the {win - 1} before it, so one odd night doesn’t throw it.</p>
+      <p><strong>Hatched band:</strong> how far that average wanders on bounces alone. Inside it, nothing has to have changed.</p>
+      <p><strong>Dotted lines:</strong> their level before and after the play changed, or each season’s average when it didn’t.</p>
+      {(t.around ?? []).length > 0 && <p><strong>Numbered pins:</strong> other things that happened around the change. The numbers can’t say which of them, if any, caused it.</p>}
+    </Explain>
     {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
-    <p class="tr-how"><strong>How to read it:</strong> each dot is one game, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play than the other team; below it, less. The thick line is a running average: at each game, their share over that game and the {win - 1} before it, so one odd night doesn’t throw it.</p>
     <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <p class="tr-key tr-key2">
       <span class="k-line">{win}-game average</span><span class="k-dot">One game</span>
-      <span class="k-band term" tabindex="0" data-tip={`A ${win}-game line moves up and down even when nothing about the team has changed. Inside the band, the move is small enough to be bounces alone; outside it, something more is going on.`}>Normal ups and downs</span>
-      <span class="k-ref">{t.change ? 'Their level before and after the change' : 'Their average each season'}</span>
-      {(t.around ?? []).length > 0 && <span class="k-pin">What else happened (listed below)</span>}
+      <span class="k-band term" tabindex="0" data-tip={`How far a ${win}-game average wanders on bounces alone. Inside it, nothing has to have changed.`}>Bounce range</span>
+      <span class="k-ref">{t.change ? 'Before and after' : 'Season average'}</span>
     </p>
     {(t.around ?? []).length > 0 && (
       <div class="tr-around">
@@ -50,7 +54,6 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
             <li><span class="tr-pin">{n + 1}</span><span class="tr-when">{day(e.date)}</span><span>{e.text.join('. ')}.</span></li>
           ))}
         </ol>
-        <p class="tr-caveat">These happened near the date the play changed. The numbers can’t say which of them, if any, caused it.</p>
       </div>
     )}
     <script type="application/json" id="tr-data" set:html={JSON.stringify({ place, games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
@@ -60,6 +63,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     <Explain id="tr-then" title="Then and now">
       <p>Each card is one part of their style. The open ring is where they ranked last season, the filled dot where they rank this season, and the short tick in the middle is the league average.</p>
       <p><strong>New this season</strong> means the move is bigger than a few games of bounces would explain. <strong>Carried over</strong> means one of last season’s strongest habits is still there.</p>
+      <p>{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
     </Explain>
     <ul class="tr-traits">
       {traits.map((r) => {
@@ -78,7 +82,6 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
         );
       })}
     </ul>
-    <p class="tr-note">{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
   </>}
 
   {hist.length > 0 && (
@@ -118,13 +121,13 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 230 : 270;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.style.height = `${H}px`;
-    const nt = d.notes || {}, L = 38, R = 10, T = 62, B = 24, LO = 25, HI = 75;
+    const nt = d.notes || {}, L = 38, R = 10, T = 48, B = 24, LO = 25, HI = 75;
     const x = (i: number) => L + ((W - L - R) * (i + 0.5)) / n;
     const y = (v: number) => T + ((H - T - B) * (HI - Math.max(LO, Math.min(HI, v)))) / (HI - LO);
     const share = (i: number, j: number) => { let f = 0, a = 0; for (let k = i; k < j; k++) { f += g[k][6]; a += g[k][7]; } return f + a ? (100 * f) / (f + a) : 50; };
     const level = (i: number) => (brk ? (i < brk.k ? brk.before : brk.after) : share(0, n));
     let o = `<defs><pattern id="tr-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect class="tr-hatch" width="3" height="6"/></pattern></defs>`;
-    for (const v of [30, 40, 50, 60, 70]) {
+    for (const v of [30, 50, 70]) {
       if (v !== 50) o += `<line class="tr-grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
       o += `<text class="tr-yl" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}%</text>`;
     }
@@ -145,14 +148,13 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     const lastN = cut > 0 ? cut : n;
     const pct = (v: number) => `${Math.round(v)}%`;
     const head = (x0: number, anchor: string, rows: string[]) => rows.forEach((r, j) => {
-      if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 16}" text-anchor="${anchor}">${r}</text>`;
+      if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 17}" text-anchor="${anchor}">${r}</text>`;
     });
-    if (nt.last) head(L, 'start', [sn(d.season - 1), `${pct(nt.last.share)} of the chances${narrow ? '' : ` · ${nt.last.words}`}`,
-      [nt.last.result, narrow ? '' : nt.last.streak].filter(Boolean).join(' · ')]);
+    if (nt.last) head(L, 'start', [sn(d.season - 1), nt.last.result || '']);
     if (cut > 0) {
       const cx = (x(cut - 1) + x(cut)) / 2;
       o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T - 6}" y2="${H - B}"/>`;
-      if (nt.now) head(W - R, 'end', [sn(d.season), `${pct(nt.now.share)} so far`, `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
+      if (nt.now) head(W - R, 'end', [sn(d.season), `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
     }
     // Bounces alone: the band around the team's level (before and after the change, when there is one).
     if (n >= win) {
@@ -167,14 +169,16 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const seg = (i: number, j: number) => { if (j > i) o += `<line class="tr-ref" x1="${x(i)}" x2="${x(j - 1)}" y1="${y(share(i, j))}" y2="${y(share(i, j))}"/>`; };
       seg(0, lastN);
       if (cut > 0) seg(cut, n);
-      if (lastN > 4) o += `<text class="tr-rl" x="${x(0)}" y="${y(share(0, lastN)) + (share(0, lastN) >= 50 ? -7 : 15)}">${narrow ? '' : `${sn(d.season - 1)} average: `}${Math.round(share(0, lastN))}%</text>`;
+      const avg = (i: number, j: number, end: boolean) => { const v = share(i, j); o += `<text class="tr-rl" x="${end ? x(j - 1) : x(i)}" y="${y(v) + (v >= 50 ? -7 : 15)}" text-anchor="${end ? 'end' : 'start'}">${pct(v)}</text>`; };
+      if (lastN > 4) avg(0, lastN, false);
+      if (cut > 0 && n - cut > 0) avg(cut, n, true);
     }
     if (brk) {
       const lab = (v: number, words: string, x0: number, x1: number, end: boolean, below: boolean) =>
         `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-rl" x="${end ? x1 : x0}" y="${y(v) + (below ? 15 : -7)}" text-anchor="${end ? 'end' : 'start'}">${words}</text>`;
       const down = brk.after < brk.before;
-      o += lab(brk.before, `Before: ${Math.round(brk.before)}%`, x(0), x(brk.k - 1), false, !down);
-      o += lab(brk.after, `Since ${day(g[brk.k][0])}: ${Math.round(brk.after)}%`, x(brk.k), x(n - 1), true, down);
+      o += lab(brk.before, `Before ${Math.round(brk.before)}%`, x(0), x(brk.k - 1), false, !down);
+      o += lab(brk.after, `Since ${day(g[brk.k][0])} ${Math.round(brk.after)}%`, x(brk.k), x(n - 1), true, down);
     }
     const pts: string[] = [];
     for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
@@ -208,8 +212,8 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       if (fits(L + 6, L + 6 + w)) o += `<text class="tr-dir" x="${L + 6}" y="${y(v) + 4}">${txt}</text>`;
       else if (fits(W - R - 6 - w, W - R - 6)) o += `<text class="tr-dir" x="${W - R - 6}" y="${y(v) + 4}" text-anchor="end">${txt}</text>`;
     };
-    dir(narrow ? '▲ They had more' : `▲ ${d.place} had more of the chances`, 72, placed.map(([q]) => q));
-    dir('▼ The other team had more', 28, []);
+    dir(narrow ? '▲ Their edge' : `▲ ${d.place}’s edge`, 72, placed.map(([q]) => q));
+    dir('▼ Opponents’ edge', 28, []);
     o += `<text class="tr-rl tr-evl" x="${W - R}" y="${y(50) - 6}" text-anchor="end">Even</text>`;
     o += pins;
     svg.innerHTML = o;
@@ -271,7 +275,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-line { fill: none; stroke: var(--team); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
   .tr-ref { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 1.5 5; stroke-linecap: round; }
   .tr-hit { fill: transparent; }
-  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.3; stroke-width: 1; }
+  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.16; stroke-width: 1; }
   .tr-pinm circle { fill: var(--ink); }
   .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
   .tr-pinm { cursor: default; }
