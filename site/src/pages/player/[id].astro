@@ -243,7 +243,7 @@ const statRow = (x: any) => (isG ? null : x);
             const cmpOf = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
               ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
               : <>{cmpTip(it, true)}</>;
-            if (unplayed && m === 'season') return <div class="gmode m-season"><p class="note">He hasn’t played this season. Pick “this season and last” in the settings to see what he did last season.</p></div>;
+            if (unplayed && m === 'season') return <div class="gmode m-season"><p class="note">He hasn’t played this season. Pick “Blended” in the settings to see what he did last season.</p></div>;
             return (
               <div class={`gmode m-${m}`}>
                 <div class="two sw">
@@ -273,7 +273,7 @@ const statRow = (x: any) => (isG ? null : x);
             {unplayed
               ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The gray dots show last season.</p>
               : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
-            <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Adjusted stats” to Raw in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
+            <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
           </Fragment>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
           {GROUPS.map((grp) => (
@@ -421,7 +421,7 @@ const statRow = (x: any) => (isG ? null : x);
           </Fragment>
           {modes.map(([m, mw]) => {
             const x = g[m];
-            if (!x) return <div class={`gmode m-${m}`}><p class="note">He hasn’t played this season. Pick “this season and last” in the settings to see last season.</p></div>;
+            if (!x) return <div class={`gmode m-${m}`}><p class="note">He hasn’t played this season. Pick “Blended” in the settings to see last season.</p></div>;
             const few = x.pct.gsax === null;
             return (
               <div class={`gmode m-${m}`}>

@@ -193,7 +193,7 @@ const _ = ordinal;
             );
           })}
         </ol>
-        <p class="note">{settle(t.key)}{rawWords[t.key] && <> This trait is shown as a score where 100 is league average; switch “Adjusted stats” to Raw in the settings to rank teams by the numbers as recorded.</>}</p>
+        <p class="note">{settle(t.key)}{rawWords[t.key] && <> This trait is shown as a score where 100 is league average; switch “Adjusted stats” to Recorded in the settings to rank teams by the numbers as recorded.</>}</p>
       </div>
     ))}
   </Section>
@@ -330,7 +330,7 @@ const _ = ordinal;
   <Section id="sources" title="Goal sources" placeholder={false} takeaway="Where every team’s goals come from, against what luck alone would hand a league-average team.">
     <Fragment slot="explain">
       <p class="note">Most of these differences are luck: a team’s goal mix barely carries over from one half of a season to the other. Only the power play and everyday even-strength play show real habits. The hatched band is where 80% of league-average teams with the same number of goals would land; a dot outside it is more than luck would usually explain.</p>
-      <p class="note">League average: {srcInfo.map(([k, w]) => `${w} ${lgSrc[k]}%`).join(', ')}. “This season and last” pools both seasons; the luck range is wider for teams with fewer goals.</p>
+      <p class="note">League average: {srcInfo.map(([k, w]) => `${w} ${lgSrc[k]}%`).join(', ')}. “Blended” pools both seasons; the luck range is wider for teams with fewer goals.</p>
     </Fragment>
     <div class="pick"><span>Rank teams by share of</span>
       <select id="side-pick" aria-label="Goals scored or allowed">{sides.map(([v, w]) => <option value={v}>{w}</option>)}</select>

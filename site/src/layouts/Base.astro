@@ -1,6 +1,7 @@
 ---
 import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
+import PrefSwitches from '../components/PrefSwitches.astro';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
@@ -176,21 +177,22 @@ const teamList = teams as { abbr: string; name: string }[];
           </select>
         </label>
         <div class="pref">
-          <span>Numbers from</span>
+          <span class="term" tabindex="0" data-tip="Blended mixes this season with last, leaning more on this season as its games pile up, so early numbers don’t swing wildly. This season shows this season alone.">Seasons</span>
           <div class="mode" role="group" aria-label="Which seasons the numbers use">
-            <button type="button" data-pref="mode" data-value="blend">This season and last</button>
-            <button type="button" data-pref="mode" data-value="season">This season only</button>
+            <button type="button" data-pref="mode" data-value="blend">Blended</button>
+            <button type="button" data-pref="mode" data-value="season">This season</button>
           </div>
         </div>
         <div class="pref">
-          <span class="term" tabindex="0" data-tip="Two kinds of numbers are adjusted before they’re shown. Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Shot rates are weighted for the score and home ice, because teams that are behind shoot more. Adjusted shows both as scores, where 100 is league average. Raw shows the numbers exactly as recorded.">Adjusted stats</span>
-          <div class="mode" role="group" aria-label="Adjusted scores or raw recorded numbers">
+          <span class="term" tabindex="0" data-tip="Two kinds of numbers are adjusted before they’re shown. Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Shot rates are weighted for the score and home ice, because teams that are behind shoot more. Adjusted shows both as scores, where 100 is league average. Recorded shows the numbers exactly as the scorers counted them.">Adjusted stats</span>
+          <div class="mode" role="group" aria-label="Adjusted scores or recorded numbers">
             <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
-            <button type="button" data-pref="arena" data-value="raw">Raw</button>
+            <button type="button" data-pref="arena" data-value="raw">Recorded</button>
           </div>
         </div>
       </div>
     </header>
+    <div class="prefs-pin"><PrefSwitches /></div>
     <main><slot /></main>
     <nav class="tabbar" aria-label="Site">
       <a href={base} aria-current={cur('home')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" /></svg>Home</a>
@@ -244,6 +246,10 @@ const teamList = teams as { abbr: string; name: string }[];
         moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(more.hidden); });
         document.addEventListener('click', (e) => { if (!more.hidden && !more.contains(e.target)) setMore(false); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
+        // Once the settings strip has scrolled away, the two switches stay at the top of the screen (beside the pinned
+        // section menu, or on their own in .prefs-pin).
+        const head = document.querySelector('.site-head');
+        if (head && 'IntersectionObserver' in window) new IntersectionObserver(([e]) => root.classList.toggle('prefs-away', !e.isIntersecting)).observe(head);
         const toggle = document.getElementById('prefs-toggle');
         toggle.addEventListener('click', () => {
           const open = document.getElementById('prefs').classList.toggle('open');
@@ -536,6 +542,18 @@ const teamList = teams as { abbr: string; name: string }[];
   @media (max-width: 719px) {
     .prefs-toggle { display: inline-block; }
     .prefs:not(.open) { display: none; }
+  }
+  .mode.sm { padding: 1px; }
+  .mode.sm button { font-size: 12px; padding: 3px 9px; }
+  .pswitch { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  /* Pinned switches on pages without a pinned section menu: top right on wide screens, a slim bar on phones. */
+  .prefs-pin { position: fixed; z-index: 30; top: 0; right: 0; padding: 8px 16px; visibility: hidden; opacity: 0; transition: opacity 0.2s, visibility 0s 0.2s; pointer-events: none; }
+  html.prefs-away:not(:has(.secnav-pills.pinned)) .prefs-pin { visibility: visible; opacity: 1; transition: opacity 0.2s; pointer-events: auto; }
+  .prefs-pin .pswitch { background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: 999px; padding: 4px; }
+  @media (max-width: 719px) {
+    .prefs-pin { left: 0; padding: 0; padding-top: env(safe-area-inset-top, 0px); }
+    .prefs-pin .pswitch { justify-content: center; border-radius: 0; padding: 7px 16px; border-bottom: 1px solid var(--rule); }
+    html.prefs-away:has(.secnav-bar.secnav-bar) .prefs-pin { visibility: hidden; opacity: 0; pointer-events: none; }
   }
   .pref { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .pref > span { font-weight: 600; }
