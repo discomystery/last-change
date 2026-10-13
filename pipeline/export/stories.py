@@ -323,6 +323,60 @@ def _careers() -> dict[int, list[tuple[str, int, int]]]:
     return out
 
 
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str, loser: str, most: int = 2) -> list[str]:
+    """Up to `most` sentences on firsts, debuts and returns (export/firsts.py), most important first. A loser's player
+    is named with his team, since the paragraph is about the winner's goals."""
+    from pipeline.export import firsts
+    try:
+        found = firsts.for_game(gid, season, G, P)
+    except Exception as e:  # a nice-to-have: never lose the story over it
+        print(f"firsts for {gid} unavailable: {e!r}")
+        return []
+    out, returns = [], 0
+    for x in found:
+        if len(out) >= most:
+            break
+        pid = x["pid"]
+        if pid not in N:
+            continue
+        known = pid in said
+        who = name(pid)
+        if not known and x["team"] == loser:
+            who = f"{W.poss(loser)} {who}"
+        k = x["kind"]
+        if k == "first_goal":
+            debut = ", in his NHL debut" if x.get("debut") else ""
+            two = "" if x["goals"] == 1 else f", then added {'another' if x['goals'] == 2 else num(x['goals'] - 1) + ' more'}"
+            out.append(f"It was {_short(pid, P, N, season)}’s first NHL goal{debut}." if known and not two
+                       else f"{_cap(who)} scored his first NHL goal{debut}{two}.")
+        elif k == "debut":
+            if x.get("goalie"):
+                won = " and got the win" if x["team"] == winner else ""
+                out.append(f"{_cap(who)} made his NHL debut in net{won}.")
+            else:
+                pts = x.get("points") or 0
+                tail = f" and picked up {'a point' if pts == 1 else num(pts) + ' points'}" if pts else ""
+                out.append(f"{_cap(who)} played his first NHL game{tail}.")
+        elif k == "return":
+            if returns:
+                continue
+            returns += 1
+            if x.get("since"):
+                d = Date.fromisoformat(x["since"])
+                what = "was back in an NHL net for the first time since" if x.get("goalie") else "played his first NHL game since"
+                out.append(f"{_cap(who)} {what} {MONTHS[d.month - 1]} {d.day}, {d.year}.")
+            else:
+                out.append(f"{_cap(who)} was back in the lineup after missing {num(x['missed'])} games.")
+        elif k == "first_point":
+            out.append(f"{_cap(who)} picked up his first NHL point.")
+        elif k == "club_goal":
+            out.append(f"{_cap(who)} scored his first goal for {W.place(x['team'])}.")
+    return out
+
+
 def milestone(games: list[tuple[str, int, int]], before: str) -> tuple[float, str] | None:
     """(score, phrase) for the round number a skater is closest to, from his games before `before`, e.g. "is one goal
     from 400" or "is set to play his 800th NHL game"; None if nothing is close."""
@@ -644,6 +698,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 s1.append(f"{name(pid)} scored {num(len(gs))}: {_and(['one ' + k for k in kinds])}.")
             else:
                 s1.append(f"{name(pid)} scored {num(len(gs))}.")
+        s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser)
         if comeback:
             s1.append(f"{_cap(W.the(winner))} came all the way back." if any(x.endswith("half over.") and "led" in x for x in s1)
                       else f"{_cap(W.the(loser))} led by {num(lead_max[loser])}, but {W.the(winner)} came all the way back.")
