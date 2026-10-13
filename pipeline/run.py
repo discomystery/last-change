@@ -45,11 +45,12 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, nhl, nhl_previews, rosters
+    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
     if season == CURRENT_SEASON:
+        out["wikidata"] = names.fetch_wikidata()  # accented spellings of players' names, refreshed weekly
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
     moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
     out["shift_checks"] = check_saved_shifts(season)

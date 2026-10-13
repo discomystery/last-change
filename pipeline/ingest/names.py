@@ -5,8 +5,13 @@ The NHL's own feeds carry each name as `{"default": "Teravainen", "fi": "Teräv�
 only when it is the same name with accents added (same letters once the marks are taken off, more marks than the
 plain one), so a nickname's full form ("Will" / "William"), a different spelling or a typo in the feed is never
 taken. Players born in Russia, Belarus, Ukraine or Kazakhstan keep the English spelling: their language versions are
-Czech or Finnish transliterations of Cyrillic ("Naměstnikov"), not their own spelling. Where the NHL has no accented
-version at all, `FIXES` holds reviewed spellings by player id, checked by the same rule.
+Czech or Finnish transliterations of Cyrillic ("Naměstnikov"), not their own spelling.
+
+Where the NHL has no accented version, Wikidata fills in: its player entries carry the NHL player id (property
+P3522), so each English label is matched by id, never by name, and used by the same rule (Merzļikins, Fleury's
+Marc-André, Hämeenaho). Checked 2026-10-13: 1,508 of our 1,548 players are on it; it agreed with 1,392, added accents
+to 46, and every hand-made spelling below appears there in some language. `FIXES` holds the few reviewed spellings
+neither source gives in English, checked by the same rule.
 
 Names are spelled this way where they enter the tables (build/games.py, ingest/rosters.py, ingest/game_rosters.py),
 and `respell` brings tables saved earlier into line, so every page, sentence and search reads the same spelling.
@@ -14,10 +19,12 @@ Player ids and page addresses never change. Name matching against other sources 
 accents away (`fold`), so it is unaffected.
 
 Saved: data/raw/names/fields.json (each player's name fields as the NHL sent them in the play-by-play, and which seasons
-were read) and data/raw/names/countries.json (birth country, from the daily roster listing or the player's landing).
+were read), data/raw/names/countries.json (birth country, from the daily roster listing or the player's landing) and
+data/raw/names/wikidata.json (accented English labels by NHL id, refreshed weekly; one query, skipped offline).
 """
 import gzip
 import json
+import time
 import unicodedata
 from collections import Counter
 
@@ -31,26 +38,17 @@ NATIVE = {"FIN": ("fi", "sv"), "SWE": ("sv",), "CZE": ("cs",), "SVK": ("sk",), "
 # Letters that do not come apart into a base letter and a mark
 SPECIAL = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "Ae", "œ": "oe", "Œ": "Oe", "ß": "ss", "đ": "d", "Đ": "D", "ł": "l", "Ł": "L", "ı": "i"})
 
-# Reviewed spellings for players the NHL sends with no accented version (id: (first, last)). Each must be the
-# NHL's own name with accents added, or it is ignored (`_same`).
+WIKIDATA = "https://query.wikidata.org/sparql"
+WIKIDATA_DAYS = 7
+
+# Reviewed spellings neither the NHL nor Wikidata's English label gives (id: (first, last)); Wikidata has each of these
+# in other languages. Each must be the NHL's own name with accents added, or it is ignored (`_same`). French-Canadian
+# names are included (Sora's choice, 2026-10-13).
 FIXES: dict[int, tuple[str, str]] = {
-    8482487: ("Jakub", "Dobeš"),
-    8482877: ("Jaroslav", "Chmelař"),
-    8483686: ("Adam", "Engström"),
     8484164: ("Dalibor", "Dvorský"),
-    8484790: ("Adam", "Jiříček"),
-    8482765: ("Isak", "Rosén"),
     8480007: ("Jonas", "Røndbjerg"),  # Danish: the NHL's versions give the Swedish ö
-    8483669: ("Adam", "Sýkora"),
-    8485957: ("Alberts", "Šmits"),
-    8477970: ("Vítek", "Vaněček"),  # the NHL accents his last name only
-    8483500: ("Noah", "Östlund"),
-    # French-Canadian (Sora chose to include them, 2026-10-13)
     8483017: ("Frédéric", "Brunet"),
-    8480426: ("Charle-Édouard", "D'Astous"),
-    8477919: ("Frédérick", "Gaudreau"),
-    8478468: ("Jérémy", "Lauzon"),
-    8481534: ("Raphaël", "Lavoie"),
+    8480426: ("Charle-Édouard", "D'Astous"),  # Wikidata's English label has "Charles"
 }
 
 
@@ -88,13 +86,27 @@ def pick(field, country: str | None) -> str | None:
     return Counter(ok).most_common(1)[0][0]
 
 
+def _split(full: str, first: str, last: str) -> tuple[str, str] | None:
+    """Cut an accented full name where the plain first and last names meet ("Marc-André Fleury")."""
+    for i, c in enumerate(full):
+        if c == " " and strip(full[:i]) == strip(first) and strip(full[i + 1:]) == strip(last):
+            return full[:i], full[i + 1:]
+    return None
+
+
 def spell(pid: int, first, last, country: str | None = None) -> tuple[str | None, str | None]:
     """A player's first and last name as he spells them."""
     country = country or countries().get(str(pid))
+    plain = (pick(first, None), pick(last, None))
+    names = [pick(first, country), pick(last, country)]
     fix = FIXES.get(pid)
     if fix:  # checked against the NHL's plain spelling, so a fix can also correct its accents ("Röndbjerg" -> "Røndbjerg")
-        return tuple(x if _same(pick(field, None), x) else pick(field, country) for field, x in zip((first, last), fix))
-    return pick(first, country), pick(last, country)
+        names = [x if _same(p, x) else n for p, x, n in zip(plain, fix, names)]
+    label = wikidata().get(str(pid))
+    parts = _split(label, *names) if label and all(names) else None
+    if parts:
+        names = [w if _marks(w) > _marks(n) else n for w, n in zip(parts, names)]
+    return names[0], names[1]
 
 
 # --- saved fields and countries ---------------------------------------------------------------------------------
@@ -112,6 +124,37 @@ def _load(name: str) -> dict:
 def _save(name: str) -> None:
     FOLDER.mkdir(parents=True, exist_ok=True)
     (FOLDER / f"{name}.json").write_text(json.dumps(_cache[name], ensure_ascii=False, sort_keys=True))
+
+
+def wikidata() -> dict[str, str]:
+    """NHL id -> Wikidata's English label, for labels with accents."""
+    return _load("wikidata").get("labels", {})
+
+
+def fetch_wikidata() -> dict:
+    """Refresh the saved labels once a week; offline runs and failures keep the saved copy."""
+    saved = _load("wikidata")
+    if OFFLINE or time.time() - saved.get("fetched", 0) < WIKIDATA_DAYS * 86400:
+        return {"skipped": True, "labels": len(saved.get("labels", {}))}
+    import httpx
+
+    query = 'SELECT ?id ?en WHERE { ?p wdt:P3522 ?id . ?p rdfs:label ?en FILTER(lang(?en) = "en") }'
+    try:
+        res = httpx.get(WIKIDATA, params={"query": query, "format": "json"}, timeout=120,
+                        headers={"User-Agent": "Spare Line Change (github.com/discomystery/last-change)"})
+        res.raise_for_status()
+        rows = res.json()["results"]["bindings"]
+    except Exception as e:  # a missing refresh only means a week-old copy
+        print(f"wikidata unavailable: {e!r}")
+        return {"failed": True, "labels": len(saved.get("labels", {}))}
+    labels = {}
+    for r in rows:
+        name = unicodedata.normalize("NFC", r["en"]["value"])
+        if _marks(name):
+            labels.setdefault(r["id"]["value"], name)
+    _cache["wikidata"] = {"fetched": time.time(), "labels": labels}
+    _save("wikidata")
+    return {"labels": len(labels)}
 
 
 def countries() -> dict[str, str]:
@@ -167,21 +210,20 @@ def spellings(seasons: list[int], again: tuple[int, ...] = ()) -> dict[int, tupl
     """Every player seen in a game: id -> (first, last) as he spells them (for most, the NHL's plain spelling)."""
     read_seasons(seasons, again)
     _fill_countries()
-    out = {int(pid): spell(int(pid), f, l) for pid, (f, l) in _load("fields").get("players", {}).items()}
-    for pid, fix in FIXES.items():  # a reviewed spelling for someone not seen in a game yet (from the roster listing)
-        out.setdefault(pid, fix)
-    return out
+    return {int(pid): spell(int(pid), f, l) for pid, (f, l) in _load("fields").get("players", {}).items()}
 
 
 def respell(seasons: list[int], again: tuple[int, ...] = ()) -> dict:
     """Bring the saved player, roster and game-roster tables into line with `spellings`, both ways (a spelling taken out
-    of `FIXES` goes back to the NHL's). Only rewrites a name whose letters are the same once accents are taken off, so
-    it can never swap one player's name for another's."""
+    of `FIXES` goes back to the NHL's). A player only seen in roster listings is spelled from the listed name. Only
+    rewrites a name whose letters are the same once accents are taken off, so it can never swap one player's name for
+    another's."""
     names = spellings(seasons, again)
-    if not names:
-        return {}
-    look = pl.DataFrame({"player_id": list(names), "_f": [v[0] for v in names.values()], "_l": [v[1] for v in names.values()]},
-                        schema={"player_id": pl.Int64, "_f": pl.Utf8, "_l": pl.Utf8})
+
+    def target(pid: int, first: str | None, last: str | None) -> tuple[str | None, str | None]:
+        new = names.get(pid) or spell(pid, first, last)
+        return tuple(n if n and o and n != o and strip(n) == strip(o) else o for n, o in zip(new, (first, last)))
+
     out = {}
     for s in seasons:
         for table in ("players", "rosters", "game_rosters"):
@@ -191,13 +233,15 @@ def respell(seasons: list[int], again: tuple[int, ...] = ()) -> dict:
             t = pl.read_parquet(p)
             if not {"player_id", "first", "last"} <= set(t.columns):
                 continue
-            j = t.join(look, on="player_id", how="left", maintain_order="left")
-            ok_f = pl.col("_f").is_not_null() & (pl.col("_f") != pl.col("first")) & (pl.col("_f").map_elements(strip, return_dtype=pl.Utf8) == pl.col("first").map_elements(strip, return_dtype=pl.Utf8))
-            ok_l = pl.col("_l").is_not_null() & (pl.col("_l") != pl.col("last")) & (pl.col("_l").map_elements(strip, return_dtype=pl.Utf8) == pl.col("last").map_elements(strip, return_dtype=pl.Utf8))
-            n = j.filter(ok_f | ok_l).height
-            if n:
-                j = j.with_columns(pl.when(ok_f).then(pl.col("_f")).otherwise(pl.col("first")).alias("first"),
-                                   pl.when(ok_l).then(pl.col("_l")).otherwise(pl.col("last")).alias("last"))
-                j.select(t.columns).write_parquet(p)
-                out[f"{s}/{table}"] = n
+            keys = t.select("player_id", "first", "last").unique()
+            fixed = [(pid, f, l, *target(pid, f, l)) for pid, f, l in keys.iter_rows()]
+            fixed = [r for r in fixed if r[1:3] != r[3:5]]
+            if not fixed:
+                continue
+            look = pl.DataFrame(fixed, schema={"player_id": pl.Int64, "first": pl.Utf8, "last": pl.Utf8, "_f": pl.Utf8, "_l": pl.Utf8}, orient="row")
+            j = t.join(look, on=["player_id", "first", "last"], how="left", maintain_order="left", nulls_equal=True)
+            n = j.filter(pl.col("_f").is_not_null() | pl.col("_l").is_not_null()).height
+            j = j.with_columns(pl.coalesce("_f", "first").alias("first"), pl.coalesce("_l", "last").alias("last"))
+            j.select(t.columns).write_parquet(p)
+            out[f"{s}/{table}"] = n
     return out

@@ -41,3 +41,13 @@ def test_fixes_must_match_the_plain_name():
 def test_fold_matches_across_sources():
     assert names.fold("Mads Søgaard") == names.fold("Mads Sogaard") == "mads sogaard"
     assert names.fold("Juraj Slafkovský") == "juraj slafkovsky"
+
+
+def test_wikidata_label_by_id(monkeypatch):
+    monkeypatch.setattr(names, "wikidata", lambda: {"1": "Marc-André Fleury", "2": "Charles-Édouard D'Astous", "3": "Teuvo Teravainen"})
+    assert names.spell(1, {"default": "Marc-Andre"}, {"default": "Fleury"}, "CAN") == ("Marc-André", "Fleury")
+    # a label with different letters is never taken
+    assert names.spell(2, {"default": "Charle-Edouard"}, {"default": "D'Astous"}, "CAN") == ("Charle-Edouard", "D'Astous")
+    # nor one with fewer accents than the NHL's own version
+    last = {"default": "Teravainen", "fi": "Teräväinen"}
+    assert names.spell(3, {"default": "Teuvo"}, last, "FIN") == ("Teuvo", "Teräväinen")
