@@ -66,7 +66,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60))
 const last = (r?: Row) => r?.name.replace(/^.\. /, '') ?? '?';
 const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
 const tip = (r: Row) => {
-  const where = r.pct == null ? '' : ` Better than ${r.pct}% of ${peer[r.pos] ?? 'forwards'}’ nights last season.`;
+  const where = r.pct == null ? '' : ` Better than ${r.pct}% of nights by ${peer[r.pos] ?? 'forwards'} last season.`;
   if (r.pos === 'G') return `${two(r.score)} goals saved above expected.${where}`;
   const p = r.parts;
   return `Scoresheet ${two(p.sheet ?? 0)}. At 5-on-5 ${two(val(r, 'play'))}. Special teams ${two(p.special ?? 0)}.${where}`;
@@ -162,7 +162,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
                       </div>
                     ))}
                   </div>
-                  {r.pct != null && <p class="sw-dp"><Pips pct={r.pct} tip={tip(r)} /> Better than {r.pct}% of {peer[r.pos] ?? 'forwards'}’ nights last season.</p>}
+                  {r.pct != null && <p class="sw-dp"><Pips pct={r.pct} tip={tip(r)} /> Better than {r.pct}% of nights by {peer[r.pos] ?? 'forwards'} last season.</p>}
                 </div>
               </li>
             ))}
