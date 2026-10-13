@@ -23,6 +23,7 @@ Each one says why it was unusual:
 Shot counts are the most common way a game strays, so they need a bigger departure to make the list.
 """
 import math
+import re
 from functools import lru_cache
 from statistics import NormalDist
 
@@ -501,13 +502,15 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
             out.append(None)
             continue
         out.append(goalie_night(gl, places, score, won))
-    for t, names, sec in new_trio:
+    for t, names, sec, *ids in new_trio:
         if sec < 360:
             continue
         # early in a season coaches shuffle lines most nights, so a new trio needs real minutes to stand out:
         # 12:00 together makes a smaller twist, 18:00 a surprise
         out.append(_item("lineup", min(2.25, 0.75 + (sec - 360) / 360 * 0.5), "break", f"{places[t]} tried a different line",
                          f"{names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, a trio that isn’t one of {places[t]}’s usual lines."))
+        if ids:
+            out[-1]["_trio"] = (t, names, sec, set(ids[0]))
     if replay:
         w, l = (a, h) if won[a] else (h, a)
         p = replay["share"][l]
@@ -611,6 +614,79 @@ def against_calls(cands: list[dict], calls: list[dict]) -> tuple[list[dict], dic
             c = {**c, "flipped": hit[1]["head"]}
         kept.append(c)
     return kept, {k: {"head": v["head"], "body": v["body"], "score": v["score"]} for k, v in beyond.items()}
+
+
+FORWARDS = ("C", "L", "R")
+ORDINAL = {1: "first", 2: "second", 3: "third"}
+
+
+def when_left(sec: int) -> str:
+    """"in the first period", "early in the second", "after the first period" (his last shift ended at the horn)."""
+    if sec > 0 and sec % 1200 == 0 and sec <= 2400:
+        return f"after the {ORDINAL[sec // 1200]} period"
+    per, into = min(sec // 1200 + 1, 3), sec % 1200
+    if per == 3 and sec >= 3600:
+        return "in overtime"
+    if into < 300:
+        return f"early in the {ORDINAL[per]} period"
+    if into >= 900:
+        return f"late in the {ORDINAL[per]} period"
+    return f"in the {ORDINAL[per]} period"
+
+
+def _names(xs: list[str]) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + f" and {xs[-1]}"
+
+
+def left_clause(who: list[dict]) -> str:
+    """"After Nick Sturm left in the first period" for one player; for several, each with his own time unless
+    they went in the same period. Ejections say so: the penalty sheet shows it."""
+    if len(who) == 1:
+        x = who[0]
+        return f"After {x['name']} {'was ejected' if x['ejected'] else 'left'} {when_left(x['sec'])}"
+    if not any(x["ejected"] for x in who) and len({when_left(x["sec"]) for x in who}) == 1:
+        return f"After {_names([x['name'] for x in who])} left {when_left(who[0]['sec'])}"
+    return "After " + _names([f"{x['name']} {'was ejected' if x['ejected'] else 'left'} {when_left(x['sec'])}" for x in who])
+
+
+def forced(cands: list[dict], exits: dict[str, list[dict]], usual_lines: dict, places: dict) -> list[dict]:
+    """Lineup surprises a skater leaving the game can explain, told as something the team had to do rather than chose
+    (Sora, 2026-10-13: "Minnesota shortened their bench" on a night Nick Sturm left in the first period and did not
+    return). `exits` comes from recaps.Season.exits: skaters with no shift over the game's last 20 minutes or more.
+      short bench    any forward leaving: his ice time stops, so the bottom six by tonight's minutes plays less of it
+                     (a top-six forward leaving lands in the bottom six by minutes too). Leaning on the bottom six
+                     the other way is not explained by it, so it is left alone.
+      new line       a forward who belongs to one of the team's usual lines left, and the new trio has one of his
+                     usual linemates in it: his line had to be filled in.
+    The figure, its rarity and its score stay as they are; the "why" about what the team is usually known for is
+    dropped (the night wasn't about their habits) and the tag becomes "Out of the ordinary". Defensemen leaving
+    explain nothing here (no surprise is about defense pairs); goalie changes are told by the goalie surprise."""
+    out = []
+    for c in cands:
+        trio = c.pop("_trio", None)
+        sig = c.get("sig") or ()
+        if sig[:1] == ("depth",) and not sig[2]:
+            t = sig[1]
+            fwd = [x for x in exits.get(t, []) if x["pos"] in FORWARDS]
+            if fwd:
+                T = places[t]
+                m = re.search(r"played (\d+)% of the forwards’ 5-on-5 time, (against their usual .*?\.)", c["body"])
+                rare = c["body"][m.end():].strip() if m else ""
+                fig = (f"{left_clause(fwd)}, {T}’s bottom-six forwards played {m.group(1)}% of the forwards’ 5-on-5 time, "
+                       f"{m.group(2)}" if m else c["body"])
+                c = {**c, "tag": TAGS["rare"], "head": f"{T} had to shorten their bench", "body": " ".join(x for x in (fig, rare) if x), "forced": True}
+        elif trio:
+            t, names, sec, ids = trio
+            usual = [set(u) for u in usual_lines.get(t, [])]
+            gone = [x for x in exits.get(t, []) if x["pos"] in FORWARDS
+                    and any(x["id"] in u and (u - {x["id"]}) & ids for u in usual)]
+            if gone:
+                T = places[t]
+                c = {**c, "tag": TAGS["rare"], "head": f"{T} had to shuffle their lines", "forced": True,
+                     "body": f"{left_clause(gone)}, {names} played {sec // 60}:{sec % 60:02d} together at 5-on-5, "
+                             f"a trio that isn’t one of {T}’s usual lines."}
+        out.append(c)
+    return out
 
 
 def pick(cands: list[dict]) -> list[dict]:

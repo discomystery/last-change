@@ -22,7 +22,9 @@ PENDING = {"verdict": "pending", "happened": "Checked once the NHL finishes fill
 PP_STRENGTHS = {"5v4", "5v3", "4v3"}
 MIN_PP_SEC = 60  # less power-play time than this and a power-play call can't be judged
 MIN_CLOSE_SEC = 600  # hit rates need some close-game time
-MIN_MATCHUP_SEC = 180  # a matchup call needs the group on the ice against the opposing lines for three minutes
+MIN_MATCHUP_SEC = 180
+EXIT_SEC = 1200  # a skater with no shift in the game's last 20 minutes or more left it (see Season.exits)
+BENCHED_SEC = 1800  # a matchup call needs the group on the ice against the opposing lines for three minutes
 
 
 def clock(sec: float) -> str:
@@ -65,10 +67,14 @@ class Season:
         self.pos = {(r["game_id"], r["player_id"]): r["pos"] for r in players.select("game_id", "player_id", "pos").iter_rows(named=True)}
         self.name = {r["player_id"]: f"{r['first'][0]}. {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
+        self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
+        self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
         ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period_type"])
+        pen = pl.read_parquet(d / "events.parquet", columns=["game_id", "p1", "pen_type"]) if "pen_type" in pl.read_parquet_schema(d / "events.parquet") else None
+        self.ejected = set() if pen is None else {(g, p) for g, p in pen.filter(pl.col("pen_type").is_in(["GAM", "MAT"])).select("game_id", "p1").iter_rows()}
         self.goal_times = {}
         for gid, t, sec in ev.filter((pl.col("type") == "goal") & (pl.col("period_type") != "SO")).select("game_id", "team_id", "sec").iter_rows():
             self.goal_times.setdefault((gid, t), []).append(sec)
@@ -92,6 +98,33 @@ class Season:
             how = "mid"
         other = self.stints.filter((pl.col("game_id") == gid) & (pl.col(col).is_not_null()) & (pl.col(col) != goalie) & (pl.col("start") > at))
         return {"sec": at, "how": how, "back": bool(other.height)}  # back: the goalie he replaced (or another) went in again
+
+    def exits(self, gid: int, tid: int) -> list[dict]:
+        """Skaters who stopped taking shifts with at least a full period still to play (`EXIT_SEC`), earliest first.
+        Over 2025-26, 70% of skaters who sat out the last 20 minutes or more missed the team's next game too (6% of all
+        skaters do), so most of these are injuries; a few are benchings. One who dressed for the team's next game and
+        sat out less than `BENCHED_SEC` is left out, since a coach sitting him is as likely as an injury. The data can't
+        say why, so the wording only says he left (or was ejected, from the penalty sheet)."""
+        g = self.games[gid]
+        col = "home_skaters" if g["home_id"] == tid else "away_skaters"
+        st = self.stints.filter(pl.col("game_id") == gid)
+        if not st.height:
+            return []
+        end = int(st["end"].max())
+        last = st.select(col, "end").explode(col).drop_nulls(col).group_by(col).agg(pl.col("end").max())
+        later = sorted((x for x in self.games.values() if tid in (x["home_id"], x["away_id"]) and x["game_id"] > gid and x["state"] in ("OFF", "FINAL")),
+                       key=lambda x: x["game_id"])
+        nxt = later[0]["game_id"] if later else None
+        out = []
+        for p, at in last.iter_rows():
+            gone = end - at
+            if gone < EXIT_SEC:
+                continue
+            ejected = (gid, p) in self.ejected
+            if not ejected and nxt and (nxt, p) in self.dressed and gone < BENCHED_SEC:
+                continue
+            out.append({"id": p, "name": self.full.get(p, self.name.get(p, "?")), "pos": self.pos.get((gid, p)), "sec": int(at), "ejected": ejected})
+        return sorted(out, key=lambda x: x["sec"])
 
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
@@ -331,9 +364,12 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         for r in units.iter_rows(named=True):
             ids = {int(x) for x in r["unit"].split("-")}
             if ids not in usual:
-                trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"])))
+                trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"]), ids))
                 break
-    cands, beyond = surprise_rules.against_calls(surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season), list(calls))
+    left = {t: S.exits(gid, S.team_id[(gid, t)]) for t in (a, h)}
+    cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
+    cands = surprise_rules.forced(cands, left, usual_lines, places)
+    cands, beyond = surprise_rules.against_calls(cands, list(calls))
     return surprise_rules.pick(cands), beyond
 
 
