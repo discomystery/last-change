@@ -329,7 +329,7 @@ const fpMeta: Record<string, FpMeta> = {
   longShifts: { group: 'Defense', lo: 'Pinned', hi: 'Fresh legs', at0: 27, at100: 17, say: (v) => `${f1(v)}% of shots against come on long shifts` },
   blocking: { group: 'Defense', lo: 'Rarely block', hi: 'Shot blockers', at0: 25, at100: 32, say: (v) => `${f1(v)}% of the other team’s shot attempts blocked` },
   pointAllowed: { group: 'Defense', lo: 'Point covered', hi: 'Guard the net', at0: 30, at100: 39, say: (v) => `${f1(v)}% of the other team’s shot attempts come from their defensemen` },
-  icing: { group: 'Defense', lo: 'Icing it', hi: 'Clean exits', at0: 6.0, at100: 3.8, say: (v) => `${f1(v)} icings per 60 at 5-on-5` },
+  icing: { group: 'Defense', lo: 'Ices often', hi: 'Rarely ices', at0: 6.0, at100: 3.8, say: (v) => `${f1(v)} icings per 60 at 5-on-5` },
   goalie: { group: 'Defense', lo: 'Sieve', hi: 'Wall', at0: -0.45, at100: 0.45, say: (v) => `${Math.abs(v) < 0.005 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} goals saved above expected per 60` },
   pace: { group: 'Tempo and edge', lo: 'Slog', hi: 'Track meet', at0: 78, at100: 98, say: (v) => `pace score ${Math.round(v)}` },
   forecheck: { group: 'Tempo and edge', lo: 'Passive', hi: 'Hounding', at0: 78, at100: 124, say: (v) => `forecheck score ${Math.round(v)}`, raw: (p) => `${f1(9 + p * 0.12 + 1.1)} forecheck plays recorded per 60` },
