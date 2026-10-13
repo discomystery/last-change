@@ -193,6 +193,7 @@ def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
 
 
 REPORTED_OUT = ("injured", "suspended", "personal")
+LONG_AWAY = 4  # unreported: "hasn't played since Oct 3" from this many missed games
 
 
 @lru_cache(maxsize=8)
@@ -207,7 +208,9 @@ def _availability(season: int, day: str) -> dict[str, dict[int, dict]]:
         return {}
     av = av.filter(pl.col("date") == av["date"].max())
     out = {}
-    for r in av.filter(pl.col("status").is_in(list(REPORTED_OUT))).iter_rows(named=True):
+    from pipeline.export.changes import LONG_GONE  # missed games in a row with nothing reported: out all the same
+    gone = pl.col("status").is_in(list(REPORTED_OUT)) | ((pl.col("status") != "playing") & (pl.col("games_missed") >= LONG_GONE))
+    for r in av.filter(gone).iter_rows(named=True):
         out.setdefault(r["team"], {})[r["player_id"]] = r
     return out
 
@@ -225,8 +228,8 @@ def _out_notes(season: int, day: str) -> dict[str, list[dict]]:
 
 
 def _starters_out(season: int, day: str, tid: int, out: dict[int, dict]) -> list[dict]:
-    """Goalies the league has out who started at least a third of the club's games (and three or more) this season or
-    last."""
+    """Goalies who are out (reported, or missing a run of games) and started at least a fifth of the club's games (and
+    three or more) this season or last, with that share."""
     from pipeline.metrics import goalies
     keep = []
     for pid, r in out.items():
@@ -237,8 +240,8 @@ def _starters_out(season: int, day: str, tid: int, out: dict[int, dict]) -> list
                 continue
             starts = goalies.per_game(s).filter(pl.col("started") & (pl.col("date") < day) & (pl.col("team_id") == tid))
             mine = starts.filter(pl.col("goalie_id") == pid).height
-            if starts.height and mine >= 3 and mine / starts.height >= 1 / 3:
-                keep.append(r)
+            if starts.height and mine >= 3 and mine / starts.height >= 0.2:  # a regular backup is news too (Demko: 24%)
+                keep.append({**r, "share": mine / starts.height})
                 break
     return keep
 
@@ -277,7 +280,10 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             if not n.get("status"):  # nothing reported: only what the game sheets show, never "a scratch"
                 who = N.get(n["pid"]) or n["player"]
                 gone = n.get("games") or 0
-                text = (f"{who} hasn’t played this season." if " this season" in text.split(".")[0] else
+                since = n.get("last_played")
+                when = Date.fromisoformat(since).strftime("%b %-d") if since else None
+                text = (f"{who} hasn’t played since {when}." if when and gone >= LONG_AWAY else
+                        f"{who} hasn’t played this season." if " this season" in text.split(".")[0] else
                         f"{who} has missed the last {num(gone)} games." if gone > 1 else f"{who} missed their last game.") \
                     + (" He is" + text.split(" He is", 1)[1] if " He is" in text else "")
             out["out"].add(n["pid"])
@@ -288,11 +294,16 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             if r["player_id"] in told:
                 continue
             from pipeline.export import changes
-            text = f"{N.get(r['player_id']) or changes._name(r)} {changes._status_text(r, n_games)}."
+            if r["status"] in REPORTED_OUT:
+                text = f"{N.get(r['player_id']) or changes._name(r)} {changes._status_text(r, n_games)}."
+            elif r["last_played"]:
+                text = f"{N.get(r['player_id']) or changes._name(r)} hasn’t played since {Date.fromisoformat(r['last_played']).strftime('%b %-d')}."
+            else:
+                text = f"{N.get(r['player_id']) or changes._name(r)} hasn’t played this season."
             nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
             if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
                 text += f" {N[nxt[0]]} is expected to start."
-            items.append({"tag": "Out", "text": text, "score": 78, "pid": r["player_id"]})
+            items.append({"tag": "Out", "text": text, "score": 70 + 20 * r["share"], "pid": r["player_id"]})
         roster = [p for p, team in cur.items() if team == t and p not in skip]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))

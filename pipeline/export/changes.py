@@ -32,6 +32,7 @@ STATUS_WORDS = {
     "personal": "is away for personal reasons",
 }
 OUT_STATUSES = {"injured", "suspended", "personal", "scratched", "off_roster", "not_listed"}
+LONG_GONE = 4  # a listed player with nothing reported who has missed this many games in a row counts as out (Demko, Hyman)
 UNREPORTED_MIN_MISSED = 2  # a scratch or roster move with nothing reported needs this many games in a row to count
 TOP = {"F": 9, "D": 4}  # regulars worth a note: top nine forwards, top four defensemen by ice time
 NEW_DAYS = 14
@@ -182,8 +183,9 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         found = []
 
         # Out: regulars not available, most valuable first.
-        away = set(rows.filter(pl.col("status").is_in(list(OUT_STATUSES)))["player_id"].to_list())
-        for r in rows.filter(pl.col("status").is_in(list(OUT_STATUSES))).iter_rows(named=True):
+        gone = pl.col("status").is_in(list(OUT_STATUSES)) | ((pl.col("status") == "available") & (pl.col("games_missed") >= LONG_GONE))
+        away = set(rows.filter(gone)["player_id"].to_list())
+        for r in rows.filter(gone).iter_rows(named=True):
             pid, ro = r["player_id"], role.get(r["player_id"])
             reported = r["status"] in ("injured", "suspended", "personal")
             star = pid in stars
@@ -202,7 +204,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
             if cover:
                 text += " " + cover
-            found.append({"pid": pid, "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
+            found.append({"pid": pid, "last_played": r["last_played"], "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
                           "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"] if ro else 0})
         found = sorted(found, key=lambda n: n["order"])[:MAX_OUT]
 
