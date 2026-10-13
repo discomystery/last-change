@@ -1,87 +1,139 @@
 ---
-// Section menu for long pages (team, preview, player). Wide screens: a row of section links (pinned while
+// Section menu for long pages (team, preview, player). Wide screens: a row of section names (pinned while
 // scrolling when `pinned`). Phones: a thin bar pinned to the top of the screen, "Jump to [section]", using the phone's
 // own picker; it follows along to name the section being read. Renders two siblings (no wrapper) so the
 // pinned elements stick for the whole page, not just inside a short wrapper.
-// Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it:
-// without one, unclicked pills turned square and the highlighted one stayed round.
+// Reading line (Sora picked B and D of the section-menu pitches, 2026-10-13): a line with one dot per section runs
+// under the pinned row (under each name) and under the phone bar (evenly spaced); a puck slides along it with the
+// scroll, the line darkens behind it and each dot fills once its section has been reached. Phones add "Next: ...".
+// Each link carries a class so the site's plain-text-link style (Base.astro, `a:not([class])`) never reaches it.
 interface Props { items: [string, string][]; pinned?: boolean }
 const { items, pinned = false } = Astro.props;
 ---
-<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-puck" aria-hidden="true"></span><span class="secnav-prog" aria-hidden="true"></span></>}</nav>
+<nav class:list={['jump', 'secnav-pills', { pinned }]} aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}{pinned && <><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></>}</nav>
 <div class="secnav-bar">
-  <label for="secnav-pick">Jump to</label>
-  <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
-  <span class="secnav-prog" aria-hidden="true"></span>
+  <div class="secnav-jumprow">
+    <label for="secnav-pick">Jump to</label>
+    <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
+  </div>
+  <div class="secnav-dots"><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></div>
+  <p class="secnav-next" aria-hidden="true"></p>
 </div>
 
 <script is:inline>
   // Runs once the page has loaded: the sections it tracks come after this menu in the page.
   const secnavStart = () => {
-    const root = document.documentElement;
-    const pills = [...document.querySelectorAll('.secnav-pills a')];
-    const bar = document.querySelector('.secnav-bar');
     const pick = document.getElementById('secnav-pick');
     if (!pick) return;
+    const bar = document.querySelector('.secnav-bar');
+    const row = document.querySelector('.secnav-pills');
+    const names = [...row.querySelectorAll('a')];
+    const labels = [...pick.options].map((o) => o.textContent);
     const ids = [...pick.options].map((o) => o.value);
-    const secs = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    const secs = ids.map((id) => document.getElementById(id));
+    const next = bar.querySelector('.secnav-next');
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     pick.addEventListener('change', () => {
       const el = document.getElementById(pick.value);
       if (el) el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     });
-    let queued = false;
+    // Each track: where its dots sit along it (centre of each name on the row, evenly spaced on phones).
+    const tracks = [];
+    if (row.classList.contains('pinned')) tracks.push({ box: row, xs: () => names.map((a) => a.offsetLeft + a.offsetWidth / 2) });
+    const dots = bar.querySelector('.secnav-dots');
+    tracks.push({ box: dots, xs: () => ids.map((_, i) => (ids.length > 1 ? (dots.clientWidth * i) / (ids.length - 1) : 0)) });
+    const lay = () => tracks.forEach((t) => {
+      const x = t.xs();
+      t.x = x;
+      t.ticks = [...t.box.querySelectorAll('.secnav-tick')];
+      t.ticks.forEach((d, i) => (d.style.left = x[i] + 'px'));
+      const line = t.box.querySelector('.secnav-line');
+      line.style.left = x[0] + 'px';
+      line.style.width = x[x.length - 1] - x[0] + 'px';
+      t.box.querySelector('.secnav-fill').style.left = x[0] + 'px';
+    });
+    let queued = false, cur = -1;
     const update = () => {
       queued = false;
-      const top = (bar.offsetHeight || 0) + 40;
-      let cur = ids[0];
-      for (const s of secs) if (s.getBoundingClientRect().top <= top) cur = s.id;
-      if (document.activeElement !== pick) pick.value = cur;
+      const visible = getComputedStyle(bar).display !== 'none';
+      const reach = scrollY + (visible ? bar.offsetHeight : row.offsetHeight) + 40;
+      // Page position of each section's top; a missing section borrows the one before it.
+      let prev = 0;
+      const tops = secs.map((s) => (prev = s ? s.getBoundingClientRect().top + scrollY : prev));
+      let i = 0;
+      tops.forEach((t, k) => { if (t <= reach) i = k; });
+      const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+      // How far through the section being read: the puck sits between its dot and the next one.
+      let f = i;
+      if (atEnd) f = i = ids.length - 1;
+      else if (i < ids.length - 1 && tops[i + 1] > tops[i]) f = i + Math.min(1, Math.max(0, (reach - tops[i]) / (tops[i + 1] - tops[i])));
+      if (reach < tops[0]) f = 0;
+      tracks.forEach((t) => {
+        if (!t.x) return;
+        const k = Math.floor(f), b = Math.min(k + 1, t.x.length - 1);
+        const px = t.x[k] + (t.x[b] - t.x[k]) * (f - k);
+        t.box.querySelector('.secnav-puck').style.translate = `${px}px 0`;
+        t.box.querySelector('.secnav-fill').style.width = Math.max(0, px - t.x[0]) + 'px';
+        t.ticks.forEach((d, j) => d.classList.toggle('past', j <= f + 0.001));
+      });
       bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= 1 && scrollY > 0);
-      pills.forEach((a) => a.classList.toggle('here', a.getAttribute('href') === '#' + cur));
-      const row = document.querySelector('.secnav-pills.pinned');
-      const here = row && row.querySelector('a.here');
-      // How far down the page the reader is, as a thin line along the pinned menu (motion.css shows it).
-      const left = document.documentElement.scrollHeight - innerHeight;
-      root.style.setProperty('--read', left > 0 ? Math.min(1, scrollY / left).toFixed(4) : '0');
-      // A small puck glides under the section being read.
-      const puck = row && row.querySelector('.secnav-puck');
-      if (puck && here) puck.style.translate = `${here.offsetLeft + here.offsetWidth / 2}px 0`;
-      if (here) {
+      if (i === cur) return;
+      cur = i;
+      if (document.activeElement !== pick) pick.value = ids[i];
+      next.textContent = i < ids.length - 1 ? 'Next: ' + labels[i + 1] : '';
+      names.forEach((a, k) => a.classList.toggle('here', k === i));
+      const here = names[i];
+      if (here && row.classList.contains('pinned')) {
         const want = here.offsetLeft - row.clientWidth / 2 + here.offsetWidth / 2;
-        if (Math.abs(row.scrollLeft - want) > 4) row.scrollLeft = want;
+        if (Math.abs(row.scrollLeft - want) > 4) row.scrollTo({ left: want, behavior: reduce ? 'auto' : 'smooth' });
       }
     };
+    const refresh = () => { lay(); cur = -1; update(); };
     addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
-    update();
+    if ('ResizeObserver' in window) { const ro = new ResizeObserver(refresh); ro.observe(row); ro.observe(dots); }
+    else addEventListener('resize', refresh);
+    if (document.fonts) document.fonts.ready.then(refresh);
+    refresh();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', secnavStart);
   else secnavStart();
 </script>
 
 <style is:global>
-  .secnav-pills.pinned { position: sticky; top: 0; z-index: 15; background: var(--ice); padding-block: 8px; }
-  .secnav-pills a.here { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+  /* Plain section names; the one being read is dark. Pinned rows get the reading line underneath. */
+  .jump.secnav-pills { gap: 2px; }
+  .jump.secnav-pills a { font-weight: 600; color: var(--ink-3); border: 0; background: none; padding: 5px 10px; transition: color 0.2s; }
+  .jump.secnav-pills a:hover { color: var(--ink); }
+  .jump.secnav-pills a.here { color: var(--ink); }
+  .secnav-pills.pinned {
+    position: sticky; top: 0; z-index: 15; padding-block: 8px 18px;
+    background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .secnav-line, .secnav-fill { position: absolute; bottom: 7px; height: 2px; border-radius: 1px; background: var(--rule); pointer-events: none; }
+  .secnav-fill { background: var(--ink); width: 0; }
+  .secnav-tick { position: absolute; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--sheet); box-shadow: inset 0 0 0 1.5px var(--rule); pointer-events: none; }
+  .secnav-tick.past { background: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .secnav-puck { position: absolute; left: -4px; bottom: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); pointer-events: none; }
+  html.motion .secnav-puck { transition: translate 0.12s linear; }
+  html.motion .secnav-tick { transition: background 0.25s, box-shadow 0.25s; }
   .secnav-bar { display: none; }
   @media (max-width: 719px) {
     .jump.secnav-pills { display: none; }  /* beats the shared .jump row style, whichever loads last */
     .secnav-bar {
-      display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 15;
-      margin: 14px -16px 0; padding: 9px 16px; background: var(--ice); border-bottom: 1px solid transparent; transition: border-color 0.2s;
-      font: 600 17px var(--display); font-variation-settings: 'SOFT' 100;
+      display: block; position: sticky; top: 0; z-index: 15;
+      margin: 14px -16px 0; padding: 9px 16px 0; border-bottom: 1px solid transparent; transition: border-color 0.2s;
+      background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     .secnav-bar.stuck { border-bottom-color: var(--rule); }
-    .secnav-bar label { white-space: nowrap; }
-    .secnav-bar select {
+    .secnav-jumprow { display: flex; align-items: center; gap: 10px; font: 600 17px var(--display); font-variation-settings: 'SOFT' 100; }
+    .secnav-jumprow label { white-space: nowrap; }
+    .secnav-jumprow select {
       flex: 1; min-width: 0; font: 600 16px var(--ui); color: var(--ink); background: var(--sheet);
       border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer;
     }
-    main [id] { scroll-margin-top: 72px; }
+    .secnav-dots { position: relative; height: 18px; margin: 4px 4px 0; }
+    .secnav-next { margin: 0; padding: 0 2px 6px; min-height: 1.5em; font: 500 12px var(--ui); color: var(--ink-3); text-align: right; }
+    main [id] { scroll-margin-top: 104px; }
   }
-  .secnav-puck, .secnav-prog { display: none; }
-  html.motion .secnav-pills.pinned { padding-bottom: 14px; }
-  html.motion .secnav-puck { display: block; position: absolute; left: -3.5px; bottom: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); transition: translate 0.45s cubic-bezier(0.3, 1.25, 0.5, 1); }
-  html.motion .secnav-prog { display: block; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink-3); opacity: 0.5; transform-origin: left; transform: scaleX(var(--read, 0)); }
-  @media (max-width: 719px) { html.motion .secnav-bar { position: sticky; } }
-  @media (prefers-reduced-motion: reduce) { .secnav-bar { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .secnav-bar, .jump.secnav-pills a { transition: none; } }
 </style>
