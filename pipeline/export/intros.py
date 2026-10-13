@@ -17,6 +17,7 @@ import polars as pl
 
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, REGULAR, SITE_DATA, TABLES
 from pipeline.ingest import history
+from pipeline.export import wording
 from pipeline.metrics import adjust
 
 HISTORY = 4  # seasons of team history to describe (we hold full tables from 2022-23)
@@ -79,8 +80,8 @@ def _for(t: dict) -> str:
 
 
 def _in(t: dict) -> str:
-    """"in Columbus", but "on the Rangers" for the two New York clubs."""
-    return f"on the {_nick(t)}" if t["place"].startswith("NY ") else f"in {t['place']}"
+    """"in Columbus", "in New York", "on Long Island": where the club plays, never the team's name."""
+    return wording.at(t["place"])
 
 
 def _rank_words(rank: int, n: int = 32) -> str:
@@ -297,11 +298,11 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
     elif dry >= 3:
         hook = {"good": f"Could this be the year? {_cap(X)} haven't made the playoffs in {_num(dry)} seasons, but they're {record} so far.",
                 "even": f"{_cap(X)} are {record}, still looking for their first playoff spot in {_num(dry)} seasons.",
-                "bad": f"The rebuild grinds on in {t['place']}: no playoffs in {_num(dry)} seasons, and a {record} start."}[rec]
+                "bad": f"The rebuild grinds on {_in(t)}: no playoffs in {_num(dry)} seasons, and a {record} start."}[rec]
     elif last and not last["playoffs"] and made:
         hook = {"good": f"After missing the playoffs last spring, {X} have bounced back to {record}.",
                 "even": f"After missing the playoffs last spring, {X} are {record}.",
-                "bad": f"Last season was one to forget in {t['place']}, and this one hasn't started much better: they're {record}."}[rec]
+                "bad": f"Last season was one to forget {_in(t)}, and this one hasn't started much better: they're {record}."}[rec]
     elif made == len(past) and past:
         hook = {"good": _pick([f"Same old {nick}: {record}, and in the mix again.", f"{_cap(X)} are {record}, which is what we've come to expect."], *key),
                 "even": f"{_cap(X)}, playoff regulars, are {record} so far.",
@@ -472,7 +473,7 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     if p.get("unplayed"):  # with the club but not dressed yet: never say why (the page's status tag does, when NHL.com has)
         out.append(_pick([f"{last} hasn't played for {_for(team)} yet this season.", f"{last} has yet to play a game this season."], *key, "out"))
     elif new:
-        were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop in {new['place']}"
+        were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop {wording.at(new['place'])}"
         if hot:
             out.append(f"{last} has wasted no time {_in(team)}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
         else:
@@ -488,7 +489,7 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
         what = "one of the league's best" if label == "elite" else "a point-a-game player"
         out.append(f"{last} is only in his {_nth(len(full) + 1)} season and already {what}.")
     elif label == "elite":
-        out.append(f"{last} is one of the best {'defensemen' if p['pos'] == 'D' else 'players'} in the league, and {team['place']} knows it.")
+        out.append(f"{last} is one of the best {'defensemen' if p['pos'] == 'D' else 'players'} in the league, and {_for(team)} know{'' if team['place'].startswith('NY ') else 's'} it.")
     else:
         out.append(None)
 
@@ -540,7 +541,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
         spell = sum(_seasons_span(s["first"], s["last"]) for s in former)
         drafted = p.get("draft_team") == opp
         if not since:
-            out.append(f"This one's personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} in {o['place']}"
+            out.append(f"This one's personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
         elif spell >= 2:
             out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
@@ -683,10 +684,11 @@ def run(today: str | None = None) -> dict:
         if n and not p.get("unplayed"):
             player_out[pid]["game"] = n
     curly = lambda xs: [x.replace("'", "’") for x in xs]
-    for v in team_out.values():
-        v["text"] = curly(v["text"])
-    for v in player_out.values():
-        v["text"], v["next"] = curly(v["text"]), curly(v["next"])
+    full = {_nick(t): t["place"] for t in teams.values()}
+    for k, v in team_out.items():  # the first sentence is the team card's headline: it stays formal
+        v["text"] = wording.nickname_once(curly(v["text"]), f"team-{k}", skip_first=True, places=full)
+    for k, v in player_out.items():
+        v["text"], v["next"] = wording.nickname_once(curly(v["text"]), f"player-{k}", places=full), curly(v["next"])
     out = SITE_DATA / "intros"
     out.mkdir(parents=True, exist_ok=True)
     (out / "teams.json").write_text(json.dumps({"generated": today, "teams": team_out}, separators=(",", ":")))

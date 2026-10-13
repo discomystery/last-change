@@ -155,6 +155,25 @@ class Words:
         p = self.places.get(t, t)
         return self.the(t) if p.startswith("NY ") else p  # "NY Rangers" reads badly as a place
 
+    # `place` names the team ("against the Rangers"); these two name where it plays ("in New York", "on Long Island").
+    def town(self, t: str) -> str:
+        return wording.town(self.places.get(t, t))
+
+    def at(self, t: str) -> str:
+        return wording.at(self.places.get(t, t))
+
+    def nicknames(self, paras: list[str], key) -> list[str]:
+        """At most one fan nickname ("the Canes") in the whole story, by `wording.nickname_once`'s rule, in whichever
+        paragraph a stable hash of `key` reaches first."""
+        full = {self.nick.get(t, t): self.places.get(t, t) for t in self.places}
+        start = zlib.crc32(str(key).encode()) % max(len(paras), 1)
+        out = list(paras)
+        for i in [*range(start, len(paras)), *range(start)]:
+            out[i] = wording.nickname_para(paras[i], f"{key}-{i}", full)
+            if out[i] != paras[i]:
+                break
+        return out
+
 
 # --- preview -------------------------------------------------------------------------------------------------------
 
@@ -211,12 +230,12 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         now = this.group_by("player_id").agg(gp=pl.len(), g=pl.col("g").sum())
         cold = last.join(now, on="player_id", suffix="_now").filter((pl.col("gp_now") >= 4) & (pl.col("g_now") == 0))
         if cold.height:
-            pid = cold.sort(pl.col("g") / pl.col("gp"), descending=True)["player_id"][0]
+            pid = cold.sort(pl.col("g") / pl.col("gp"), -pl.col("player_id"), descending=True)["player_id"][0]
             items.append({"tag": "Slow start", "text": f"{N[pid]} is still looking for his first goal of the season.", "score": 50, "pid": pid})
         # records against tonight's opponent since 2023-24
         vs = mine.filter(pl.col("opp") == o).sort("date")
         cands = []
-        for pid, g in vs.group_by("player_id"):
+        for pid, g in vs.sort("player_id", "date").group_by("player_id", maintain_order=True):  # stable ties between runs
             pid = pid[0]
             pts, goals, gp = g["pts"].to_list(), int(g["g"].sum()), g.height
             n = 0
@@ -275,7 +294,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                                                  last=pl.col("game_id").max())
             gone = {}  # players who missed the same stretch share one item (Sora, 2026-10-12)
             for pos, top in (("F", 6), ("D", 4)):
-                grp = per.filter(pl.col("pos").is_in(["C", "L", "R"]) if pos == "F" else pl.col("pos") == "D").sort("toi", descending=True).head(top)
+                grp = per.filter(pl.col("pos").is_in(["C", "L", "R"]) if pos == "F" else pl.col("pos") == "D").sort("toi", "player_id", descending=[True, False]).head(top)
                 for r in grp.iter_rows(named=True):
                     missed = len(team_games) - 1 - team_games.index(r["last"])
                     if missed >= 1 and r["gp"] >= 2:
@@ -360,7 +379,7 @@ def _goalie_on_the_road(away: str, home: str, before: str, W: Words, N: dict[int
     if not N.get(pid):
         return None
     try:
-        where = f"on {W.poss(home)} ice" if W.places[home].startswith("NY ") else f"in {W.place(home)}"
+        where = W.at(home)
         story = venues.storyline(pid, N[pid], home, where, before)
     except Exception as e:  # no saved boxscores or career files: no goalie storyline
         print(f"goalie records unavailable: {e!r}")
@@ -412,14 +431,13 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     if len(m) == 1:
         r = m[0]
         winner = home if r["win"] else away
-        where = W.place(r["home"] and home or away) if r["home"] else W.place(away)
-        place = W.place(home) if r["home"] else W.place(away)
+        host = home if r["home"] else away
         if winner == away and r["home"]:
-            sents.append(f"{_cap(W.the(away))} already came to {place} once this season and left with a {score_text(r, win=True)}.")
+            sents.append(f"{_cap(W.the(away))} already came to {W.town(host)} once this season and left with a {score_text(r, win=True)}.")
         else:
-            sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} in {place}.")
+            sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} {W.at(host)}.")
         if r["home"]:
-            facts["heads"].append((70, f"Round two in {W.place(home)}"))
+            facts["heads"].append((70, f"Round two {W.at(home)}"))
         else:
             facts["heads"].append((65, "Round two"))
     elif len(m) > 1:
@@ -480,6 +498,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     paras = [" ".join(sents)] if sents else []
     if look:
         paras.append(" ".join(look))
+    paras = W.nicknames(paras, gid)
     return {"kicker": "Before the game", "head": head, "paras": paras, "lean": lean, "list_head": "Who to watch", "items": picked}
 
 
@@ -488,7 +507,7 @@ def _leader(t: str, before: str, season: int) -> tuple[int, int] | None:
     p = P.filter((pl.col("season") == season) & (pl.col("team") == t) & (pl.col("date") < before[:10]))
     if p.is_empty():
         return None
-    r = p.group_by("player_id").agg(pl.col("pts").sum()).sort("pts", descending=True).row(0)
+    r = p.group_by("player_id").agg(pl.col("pts").sum()).sort("pts", "player_id", descending=[True, False]).row(0)
     return (r[0], int(r[1])) if r[1] > 0 else None
 
 
@@ -582,7 +601,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         heads.append((92, f"{last(wg['id']) or wg['name'].split(' ', 1)[-1]} shuts out {W.the(loser)}"))
     if share is not None and share <= 0.35 and ws - ls <= 2:
         thief = wg["name"].split(" ", 1)[-1] if wg and (wg.get("gsax") or 0) >= 1 else None
-        where = f" in {W.place(home)}" if winner == away else ""
+        where = f" {W.at(home)}" if winner == away else ""
         heads.append((90, f"{thief} steals one{where}" if thief else f"{_cap(W.the(winner))} steal one{where}"))
     if comeback:
         heads.append((88, f"{_cap(W.the(winner))} come back from {num(lead_max[loser])} down"))
@@ -789,7 +808,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             team = next((t for t in (away, home) if W.place(t) in sp["head"]), None)
             if team and team in nxt:
                 n = nxt[team]
-                where = f"in {W.place(n['home'])}" if n["home"] != team else f"at home against {W.place(n['away'])}"
+                where = W.at(n['home']) if n["home"] != team else f"at home against {W.place(n['away'])}"
                 items.append({"tag": "Keep an eye on", "text": f"Whether {W.the(team)} keep that line together {where} on {weekday(n['date'])}.", "score": 45})
     for t, n in nxt.items():
         opp = n["home"] if n["away"] == t else n["away"]
@@ -813,7 +832,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if len(picked) < MIN_ITEMS:
         res = results(G.filter(pl.col("date") <= r["date"]), winner, season)
         picked.append({"tag": "Record", "text": f"{_cap(W.the(winner))} are now {record(res)}."})
-    return {"kicker": "What happened", "head": head, "paras": [p for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p],
+    return {"kicker": "What happened", "head": head, "paras": W.nicknames([p for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p], r.get("game_id")),
             "list_head": "What it means", "items": picked}
 
 

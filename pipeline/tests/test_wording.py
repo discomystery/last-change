@@ -24,3 +24,30 @@ def test_goalie_rink_storylines(monkeypatch):
     assert "last 6 starts there, and his last win there was in 2019" in venues.storyline(1, "A. Goalie", "TOR", "in Toronto", "2026-10-11")["text"]
     rec.update(w=1, winless=1, starts=3)
     assert venues.storyline(1, "A. Goalie", "TOR", "in Toronto", "2026-10-11") is None
+
+
+def test_places_for_where_a_game_was_played():
+    # "5-1 in the Rangers" and "Round two in the Rangers" (Sora, 2026-10-13): a team name is not a place
+    assert wording.at("NY Rangers") == "in New York"
+    assert wording.at("NY Islanders") == "on Long Island"
+    assert wording.at("Carolina") == "in Carolina"
+    assert wording.town("NY Islanders") == "Long Island"
+
+
+def test_nickname_once_is_sparing():
+    places = {"Rangers": "NY Rangers", "Lightning": "Tampa Bay"}
+    sents = ["The Rangers won the first meeting, 5-1 in New York.", "The Rangers are 5-2-0.", "The Lightning have won four straight.",
+             "The Rangers’ best way to tip it is a power play."]
+    out = wording.nickname_once(sents, "x", places=places)
+    changed = [i for i, (a, b) in enumerate(zip(sents, out)) if a != b]
+    assert len(changed) == 1 and changed[0] != 0  # one swap, never the first mention
+    assert "Blueshirts" in out[changed[0]]
+    assert sents[2] == out[2]  # the Lightning are named once: no nickname
+    # never in a sentence that also has the full name or the place
+    assert wording.nickname_once(["The Hurricanes won.", "The Hurricanes beat Carolina’s rivals."], "k",
+                                 places={"Hurricanes": "Carolina"}) == ["The Hurricanes won.", "The Hurricanes beat Carolina’s rivals."]
+    # possessives follow the nickname: "the Avalanche’s" becomes "the Avs’", "the Oilers’" becomes "the Oil’s"
+    assert wording.nickname_para("The Avalanche won. The Avalanche’s kill held.", "k") == "The Avalanche won. The Avs’ kill held."
+    assert wording.nickname_para("The Oilers won. The Oilers’ kill held.", "k") == "The Oilers won. The Oil’s kill held."
+    # a club with no common nickname keeps its name
+    assert wording.nickname_para("The Kings won. The Kings scored.", "k") == "The Kings won. The Kings scored."
