@@ -83,7 +83,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
           <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
             <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
             <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
-            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>{j.key === 'high' || j.key === 'routine' ? 'typically saves' : 'typical'} {j.usual}</span></span>}
+            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>{j.key === 'high' || j.key === 'routine' ? 'expected to save' : 'expected'} {j.usual}</span></span>}
           </li>
         ))}
       </ul>
@@ -99,7 +99,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   <Section id="jobs" title="Did they do their job?" placeholder={false}
     takeaway="What each player is relied on for or better than most at, and whether he delivered.">
     <Fragment slot="explain">
-      <p class="note"><strong>✓</strong> a typical night for him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
+      <p class="note"><strong>✓</strong> what we expected of him in the ice time he got (the level he reaches in about half his games). <strong>≈</strong> beat an average player at his position, a typical power play or kill, or his own team with him off the ice. <strong>✕</strong> neither. Power-play and penalty-kill results count half, since five players share them.</p>
       <p class="note"><strong>Huge night</strong>: a hat trick or four or more points. <strong>Big night</strong>: two or more points, or a goal from a player who scores in fewer than one game in five on top of doing his jobs. <strong>Rough night</strong>: no points while the other team had 70% or more of the 5-on-5 chances with him on (xGF–xGA). Plus-minus never sets the level. A shorthanded goal counts as two points. Points never fully cover for jobs that went badly: with his jobs off, a huge night reads big and a big night reads mixed.</p>
       <p class="note">Judged only from games before this one; 5-on-5 rates adjusted for score and venue. One game is a small sample: even a strong player misses a typical night about half the time. Both teams: {share('held')} ✓, {share('partly')} ≈, {share('missed')} ✕.</p>
     </Fragment>
