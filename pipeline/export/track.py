@@ -110,6 +110,9 @@ def run(season: int = CURRENT_SEASON) -> dict:
     d = SITE_DATA / "recaps"
     recaps = [json.loads(p.read_text()) for p in sorted(d.glob("2*.json"))]
     recaps = [r for r in recaps if int(str(r["game_id"])[:4]) == season]
+    # Playoff calls get their own tally, never mixed into the regular season's (the page leads with them once any exist)
+    playoff = [r for r in recaps if str(r["game_id"])[4:6] == "03"]
+    recaps = [r for r in recaps if str(r["game_id"])[4:6] != "03"]
     calls = call_record(recaps)
     snaps = [json.loads(p.read_text()) for p in (SITE_DATA / "previews").glob("2*.json")]
     done = {r["game_id"] for r in recaps}
@@ -119,9 +122,10 @@ def run(season: int = CURRENT_SEASON) -> dict:
         print(f"win chance backtest unavailable: {e!r}")
         past = None
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season,
-           "waiting": sum(1 for s in snaps if s["game_id"] not in done), "calls": calls, "win": {"season": win_record(recaps), "past": past}}
+           "waiting": sum(1 for s in snaps if s["game_id"] not in done), "calls": calls, "win": {"season": win_record(recaps), "past": past},
+           "playoffs": {"calls": call_record(playoff), "win": win_record(playoff)} if playoff else None}
     (SITE_DATA / "track.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
-    return {"graded": sum(calls["tally"].values())}
+    return {"graded": sum(calls["tally"].values()), "playoffs": sum(out["playoffs"]["calls"]["tally"].values()) if playoff else 0}
 
 
 if __name__ == "__main__":

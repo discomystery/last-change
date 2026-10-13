@@ -13,8 +13,12 @@ type CallSet = { tally: Count; kinds: Record<string, Count>; weeks: ({ week: str
 type Band = { band: string; games: number; said: number; won: number; lo: number; hi: number };
 type Win = { games: number; picked: number; hit_rate: number; home_rate: number; bands: Band[]; puck?: { games: number; picked: number }; seasons?: number[] };
 
-const calls = track.calls as CallSet;
-const win = track.win as { season: Win | null; past: Win | null };
+// Once playoff games are graded the page leads with them (they are what's current in May); the regular season's
+// final score stays beside them as one card, and the two are never added together.
+const po = (track as { playoffs?: { calls: CallSet; win: Win | null } | null }).playoffs ?? null;
+const regular = track.calls as CallSet;
+const calls = po ? po.calls : regular;
+const win = (po ? { ...track.win, season: po.win } : track.win) as { season: Win | null; past: Win | null };
 const base = import.meta.env.BASE_URL;
 const total = (c: Count) => c.held + c.partly + c.missed;
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
@@ -54,7 +58,8 @@ const pucks = (c: Count) => V.flatMap((v) => Array.from({ length: c[v] }, () => 
 const THIN = 10; // fewer calls than this and a kind's rate is shown greyed, as too few to judge
 const emptyText = `No graded calls yet.${track.waiting > 0 ? ` ${track.waiting} previews are waiting on their games.` : ''}`;
 const seasonsLabel = (s: number[]) => `${s[0]}–${String(s[0] + 1).slice(2)} to ${s[s.length - 1]}–${String(s[s.length - 1] + 1).slice(2)}`;
-const seasonLabel = `${track.season}–${String(track.season + 1).slice(2)}`;
+const seasonLabel = po ? `${track.season + 1} playoffs` : `${track.season}–${String(track.season + 1).slice(2)}`;
+const regularN = total(regular.tally);
 
 // Latest calls, grouped by game (newest first), the first few games open and the rest behind a fold.
 type Game = { game_id: number; date: string; away: string; home: string; calls: Latest[] };
@@ -77,11 +82,11 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   <p class="lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />
 
-  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Every graded call this season, one puck each.">
+  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway={po ? 'Every graded call in these playoffs, one puck each.' : 'Every graded call this season, one puck each.'}>
     {n > 0 ? (
       <div class="card score">
         <div class="sc-main">
-          <p class="eyebrow">{seasonLabel} so far</p>
+          <p class="eyebrow">{seasonLabel}{po ? '' : ' so far'}</p>
           <p class="hero">{pct(calls.tally.held, n)}<span class="pc">%</span></p>
           <p class="hero-sub">of the previews’ calls held up</p>
           <dl class="counts">
@@ -94,6 +99,9 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
         </div>
       </div>
     ) : <p class="note">{emptyText}</p>}
+    {po && regularN > 0 && (
+      <p class="note">Regular season: {pct(regular.tally.held, regularN)}% of {plural(regularN, 'call')} held up ({regular.tally.held} held, {regular.tally.partly} partly, {regular.tally.missed} didn’t happen). Playoff calls are counted on their own.</p>
+    )}
   </Section>
 
   <Section id="kinds" title="By kind of call" placeholder={false} takeaway="Some calls ask more of a team than others. Grayed rates rest on too few calls to judge.">
@@ -210,7 +218,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
         <div class="tiles">
           {win.season && (
             <div class="card tile">
-              <p class="eyebrow">This season</p>
+              <p class="eyebrow">{po ? 'These playoffs' : 'This season'}</p>
               <p class="big">{win.season.picked}<span> of {win.season.games}</span></p>
               <p class="sub">games won by the team we favored ({Math.round(100 * win.season.hit_rate)}%)</p>
             </div>
@@ -219,7 +227,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             <div class="card tile">
               <p class="eyebrow">Home team every time</p>
               <p class="big">{Math.round(100 * win.season.home_rate)}%</p>
-              <p class="sub">the score to beat this season</p>
+              <p class="sub">the score to beat {po ? 'in these playoffs' : 'this season'}</p>
             </div>
           )}
           {win.past && win.past.seasons && (
@@ -233,7 +241,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
         <div class="card calib-card">
           <div class="pick"><span>Show</span>
             <select id="win-pick" aria-label="Which games">
-              {win.season && <option value="season">this season</option>}
+              {win.season && <option value="season">{po ? 'these playoffs' : 'this season'}</option>}
               {win.past && win.past.seasons && <option value="past">{seasonsLabel(win.past.seasons)}</option>}
             </select>
           </div>

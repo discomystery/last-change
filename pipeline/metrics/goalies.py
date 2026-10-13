@@ -9,7 +9,7 @@ from functools import lru_cache
 import numpy as np
 import polars as pl
 
-from pipeline.config import FULL_SEASONS, REGULAR, TABLES
+from pipeline.config import GAME_TYPES, FULL_SEASONS, REGULAR, TABLES, types_for
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 TIERS = (("low", 0.0, 0.05), ("medium", 0.05, 0.15), ("high", 0.15, 9.9))
@@ -53,7 +53,7 @@ def rebound_rates() -> pl.DataFrame:
 
 def shots(season: int) -> pl.DataFrame:
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date")
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).select("game_id", "date")
     ev = pl.read_parquet(d / "events.parquet").filter(pl.col("type").is_in(UNBLOCKED) & pl.col("goalie_id").is_not_null()).select("game_id", "event_id", "goalie_id", "type", "period", "sec")
     f = pl.read_parquet(d / "shot_features.parquet").select("game_id", "event_id", "empty_net", "prev_type", "prev_gap", "prev_x", "prev_same_team")
     xg = pl.read_parquet(d / "shots_xg_own.parquet")

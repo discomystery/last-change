@@ -27,7 +27,7 @@ from collections import defaultdict
 import numpy as np
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, GAME_TYPES, RAW, REGULAR, SITE_DATA, TABLES, types_for
 from pipeline.export import pending
 from pipeline.metrics import players as P
 from pipeline.metrics import rink_bias
@@ -383,7 +383,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     judged from earlier games alone, so one game's cards come out the same either way). Games whose shift chart the
     NHL is still filling in get no cards yet."""
     d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type").is_in(types_for(season))) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}

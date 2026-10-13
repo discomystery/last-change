@@ -592,7 +592,8 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
         "call": f"{_cap(w['Hp'])} {r['label']} ({mine}) spends at least {v}% of its 5-on-5 time against {w['Op']} {ORD[j]} line.",
         "body": _cap(body),
         "nums": f"At home: {v}% of this group’s 5-on-5 time against {ORD[j]} lines, about {r['expected'][j]}% with no line matching",
-        "gist": f"At home, {coach or 'their coach'} likes to pick matchups, so watch who goes out against {w['Op']} {ORD[j]} line.",
+        "gist": f"At home{'' if w['Hc'].startswith('the ') else ' in ' + w['Hc']}, {coach or w['Hp'] + ' coach'} likes to pick matchups, "
+                f"so watch who goes out against {w['Op']} {ORD[j]} line.",
         "cite": f"Who plays against whom · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
         "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
                   "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
@@ -611,7 +612,7 @@ def _goalie_history() -> "object | None":
         from pipeline.config import CURRENT_SEASON, FULL_SEASONS, TABLES
         from pipeline.metrics import goalies
         fr = []
-        for s in [*FULL_SEASONS, CURRENT_SEASON]:
+        for s in sorted({*FULL_SEASONS, CURRENT_SEASON}):
             if not (TABLES / str(s) / "events.parquet").exists():
                 continue
             g = goalies.per_game(s).filter(pl.col("started"))

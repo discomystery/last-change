@@ -20,7 +20,7 @@ from pipeline.metrics import win_model
 
 
 def backtest(params: win_model.Params = win_model.Params()) -> dict:
-    seasons = FULL_SEASONS + [CURRENT_SEASON]
+    seasons = sorted({*FULL_SEASONS, CURRENT_SEASON})
     lineup_seasons = [s for s in seasons if s > min(FULL_SEASONS)]
     df = win_model.with_lineups(win_model.pregame(win_model.team_games(seasons), params), win_model.lineups(lineup_seasons, params))
     out = {}

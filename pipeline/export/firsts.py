@@ -76,7 +76,7 @@ def _goalie_games() -> dict[int, list[str]]:
     from pipeline.config import FULL_SEASONS
     from pipeline.metrics import goalies
     out = {}
-    for s in [*FULL_SEASONS, CURRENT_SEASON]:
+    for s in sorted({*FULL_SEASONS, CURRENT_SEASON}):
         if not (TABLES / str(s) / "events.parquet").exists():
             continue
         for gid_, d in goalies.per_game(s).filter(pl.col("sec") > 0).select("goalie_id", "date").iter_rows():

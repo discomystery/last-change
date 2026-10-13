@@ -1,0 +1,21 @@
+---
+// Under a playoff game's rink: the round and game number, the series score (before the game on a preview, after it
+// on a post-game page) and a link to the series page. Renders nothing for regular-season games.
+import { seriesOf, scoreWords, ROUND_SHORT } from '../lib/series';
+interface Props { id: number; when: 'before' | 'after' }
+const { id, when } = Astro.props;
+const hit = seriesOf(id);
+const base = import.meta.env.BASE_URL;
+const w = hit ? (when === 'before' ? hit.before : hit.after) : null;
+const started = hit && (when === 'after' || hit.g.game > 1);
+---
+{hit && (
+  <p class="series-line">
+    <a href={`${base}series/${hit.s.id}/`}>{ROUND_SHORT[hit.s.round]}, Game {hit.g.game}</a>
+    {started && <span> · {scoreWords(hit.s, w!, when === 'after' && Math.max(...w!) === 4)}{when === 'before' ? ' going in' : ''}</span>}
+  </p>
+)}
+<style>
+  .series-line { font: 600 14px/1.4 var(--ui); color: var(--ink-2); margin-top: 4px; }
+  .series-line a { color: var(--ink); }
+</style>

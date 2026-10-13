@@ -185,6 +185,10 @@ def nhl_picks(games: list[dict], season: int = CURRENT_SEASON, before: str | Non
     return out
 
 
+def _playoff(game_id) -> bool:
+    return str(game_id)[4:6] == "03"
+
+
 def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None = None,
              nhl: dict[int, dict[str, int]] | None = None) -> dict[int, dict[str, list[tuple[int, float]]]]:
     """Likely starters for unplayed games: {game_id: {team: [(player_id, chance), ...]}}, likeliest first. `games`
@@ -196,9 +200,12 @@ def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None
     if before:
         st = st.filter(pl.col("date") < before[:10])
     team, gl = defaultdict(list), defaultdict(list)
+    po_last = {}  # each team's starter in its latest playoff game
     for r in st.iter_rows(named=True):
         team[r["team"]].append((r["date"], r["season"], r["player_id"]))
         gl[r["player_id"]].append((r["date"], r["gsax"]))
+        if _playoff(r["game_id"]):
+            po_last[r["team"]] = r["player_id"]
     out: dict[int, dict] = {}
     for g in sorted(games, key=lambda g: (g["date"], g["id"])):
         out[g["id"]] = {}
@@ -213,11 +220,15 @@ def upcoming(games: list[dict], season: int = CURRENT_SEASON, before: str | None
             rows += [_newcomer(q, team[t], gl, st, g["date"], season) for q in sorted(_listed_goalies(season, t, g["date"]) - known - drop)]
             ranked = _score(rows, drop)
             pick = (nhl.get(g["id"]) or {}).get(t)
+            if not pick and _playoff(g["id"]):  # in the playoffs teams ride one goalie: last game's starter started
+                pick = po_last.get(t)  # the next one 92% of the time in 2023-24 to 2025-26 (464 team-games)
             if pick and pick not in drop:
                 ranked = _promote(ranked, pick)
             out[g["id"]][t] = ranked
             if ranked:  # the next game of this team assumes tonight's likeliest starter played
                 team[t].append((g["date"], season, ranked[0][0]))
+                if _playoff(g["id"]):
+                    po_last[t] = ranked[0][0]
     return out
 
 

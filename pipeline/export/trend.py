@@ -58,6 +58,7 @@ MOVE = {
     "pk": ("killing penalties better", "leaking more on the penalty kill"),
     "powerKill": ("more dangerous shorthanded", "less dangerous shorthanded"),
     "discipline": ("staying out of the box more", "taking more penalties"),
+    "rough": ("getting into more chippy games", "keeping things calmer after the whistle"),
 }
 # What a team was known for, after "they ...": (top of the league, bottom of the league).
 KNOWN = {
@@ -80,6 +81,7 @@ KNOWN = {
     "pk": ("kill penalties well", "leak on the penalty kill"),
     "powerKill": ("create chances shorthanded", None),
     "discipline": ("stay out of the box", "spend a lot of time in the box"),
+    "rough": ("get into a lot of chippy games", "keep things calm after the whistle"),
 }
 ROUND = {0: "missed the playoffs", 1: "went out in the first round", 2: "went out in the second round",
          3: "went out in the conference final", 4: "lost in the Final", 5: "won the Stanley Cup"}

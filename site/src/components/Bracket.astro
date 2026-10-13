@@ -1,0 +1,64 @@
+---
+// The playoff bracket: one column per round, each series a card with both teams in their colours and the series
+// score; the whole card opens the series page. West on top, East below within each round; on phones the rounds stack.
+import { seriesIndex, ROUND_SHORT, type SeriesRow } from '../lib/series';
+import { teamPaint } from '../lib/teams';
+interface Props { compact?: boolean }
+const { compact = false } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const rounds = [1, 2, 3, 4].map((r) => (seriesIndex?.series ?? []).filter((s) => s.round === r)
+  .sort((a, b) => (a.conference ?? '').localeCompare(b.conference ?? '') * -1 || a.letter.localeCompare(b.letter)));
+const status = (s: SeriesRow) => {
+  const [a, b] = s.wins;
+  if (s.winner) return `${s.winner} in ${a + b}`;
+  if (a + b === 0) return 'Starts soon';
+  return a === b ? `Tied ${a}-${b}` : `${a > b ? s.top : s.bottom} leads ${Math.max(a, b)}-${Math.min(a, b)}`;
+};
+const champ = rounds[3][0]?.winner ?? null;
+---
+{seriesIndex && (
+  <div class:list={['bracket', { compact }]}>
+    {rounds.map((list, i) => list.length > 0 && (
+      <div class="round">
+        <p class="eyebrow">{ROUND_SHORT[i + 1]}</p>
+        <ul>
+          {list.map((s) => (
+            <li>
+              <a class="card bk" href={`${base}series/${s.id}/`}>
+                {[[s.top, s.wins[0]], [s.bottom, s.wins[1]]].map(([t, w]) => (
+                  <span class:list={['bk-team', { won: s.winner === t, out: s.loser === t }]} style={`--team:${teamPaint(t as string)}`}>
+                    <span class="bk-ab">{t}</span><span class="bk-w">{w}</span>
+                  </span>
+                ))}
+                <span class="bk-st">{status(s)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+    {champ && <p class="champ">Stanley Cup champions: <strong style={`color:${teamPaint(champ)}`}>{champ}</strong></p>}
+  </div>
+)}
+
+<style>
+  .bracket { display: grid; gap: 18px 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; }
+  .round ul { display: grid; gap: 8px; }
+  .round .eyebrow { margin-bottom: 8px; }
+  .bk { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 10px 14px; text-decoration: none; color: var(--ink); border-radius: 14px; }
+  a.bk:hover { border-color: var(--ink-3); }
+  .bk-team { display: flex; justify-content: space-between; align-items: baseline; }
+  .bk-ab { font: 700 20px/1.1 var(--ui); letter-spacing: -0.02em; color: var(--team); }
+  .bk-w { font: 600 20px/1.1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .out .bk-ab, .out .bk-w { opacity: 0.45; }
+  .won .bk-w { font-weight: 800; }
+  .bk-st { font: 400 12px var(--ui); color: var(--ink-3); margin-top: 2px; }
+  .champ { grid-column: 1 / -1; font: 600 15px var(--ui); color: var(--ink-2); }
+  @media (max-width: 860px) {
+    .bracket { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 520px) {
+    .bracket { grid-template-columns: 1fr; }
+    .round ul { grid-template-columns: 1fr 1fr; }
+  }
+</style>

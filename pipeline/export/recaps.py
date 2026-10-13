@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.config import PAGE_TYPES, CURRENT_SEASON, GAME_TYPES, REGULAR, SITE_DATA, TABLES, types_for
 from pipeline.export import grades, pending, previews, wording
 from pipeline.ingest import game_stats
 from pipeline.export import surprises as surprise_rules
@@ -68,7 +68,7 @@ class Season:
     def __init__(self, season: int):
         self.season = season
         d = TABLES / str(season)
-        self.games = {g["game_id"]: g for g in pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).iter_rows(named=True)}
+        self.games = {g["game_id"]: g for g in pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(season))).iter_rows(named=True)}
         self.team_id = {}
         for g in self.games.values():
             self.team_id[(g["game_id"], g["home"])] = g["home_id"]
@@ -431,7 +431,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     usual_lines = {t: [u["ids"] for u in v["units"] if u["label"][0] == "L"] for t, v in lines.items()}
     S = Season(season)
-    meter = {r["game_id"]: r for r in replays.season_table(season).iter_rows(named=True)}
+    meter = {r["game_id"]: r for r in replays.season_table(season, GAME_TYPES).iter_rows(named=True)}
     out_dir = SITE_DATA / "recaps"
     out_dir.mkdir(parents=True, exist_ok=True)
     snaps = {}
@@ -443,13 +443,13 @@ def run(season: int = CURRENT_SEASON) -> dict:
     from pipeline.export import outlook
     sched = json.loads((SITE_DATA / "schedule.json").read_text())["games"]
     try:
-        reveals = outlook.reveal(season, [g for g in sched if g["final"]], places)
+        reveals = outlook.reveal(season, [g for g in sched if g["final"] and g.get("type", REGULAR) in PAGE_TYPES], places)
     except Exception as e:  # the post-game page still works without the reveal
         print(f"win chance reveal unavailable: {e!r}")
         reveals = {}
     by_kind = defaultdict(lambda: defaultdict(int))
     for gid, g in sorted(S.games.items()):
-        if g["state"] not in ("OFF", "FINAL"):
+        if g["state"] not in ("OFF", "FINAL") or g["game_type"] not in PAGE_TYPES:
             continue
         abbr_of = {g["home_id"]: g["home"], g["away_id"]: g["away"]}
         nums = {t: team_numbers(S, gid, t) for t in (g["away"], g["home"])}

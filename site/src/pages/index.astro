@@ -2,10 +2,19 @@
 // Home: built in the browser from the real schedule, around whichever team the visitor has chosen.
 import Base from '../layouts/Base.astro';
 import { matchupTable } from '../lib/teams';
+import Bracket from '../components/Bracket.astro';
+import { seriesIndex } from '../lib/series';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="home" title="Spare Line Change">
   <div id="home" data-base={base}>
+    {seriesIndex && (
+      <section id="playoffs">
+        <h2>{seriesIndex.spring} Stanley Cup Playoffs</h2>
+        <Bracket compact />
+        <p class="more-link"><a href={`${base}playoffs/`}>Every series →</a></p>
+      </section>
+    )}
     <section id="pick" hidden>
       <h1 class="page-top">Pick your team</h1>
       <p class="lede">Choose a team and this page becomes theirs. Your choice is remembered on this device, and you can change it at the top of any page.</p>

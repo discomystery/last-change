@@ -38,7 +38,7 @@ import numpy as np
 import polars as pl
 from sklearn.linear_model import LogisticRegression
 
-from pipeline.config import FINAL_STATES, REGULAR, TABLES
+from pipeline.config import FINAL_STATES, REGULAR, TABLES, types_for
 
 FEATURES = ["xgd", "b2b"]
 # Lineup terms: less cautious impact ratings than the player pages' (those are tuned for one player's numbers, not a
@@ -65,7 +65,7 @@ def team_games(seasons: list[int]) -> pl.DataFrame:
     out = []
     for s in seasons:
         d = TABLES / str(s)
-        g = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(FINAL_STATES))
+        g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type").is_in(types_for(s)) & pl.col("state").is_in(FINAL_STATES))
         # Empty-net shots are filed under "EN" for the shooting team and "EA" (extra attacker) for the team that
         # pulled its goalie, so both sides of them are left out: a team chasing a game is not charged for them.
         tg = (pl.read_parquet(d / "team_game.parquet").group_by("game_id", "team_id")
@@ -183,7 +183,7 @@ def _lineup_pass(seasons: tuple[int, ...], p: Params = Params()) -> tuple[pl.Dat
     news = _news(seasons, p.transactions)
     pg = pl.concat([
         pl.read_parquet(TABLES / str(s) / "player_game.parquet").filter(pl.col("pos") != "G").select("game_id", "player_id", "team_id", "pos", "sec5")
-        .join(pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date"), on="game_id")
+        .join(pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type").is_in(types_for(s))).select("game_id", "date"), on="game_id")
         .with_columns(season=pl.lit(s)) for s in have]).sort("date", "game_id")
     default = {d: float(pg.filter((pl.col("pos") == "D") == d)["sec5"].mean() or pg["sec5"].mean()) for d in (True, False)}
     tw: dict[int, float] = defaultdict(float)  # decaying ice-time history per skater
