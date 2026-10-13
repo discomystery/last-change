@@ -45,6 +45,12 @@ FIXES: dict[int, tuple[str, str]] = {
     8485957: ("Alberts", "Šmits"),
     8477970: ("Vítek", "Vaněček"),  # the NHL accents his last name only
     8483500: ("Noah", "Östlund"),
+    # French-Canadian (Sora chose to include them, 2026-10-13)
+    8483017: ("Frédéric", "Brunet"),
+    8480426: ("Charle-Édouard", "D'Astous"),
+    8477919: ("Frédérick", "Gaudreau"),
+    8478468: ("Jérémy", "Lauzon"),
+    8481534: ("Raphaël", "Lavoie"),
 }
 
 
