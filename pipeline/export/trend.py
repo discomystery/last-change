@@ -262,7 +262,7 @@ def _ordinal(n: int) -> str:
 
 
 def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[dict], full: list[dict]) -> dict:
-    """A headline, a one- or two-sentence lede about style, the history sentence (kept for the fold under the chart)
+    """A headline, a one- or two-sentence lede about style (shown with Then and now), the history sentence (kept for the fold under the chart)
     and the notes the chart writes on itself: last season's level and how it ended, this season's level so far, and
     the change date."""
     X, key = _the(t), (abbr, "trend")
@@ -274,11 +274,10 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
     lede = []
     if new:
         moves = [MOVE[r["key"]][0 if r["now"]["pct"] > r["then"]["pct"] else 1] for r in new]
-        lead = "One thing has changed" if len(new) == 1 else "What’s new"
-        lede.append(f"{lead}: they’re {_and(moves)}, by more than {'early-season ' if len(now) < 20 else ''}bounces would explain.")
+        lede.append(f"This season they’re {_and(moves)}.")
     if kept:
         habits = [KNOWN[r["key"]][0 if r["then"]["pct"] > 50 else 1] for r in kept[:2]]
-        lede.append(f"{'Otherwise they' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
+        lede.append(f"{'They' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
     notes: dict = {}
     if len(last):
         s = 100 * _share(last["xgf_adj"].to_numpy(), last["xga_adj"].to_numpy())
@@ -333,7 +332,6 @@ def around(abbr: str, mine: pl.DataFrame, brk: dict | None, lineups: pl.DataFram
     for the club, regulars who missed a long stretch, new regulars, and coaching changes. Never why, never "because"."""
     if not brk:
         return []
-    place = teams.get(abbr, {}).get("place", abbr)
     ids = mine["game_id"].to_list()
     dates = mine["date"].to_list()
     seasons = mine["season"].to_list()
@@ -391,10 +389,16 @@ def around(abbr: str, mine: pl.DataFrame, brk: dict | None, lineups: pl.DataFram
     for j, who in left.items():
         names = [f"{nm} (now with {pl_})" if pl_ else nm for nm, pl_ in who]
         add(j, f"Not back this season: {_and(names)}" if seasons[j] != seasons[j - 1]
-            else f"Played {'their' if len(names) > 1 else 'his'} last game for {place}: {_and(names)}")
+            else f"First game without {_and(names)}")
     for j, who in out_.items():
         for nm, miss, rest in who:
-            add(j, f"{nm} out of the lineup for {'the last ' if rest else ''}{miss} games")
+            # Pinned on the first game he missed, so the words count forward from here.
+            if not rest:
+                add(j, f"First game without {nm}, who missed {miss} in a row")
+            elif seasons[j] == seasons[-1]:
+                add(j, f"First game without {nm}, who has missed every game since ({miss} so far)")
+            else:
+                add(j, f"First game without {nm}, who missed the rest of the season ({miss} games)")
     for j, who in new.items():
         add(j, f"New in the lineup: {_and(who)}")
     if coaches is not None:

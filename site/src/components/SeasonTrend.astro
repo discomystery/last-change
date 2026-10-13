@@ -6,6 +6,7 @@
 // last season (open ring) against this season (filled dot), and the franchise's history since 1997-98 behind a fold.
 // The two-season chart is drawn in the browser so its labels stay readable at any width.
 import { fpInfo, ordinal } from '../data/mock';
+import Explain from './Explain.astro';
 interface Props { abbr: string; colour: string; place: string; t: any; window: number; band: [number, number]; season: number }
 const { abbr, colour, place, t, window: win, band, season } = Astro.props;
 const sn = (s: number) => `${s}-${String(s + 1).slice(-2)}`;
@@ -28,32 +29,47 @@ const ariaLong = `${place}: playoffs in ${made} of ${hist.length} seasons since 
 type Trait = { key: string; tag: 'new' | 'kept'; then: { pct: number; rank: number }; now: { pct: number; rank: number } };
 const traits = (t.traits as Trait[]).filter((r) => fpInfo[r.key]);
 const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
+// The chart's two levels as plain figures under it, so the plot itself carries no number labels.
+const levels: { v: number; words: string }[] = t.change
+  ? [{ v: Math.round(t.change.before), words: `of the chances before ${day(t.games[t.change.k][0])}` }, { v: Math.round(t.change.after), words: 'since then' }]
+  : [t.notes?.last && { v: Math.round(t.notes.last.share), words: `of the chances in ${sn(season - 1)}` }, t.notes?.now && { v: Math.round(t.notes.now.share), words: `so far in ${sn(season)}` }].filter(Boolean) as any;
 ---
 <div class="trend" style={`--tc:${colour}`}>
   <div class="card tr-run">
-    <h3 class="tr-head">{t.head}</h3>
-    {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
+    <Explain id="tr-how" title={t.head} class="tr-head">
+      <p><strong>Dots</strong> (on wider screens)<strong>:</strong> one game each, {place}’s share of the 5-on-5 scoring chances. Above 50%, they had more of the play; below it, the other team did.</p>
+      <p><strong>Thick line:</strong> a running average, their share over each game and the {win - 1} before it, so one odd night doesn’t throw it.</p>
+      <p><strong>Hatched band:</strong> how far that average wanders on bounces alone. Inside it, nothing has to have changed.</p>
+      <p><strong>Dotted lines:</strong> their level before and after the play changed, or each season’s average when it didn’t.</p>
+      {(t.around ?? []).length > 0 && <p><strong>Numbered pins:</strong> other things that happened around the change. The numbers can’t say which of them, if any, caused it.</p>}
+    </Explain>
+    <div class="tr-levels">{levels.map((l) => <p><strong>{l.v}%</strong><span>{l.words}</span></p>)}</div>
     <svg class="tr-svg" id="tr-svg" role="img" aria-label={`${place}’s share of the 5-on-5 chances in each game of ${sn(season - 1)} and ${sn(season)}, with a ${win}-game line`}></svg>
     <p class="tr-key tr-key2">
-      <span class="k-line">Last {win} games</span><span class="k-dot">Each game</span><span class="k-band">What bounces alone do</span><span class="k-avg">Even</span>
-      <span class="k-ref">{t.change ? 'Before and after the change' : 'Each season so far'}</span>
+      <span class="k-line">{win}-game average</span><span class="k-dot tr-wide">One game</span>
+      <span class="k-band term" tabindex="0" data-tip={`How far a ${win}-game average wanders on bounces alone. Inside it, nothing has to have changed.`}>Bounce range</span>
+      <span class="k-ref">{t.change ? 'Before and after' : 'Season average'}</span>
     </p>
     {(t.around ?? []).length > 0 && (
       <div class="tr-around">
-        <p class="mini-h">Around the same time</p>
+        <p class="mini-h">What else happened around {day(t.games[t.change.k][0])}</p>
         <ol>
           {(t.around as { i: number; date: string; text: string[] }[]).map((e, n) => (
             <li><span class="tr-pin">{n + 1}</span><span class="tr-when">{day(e.date)}</span><span>{e.text.join('. ')}.</span></li>
           ))}
         </ol>
-        <p class="tr-caveat">Things that happened near the change date. The numbers can’t say which of them, if any, moved the play.</p>
       </div>
     )}
-    <script type="application/json" id="tr-data" set:html={JSON.stringify({ games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
+    <script type="application/json" id="tr-data" set:html={JSON.stringify({ place, games: t.games, change: t.change, notes: t.notes, around: t.around, window: win, band, season })}></script>
   </div>
 
   {traits.length > 0 && <>
-    <h3 class="sub">Then and now</h3>
+    <Explain id="tr-then" title="Then and now">
+      <p>Each card is one part of their style. The open ring is where they ranked last season, the filled dot where they rank this season, and the short tick in the middle is the league average.</p>
+      <p><strong>New this season</strong> means the move is bigger than a few games of bounces would explain. <strong>Carried over</strong> means one of last season’s strongest habits is still there.</p>
+      <p>{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
+    </Explain>
+    {(t.lede as string[]).length > 0 && <p class="tr-text">{(t.lede as string[]).join(' ')}</p>}
     <ul class="tr-traits">
       {traits.map((r) => {
         const info = fpInfo[r.key];
@@ -71,7 +87,6 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
         );
       })}
     </ul>
-    <p class="tr-note">{nGames} {nGames === 1 ? 'game' : 'games'} in. A trait only shows up here once the season holds enough games to read it, so the list fills in as the season goes on.</p>
   </>}
 
   {hist.length > 0 && (
@@ -108,18 +123,31 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     if (!svg || !src) return;
     const d = JSON.parse(src.textContent || '{}');
     const g: any[] = d.games, n = g.length, win: number = d.window, brk = d.change;
-    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 230 : 270;
+    const W = Math.round(Math.max(300, svg.clientWidth || 800)), narrow = W < 560, H = narrow ? 250 : 280;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.style.height = `${H}px`;
-    const nt = d.notes || {}, L = 38, R = 10, T = 62, B = 24, LO = 25, HI = 75;
+    const nt = d.notes || {}, L = 38, R = 10, B = 24, LO = 25, HI = 75;
     const x = (i: number) => L + ((W - L - R) * (i + 0.5)) / n;
+    // Numbered pins (what happened around the change) are fanned out in one row so they never overlap. That row
+    // shares the line with the season names when no pin would touch them, and drops below them when one would.
+    const ar: any[] = d.around || [], gap = 24;
+    const want = ar.map((e) => x(e.i) - (x(1) - x(0)) / 2);
+    const at = want.slice();
+    for (let j = 1; j < at.length; j++) at[j] = Math.max(at[j], at[j - 1] + gap);
+    for (let j = at.length - 1; j >= 0; j--) at[j] = Math.min(at[j], (j === at.length - 1 ? W - R - 10 : at[j + 1] - gap));
+    const cutAt = g.findIndex((r) => r[8] === d.season);
+    const lastRows = nt.last ? [sn(d.season - 1), nt.last.result || ''] : [];
+    const nowRows = cutAt > 0 && nt.now ? [sn(d.season), `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`] : [];
+    const wide = (rows: string[]) => Math.max(0, ...rows.map((r) => r.length * 6.6));
+    const clear = at.every((p) => p - 9 > L + wide(lastRows) + 8 && p + 9 < W - R - wide(nowRows) - 8);
+    const T = !ar.length || clear ? 48 : 74, py = clear ? 22 : T - 18;
     const y = (v: number) => T + ((H - T - B) * (HI - Math.max(LO, Math.min(HI, v)))) / (HI - LO);
     const share = (i: number, j: number) => { let f = 0, a = 0; for (let k = i; k < j; k++) { f += g[k][6]; a += g[k][7]; } return f + a ? (100 * f) / (f + a) : 50; };
     const level = (i: number) => (brk ? (i < brk.k ? brk.before : brk.after) : share(0, n));
     let o = `<defs><pattern id="tr-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect class="tr-hatch" width="3" height="6"/></pattern></defs>`;
-    for (const v of [30, 40, 50, 60, 70]) {
+    for (const v of [30, 50, 70]) {
       if (v !== 50) o += `<line class="tr-grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`;
-      o += `<text class="tr-yl" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}%</text>`;
+      o += `<text class="tr-yl${v === 50 ? ' tr-ye' : ''}" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v === 50 ? 'Even' : `${v}%`}</text>`;
     }
     // Months along the bottom, thinned on phones; the season break as a dotted line with each season named above.
     let lastM = '', lastX = -99;
@@ -138,14 +166,13 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
     const lastN = cut > 0 ? cut : n;
     const pct = (v: number) => `${Math.round(v)}%`;
     const head = (x0: number, anchor: string, rows: string[]) => rows.forEach((r, j) => {
-      if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 16}" text-anchor="${anchor}">${r}</text>`;
+      if (r) o += `<text class="${j ? 'tr-note' : 'tr-sl'}" x="${x0}" y="${13 + j * 17}" text-anchor="${anchor}">${r}</text>`;
     });
-    if (nt.last) head(L, 'start', [sn(d.season - 1), `${pct(nt.last.share)} of the chances${narrow ? '' : ` · ${nt.last.words}`}`,
-      [nt.last.result, narrow ? '' : nt.last.streak].filter(Boolean).join(' · ')]);
+    if (lastRows.length) head(L, 'start', lastRows);
     if (cut > 0) {
       const cx = (x(cut - 1) + x(cut)) / 2;
-      o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T - 6}" y2="${H - B}"/>`;
-      if (nt.now) head(W - R, 'end', [sn(d.season), `${pct(nt.now.share)} so far`, `${nt.now.games} ${nt.now.games === 1 ? 'game' : 'games'} in`]);
+      o += `<line class="tr-break" x1="${cx}" x2="${cx}" y1="${T}" y2="${H - B}"/>`;
+      if (nowRows.length) head(W - R, 'end', nowRows);
     }
     // Bounces alone: the band around the team's level (before and after the change, when there is one).
     if (n >= win) {
@@ -154,7 +181,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       o += `<polygon class="tr-band" points="${top.concat(bot).join(' ')}"/>`;
     }
     o += `<line class="tr-even" x1="${L}" x2="${W - R}" y1="${y(50)}" y2="${y(50)}"/>`;
-    g.forEach((r, i) => { const t = r[6] + r[7]; if (t > 0) o += `<circle class="tr-g" cx="${x(i).toFixed(1)}" cy="${y((100 * r[6]) / t).toFixed(1)}" r="${narrow ? 2.5 : 3}"/>`; });
+    if (!narrow) g.forEach((r, i) => { const t = r[6] + r[7]; if (t > 0) o += `<circle class="tr-g" cx="${x(i).toFixed(1)}" cy="${y((100 * r[6]) / t).toFixed(1)}" r="${narrow ? 2.5 : 3}"/>`; });
     if (!brk) {
       // No change found: each season's level as a dotted line, the number it stands for written at the top.
       const seg = (i: number, j: number) => { if (j > i) o += `<line class="tr-ref" x1="${x(i)}" x2="${x(j - 1)}" y1="${y(share(i, j))}" y2="${y(share(i, j))}"/>`; };
@@ -162,29 +189,18 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       if (cut > 0) seg(cut, n);
     }
     if (brk) {
-      const lab = (v: number, words: string, x0: number, x1: number, end: boolean, below: boolean) =>
-        `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-rl" x="${end ? x1 : x0}" y="${y(v) + (below ? 15 : -7)}" text-anchor="${end ? 'end' : 'start'}">${words}</text>`;
-      const down = brk.after < brk.before;
-      o += lab(brk.before, `${Math.round(brk.before)}% before`, x(0), x(brk.k - 1), false, !down);
-      o += lab(brk.after, `${Math.round(brk.after)}% since ${day(g[brk.k][0])}`, x(brk.k), x(n - 1), true, down);
+      const ref = (v: number, x0: number, x1: number) => `<line class="tr-ref" x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}"/>`;
+      o += ref(brk.before, x(0), x(brk.k - 1)) + ref(brk.after, x(brk.k), x(n - 1));
     }
     const pts: string[] = [];
     for (let i = win - 1; i < n; i++) pts.push(`${x(i).toFixed(1)},${y(share(i - win + 1, i + 1)).toFixed(1)}`);
     if (pts.length > 1) o += `<polyline class="tr-line" pathLength="1" points="${pts.join(' ')}"/>`;
-    // Numbered pins for what happened around the change, matching the list under the chart.
-    (d.around || []).forEach((e: any, j: number) => {
-      const px = x(e.i) - (x(1) - x(0)) / 2;
-      o += `<line class="tr-pinl" x1="${px}" x2="${px}" y1="${T}" y2="${H - B}"/>`;
-    });
+    // Numbered pins for what happened around the change, in one row above the plot (fanned out so they never overlap),
+    // each with a thin leader down to its date. They match the list under the chart.
     let pins = '';
-    const placed: [number, number][] = [];
-    (d.around || []).forEach((e: any, j: number) => {
-      const px = x(e.i) - (x(1) - x(0)) / 2;
-      let stack = 0; // pins close together stack downward, each on the first free level
-      while (placed.some(([q, l]) => l === stack && Math.abs(q - px) < 20)) stack++;
-      placed.push([px, stack]);
-      const py = T + 10 + stack * 21;
-      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${px}" cy="${py}" r="9"/><text x="${px}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
+    ar.forEach((e, j) => {
+      o += `<path class="tr-pinl" d="M${at[j].toFixed(1)},${py + 9} L${want[j].toFixed(1)},${T} L${want[j].toFixed(1)},${H - B}"/>`;
+      pins += `<g class="tr-pinm" data-tip="${e.text.join('. ').replace(/"/g, '&quot;')}."><circle cx="${at[j].toFixed(1)}" cy="${py}" r="9"/><text x="${at[j].toFixed(1)}" y="${py + 4}" text-anchor="middle">${j + 1}</text></g>`;
     });
     // One tall hover target per game, read by the site's tooltip.
     const step = (W - L - R) / n;
@@ -193,6 +209,9 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
       const tip = `${day(r[0])} ${r[2] ? 'vs' : 'at'} ${r[1]}, ${res} ${r[3]}-${r[4]}: ${t ? Math.round((100 * r[6]) / t) : 50}% of the chances${i >= win - 1 ? `; ${Math.round(share(i - win + 1, i + 1))}% over the last ${win}` : ''}`;
       o += `<rect class="tr-hit" x="${(L + step * i).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${H - T - B}" data-tip="${tip}"/>`;
     });
+    // Which way is good, written into the chart: up means more of the play, down less, and the 50% line is even.
+    o += `<text class="tr-dir" x="${L + 6}" y="${y(72) + 4}">▲ ${narrow ? 'Their' : `${d.place}’s`} edge</text>`;
+    o += `<text class="tr-dir" x="${L + 6}" y="${y(28) + 4}">▼ Opponents’ edge</text>`;
     o += pins;
     svg.innerHTML = o;
   }
@@ -204,7 +223,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
 <style is:global>
   .trend { --team: var(--tc); }
     .tr-head { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 10px; text-wrap: balance; }
-  .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; max-width: 70ch; }
+  .tr-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 14px; }
   .tr-hist { margin-top: 26px; }
   .tr-long { padding: 22px 24px; }
   .tr-htext { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 0 0 16px; }
@@ -224,6 +243,10 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-ax { display: flex; justify-content: space-between; margin: 6px 0 0; font: 500 12px var(--ui); color: var(--ink-3); }
   .tr-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
   .tr-key > span { white-space: nowrap; }
+  .k-pin::before { content: '1'; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 6px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 9.5px var(--ui); vertical-align: 1px; }
+  .tr-how { font: 400 15px/1.5 var(--ui); color: var(--ink-2); margin: 0 0 14px; max-width: 80ch; }
+  .tr-how strong { color: var(--ink); font-weight: 600; }
+  .tr-svg .tr-dir { font: 600 10.5px var(--ui); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--ink-3); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
   :is(.k-miss, .k-made, .k-deep, .k-cup, .k-line)::before { content: ''; display: inline-block; vertical-align: -1px; margin-right: 6px; }
   :is(.k-miss, .k-made, .k-deep)::before { width: 10px; height: 12px; border-radius: 2px 2px 0 0; }
   .k-miss::before { background: var(--track); }
@@ -231,6 +254,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .k-deep::before { background: var(--team); }
   .k-cup::before { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); vertical-align: 1px; }
   .k-line::before { width: 20px; height: 3px; border-radius: 2px; background: var(--team); vertical-align: 3px; }
+  .tr-key2 .k-ref::before { width: 18px; height: 0; border-left: 0; border-top: 2px dotted var(--ink); vertical-align: 3px; }
   .tr-key2 .k-dot::before { opacity: 0.35; width: 8px; height: 8px; }
   /* The two-season chart. */
   .tr-run { padding: 22px 24px 16px; }
@@ -239,6 +263,7 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-svg .tr-sl { font: 700 12px var(--ui); letter-spacing: 0.07em; fill: var(--ink); }
   .tr-svg .tr-note { font: 500 12px var(--ui); fill: var(--ink-2); }
   .tr-svg .tr-rl { font: 600 12px var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
+  .tr-svg .tr-ye { font-weight: 700; fill: var(--ink-2); }
   .tr-grid { stroke: var(--rule); stroke-width: 1; }
   .tr-even { stroke: var(--ink); stroke-opacity: 0.5; stroke-width: 2; }
   .tr-break { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 1.5 4; stroke-linecap: round; }
@@ -248,15 +273,18 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-line { fill: none; stroke: var(--team); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
   .tr-ref { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 1.5 5; stroke-linecap: round; }
   .tr-hit { fill: transparent; }
-  .tr-pinl { stroke: var(--ink); stroke-opacity: 0.3; stroke-width: 1; }
+  .tr-pinl { fill: none; stroke: var(--ink); stroke-opacity: 0.2; stroke-width: 1; }
   .tr-pinm circle { fill: var(--ink); }
   .tr-svg .tr-pinm text { font: 700 11px var(--ui); fill: var(--sheet); }
   .tr-pinm { cursor: default; }
+  .tr-levels { display: flex; flex-wrap: wrap; gap: 8px 36px; margin: 8px 0 18px; }
+  .tr-levels p { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 400 14px/1.35 var(--ui); color: var(--ink-2); }
+  .tr-levels strong { font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); }
   .tr-around { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
   .tr-around .mini-h { margin: 0 0 10px; }
   .tr-around ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .tr-around li { display: grid; grid-template-columns: 22px 58px 1fr; gap: 0 8px; align-items: baseline; font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
-  .tr-pin { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 11px var(--ui); transform: translateY(3px); }
+  .tr-pin { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--sheet); font: 700 11px/1 var(--ui); align-self: start; margin-top: 2px; }
   .tr-when { font-weight: 600; color: var(--ink); }
   .tr-caveat { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
   .tr-hit:hover { fill: color-mix(in oklab, var(--ink) 6%, transparent); }
@@ -275,7 +303,12 @@ const nGames = (t.games as any[]).filter((g) => g[8] === season).length;
   .tr-note { font: 400 14px/1.5 var(--ui); color: var(--ink-3); margin: 12px 0 0; }
   @media (max-width: 719px) {
     .tr-long { padding: 18px 16px; }
-    .tr-run { padding: 14px 12px 12px; }
+    .tr-run { padding: 16px 14px 14px; }
+    .tr-wide { display: none; }
+    .tr-levels { gap: 6px 24px; }
+    .tr-around li { grid-template-columns: 22px 1fr; font-size: 14.5px; }
+    .tr-around .tr-when { grid-column: 2; }
+    .tr-around li > span:last-child { grid-column: 2; }
     .tr-cols { height: 120px; gap: 1px; }
   }
 </style>
