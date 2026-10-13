@@ -202,7 +202,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
             if cover:
                 text += " " + cover
-            found.append({"player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
+            found.append({"pid": pid, "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
                           "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"] if ro else 0})
         found = sorted(found, key=lambda n: n["order"])[:MAX_OUT]
 

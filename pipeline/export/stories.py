@@ -192,12 +192,72 @@ def _current_team(P: pl.DataFrame, season: int) -> dict[int, str]:
     return dict(zip(rows["player_id"], rows["team"]))
 
 
+REPORTED_OUT = ("injured", "suspended", "personal")
+
+
+@lru_cache(maxsize=8)
+def _availability(season: int, day: str) -> dict[str, dict[int, dict]]:
+    """Per team, players the league has reported out (injured, suspended, away for personal reasons) as of `day`: each
+    player's latest row on or before it. Empty when the table has not been built."""
+    f = TABLES / str(season) / "availability.parquet"
+    if not f.exists():
+        return {}
+    av = pl.read_parquet(f).filter(pl.col("date") <= day)
+    if not av.height:
+        return {}
+    av = av.filter(pl.col("date") == av["date"].max())
+    out = {}
+    for r in av.filter(pl.col("status").is_in(list(REPORTED_OUT))).iter_rows(named=True):
+        out.setdefault(r["team"], {})[r["player_id"]] = r
+    return out
+
+
+@lru_cache(maxsize=8)
+def _out_notes(season: int, day: str) -> dict[str, list[dict]]:
+    """The team page's "Out" notes (export/changes.py) as of `day`: regulars and stars, most important first."""
+    from pipeline.export import changes
+    try:
+        notes = changes.notes(season, day) or {}
+    except Exception as e:  # tables missing in a test or a fresh season: no Out items
+        print(f"lineup notes unavailable: {e!r}")
+        return {}
+    return {t: [n for n in ns if n.get("change") == "out" and n.get("pid")] for t, ns in notes.items()}
+
+
+def _starters_out(season: int, day: str, tid: int, out: dict[int, dict]) -> list[dict]:
+    """Goalies the league has out who started at least a third of the club's games (and three or more) this season or
+    last."""
+    from pipeline.metrics import goalies
+    keep = []
+    for pid, r in out.items():
+        if r["pos"] != "G":
+            continue
+        for s in (season, season - 1):
+            if not (TABLES / str(s) / "events.parquet").exists():
+                continue
+            starts = goalies.per_game(s).filter(pl.col("started") & (pl.col("date") < day) & (pl.col("team_id") == tid))
+            mine = starts.filter(pl.col("goalie_id") == pid).height
+            if starts.height and mine >= 3 and mine / starts.height >= 1 / 3:
+                keep.append(r)
+                break
+    return keep
+
+
 def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
     """Everything the preview story can say, from games before `before` (a date)."""
     G, P, N = book()
     G, P = G.filter(pl.col("date") < before[:10]), P.filter(pl.col("date") < before[:10])
     cur = _current_team(P, season)
-    out = {"meetings": [], "form": {}, "items": [], "heads": []}
+    out = {"meetings": [], "form": {}, "items": [], "heads": [], "out": set()}
+    # Who the league has out today (eye test, 2026-10-13: hot-streak and old-team items for players who were hurt, and
+    # Shesterkin, Bedard, Barkov missing from the list). Storylines skip them; regulars, stars and starting goalies
+    # get an "Out" item instead.
+    day = before[:10]
+    reported = _availability(season, day)
+    notes = _out_notes(season, day)
+    tids = {}
+    for r in G.filter(pl.col("season") == season).iter_rows(named=True):
+        tids[r["home"]], tids[r["away"]] = r["home_id"], r["away_id"]
     # last meetings this season
     for r in results(G, home, season):
         if r["opp"] == away:
@@ -207,7 +267,33 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         out["form"][t] = {"res": res, "streak": streak(res), "record": record(res)}
     items = out["items"]
     for t, o in ((away, home), (home, away)):
-        roster = [p for p, team in cur.items() if team == t]
+        skip = set(reported.get(t, {}))
+        out["out"] |= skip
+        told = []
+        for k, n in enumerate(notes.get(t, [])[:2]):
+            text = n["text"].split(" He is ")[0] + (" He is " + n["text"].split(" He is ")[1].split(".")[0] + "." if " He is " in n["text"] else "")
+            if N.get(n["pid"]) and text.startswith(n["player"]):  # the team page's short names, written out in full
+                text = N[n["pid"]] + text[len(n["player"]):]
+            if not n.get("status"):  # nothing reported: only what the game sheets show, never "a scratch"
+                who = N.get(n["pid"]) or n["player"]
+                gone = n.get("games") or 0
+                text = (f"{who} hasn’t played this season." if " this season" in text.split(".")[0] else
+                        f"{who} has missed the last {num(gone)} games." if gone > 1 else f"{who} missed their last game.") \
+                    + (" He is" + text.split(" He is", 1)[1] if " He is" in text else "")
+            out["out"].add(n["pid"])
+            items.append({"tag": "Out", "text": text, "score": 76 - k, "pid": n["pid"]})
+            told.append(n["pid"])
+        n_games = len(results(G, t, season))
+        for r in _starters_out(season, day, tids.get(t, -1), reported.get(t, {})):
+            if r["player_id"] in told:
+                continue
+            from pipeline.export import changes
+            text = f"{N.get(r['player_id']) or changes._name(r)} {changes._status_text(r, n_games)}."
+            nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
+            if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
+                text += f" {N[nxt[0]]} is expected to start."
+            items.append({"tag": "Out", "text": text, "score": 78, "pid": r["player_id"]})
+        roster = [p for p, team in cur.items() if team == t and p not in skip]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))
         # hot streaks; teammates on the same run share one item (Sora, 2026-10-12: "Granlund and LaCombe have ...")
@@ -239,6 +325,8 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         cands = []
         for pid, g in vs.group_by("player_id"):
             pid = pid[0]
+            if pid in skip:
+                continue
             pts, goals, gp = g["pts"].to_list(), int(g["g"].sum()), g.height
             n = 0
             for x in reversed(pts):
@@ -298,6 +386,8 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             for pos, top in (("F", 6), ("D", 4)):
                 grp = per.filter(pl.col("pos").is_in(["C", "L", "R"]) if pos == "F" else pl.col("pos") == "D").sort("toi", descending=True).head(top)
                 for r in grp.iter_rows(named=True):
+                    if r["player_id"] in skip:
+                        continue  # told as "Out"
                     missed = len(team_games) - 1 - team_games.index(r["last"])
                     if missed >= 1 and r["gp"] >= 2:
                         gone.setdefault(missed, []).append((72 + (top - grp["player_id"].to_list().index(r["player_id"])), r["player_id"]))
@@ -308,7 +398,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                 items.append({"tag": "Missing", "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who],
                               "text": f"{_and(names)} {'has' if len(names) == 1 else 'have'} missed {W.poss(t)} {when}."})
         if res:
-            items += _milestones(t, res[-1], P, N, before)
+            items += [x for x in _milestones(t, res[-1], P, N, before) if x.get("pid") not in skip]
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
     if item:
         items.append(item)
@@ -539,8 +629,11 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             look.append(c["gist"])
             kinds.add(c["kind"])
     blood = penalties.bad_blood(m[-1]["game_id"], season, N) if m else None
-    items = sorted(facts["items"] + ([blood] if blood else []) + _still_out([n["text"] for n in lines.get(away, {}).get("notes", [])], away, N, season)
-                   + _still_out([n["text"] for n in lines.get(home, {}).get("notes", [])], home, N, season), key=lambda i: -i["score"])
+    still = _still_out([n["text"] for n in lines.get(away, {}).get("notes", [])], away, N, season) \
+        + _still_out([n["text"] for n in lines.get(home, {}).get("notes", [])], home, N, season)
+    out_last = {N[p].split(" ", 1)[-1] for p in facts["out"] if N.get(p)}
+    still = [x for x in still if not any(f" {nm} " in " " + x["text"] for nm in out_last)]  # already an "Out"
+    items = sorted(facts["items"] + ([blood] if blood else []) + still, key=lambda i: -i["score"])
     picked, per, seen = [], {}, set()
     for i in items:
         if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
