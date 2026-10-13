@@ -14,13 +14,13 @@ from __future__ import annotations
 import gzip
 import json
 import re
-import unicodedata
 from datetime import date as Date, datetime, timedelta, timezone
 
 import httpx
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FINAL_STATES, OFFLINE, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.ingest import names
 from pipeline.ingest.client import get
 
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
@@ -30,7 +30,7 @@ DAYS_AHEAD = 1  # today's and tomorrow's games (by the schedule's date)
 
 
 def fold(s: str) -> str:
-    s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)).lower()
+    s = names.fold(s)
     return re.sub(r"[^a-z]+", " ", s).strip()
 
 

@@ -20,7 +20,7 @@ import httpx
 import polars as pl
 
 from pipeline.config import FINAL_STATES, NHL_WEB, OFFLINE, PLAYOFFS, REGULAR, TABLES
-from pipeline.ingest import nhl
+from pipeline.ingest import names, nhl
 from pipeline.ingest.client import get
 from pipeline.ingest.rosters import today
 
@@ -30,10 +30,6 @@ SCHEMA = {"game_id": pl.Int64, "date": pl.Utf8, "team": pl.Utf8, "player_id": pl
 
 def path(season: int):
     return TABLES / str(season) / "game_rosters.parquet"
-
-
-def _name(n) -> str | None:
-    return (n or {}).get("default") if isinstance(n, dict) else n
 
 
 def _dressed(season: int, game: dict) -> list[dict]:
@@ -52,8 +48,8 @@ def _scratches(game: dict) -> list[dict]:
     out = []
     for side in ("home", "away"):
         for p in (info.get(f"{side}Team") or {}).get("scratches") or []:
-            out.append({"team": game[side], "player_id": p["id"], "first": _name(p.get("firstName")),
-                        "last": _name(p.get("lastName")), "pos": None, "status": "scratched"})
+            first, last = names.spell(p["id"], p.get("firstName"), p.get("lastName"))
+            out.append({"team": game[side], "player_id": p["id"], "first": first, "last": last, "pos": None, "status": "scratched"})
     return out
 
 

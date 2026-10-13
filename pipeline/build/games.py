@@ -5,7 +5,7 @@ import polars as pl
 
 from pipeline.config import FINAL_STATES, REGULAR, TABLES
 from pipeline.build.stints import Shift, build_stints, clean_shifts, clock_to_seconds, game_seconds, on_ice
-from pipeline.ingest import nhl
+from pipeline.ingest import names, nhl
 
 SHOT_TYPES = {"shot-on-goal", "missed-shot", "blocked-shot", "goal"}
 UNBLOCKED = {"shot-on-goal", "missed-shot", "goal"}
@@ -47,7 +47,7 @@ def build_game(season: int, game: dict) -> dict:
 
     players = [
         {"game_id": gid, "player_id": pid, "team_id": r["teamId"], "is_home": r["teamId"] == home_id, "pos": r["positionCode"],
-         "first": r["firstName"]["default"], "last": r["lastName"]["default"], "number": r.get("sweaterNumber")}
+         **dict(zip(("first", "last"), names.spell(pid, r["firstName"], r["lastName"]))), "number": r.get("sweaterNumber")}
         for pid, r in roster.items()
     ]
 

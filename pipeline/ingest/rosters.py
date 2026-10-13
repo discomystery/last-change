@@ -14,6 +14,7 @@ import httpx
 import polars as pl
 
 from pipeline.config import NHL_WEB, OFFLINE, PLAYOFFS, REGULAR, TABLES, season_id
+from pipeline.ingest import names
 from pipeline.ingest.client import get
 
 SCHEMA = {"date": pl.Utf8, "team": pl.Utf8, "player_id": pl.Int64, "first": pl.Utf8, "last": pl.Utf8, "pos": pl.Utf8,
@@ -34,8 +35,10 @@ def _rows(team: str, season: int, day: str) -> list[dict]:
     out = []
     for group in ("forwards", "defensemen", "goalies"):
         for p in data.get(group, []):
-            out.append({"date": day, "team": team, "player_id": p["id"], "first": (p.get("firstName") or {}).get("default"),
-                        "last": (p.get("lastName") or {}).get("default"), "pos": p.get("positionCode"), "shoots": p.get("shootsCatches"),
+            names.note_country(p["id"], p.get("birthCountry"))
+            first, last = names.spell(p["id"], p.get("firstName"), p.get("lastName"), p.get("birthCountry"))
+            out.append({"date": day, "team": team, "player_id": p["id"], "first": first,
+                        "last": last, "pos": p.get("positionCode"), "shoots": p.get("shootsCatches"),
                         "number": p.get("sweaterNumber"), "birth_date": p.get("birthDate"), "headshot": p.get("headshot")})
     return out
 
