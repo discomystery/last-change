@@ -45,6 +45,8 @@ def run(season: int) -> dict:
     stories.run_recaps(season)  # last: the plain-English story reads the recap, report cards and Swing
     from pipeline.export import track
     track.run(season)  # the Track record page's season summary, from the post-game files
+    from pipeline.export import home
+    home.run(season)  # the home page: last night, the coming games, league leaders (reads the stories above)
     from pipeline.export import intros
     intros.run()  # plain-English intros for team and player pages: reads the JSON written above
     return {"team_list": n_teams, "schedule_games": n_games, "players": n_players}

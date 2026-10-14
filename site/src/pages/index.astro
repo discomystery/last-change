@@ -1,5 +1,8 @@
 ---
-// Home: built in the browser from the real schedule, around whichever team the visitor has chosen.
+// Home (Sora, 2026-10-14): the visitor's own team's last and next game, last night around the league (the game of the
+// night and the other results, most interesting first), today's games (the game to watch, the rest of tonight, and
+// tomorrow only when there's room), and league leaders with last night's standout stat. Built in the browser from
+// home.json (export/home.py), the schedule and the standings, so the visitor's team and division can lift games.
 import Base from '../layouts/Base.astro';
 import { matchupTable } from '../lib/teams';
 const base = import.meta.env.BASE_URL;
@@ -15,24 +18,40 @@ const base = import.meta.env.BASE_URL;
     <section id="mine" hidden>
       <p class="mine-meta" id="mine-eyebrow"></p>
       <div class="tickets" id="tickets"></div>
-      <div class="cols">
-        <div>
-          <h2>Coming up</h2>
-          <ul class="games" id="upcoming"></ul>
-        </div>
-        <div>
-          <h2>Recent results</h2>
-          <ul class="games" id="recent"></ul>
-        </div>
-      </div>
     </section>
 
-    <section id="league">
-      <h2 id="slate-h">Around the league</h2>
-      <ul class="games slate" id="slate">{Array.from({ length: 4 }, () => <li class="skel skel-row" aria-hidden="true"></li>)}</ul>
-      <p class="more-link"><a href={`${base}games/`}>Every game, day by day →</a></p>
-      <h2 id="results-h" hidden>Latest results</h2>
-      <ul class="games slate" id="results"></ul>
+    <section id="night" class="band-sec">
+      <h2 class="band" id="night-h">Last night</h2>
+      <p class="band-sub" id="night-sub"></p>
+      <div class="split" id="night-split"><div class="skel skel-row" aria-hidden="true"></div><div class="skel skel-row" aria-hidden="true"></div></div>
+    </section>
+
+    <section id="today" class="band-sec">
+      <h2 class="band" id="today-h">Today around the league</h2>
+      <p class="band-sub" id="today-sub"></p>
+      <div class="split" id="today-split"><div class="skel skel-row" aria-hidden="true"></div><div class="skel skel-row" aria-hidden="true"></div></div>
+    </section>
+
+    <section id="leaders" class="band-sec" hidden>
+      <h2 class="band">League leaders</h2>
+      <p class="band-sub" id="lead-sub">This season</p>
+      <div class="lead-grid">
+        <div class="card lead-main">
+          <p class="pick"><label for="stat">Show leaders in</label> <select id="stat">
+            <option value="p">points</option><option value="g">goals</option><option value="a">assists</option><option value="x">expected goals</option><option value="gs">goals saved above expected</option>
+          </select></p>
+          <ol class="board" id="board"></ol>
+          <p class="foot-note" id="board-note"></p>
+        </div>
+        <div class="card dyn" id="standout" hidden>
+          <div class="lead-top">
+            <span class="box-h">Last night’s standout stat</span>
+            <h3 id="so-h"></h3>
+            <p class="so-sub" id="so-sub"></p>
+          </div>
+          <ol class="board" id="so-board"></ol>
+        </div>
+      </div>
     </section>
   </div>
   <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
@@ -42,8 +61,9 @@ const base = import.meta.env.BASE_URL;
   (async () => {
     const root = document.getElementById('home');
     const base = root.dataset.base;
-    const [teams, sched, pv, rc] = await Promise.all(['teams', 'schedule', 'previews/index', 'recaps/index'].map((n) => fetch(`${base}data/${n}.json`).then((r) => r.json())));
-    const RECAPS = new Set(rc.games.map((g) => g.id));
+    const get = (n) => fetch(`${base}data/${n}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const [teams, sched, home, pv] = await Promise.all(['teams', 'schedule', 'home', 'previews/index'].map(get));
+    const PREVIEWS = new Set((pv ?? []).map((p) => p.id));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
     const MC = JSON.parse(document.getElementById('mcol').textContent);
@@ -51,28 +71,208 @@ const base = import.meta.env.BASE_URL;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const finals = new Set(sched.games.filter((g) => g.final).map((g) => g.id));
-    const PREVIEWS = Object.fromEntries(pv.filter((p) => !finals.has(p.id)).map((p) => [p.id, 'Preview']));
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateOf = (s) => new Date(`${s}T12:00:00`);
+    const RECAP = new Set((home?.results ?? []).flatMap((b) => b.rows.filter((r) => !r.pending).map((r) => r.id)));
+    const SHORT = { Metropolitan: 'Metro' };
+    const ab = (a, g, cls = 'ab') => { const s = el('span', cls, a); const c = colourOf(a, g); if (c) s.style.setProperty('--t', c); return s; };
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const record = (a) => { const t = byAbbr[a]; return t ? `${t.nick ?? a} ${t.w}-${t.l}-${t.otl}` : a; };
 
-    // Each game is one card that opens the game: its post-game page, its preview, or that day on the Games page.
-    const row = (g, me) => {
-      const li = el('li', 'card row game go');
-      const opp = me ? (g.home === me ? g.away : g.home) : null;
-      const tl = el('a', 'g-title go-link', me ? `${g.home === me ? 'vs' : 'at'} ${byAbbr[opp]?.name ?? opp}` : `${g.away} at ${g.home}`);
-      tl.href = g.final && RECAPS.has(g.id) ? `${base}recap/${g.id}/` : !g.final && PREVIEWS[g.id] ? `${base}preview/${g.id}/` : `${base}games/#${g.date}`;
-      li.append(el('span', 'g-when', day.format(g.t) + (g.final ? '' : ' · ' + time.format(g.t))), tl);
-      if (g.final) {
-        const mine = me ? (g.home === me ? [g.hs, g.as] : [g.as, g.hs]) : [g.as, g.hs];
-        const extra = g.end && g.end !== 'REG' ? ` (${g.end})` : '';
-        const res = me ? (mine[0] > mine[1] ? 'W ' : 'L ') : '';
-        li.append(el('span', 'g-score', `${res}${mine[0]}–${mine[1]}${extra}`));
-        if (RECAPS.has(g.id)) li.title = 'How the game went, and how the preview held up';
-      } else if (PREVIEWS[g.id]) {
-        li.append(el('span', 'g-link', `${PREVIEWS[g.id]} ›`));
-      } else {
-        li.append(el('span', 'g-soon', g.venue ?? ''));
+    // The visitor's division lifts games: both teams in it most, one of them a little.
+    const boost = (r, me) => {
+      const d = me && byAbbr[me]?.division;
+      if (!d) return r.score;
+      const n = [r.away, r.home].filter((a) => byAbbr[a]?.division === d).length;
+      return r.score + (n === 2 ? 10 : n === 1 ? 5 : 0);
+    };
+    const divTag = (r, me) => {
+      const d = me && byAbbr[me]?.division;
+      return d && byAbbr[r.away]?.division === d && byAbbr[r.home]?.division === d ? (SHORT[d] ?? d) : null;
+    };
+    const rank = (rows, me) => [...rows].sort((a, b) => boost(b, me) - boost(a, me));
+
+    // One featured game: matchup, headline, a few sentences, why we picked it, and the way in.
+    const feature = (r, kind, me) => {
+      const g = { ...r, t: r.start ? new Date(r.start) : dateOf(r.date) };
+      const href = kind === 'result' ? (RECAP.has(r.id) ? `${base}recap/${r.id}/` : `${base}games/#${r.date}`) : (r.preview ? `${base}preview/${r.id}/` : `${base}games/#${r.date}`);
+      const a = el('a', 'card feat');
+      a.href = href;
+      const top = el('div', 'feat-top');
+      top.append(el('span', 'box-h', kind === 'result' ? 'Game of the night' : 'Game to watch'), el('span', 'eyebrow', kind === 'result' ? (r.venue ?? '') : `${time.format(g.t)}${r.venue ? ` · ${r.venue}` : ''}`));
+      const m = el('p', 'feat-m');
+      if (kind === 'result') {
+        m.append(ab(r.away, g), el('span', 'sc', String(r.as)), el('span', 'dash', '–'), el('span', 'sc', String(r.hs)), ab(r.home, g));
+        if (r.end && r.end !== 'REG') m.append(el('span', 'end', r.end));
+        m.setAttribute('aria-label', `${r.away} ${r.as}, ${r.home} ${r.hs}`);
+      } else m.append(ab(r.away, g), el('span', 'tk-at', 'at'), ab(r.home, g));
+      a.append(top, m);
+      if (r.head) a.append(el('h3', null, r.head));
+      if (r.story) a.append(el('p', 'story', r.story));
+      if (r.chips?.length) {
+        const why = el('div', 'why');
+        why.setAttribute('aria-label', 'Why we picked it');
+        why.append(...r.chips.map((c) => el('span', null, c)));
+        a.append(why);
       }
+      const foot = el('div', 'feat-foot');
+      foot.append(el('span', null, kind === 'result' ? (r.calls ?? '') : `${record(r.away)} · ${record(r.home)}`), el('span', 'go', kind === 'result' ? 'Post-game ›' : (r.preview ? 'Preview ›' : 'That day’s games ›')));
+      a.append(foot);
+      return a;
+    };
+
+    // A condensed row: time (and the division tag) or the score, with a one-line note.
+    const row = (r, kind, me) => {
+      const g = { ...r, t: r.start ? new Date(r.start) : dateOf(r.date) };
+      const a = el('a', 'row');
+      a.href = kind === 'result' ? (RECAP.has(r.id) ? `${base}recap/${r.id}/` : `${base}games/#${r.date}`) : (r.preview ? `${base}preview/${r.id}/` : `${base}games/#${r.date}`);
+      const m = el('span', 'm');
+      if (kind === 'result') {
+        const hw = r.hs > r.as;
+        const w = (side) => (side === 'home') === hw;
+        const sideAb = (x, side) => { const s = ab(x, g, `ab ${w(side) ? 'w' : 'l'}`); return s; };
+        m.append(sideAb(r.away, 'away'), el('span', `sc${w('away') ? '' : ' l'}`, String(r.as)), el('span', 'l', '–'), el('span', `sc${w('home') ? '' : ' l'}`, String(r.hs)), sideAb(r.home, 'home'));
+        if (r.end && r.end !== 'REG') m.append(el('span', 'end', r.end));
+        m.setAttribute('aria-label', `${r.away} ${r.as}, ${r.home} ${r.hs}`);
+        a.append(m);
+      } else {
+        const tm = el('span', 'time', time.format(g.t));
+        const d = divTag(r, me);
+        if (d) tm.append(el('span', 'div', d));
+        m.append(ab(r.away, g), el('span', 'at', 'at'), ab(r.home, g));
+        a.append(tm, m);
+      }
+      a.append(el('span', 'tag', r.pending ? 'Still coming in' : (r.note ?? '')));
+      return a;
+    };
+    const card = (head, side, cls = 'card list') => {
+      const d = el('div', cls);
+      if (head) { const h = el('div', 'list-h'); h.append(el('span', 'box-h', head)); if (side) h.append(el('span', 'eyebrow', side)); d.append(h); }
+      return d;
+    };
+    const more = (text, href) => { const a = el('a', 'more', text); a.href = href; return a; };
+
+    // Last night: the latest game day before today wherever the visitor is.
+    const renderNight = (me) => {
+      const today = iso(new Date());
+      const blocks = (home?.results ?? []).filter((b) => b.rows.length);
+      const b = [...blocks].reverse().find((x) => x.date < today) ?? blocks[blocks.length - 1];
+      const sec = document.getElementById('night');
+      if (!b) { sec.hidden = true; return; }
+      const yest = iso(new Date(Date.now() - 864e5));
+      document.getElementById('night-h').textContent = b.date === yest ? 'Last night' : 'Latest results';
+      document.getElementById('night-sub').textContent = `${day.format(dateOf(b.date))} · ${plural(b.games, 'game')}`;
+      const ranked = rank(b.rows, me);
+      const top = ranked.find((r) => r.away !== me && r.home !== me && !r.pending) ?? ranked[0];
+      const split = document.getElementById('night-split');
+      const list = card('Other results', 'Most interesting first');
+      ranked.filter((r) => r !== top).slice(0, 6).forEach((r) => list.append(row(r, 'result', me)));
+      list.append(more(`All ${b.games} results ›`, `${base}games/#${b.date}`));
+      split.replaceChildren(feature(top, 'result', me), list);
+    };
+
+    // Today: tonight's games first; tomorrow only fills room left beside the game to watch, else it's a one-line button.
+    let fill = () => {};
+    const renderToday = (me) => {
+      const today = iso(new Date());
+      const blocks = (home?.coming ?? []).filter((b) => b.rows.length);
+      // games already under way stay in tonight's list until the page is rebuilt
+      let i = blocks.findIndex((x) => x.date >= today);
+      const sec = document.getElementById('today');
+      if (i < 0) { sec.hidden = true; return; }
+      const tn = blocks[i], tm = blocks[i + 1];
+      document.getElementById('today-h').textContent = tn.date === today ? 'Today around the league' : `Around the league, ${day.format(dateOf(tn.date))}`;
+      document.getElementById('today-sub').textContent = `${day.format(dateOf(tn.date))} · ${plural(tn.games, 'game')}`;
+      const ranked = rank(tn.rows, me);
+      const top = ranked.find((r) => r.away !== me && r.home !== me) ?? ranked[0];
+      const rest = ranked.filter((r) => r !== top);
+      const split = document.getElementById('today-split');
+      const feat = feature(top, 'coming', me);
+      const lists = el('div', 'stack');
+      split.replaceChildren(feat, lists);
+      const tmRanked = tm ? rank(tm.rows, me) : [];
+      const tmLabel = tm ? (tm.date === iso(new Date(Date.now() + 864e5)) ? 'Tomorrow' : day.format(dateOf(tm.date)).split(',')[0]) : null;
+      const tmAll = tm ? `All of ${tmLabel === 'Tomorrow' ? 'tomorrow’s' : `${tmLabel}’s`} games ›` : null;
+      fill = () => {
+        const side = getComputedStyle(split).gridTemplateColumns.split(' ').length > 1;
+        const room = side ? feat.offsetHeight : Infinity;
+        lists.replaceChildren();
+        const tnCard = card(rest.length ? (tn.date === today ? 'Also tonight' : 'Also that day') : null);
+        if (rest.length) lists.append(tnCard);
+        const tmBtn = card(null, null, 'card list btn-card');
+        if (tm) { tmBtn.append(more(tmAll, `${base}games/#${tm.date}`)); lists.append(tmBtn); }
+        const cap = side ? Infinity : 5;
+        let shown = 0;
+        for (const r of rest) {
+          if (shown >= cap) break;
+          tnCard.append(row(r, 'coming', me));
+          if (lists.offsetHeight > room) { tnCard.lastElementChild.remove(); break; }
+          shown++;
+        }
+        if (shown < rest.length) {
+          tnCard.append(more(`All ${tn.games} of ${tn.date === today ? 'tonight’s' : 'that day’s'} games ›`, `${base}games/#${tn.date}`));
+          if (lists.offsetHeight > room && shown) tnCard.querySelectorAll('.row')[shown - 1].remove();
+          return;
+        }
+        if (!tm) return;
+        // Everything tonight fits: give the next day's best games the room left, if at least one fits.
+        const tmCard = card(tmLabel, `${day.format(dateOf(tm.date))} · ${plural(tm.games, 'game')}`);
+        tmCard.append(more(tmAll, `${base}games/#${tm.date}`));
+        tmBtn.replaceWith(tmCard);
+        let added = 0;
+        for (const r of tmRanked) {
+          if (!side && added >= 3) break;
+          tmCard.lastElementChild.before(row(r, 'coming', me));
+          if (lists.offsetHeight > room) { tmCard.querySelectorAll('.row')[added].remove(); break; }
+          added++;
+        }
+        if (!added) tmCard.replaceWith(tmBtn);
+      };
+      fill();
+    };
+
+    // League leaders, with what each player added on the latest game day.
+    const NOTES = {
+      p: 'Goals plus assists.',
+      x: 'Expected goals from his own shots: who gets the best chances, whether or not they go in. Empty-net shots left out.',
+      gs: 'Goals saved above expected: goals an average goalie would have let in on the same shots, minus his.',
+    };
+    const fmt = (k, v) => (k === 'x' || k === 'gs' ? Number(v).toFixed(1) : String(v));
+    const delta = (k, v) => (!v ? '' : `${v > 0 ? '+' : '−'}${fmt(k, Math.abs(v))}`);
+    const boardRows = (rows, k, me, hot) => rows.map((r, i) => {
+      const li = el('li', [r.team === me ? 'you' : '', r.id === hot ? 'hot' : ''].filter(Boolean).join(' '));
+      const nm = el('span', 'nm');
+      const a = el('a', 'plink', r.name);
+      a.href = `${base}player/${r.id}/`;
+      nm.append(a, ab(r.team, { away: null, home: r.team }));
+      li.append(el('span', 'rk', String(i + 1)), nm, el('span', 'gp', `${r.gp} ${k === 'gs' ? 'GS' : 'GP'}`), el('span', 'v', fmt(k, r.v)), el('span', 'ln', delta(k, r.ln)));
       return li;
+    });
+    const renderLeaders = (me) => {
+      const L = home?.leaders;
+      if (!L) return;
+      document.getElementById('leaders').hidden = false;
+      const lastDay = (home.results ?? []).filter((b) => b.rows.length).at(-1)?.date;
+      const yest = iso(new Date(Date.now() - 864e5));
+      document.getElementById('lead-sub').textContent = lastDay ? `This season · grey figures are what each player added ${lastDay === yest ? 'last night' : `on ${day.format(dateOf(lastDay))}`}` : 'This season';
+      const sel = document.getElementById('stat');
+      const draw = () => {
+        const k = sel.value;
+        document.getElementById('board').replaceChildren(...boardRows(L[k] ?? [], k, me));
+        const mine = (L[k] ?? []).some((r) => r.team === me);
+        document.getElementById('board-note').textContent = `${NOTES[k] ?? ''}${mine ? ' Your team’s players are in bold.' : ''}`.trim();
+      };
+      sel.onchange = draw;
+      draw();
+      const S = home.standout;
+      const so = document.getElementById('standout');
+      so.hidden = !S;
+      if (S) {
+        so.querySelector('.box-h').textContent = lastDay === yest ? 'Last night’s standout stat' : 'The latest standout stat';
+        document.getElementById('so-h').textContent = S.head;
+        document.getElementById('so-sub').textContent = S.sub;
+        document.getElementById('so-board').replaceChildren(...boardRows(S.rows, S.stat, me, S.id));
+      }
     };
 
     const render = () => {
@@ -96,65 +296,110 @@ const base = import.meta.env.BASE_URL;
         const mine = games.filter((g) => g.home === me || g.away === me);
         const next = mine.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
         const eb = document.getElementById('mine-eyebrow');
-        const link = el('a', null, `${t.name} team page`);
+        const link = el('a', null, 'Team page');
         link.href = `${base}team/${me}/`;
-        eb.replaceChildren(`${t.w}-${t.l}-${t.otl} · `, link);
-        // Next game and latest post-game as two ticket stubs, each one opening its preview or post-game page.
+        const ord = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
+        eb.replaceChildren(`${t.name} · ${t.w}-${t.l}-${t.otl}${t.div_rank ? ` · ${ord(t.div_rank)} in the ${t.division}` : ''} · `, link);
         const tickets = [];
-        if (next) {
-          const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
-          if (!PREVIEWS[next.id]) when.push(el('br'), 'Preview opens a week before the game');
-          tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: PREVIEWS[next.id] ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
-        }
-        const last = [...mine].reverse().find((g) => g.final && RECAPS.has(g.id));
+        const last = [...mine].reverse().find((g) => g.final);
         if (last) {
           const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
           const opp = last.home === me ? last.away : last.home;
-          tickets.push(window.lcTicket(last, { eyebrow: 'Latest post-game', href: `${base}recap/${last.id}/`, sub: [`${ms > ts ? 'Won' : 'Lost'} ${last.home === me ? 'against' : 'at'} ${byAbbr[opp]?.place ?? opp}`], colour: colourOf }));
+          const head = home?.latest?.[me]?.id === last.id ? home.latest[me].head : null;
+          const sub = [`${ms > ts ? 'Beat' : 'Lost to'} ${byAbbr[opp]?.place ?? opp}.`];
+          if (head && !/ beat | roll past /.test(head)) sub.push(` ${head}.`);
+          tickets.push(window.lcTicket(last, { eyebrow: 'Last game', href: `${base}recap/${last.id}/`, sub, colour: colourOf }));
+        }
+        if (next) {
+          const has = PREVIEWS.has(next.id);
+          const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+          if (!has) when.push(el('br'), 'Preview opens a week before the game');
+          tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: has ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
         }
         document.getElementById('tickets').replaceChildren(...tickets);
-        document.getElementById('upcoming').replaceChildren(...mine.filter((g) => !g.final && g !== next).slice(0, 5).map((g) => row(g, me)));
-        document.getElementById('recent').replaceChildren(...mine.filter((g) => g.final).slice(-5).reverse().map((g) => row(g, me)));
       }
-      const key = (d) => d.toDateString();
-      let slate = games.filter((g) => key(g.t) === key(now));
-      let label = 'Today around the league';
-      if (!slate.length) {
-        const nxt = games.find((g) => g.t > now);
-        slate = nxt ? games.filter((g) => key(g.t) === key(nxt.t)) : [];
-        label = nxt ? `Around the league, ${day.format(nxt.t)}` : 'Around the league';
-      }
-      document.getElementById('slate-h').textContent = label;
-      const lastDay = [...games].reverse().find((g) => g.final)?.date;
-      const results = lastDay ? games.filter((g) => g.final && g.date === lastDay) : [];
-      document.getElementById('results-h').hidden = !results.length;
-      if (results.length) document.getElementById('results-h').textContent = `Latest results, ${day.format(results[0].t)}`;
-      document.getElementById('results').replaceChildren(...results.map((g) => row(g, null)));
-      document.getElementById('slate').replaceChildren(...slate.map((g) => row(g, null)));
+      renderNight(me);
+      renderToday(me);
+      renderLeaders(me);
     };
     render();
     document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') render(); });
+    addEventListener('resize', () => fill());
+    document.fonts?.ready.then(() => fill());
   })();
 </script>
 
 <style is:global>
-  /* Same look as a section heading on every other page. */
-  #home h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 56px 0 16px; }
-  #home .more-link { margin-top: 12px; font: 600 14px var(--ui); }
   #home .mine-meta { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
   .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }
   .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
   .teambtn:hover { border-color: var(--ink); }
   .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
   .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
-  .cols { display: grid; gap: 0 28px; }
-  @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
-  .games { display: grid; gap: 8px; }
-  .games.slate { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
-  .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
-  .g-when { grid-column: 1 / -1; font: 400 12px var(--ui); color: var(--ink-3); }
-  .g-title { font-weight: 600; }
-  .g-score { font: 700 16px var(--ui); white-space: nowrap; }
-  .g-soon { font: 400 12px var(--ui); color: var(--ink-3); text-align: right; }
-  .g-link { font: 600 13px var(--ui); }
+
+  #home h2.band { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 52px 0 6px; text-wrap: balance; }
+  #home .band-sub { font: 400 14px var(--ui); color: var(--ink-3); margin-bottom: 18px; }
+  @media (max-width: 719px) { #home h2.band { font-size: 28px; margin-top: 40px; } }
+  #home .ab { font: 700 1em/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
+
+  /* A featured game beside a condensed list */
+  #home .split { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+  @media (min-width: 820px) { #home .split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+  #home .feat { padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; color: var(--ink); }
+  #home a.feat:hover, #home a.row:hover { border-color: var(--ink-3); }
+  #home .feat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  #home .feat-m { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; font-size: 44px; }
+  #home .feat-m .sc { font: 600 1em/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  #home .feat-m .dash { font: 400 0.88em/1 var(--display); color: var(--ink-3); }
+  #home .feat-m .end { align-self: center; font: 600 12px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); }
+  #home .feat-m .tk-at { font-size: 22px; }
+  #home .feat h3 { font: 600 26px/1.15 var(--display); font-variation-settings: 'SOFT' 100; text-wrap: balance; }
+  #home .feat p.story { font: 400 16px/1.55 var(--body); color: var(--ink-2); max-width: 62ch; }
+  #home .why { display: flex; flex-wrap: wrap; gap: 6px; }
+  #home .why span { font: 600 12px var(--ui); letter-spacing: 0.02em; padding: 4px 10px; border-radius: 99px; background: var(--track); color: var(--ink-2); }
+  #home .feat-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--rule); font: 400 13px var(--ui); color: var(--ink-3); }
+  #home .feat-foot .go { font: 600 14px var(--ui); color: var(--ink); }
+  @media (max-width: 719px) { #home .feat-m { font-size: 34px; } #home .feat h3 { font-size: 22px; } #home .feat { padding: 18px; } }
+
+  #home .stack { display: grid; gap: 18px; align-content: start; }
+  #home .list { padding: 6px 0; }
+  #home .btn-card { padding: 0; }
+  #home .btn-card .more { border-top: 0; padding: 14px 18px; }
+  #home .list-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 18px 6px; }
+  #home .row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-items: baseline; padding: 9px 18px; border-top: 1px solid var(--rule); text-decoration: none; color: var(--ink); }
+  #home .row:hover { background: color-mix(in srgb, var(--track) 55%, transparent); }
+  #home .row .m { grid-column: 1; grid-row: 2; font-size: 17px; display: flex; gap: 7px; align-items: baseline; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #home .row > .m:first-child { grid-row: 1 / span 2; }
+  #home .row .m .sc { font: 700 17px var(--ui); color: var(--ink); }
+  #home .row .m .w { font-weight: 700; }
+  #home .row .m .l { color: var(--ink-3); font-weight: 500; }
+  #home .row .m .end { font: 600 11px var(--ui); color: var(--ink-3); letter-spacing: 0.05em; }
+  #home .row .m .at { font: italic 500 14px var(--body); color: var(--ink-3); }
+  #home .row .time { grid-column: 1; grid-row: 1; font: 600 12px var(--ui); color: var(--ink-3); letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #home .row .div { font: 600 9.5px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); border: 1px solid var(--rule); border-radius: 99px; padding: 0 6px; line-height: 15px; }
+  #home .row .tag { grid-column: 2; grid-row: 1 / span 2; align-self: end; font: 400 13.5px/1.35 var(--ui); color: var(--ink-2); text-align: right; min-width: 0; text-wrap: balance; }
+  @media (max-width: 719px) { #home .row { padding: 9px 14px; gap: 2px 10px; } #home .row .tag { font-size: 13px; } }
+  #home .more { display: block; padding: 11px 18px 8px; border-top: 1px solid var(--rule); font: 600 14px var(--ui); text-decoration: none; color: var(--ink); }
+  #home .more:hover { text-decoration: underline; }
+  #home .skel-row { min-height: 220px; border-radius: 18px; }
+
+  /* Leaders */
+  #home .lead-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+  @media (min-width: 820px) { #home .lead-grid { grid-template-columns: 1fr 1fr; } }
+  #home .pick { font: 400 18px/1.4 var(--body); margin-bottom: 12px; }
+  #home .pick select { font: 600 16px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 3px 8px; max-width: 100%; }
+  #home .board li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--rule); font: 400 15px var(--ui); }
+  #home .board li:first-child { border-top: 0; }
+  #home .board .rk { font: 600 13px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  #home .board .nm { min-width: 0; }
+  #home .board .nm .ab { font-size: 12px; margin-left: 6px; }
+  #home .board .gp { font: 400 12px var(--ui); color: var(--ink-3); }
+  #home .board .v { font: 700 18px var(--ui); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+  #home .board .ln { font: 600 11.5px var(--ui); color: var(--ink-3); min-width: 5ch; text-align: right; font-variant-numeric: tabular-nums; }
+  #home .board li.you .nm a { font-weight: 700; }
+  #home .board li.hot .ln { color: var(--ink); }
+  #home .foot-note { font: 400 13px/1.45 var(--ui); color: var(--ink-3); margin-top: 10px; }
+  #home .lead-top { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+  #home .dyn h3 { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 6px 0 4px; text-wrap: balance; }
+  #home .dyn p.so-sub { font: 400 15px/1.5 var(--body); color: var(--ink-2); }
 </style>
