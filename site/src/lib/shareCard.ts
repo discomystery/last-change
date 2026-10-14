@@ -37,11 +37,11 @@ const one = (nick: string) => (/[^s]s$/.test(nick) && nick !== 'Blues' ? nick.sl
 // The same sentence the report card shows when the whole game and his usual jobs disagree.
 const nightNote = (c: Card) => {
   const quiet = c.summary === 'mixed' || c.summary === 'didnt';
-  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even though his usual jobs were quieter.';
-  if (c.night === 'good') return c.pill === 'big' ? ', on top of doing his usual jobs.' : ', so it counts for more.';
-  if (c.night === 'rough' && c.summary === 'did') return ', though he still did his usual jobs.';
+  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even if he didn’t handle all of his usual responsibilities.';
+  if (c.night === 'good') return c.pill === 'big' ? ', on top of handling his usual responsibilities.' : ', so it counts for more.';
+  if (c.night === 'rough' && c.summary === 'did') return ', though he still handled his usual responsibilities.';
   return '.';
 };
 
