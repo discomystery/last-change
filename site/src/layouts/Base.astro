@@ -1,4 +1,5 @@
 ---
+import Logo from '../components/Logo.astro';
 import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
 import PrefSwitches from '../components/PrefSwitches.astro';
@@ -23,6 +24,15 @@ const teamList = teams as { abbr: string; name: string }[];
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(`${base}share-card.png`, Astro.site).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <title>{title === SITE_NAME ? title : `${title} · ${SITE_NAME}`}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
@@ -156,7 +166,7 @@ const teamList = teams as { abbr: string; name: string }[];
     <header class="site-head">
       <div class="brand">
         <span class="brand-name">
-          <a class="wordmark" href={base}>Spare Line Change</a>
+          <a class="brand-logo" href={base} aria-label="Spare Line Change, home"><Logo /></a>
           <span class="beta" tabindex="0" data-tip="Spare Line Change is in beta: pages and numbers are still being built and checked, so some may change.">Beta</span>
         </span>
         <nav class="site-nav" aria-label="Site">
@@ -208,6 +218,7 @@ const teamList = teams as { abbr: string; name: string }[];
       <a href={`${base}methods/`}>Methods</a>
     </div>
     <footer class="site-foot">
+      <a class="foot-logo" href={base} aria-label="Spare Line Change, home"><Logo mark /></a>
       <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
       <p>A fan project, in beta: pages and numbers may still change. Not affiliated with the NHL or any of its teams.</p>
       <p class="foot-spell" role="group" aria-label="Spelling and units">
@@ -469,7 +480,7 @@ const teamList = teams as { abbr: string; name: string }[];
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--ice); color: var(--ink); font: 400 17px/1.6 var(--body); font-variant-numeric: lining-nums tabular-nums; }
-  h1, h2, h3, h4, .wordmark { font-variation-settings: 'SOFT' 100; }
+  h1, h2, h3, h4 { font-variation-settings: 'SOFT' 100; }
   .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
   a { color: inherit; text-decoration: none; }
   /* Links never look like underlined web links. A link inside text is set a little bolder; under the
@@ -507,7 +518,7 @@ const teamList = teams as { abbr: string; name: string }[];
 
   .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
   .site-head { padding-block: 18px 6px; display: grid; gap: 14px; }
-  .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+  .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   .site-nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 18px; font: 600 14px var(--ui); }
   .site-nav a { white-space: nowrap; }
   .site-nav a { text-decoration: none; }
@@ -597,7 +608,11 @@ const teamList = teams as { abbr: string; name: string }[];
   .a-raw { display: none; }
   html[data-arena='raw'] .a-raw { display: inline; }
   html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
-  .wordmark { font: 700 26px/1 var(--display); letter-spacing: -0.01em; text-decoration: none; }
+  /* The logo (components/Logo.astro) in the header and the footer. */
+  .brand-logo .logo { height: 40px; }
+  .foot-logo { display: block; width: max-content; margin-bottom: 10px; }
+  .foot-logo .logo { height: 34px; }
+  @media (max-width: 719px) { .brand-logo .logo { height: 32px; } }
   .wordmark-note { font-size: 12px; color: var(--ink-3); }
   /* The quiet "Beta" pill beside the wordmark, in the same style as the other small pill tags. */
   .brand-name { display: inline-flex; align-items: center; gap: 8px; }
