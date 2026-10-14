@@ -25,7 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 14  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 15  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -38,6 +38,7 @@ RULES_VERSION = 14  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 13: softer leans at the ends ("should be favored", "work cut out"; no "miracle" or "surprise")
 # 14: tonight's coach (no matchup call for a new coach without a home habit of his own), "New coach" and "Playoff race"
 #     items, season series counted right, no 33rd of 32 (outside-coverage comparison, 2026-10-14)
+# 15: matchup, rest and goalie-history calls end in team pills like every other call (figures and source in the tooltips)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -603,6 +604,13 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
         "nums": f"At home: {v}% of this group’s 5-on-5 time against {ORD[j]} lines, about {r['expected'][j]}% with no line matching",
         "gist": f"At home, {coach or 'their coach'} likes to pick matchups, so watch who goes out against {w['Op']} {ORD[j]} line.",
         "cite": f"Who plays against whom · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
+        "chips": [
+            {"team": home, "text": f"{v}% vs {ORD[j]} lines at home",
+             "tip": f"{places[home]}’s {r['label']} ({mine}) at home: {v}% of its 5-on-5 time against opponents’ {ORD[j]} lines. "
+                    f"Who plays against whom, {places[home]} home games this season, {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5."},
+            {"team": home, "text": f"{r['expected'][j]}% with no matching",
+             "tip": f"With no line matching, this group would face {ORD[j]} lines about {r['expected'][j]}% of the time, about as often as those lines are on the ice."},
+        ],
         "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
                   "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
                   "opp_lines": {u["label"]: u["ids"] for u in a["units"] if u["label"][0] == "L"},
@@ -671,6 +679,12 @@ def history_claims(gid: int, away: str, home: str, goalies_site: dict, hist, pla
             "gist": f"Don’t read much into {_poss(G)} record against {w['O']}.",
             "call": f"If {G} starts, his save percentage lands closer to his usual {fmt(sv_all)} than to his {fmt(sv_vs)} against {w['O']}.",
             "cite": f"Goalie starts since 2023-24 · {n} against {places.get(o, o)}, {all_sa - sa:,} shots against everyone else",
+            "chips": [
+                {"team": t, "text": f"{fmt(sv_vs)} in {n} starts vs {places.get(o, o)}",
+                 "tip": f"{G}: {fmt(sv_vs)} save percentage in {n} starts against {places.get(o, o)} since 2023-24."},
+                {"team": t, "text": f"{fmt(sv_all)} against everyone else",
+                 "tip": f"{G}: {fmt(sv_all)} save percentage against everyone else since 2023-24, on {all_sa - sa:,} shots."},
+            ],
             "check": {"metric": "goalie_sv", "team": t, "goalie_id": g["id"], "baseline": round(sv_all, 4), "record": round(sv_vs, 4),
                       "starts": n, "direction": "closer",
                       "rule": "held if he starts and his save percentage is closer to his usual than to his record against this team; can't judge if he doesn't start"},
@@ -953,6 +967,12 @@ def rest_claim(gid: int, away: str, home: str, places: dict, rest: dict, usual: 
                 f"{places[r]}’s usual share of 5-on-5 expected goals: {100 * usual:.1f}%",
         "gist": _fmt("{T} played last night; {R} are rested.", **w),
         "cite": "Schedule · back-to-backs over 2023-24 to 2025-26 (809 games)",
+        "chips": [
+            {"team": t, "text": "played yesterday", "tip": f"{places[t]} played yesterday. Schedule, back-to-backs over 2023-24 to 2025-26 (809 games)."},
+            {"team": r, "text": "a day off" if days == 1 else f"{days} days off", "tip": f"{places[r]} {'had a day' if days == 1 else f'had {days} days'} off before this game."},
+            {"team": r, "text": f"usually {100 * usual:.0f}% of the chances",
+             "tip": f"{places[r]}’s usual share of 5-on-5 expected goals: {100 * usual:.1f}%, adjusted for score and venue."},
+        ],
         "check": {"metric": "rest", "measure": "share of 5-on-5 expected goals, adjusted for score and venue", "team": r,
                   "baseline": round(usual, 4), "league": 0.5, "direction": "above",
                   "rule": "held if the rested team's share of 5-on-5 expected goals is at or above its usual share; otherwise didn't happen"},
