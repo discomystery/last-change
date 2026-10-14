@@ -14,6 +14,8 @@ import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import PlayerStats from '../../components/PlayerStats.astro';
+import { lines as statLines } from '../../lib/stats';
 import SharePlayer from '../../components/SharePlayer.astro';
 import ShareButton from '../../components/ShareButton.astro';
 import { cardsFor } from '../../lib/reportCards';
@@ -108,7 +110,9 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const hasLine = statLines(isG ? 'goalies' : 'skaters', p.id).length > 0;
+const statsNav = hasLine ? [['stats', 'Stats']] : [];
+const nav = isG && !g ? [] : isG ? [['role', 'Role'], ...statsNav, ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...statsNav, ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -233,6 +237,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
         </Section>
         )}
 
+        <PlayerStats id={p.id} pos={p.pos} />
         <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
         <PlayerReport p={p} place={team?.place ?? p.team} />
 
@@ -420,6 +425,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
             </dl>
           </div>
         </Section>
+        <PlayerStats id={p.id} goalie />
         <Section id="card" title="Goalie card" placeholder={false} takeaway="Is he stopping more than he should, and what is his team asking him to face?">
           <Fragment slot="explain">
             <p class="note">Ratings compare him with goalies who have at least {goalieData.min_starts.blend} starts over two seasons, or {goalieData.min_starts.season} this season. Expected-goal models can’t see passes before a shot, so a goalie whose team gives up a lot of cross-ice passes will look worse here than he really is.</p>

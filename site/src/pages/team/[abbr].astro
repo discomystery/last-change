@@ -18,6 +18,8 @@ import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
+import TeamStats from '../../components/TeamStats.astro';
+import { rows as statRows, seasons as statSeasons } from '../../lib/stats';
 import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
 import Intro from '../../components/Intro.astro';
@@ -126,7 +128,8 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
 const trend = trendFor(abbr!);
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const hasTeamStats = statSeasons('teams').some((x) => statRows('teams', x).some((r) => r.team === abbr));
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(hasTeamStats ? [['stats', 'Team stats']] : []), ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 // The head coach from the club's latest game; a coach who took over this season says since when.
@@ -162,6 +165,8 @@ const coachSince = coach && (team as any).coach_since
     </Fragment>
     <SeasonMap abbr={abbr!} recaps={recapIds} previews={previewIds} />
   </Section>
+
+  <TeamStats abbr={abbr!} place={team.place} />
 
   {trend && (
     <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} has come from, and whether this season’s team plays a new way.`}>

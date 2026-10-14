@@ -210,3 +210,13 @@
   .lt tbody tr:last-child > * { border-bottom: 0; }
   .todo { margin-top: 16px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 
+/* Counting-stat tables (player Stats, Leaders, team stats): numbers in tabular figures, headings in the small caps label. */
+  .stbl { border-collapse: collapse; font: 400 14px var(--ui); font-variant-numeric: tabular-nums; }
+  .stbl th, .stbl td { padding: 8px 10px; text-align: right; white-space: nowrap; }
+  .stbl th:first-child { padding-left: 0; text-align: left; }
+  .stbl td:last-child, .stbl thead th:last-child { padding-right: 0; }
+  .stbl thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .stbl tbody th { font-weight: 600; }
+  .stbl tbody tr { border-top: 1px solid var(--rule); }
+  @media (max-width: 719px) { .stbl { font-size: 13px; } .stbl th, .stbl td { padding: 8px 6px; } }
+  .stbl .sr, .stsr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

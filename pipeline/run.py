@@ -66,6 +66,7 @@ def update(season: int) -> dict:
         from pipeline.ingest import standings_daily
         out["standings_days"] = standings_daily.update(season)  # the table after each game day, for the playoff race
         out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
+        out["official_stats"] = official_stats_update(season)
         out["availability"] = availability_update(season)
     if MONEYPUCK_CHECK:
         out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # shots_xg.parquet, for xg_model.evaluate
@@ -152,6 +153,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["names"] = respell(season)
     out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
     out["standings_days"] = standings_daily.update(season)  # the table after tonight's games, for the playoff race
+    out["official_stats"] = official_stats_update(season)
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     team_game.build(season)
@@ -186,8 +188,17 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     track.run(season)
     from pipeline.export import home
     out["home"] = home.run(season)  # last night's results and today's games change on game nights
+    from pipeline.export import stats
+    out["stats"] = stats.run(season)  # tonight's goals and assists in the season lines and the Leaders page
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
+
+
+def official_stats_update(season: int) -> dict:
+    """The league's own season totals (goals, power-play goals, wins, PP%...): this season every run, last season once."""
+    from pipeline.ingest import official_stats
+
+    return {season: official_stats.update(season), season - 1: official_stats.update(season - 1, current=False)}
 
 
 def respell(season: int) -> dict:

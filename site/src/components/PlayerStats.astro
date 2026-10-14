@@ -1,0 +1,51 @@
+---
+// The plain season line, as the league records it, for this season and last (Sora, 2026-10-14: the counting stats
+// fans check, like power-play and shorthanded goals, before any of our own ratings). Small tables side by side, one
+// row per season; each heading's tooltip says what the stat counts.
+import Section from './Section.astro';
+import { lines, seasons, seasonName, SKATER, GOALIE, type Stat } from '../lib/stats';
+
+interface Props { id: number; goalie?: boolean; pos?: string }
+const { id, goalie = false, pos } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const have = lines(goalie ? 'goalies' : 'skaters', id);
+const cur = seasons(goalie ? 'goalies' : 'skaters')[0];
+const label = (s: number) => (s === cur ? 'This season' : s === cur - 1 ? 'Last season' : seasonName(s));
+const anyFaceoffs = have.some(({ row }) => (row.fow ?? 0) + (row.fol ?? 0) >= 20);
+const S = goalie ? GOALIE : SKATER;
+const groups: [string, string[]][] = goalie
+  ? [['Record', ['gp', 'gs', 'w', 'l', 'otl', 'so']], ['In net', ['sa', 'sv', 'ga', 'svpct', 'gaa', 'toi']]]
+  : [['Scoring', ['gp', 'g', 'a', 'p', 'pm', 'pim']], ['By situation', ['evg', 'evp', 'ppg', 'ppp', 'shg', 'shp']],
+     ['Shooting', ['s', 'spct', 'gwg', 'otg']], ['Ice time a game', ['toi', 'pptoi', 'shtoi']],
+     ['Everything else', [...(anyFaceoffs ? ['fopct'] : []), 'hit', 'blk', 'tk', 'gv']]];
+const shortOf = (st: Stat, group: string) => (group === 'Ice time a game' ? ({ toi: 'All', pptoi: 'PP', shtoi: 'PK' } as Record<string, string>)[st.key] : st.short);
+const moved = have.filter(({ row }) => String(row.team ?? '').includes(','));
+const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
+---
+{have.length > 0 && (
+  <Section id="stats" title="Stats" placeholder={false} takeaway="His season totals as the NHL records them, for this season and last. Point at a heading to see what it counts.">
+    <div class="card stcard">
+      {groups.map(([name, keys]) => (
+        <div class="stgrp">
+          <p class="mini-h">{name}</p>
+          <table class="stbl">
+            <thead><tr><th><span class="sr">Season</span></th>{keys.map((k) => <th><span class="term" tabindex="0" data-tip={`${S[k].name}: ${S[k].tip}`}>{shortOf(S[k], name)}</span></th>)}</tr></thead>
+            <tbody>{have.map(({ season, row }) => <tr><th>{label(season)}</th>{keys.map((k) => <td>{S[k].fmt(row[k])}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+    {moved.map(({ season, row }) => <p class="note">{label(season)}’s totals include his games for {row.team.replace(/, ([^,]*)$/, ' and $1')}.</p>)}
+    <p class="note"><a href={`${base}players/leaders/?k=${goalie ? 'g' : 's'}&g=${group}&p=${id}`}>See where he ranks among every {goalie ? 'goalie' : 'skater'} →</a></p>
+  </Section>
+)}
+
+<style>
+  .stcard { display: flex; flex-wrap: wrap; gap: 22px 34px; }
+  .stgrp { min-width: 0; }
+  .stgrp .mini-h { margin: 0 0 4px; }
+  @media (max-width: 719px) {
+    .stcard { display: grid; gap: 18px; }
+    .stgrp :global(.stbl) { width: 100%; }
+  }
+</style>

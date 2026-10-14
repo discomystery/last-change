@@ -1,0 +1,229 @@
+---
+// Leaders: every skater, goalie or club with the league's own season totals, sortable by any column (Sora,
+// 2026-10-14: a complete scoring list, not just the home page's top five, and a place to check power-play and
+// shorthanded goals). The lists come from data/stats/ (pipeline/export/stats.py) and are drawn in the browser.
+import Base from '../../layouts/Base.astro';
+import teams from '../../../public/data/teams.json';
+import { seasons, seasonName, asOf, SKATER, GOALIE, TEAM } from '../../lib/stats';
+import '../../styles/blocks.css';
+
+const base = import.meta.env.BASE_URL;
+const index = Object.values(import.meta.glob('../../../public/data/players/index.json', { eager: true, import: 'default' }))[0] as { id: number }[] | undefined;
+const pages = (index ?? []).map((x) => x.id);
+const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+const yrs = seasons('skaters');
+const cur = yrs[0];
+const yearWord = (s: number) => `${s === cur ? 'this season' : s === cur - 1 ? 'last season' : seasonName(s)} (${seasonName(s)})`;
+const strip = (d: Record<string, any>) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, { short: v.short, name: v.name, tip: v.tip, f: v.f, low: !!v.low, q: v.q ?? null }]));
+const defs = { s: strip(SKATER), g: strip(GOALIE), t: strip(TEAM) };
+const when = asOf();
+const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(when)) : null;
+---
+<Base section="players" title="Leaders" description="Every NHL skater, goalie and team with goals, assists, points, power-play and shorthanded goals, save percentage and more, sortable by any stat.">
+  <header class="page-top"><h1>Leaders</h1></header>
+  <p class="lede">Every player’s and every team’s season totals, as the NHL records them. Tap a column to sort by it.</p>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`} aria-current="page">Leaders</a></nav>
+
+  {yrs.length === 0 ? <p class="note">The season totals arrive with the next update.</p> : (
+    <>
+      <div class="pick" id="pick">
+        <span>Show</span>
+        <select id="kind" aria-label="Who"><option value="s">skaters</option><option value="g">goalies</option><option value="t">teams</option></select>
+        <select id="pos" class="for-s" aria-label="Position">
+          <option value="">at every position</option><option value="F">forwards</option><option value="D">defensemen</option>
+          <option value="C">centers</option><option value="L">left wings</option><option value="R">right wings</option>
+        </select>
+        <span class="for-p">on</span>
+        <select id="team" class="for-p" aria-label="Team">
+          <option value="">every team</option>
+          {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
+        </select>
+        <span>in</span>
+        <select id="year" aria-label="Season">{yrs.map((s) => <option value={s}>{yearWord(s)}</option>)}</select>
+      </div>
+      <div class="lead-tools">
+        <label class="search for-p">
+          <span class="stsr">Find a player in this list</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+          <input id="q" type="search" placeholder="Find a name" autocomplete="off" spellcheck="false" />
+        </label>
+        <p class="pick sortpick"><span>sorted by</span><select id="sort" aria-label="Sort by"></select></p>
+      </div>
+      <p class="lead-tip" id="lead-tip" aria-live="polite"></p>
+      <div class="card lead-card">
+        <div class="lead-wrap"><table class="stbl lead" id="table"></table></div>
+        <p class="note" id="empty" hidden>Nobody matches. Try part of the last name, or set the menus back to every position on every team.</p>
+        <button type="button" class="fold-btn" id="more" hidden></button>
+      </div>
+      <p class="note">Official NHL totals{asOfWord && `, through ${asOfWord}`}. Regular season only. A player who changed teams during the season shows both clubs, with his totals for both. Hits, blocks, takeaways and giveaways are as each arena’s scorer recorded them; for numbers that even out generous scorers, see the style fingerprints on team pages and the ratings on player pages.</p>
+    </>
+  )}
+  <script type="application/json" id="lead-defs" set:html={JSON.stringify(defs)}></script>
+  <script type="application/json" id="lead-pages" set:html={JSON.stringify(pages)}></script>
+</Base>
+
+<script>
+  import { FMT, QUAL } from '../../lib/statDefs';
+
+  const base = import.meta.env.BASE_URL;
+  const $ = (id: string) => document.getElementById(id) as any;
+  const kindSel = $('kind'), posSel = $('pos'), teamSel = $('team'), yearSel = $('year'), sortSel = $('sort'), q = $('q');
+  if (kindSel) {
+    const defs = JSON.parse($('lead-defs').textContent);
+    const pages = new Set<number>(JSON.parse($('lead-pages').textContent));
+    // Columns shown for each list, in order; the first sort is the usual leaderboard's.
+    const COLS: Record<string, string[]> = {
+      s: ['gp', 'g', 'a', 'p', 'pm', 'pim', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'gwg', 'otg', 's', 'spct', 'toi', 'pptoi', 'shtoi', 'fopct', 'hit', 'blk', 'tk', 'gv'],
+      g: ['gp', 'gs', 'w', 'l', 'otl', 'sa', 'sv', 'ga', 'svpct', 'gaa', 'so', 'toi'],
+      t: ['gp', 'w', 'l', 'otl', 'pts', 'ptspct', 'rw', 'gf', 'ga', 'gfpg', 'gapg', 'diff', 'pppct', 'ppg', 'ppo', 'pkpct', 'ppga', 'tsh', 'shgf', 'shga', 'sfpg', 'sapg', 'fopct', 'hit', 'blk', 'tk', 'gv'],
+    };
+    const FIRST: Record<string, string> = { s: 'p', g: 'w', t: 'pts' };
+    // Ties on the sorted stat: the usual tiebreaks (more goals, fewer games; more wins; better points %).
+    const TIE: Record<string, [string, number][]> = { s: [['g', -1], ['gp', 1]], g: [['svpct', -1], ['gp', 1]], t: [['ptspct', -1], ['rw', -1]] };
+    const files: Record<string, any> = {};
+    const params = new URLSearchParams(location.search);
+    let focus = params.get('p') ?? '', sortKey = '', flip = false, shown = 50;
+    const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l');
+    const FILE: Record<string, string> = { s: 'skaters', g: 'goalies', t: 'teams' };
+    const load = async (k: string) => (files[k] ??= await (await fetch(`${base}data/stats/${FILE[k]}.json`)).json());
+    const posOk = (pos: string, want: string) => !want || (want === 'F' ? pos !== 'D' : pos === want);
+    const posWord: Record<string, string> = { C: 'C', L: 'LW', R: 'RW', D: 'D' };
+
+    const fillSort = () => {
+      const k = kindSel.value, d = defs[k];
+      sortSel.innerHTML = COLS[k].filter((c) => c !== 'gp' || k === 's').map((c) => `<option value="${c}">${esc(d[c].name.toLowerCase())}</option>`).join('');
+      if (!COLS[k].includes(sortKey)) sortKey = FIRST[k];
+      sortSel.value = sortKey;
+    };
+
+    const paint = async () => {
+      const k = kindSel.value, d = defs[k], year = yearSel.value;
+      document.querySelectorAll('.for-s').forEach((e) => ((e as HTMLElement).hidden = k !== 's'));
+      document.querySelectorAll('.for-p').forEach((e) => ((e as HTMLElement).hidden = k === 't'));
+      const f = await load(k);
+      const all = (f.seasons[year] ?? []).map((r: any[]) => Object.fromEntries(f.cols.map((c: string, i: number) => [c, r[i]])));
+      // The most games any club has played, for who qualifies on a rate.
+      const tf = await load('t');
+      const gp = Math.max(1, ...(tf.seasons[year] ?? []).map((r: any[]) => r[tf.cols.indexOf('gp')]));
+      const st = d[sortKey], dir = (st.low ? 1 : -1) * (flip ? -1 : 1);
+      const qual = (r: any) => !st.q || QUAL[st.q as keyof typeof QUAL](r, gp);
+      const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
+      const val = (r: any, c: string) => r[c] ?? (dir < 0 ? -Infinity : Infinity);
+      const cmp = (a: any, b: any) => {
+        if (qual(a) !== qual(b)) return qual(a) ? -1 : 1;
+        const x = dir * (val(a, sortKey) - val(b, sortKey));
+        if (x) return x;
+        for (const [c, s] of TIE[k]) { const y = s * ((a[c] ?? 0) - (b[c] ?? 0)); if (y) return y; }
+        return String(a.name ?? a.team).localeCompare(String(b.name ?? b.team));
+      };
+      // Ranks over the whole league (or the chosen position), before the team and name filters, ties sharing one.
+      const pool = all.filter((r: any) => k !== 's' || posOk(r.pos, posSel.value)).sort(cmp);
+      let prev: any = null, rank = 0;
+      pool.forEach((r: any, i: number) => {
+        if (!qual(r) || r[sortKey] == null) { r._rk = null; return; }
+        if (prev === null || r[sortKey] !== prev) rank = i + 1;
+        prev = r[sortKey];
+        r._rk = rank;
+      });
+      const team = k === 't' ? '' : teamSel.value;
+      const xs = pool.filter((r: any) => (!team || String(r.team ?? '').split(', ').includes(team)) && (k === 't' || words.every((w) => fold(r.name).includes(w))));
+      const at = focus ? xs.findIndex((r: any) => String(r.id ?? r.team) === focus) : -1;
+      const limit = words.length || team ? xs.length : Math.max(shown, at + 6);
+      const head = `<thead><tr><th class="rk">#</th><th class="who">${k === 't' ? 'Team' : 'Player'}</th>${k === 't' ? '' : '<th class="tm">Team</th>'}${k === 's' ? '<th class="ps">Pos</th>' : ''}${COLS[k].map((c) => `<th class="${c === sortKey ? 'on' : ''}"><button type="button" data-sort="${c}" data-tip="${esc(d[c].name)}: ${esc(d[c].tip)}" aria-label="Sort by ${esc(d[c].name)}">${esc(d[c].short)}${c === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`).join('')}</tr></thead>`;
+      const mine = (window as any).lcPrefs?.get('team');
+      const body = xs.slice(0, limit).map((r: any) => {
+        const id = String(r.id ?? r.team);
+        const teams = String(r.team ?? '').split(', ');
+        const who = k === 't'
+          ? `<a class="tlink" href="${base}team/${r.team}/">${esc(r.team)}</a>`
+          : pages.has(r.id) ? `<a class="plink" href="${base}player/${r.id}/">${esc(r.name)}</a>` : esc(r.name);
+        const tm = teams.map((t) => `<a class="tlink" href="${base}team/${t}/">${esc(t)}</a>`).join(', ');
+        const cls = [id === focus ? 'focus' : '', mine && teams.includes(mine) ? 'mine' : '', qual(r) ? '' : 'unq'].join(' ');
+        return `<tr class="${cls}"><td class="rk">${r._rk ?? ''}</td><th class="who" scope="row">${who}</th>${k === 't' ? '' : `<td class="tm">${tm}</td>`}${k === 's' ? `<td class="ps">${posWord[r.pos] ?? r.pos}</td>` : ''}${COLS[k].map((c) => `<td class="${c === sortKey ? 'on' : ''}">${(FMT as any)[d[c].f](r[c])}</td>`).join('')}</tr>`;
+      }).join('');
+      $('table').innerHTML = head + `<tbody>${body}</tbody>`;
+      $('empty').hidden = xs.length > 0;
+      const more = $('more');
+      more.hidden = limit >= xs.length;
+      more.textContent = `Show ${Math.min(50, xs.length - limit)} more of ${xs.length}`;
+      const unq = st.q ? xs.filter((r: any) => !qual(r)).length : 0;
+      $('lead-tip').innerHTML = `<b>${esc(st.name)}:</b> ${esc(st.tip)}${unq ? ` Players short of that are listed after, in grey.` : ''}`;
+      sortSel.value = sortKey;
+      const u = new URLSearchParams();
+      if (k !== 's') u.set('k', k);
+      if (k === 's' && posSel.value) u.set('g', posSel.value);
+      if (team) u.set('t', team);
+      if (yearSel.value !== yearSel.options[0].value) u.set('y', yearSel.value);
+      if (sortKey !== FIRST[k]) u.set('s', sortKey);
+      if (flip) u.set('r', '1');
+      if (focus) u.set('p', focus);
+      history.replaceState(null, '', `${location.pathname}${u.toString() ? '?' + u : ''}`);
+    };
+
+    // Arriving from a player or team page: ?k=kind&g=position&p=player id or team.
+    if (params.get('k') && COLS[params.get('k')!]) kindSel.value = params.get('k');
+    if (params.get('g')) posSel.value = params.get('g') === 'G' ? '' : params.get('g');
+    if (params.get('t')) teamSel.value = params.get('t');
+    if (params.get('y') && [...yearSel.options].some((o: any) => o.value === params.get('y'))) yearSel.value = params.get('y');
+    sortKey = params.get('s') ?? '';
+    flip = params.get('r') === '1';
+    fillSort();
+    kindSel.addEventListener('change', () => { focus = ''; shown = 50; flip = false; fillSort(); paint(); });
+    [posSel, teamSel, yearSel].forEach((s) => s.addEventListener('change', () => { shown = 50; paint(); }));
+    sortSel.addEventListener('change', () => { sortKey = sortSel.value; flip = false; shown = 50; paint(); });
+    q.addEventListener('input', () => paint());
+    $('table').addEventListener('click', (e: Event) => {
+      const b = (e.target as HTMLElement).closest('button[data-sort]') as HTMLElement | null;
+      if (!b) return;
+      const c = b.dataset.sort!;
+      flip = c === sortKey ? !flip : false;
+      sortKey = c;
+      shown = 50;
+      paint();
+    });
+    $('more').addEventListener('click', () => { shown += 50; paint(); });
+    paint().then(() => { const f = document.querySelector('#table tr.focus'); if (f) f.scrollIntoView({ block: 'center' }); });
+  }
+</script>
+
+<style is:global>
+  .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
+  .for-s[hidden], .for-p[hidden] { display: none; }
+  .lead-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .lead-tools .sortpick { margin: 0; }
+  .lead-tools .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 2px 14px; flex: 0 1 300px; min-width: 0; }
+  .lead-tools .search svg { width: 20px; height: 20px; fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; flex: none; }
+  .lead-tools .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--ui); padding: 10px 0; outline: none; }
+  .lead-tip { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 14px 0 0; min-height: 1.45em; }
+  .lead-tip b { color: var(--ink); font-weight: 600; }
+  .lead-card { margin-top: 12px; padding: 8px 0 14px; }
+  .lead-card > .note, .lead-card > .fold-btn { margin-inline: 16px; width: auto; }
+  .lead-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+  .stbl.lead { width: 100%; }
+  .stbl.lead th, .stbl.lead td { padding: 8px 9px; }
+  .stbl.lead thead th { vertical-align: bottom; padding-top: 10px; }
+  .stbl.lead thead button { all: unset; cursor: pointer; display: inline-flex; gap: 3px; align-items: baseline; }
+  .stbl.lead thead button:hover, .stbl.lead thead button:focus-visible { color: var(--ink); text-decoration: underline dotted; text-underline-offset: 3px; }
+  .stbl.lead thead th.on, .stbl.lead thead th.on button { color: var(--ink); }
+  .stbl.lead thead i { font-style: normal; font-size: 8px; }
+  .stbl.lead td.on { font-weight: 700; background: color-mix(in oklab, var(--track) 55%, var(--sheet)); }
+  /* Rank and name stay put while the numbers scroll sideways. */
+  .stbl.lead .rk { position: sticky; left: 0; z-index: 1; background: var(--sheet); padding-left: 16px; width: 53px; min-width: 53px; max-width: 53px; color: var(--ink-3); font-weight: 600; font-size: 12px; }
+  .stbl.lead .who { position: sticky; left: 53px; z-index: 1; background: var(--sheet); text-align: left; font-weight: 600; max-width: 190px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--rule); }
+  .stbl.lead .tm, .stbl.lead .ps { text-align: left; color: var(--ink-2); font-size: 13px; }
+  .stbl.lead .tm .tlink { color: inherit; }
+  .stbl.lead td:last-child, .stbl.lead thead th:last-child { padding-right: 16px; }
+  .stbl.lead tr.mine .rk, .stbl.lead tr.mine .who, .stbl.lead tr.mine td { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); }
+  .stbl.lead tr.focus .rk, .stbl.lead tr.focus .who, .stbl.lead tr.focus td { background: var(--track); }
+  .stbl.lead tr.focus .rk { color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+  .stbl.lead tr.unq td, .stbl.lead tr.unq .who { color: var(--ink-3); }
+  .fold-btn { display: block; margin-top: 14px; padding: 12px 16px; border: 0; border-radius: 14px; background: var(--track); font: 500 15px var(--ui); color: var(--ink); cursor: pointer; }
+  .fold-btn:hover { background: var(--rule); }
+  .fold-btn::after { content: ' +'; }
+  @media (max-width: 719px) {
+    .stbl.lead .rk { padding-left: 10px; width: 39px; min-width: 39px; max-width: 39px; }
+    .stbl.lead .who { left: 39px; max-width: 130px; }
+    .stbl.lead th, .stbl.lead td { padding: 8px 7px; }
+  }
+</style>
