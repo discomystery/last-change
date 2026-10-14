@@ -5,7 +5,7 @@ import { domToBlob } from 'modern-screenshot';
 import LOGO from '../assets/logo/full.svg?raw';
 
 type Two = { light: string; dark: string };
-type Lane = { team: string; ends: [string, string]; avg: [number, ...unknown[]]; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
+type Lane = { team: string | null; ends: [string, string] | null; avg: [number, ...unknown[]] | null; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
 export type GameData = {
   id: number; base: string; away: string; home: string; date: string; venue: string; end: string;
   score: Record<string, number>; head: string; lede: string | null;
@@ -54,10 +54,10 @@ function lane(L: Lane, col: string) {
   const pos = (x: number) => `left:${Math.min(Math.max(x, 8), 92)}%`;
   const below: [number, string][] = [[L.usual[0], L.usual[1]]];
   if (L.ref && Math.abs(L.ref[0] - L.usual[0]) > 14) below.push([L.ref[0], L.ref[1]]);
-  return `<div class="sc-lane"><span class="sc-end l">${esc(L.ends[0])}</span><div class="sc-mid">
+  return `<div class="sc-lane"><span class="sc-end l">${esc(L.ends?.[0])}</span><div class="sc-mid">
 <div class="sc-lb top"><span class="nw" style="${pos(L.now[0])}">${esc(L.now[1])}</span></div>
-<div class="sc-tr"><i class="avg" style="left:${L.avg[0]}%"></i>${L.ref ? `<i class="ref" style="left:${L.ref[0]}%"></i>` : ''}<i class="us" style="left:${L.usual[0]}%;border-color:${col}"></i><i class="now" style="left:${L.now[0]}%;background:${col}"></i></div>
-<div class="sc-lb">${below.map(([x, t]) => `<span style="${pos(x)}">${esc(t)}</span>`).join('')}</div></div><span class="sc-end r">${esc(L.ends[1])}</span></div>`;
+<div class="sc-tr">${L.avg ? `<i class="avg" style="left:${L.avg[0]}%"></i>` : ''}${L.ref ? `<i class="ref" style="left:${L.ref[0]}%"></i>` : ''}<i class="us" style="left:${L.usual[0]}%;border-color:${col}"></i><i class="now" style="left:${L.now[0]}%;background:${col}"></i></div>
+<div class="sc-lb">${below.map(([x, t]) => `<span style="${pos(x)}">${esc(t)}</span>`).join('')}</div></div><span class="sc-end r">${esc(L.ends?.[1])}</span></div>`;
 }
 
 export function gameCard(g: GameData, theme: Theme) {
@@ -77,7 +77,7 @@ export function gameCard(g: GameData, theme: Theme) {
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said: ${esc(c.said)}</div>
-<div class="sc-h${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, col(c.lane.team) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
+<div class="sc-h${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
   const lede = !g.calls.length && g.lede ? `<div class="sc-serif sc-lede" data-opt="4">${esc(g.lede)}</div>` : '';
   const best = g.best ? `<div class="sc-watch" data-opt="1"><span class="sc-tag">Best night</span>${esc(g.best)}</div>` : '';
   return shell(theme, '', `<div class="sc-kick">${end} · ${esc(g.date)} · ${esc(g.venue)}</div>

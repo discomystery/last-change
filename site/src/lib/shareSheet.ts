@@ -35,7 +35,8 @@ function setup() {
       if (made) URL.revokeObjectURL(made.url);
       made = { blob, url: URL.createObjectURL(blob), file: ask!.file };
       img.src = made.url; img.hidden = false; wait.hidden = true; go.disabled = false;
-    } catch {
+    } catch (e) {
+      console.error('Share card failed', e);
       if (me === turn) wait.textContent = 'The card couldn’t be made. Please try again.';
     }
   };

@@ -6,7 +6,7 @@
   font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; line-height: 1.2; text-align: left; letter-spacing: 0; color-scheme: light; }
 .shc.dark { --ice: #0a121a; --sheet: #111c27; --ink: #e6edf3; --ink2: #a9b6c3; --ink3: #7c8a98; --rule: #25333f; --track: #26384a; --swb: var(--ink); color-scheme: dark; }
 .shc * { box-sizing: border-box; margin: 0; padding: 0; }
-.sc-sheet { background: var(--sheet); border-radius: 40px; padding: 52px 64px 40px; flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.sc-sheet { background: var(--sheet); border-radius: 40px; padding: 52px 64px 40px; flex: 1; position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
 /* Nothing on the sheet may squeeze to fit: too much content has to overflow, so fit() sees it and drops optional parts. */
 .sc-sheet > * { flex-shrink: 0; }
 .sc-foot { height: 104px; flex: none; display: flex; align-items: center; justify-content: space-between; color: var(--ink3); font-size: 24px; letter-spacing: 0.02em; }
@@ -85,7 +85,8 @@
 .sc-sb .z { position: absolute; top: -7px; bottom: -7px; width: 2px; margin-left: -1px; background: var(--ink3); }
 
 /* His night */
-.sc-num { position: absolute; right: 40px; top: -40px; font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 700; font-size: 420px; line-height: 1; opacity: 0.13; color: var(--team); }
+/* As on the player page: a solid pale tint of the team color, behind everything else on the sheet. */
+.sc-num { position: absolute; z-index: -1; right: 40px; top: -40px; font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100, 'WONK' 0; font-weight: 700; font-size: 420px; line-height: 1; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); }
 .sc-say { font-size: 28px; line-height: 1.35; color: var(--ink2); margin-top: 18px; }
 .sc-line { font-size: 27px; color: var(--ink3); margin-top: 10px; }
 .sc-job { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 16px 0; border-top: 2px solid var(--rule); }
