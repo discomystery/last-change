@@ -480,16 +480,12 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .rp-again svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .meter-text > p:not(.detail) { margin-bottom: 4px; }
   /* Wide screens: the dots and the words sit side by side instead of leaving the card's right half empty. */
-  @media (min-width: 760px) {
-    .meter { display: grid; grid-template-columns: minmax(0, 520px) minmax(0, 1fr); grid-template-areas: 'label label' 'head head' 'chart text'; column-gap: 44px; align-items: start; }
+  @media (min-width: 880px) {
+    .meter { display: grid; grid-template-columns: minmax(0, 520px) minmax(260px, 1fr); grid-template-areas: 'label label' 'head head' 'chart text'; column-gap: 44px; align-items: start; }
     .meter > .mini-h { grid-area: label; }
     .meter > .h { grid-area: head; }
     .rp-chart { grid-area: chart; }
     .meter-text { grid-area: text; margin-top: 14px; padding-left: 44px; border-left: 1px solid var(--rule); align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
-    .meter.opt-b { grid-template-columns: minmax(0, 1fr) minmax(0, 520px); grid-template-areas: 'label chart' 'head chart' 'text chart'; grid-template-rows: auto auto 1fr; }
-    .meter.opt-b .rp-chart { align-self: center; }
-    .meter.opt-b .rp-head { margin-top: 0; }
-    .meter.opt-b .meter-text { padding-left: 0; border-left: 0; justify-content: flex-start; }
   }
   .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
