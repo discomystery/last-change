@@ -31,5 +31,11 @@ tree="$(git write-tree)"
 commit="$(git -c user.name="${GIT_AUTHOR_NAME:-last-change-bot}" -c user.email="${GIT_AUTHOR_EMAIL:-last-change-bot@users.noreply.github.com}" commit-tree "$tree" -m "$msg")"
 unset GIT_INDEX_FILE
 git fetch --depth=1 origin data >/dev/null 2>&1 || true  # lets the push skip files the branch already has
-git push -f origin "$commit:refs/heads/data"
+# GitHub sometimes answers a push with a passing server error; try again before failing the run.
+for wait in 5 15 45 0; do
+  git push -f origin "$commit:refs/heads/data" && break
+  [ "$wait" = 0 ] && exit 1
+  echo "push failed, retrying in $wait s" >&2
+  sleep "$wait"
+done
 echo "data branch -> $commit"

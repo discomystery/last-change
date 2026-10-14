@@ -15,5 +15,11 @@ git --work-tree="$stage" add -A
 tree="$(git write-tree)"
 commit="$(git -c user.name="${GIT_AUTHOR_NAME:-last-change-bot}" -c user.email="${GIT_AUTHOR_EMAIL:-last-change-bot@users.noreply.github.com}" commit-tree "$tree" -m "$msg")"
 unset GIT_INDEX_FILE
-git push -f origin "$commit:refs/heads/gh-pages"
+# GitHub sometimes answers a push with a passing server error; try again before failing the run.
+for wait in 5 15 45 0; do
+  git push -f origin "$commit:refs/heads/gh-pages" && break
+  [ "$wait" = 0 ] && exit 1
+  echo "push failed, retrying in $wait s" >&2
+  sleep "$wait"
+done
 echo "gh-pages -> $commit"
