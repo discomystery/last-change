@@ -7,6 +7,8 @@
 .shc.dark { --ice: #0a121a; --sheet: #111c27; --ink: #e6edf3; --ink2: #a9b6c3; --ink3: #7c8a98; --rule: #25333f; --track: #26384a; --swb: var(--ink); color-scheme: dark; }
 .shc * { box-sizing: border-box; margin: 0; padding: 0; }
 .sc-sheet { background: var(--sheet); border-radius: 40px; padding: 52px 64px 40px; flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+/* Nothing on the sheet may squeeze to fit: too much content has to overflow, so fit() sees it and drops optional parts. */
+.sc-sheet > * { flex-shrink: 0; }
 .sc-foot { height: 104px; flex: none; display: flex; align-items: center; justify-content: space-between; color: var(--ink3); font-size: 24px; letter-spacing: 0.02em; }
 .sc-brand { display: flex; align-items: center; gap: 14px; }
 .sc-logo { display: inline-block; line-height: 0; }
@@ -95,3 +97,79 @@
 .sc-job .u { display: block; font: 400 23px/1.35 'Hanken Grotesk'; color: var(--ink3); }
 .sc-job .n { display: grid; justify-items: end; font: 400 23px 'Hanken Grotesk'; color: var(--ink3); white-space: nowrap; }
 .sc-job .n b { font: 700 40px/1.1 'Hanken Grotesk'; color: var(--ink); }
+
+/* Team, player and goalie cards: scale lanes (percentile dot, likely-range whisker, league-average tick) */
+.sc-ln { margin-bottom: 22px; }
+.sc-ln .top { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; font-size: 30px; font-weight: 600; margin-bottom: 12px; white-space: nowrap; }
+.sc-ln .top span { overflow: hidden; text-overflow: ellipsis; }
+.sc-ln .top em { font-style: normal; font-weight: 500; color: var(--ink2); font-size: 26px; }
+.sc-ln .top em b { color: var(--ink); font-weight: 700; }
+.sc-trk { height: 16px; border-radius: 8px; background: var(--track); position: relative; }
+.sc-trk i { position: absolute; display: block; }
+.sc-trk .avg { left: 50%; top: -6px; width: 3px; height: 28px; margin-left: -1.5px; background: var(--ink3); opacity: 0.5; }
+.sc-trk .wh { top: 0; bottom: 0; border-radius: 8px; background: var(--ink3); opacity: 0.35; }
+.sc-trk .pt { top: 50%; width: 36px; height: 36px; border-radius: 50%; transform: translate(-50%, -50%); border: 4px solid var(--sheet); background: var(--team); z-index: 2; }
+.sc-trk .gd { top: 50%; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--ink3); opacity: 0.3; }
+.sc-trk .gm { top: 50%; width: 26px; height: 26px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--sheet); border: 4px solid var(--team); z-index: 1; }
+.sc-lends { display: flex; justify-content: space-between; font-size: 19px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); margin-top: 10px; font-weight: 600; white-space: nowrap; }
+.sc-rule { border-top: 2px solid var(--rule); margin: 8px 0 30px; }
+.sc-stats { display: flex; border-top: 2px solid var(--rule); border-bottom: 2px solid var(--rule); margin-top: 30px; }
+.sc-stats div { flex: 1; padding: 20px 0 18px; }
+.sc-stats b { display: block; font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 60px; line-height: 1; white-space: nowrap; }
+.sc-stats span { font-size: 21px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); font-weight: 650; white-space: nowrap; }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.sc-chips span { font-size: 26px; font-weight: 600; padding: 12px 22px; border-radius: 40px; background: color-mix(in oklab, var(--team) 12%, var(--sheet)); }
+.shc.dark .sc-chips span { background: color-mix(in oklab, var(--team) 22%, var(--sheet)); }
+.sc-ctiles { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+.sc-clab { font-size: 28px; font-weight: 600; }
+.sc-cbig { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+.sc-cbig .sc-disp { font-size: 68px; }
+.sc-tier { font-size: 20px; font-weight: 700; padding: 8px 16px; border-radius: 30px; white-space: nowrap; }
+.sc-tier.team { background: color-mix(in oklab, var(--team) 18%, var(--sheet)); }
+.shc.dark .sc-tier.team { background: color-mix(in oklab, var(--team) 30%, var(--sheet)); }
+.sc-tier.quiet { background: var(--track); color: var(--ink2); }
+.sc-csub { font-size: 23px; color: var(--ink3); margin-top: 6px; white-space: nowrap; }
+.sc-ddot { position: relative; height: 30px; margin-top: 10px; }
+.sc-ddot span { position: absolute; left: 0; right: 0; top: 14px; height: 2px; background: var(--rule); }
+.sc-ddot i, .sc-ddot b { position: absolute; top: 15px; border-radius: 50%; transform: translate(-50%, -50%); display: block; }
+.sc-ddot i { width: 14px; height: 14px; background: var(--ink3); opacity: 0.35; }
+.sc-ddot b { width: 24px; height: 24px; background: var(--team); border: 3px solid var(--sheet); z-index: 1; }
+.sc-dleg { display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--ink3); white-space: nowrap; }
+.sc-dleg i { width: 16px; height: 16px; border-radius: 50%; flex: none; display: inline-block; }
+.sc-dleg .me { background: var(--team); }
+.sc-dleg .tm { background: var(--ink3); opacity: 0.4; margin-left: 18px; }
+
+/* Goalie card: two columns under the stat line */
+.sc-g3 { display: grid; grid-template-columns: 408px minmax(0, 1fr); gap: 40px; margin-top: 30px; flex: 1 0 auto; }
+.sc-g3 .col { display: flex; flex-direction: column; min-width: 0; }
+.sc-g3 .k2 { font-size: 19px; margin-bottom: 14px; }
+.sc-g3 .bot { margin-top: auto; padding-top: 20px; }
+.sc-g3 .sc-ln { margin-bottom: 14px; }
+.sc-g3 .svl .sc-ln { margin-bottom: 22px; }
+.sc-g3 .sc-ln .top { font-size: 24px; }
+.sc-g3 .sc-ln .top em { font-size: 21px; }
+.sc-g3 .sc-lends { font-size: 14px; }
+.sc-g3 .bot .sc-ln:last-child { margin-bottom: 0; }
+.k2s { font: 500 19px 'Hanken Grotesk'; color: var(--ink3); margin: -6px 0 4px; }
+.sc-nsb { display: flex; gap: 3px; height: 26px; margin-top: 10px; }
+.sc-nsb i { border-radius: 6px; display: block; }
+.sc-nsb .r { background: color-mix(in oklab, var(--team) 26%, var(--swb)); }
+.sc-nsb .e { background: color-mix(in oklab, var(--team) 58%, var(--swb)); }
+.sc-nsb .s { background: var(--team); }
+.sc-nsl { display: flex; justify-content: space-between; font: 500 19px 'Hanken Grotesk'; color: var(--ink3); margin-top: 10px; white-space: nowrap; }
+.sc-nsl b { color: var(--ink); font-weight: 700; }
+
+/* Preview card */
+.sc-vs { display: flex; align-items: center; gap: 30px; margin-top: 30px; }
+.sc-vs .tm { flex: 1; min-width: 0; }
+.sc-vs .ab { font-weight: 750; font-size: 120px; line-height: 1; letter-spacing: -0.01em; }
+.sc-vs .rec { font-size: 28px; color: var(--ink2); margin-top: 8px; white-space: nowrap; }
+.sc-vs .at { font-family: 'Literata', serif; font-style: italic; font-size: 40px; color: var(--ink3); }
+.sc-plede { font-size: 26px; color: var(--ink2); margin-top: 12px; line-height: 1.4; }
+.sc-pcalls .call { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 0 18px; padding: 22px 0; border-top: 2px solid var(--rule); }
+.sc-pcalls .call:last-child { border-bottom: 2px solid var(--rule); }
+.sc-pcalls .n { font-family: 'Fraunces', serif; font-weight: 600; font-size: 40px; color: var(--ink3); line-height: 1.1; }
+.sc-pcalls .h { font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 38px; line-height: 1.15; }
+.sc-pcalls .h.sm { font-size: 32px; }
+.sc-pcalls .call:has(.sm) { padding: 16px 0; }
+.sc-watch.sm { margin-top: 16px; }

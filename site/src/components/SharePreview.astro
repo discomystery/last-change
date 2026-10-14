@@ -1,0 +1,40 @@
+---
+// The preview page's share card (lib/shareCard.ts previewCard): the matchup, the story's headline and first paragraph,
+// every "What to watch" call, and "Who to watch" as room allows.
+import ShareDialog from './ShareDialog.astro';
+import { cardColours } from '../lib/teams';
+import teamsData from '../../public/data/teams.json';
+import type { PreviewCardData } from '../lib/shareCard';
+
+interface Props {
+  snap: { game_id: number; start: string; away: string; home: string; claims: { head: string }[]; story?: { head: string; paras: string[]; items: { tag: string; text: string }[] } | null };
+  records: Record<string, string>;
+}
+const { snap, records } = Astro.props;
+const { away, home } = snap;
+const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
+const cc = cardColours(away, home);
+const data: PreviewCardData = {
+  id: snap.game_id, away, home,
+  date: new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(snap.start)),
+  teams: Object.fromEntries([away, home].map((a) => [a, { nick: T[a]?.nick ?? a, rec: records[a] ?? '', match: cc.matchup[a] }])),
+  // The story's headline, unless it is one of the calls word for word (the card lists every call anyway).
+  head: snap.story?.head && !snap.claims.some((c) => c.head === snap.story!.head) ? snap.story.head : `${T[away]?.place ?? away} at ${T[home]?.place ?? home}`,
+  // The story's first paragraph, or its second when the first only gives the records the card already shows.
+  lede: (snap.story?.paras ?? []).find((p) => !Object.values(records).every((r) => r && p.includes(r))) ?? null,
+  calls: snap.claims.map((c) => c.head),
+  items: snap.story?.items ?? [],
+};
+---
+<script type="application/json" id="share-preview" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
+<ShareDialog />
+<script>
+  import type { PreviewCardData } from '../lib/shareCard';
+  import { openShare, onShare, slug } from '../lib/shareSheet';
+  const d = JSON.parse(document.getElementById('share-preview')!.textContent!) as PreviewCardData;
+  onShare('preview', () => openShare({
+    title: 'Share this preview', key: 'preview',
+    file: `spare-line-change-${d.away}-at-${d.home}-${slug(d.date.replace(/^\w+, /, ''))}-preview.png`,
+    make: async (t) => { const { previewCard, render } = await import('../lib/shareCard'); return render(previewCard(d, t)); },
+  }));
+</script>

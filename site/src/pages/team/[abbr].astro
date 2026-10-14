@@ -38,6 +38,7 @@ import FpRow from '../../components/FpRow.astro';
 import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
 import SeasonMap from '../../components/SeasonMap.astro';
+import ShareTeam from '../../components/ShareTeam.astro';
 import { trendFor } from '../../lib/trend';
 
 export function getStaticPaths() {
@@ -185,7 +186,7 @@ const coachSince = coach && (team as any).coach_since
     </Section>
   )}
 
-  <Section id="style" title="Style fingerprint" placeholder={false} takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
+  <Section id="style" title="Style fingerprint" placeholder={false} share="team" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
     <Fragment slot="explain">
       <p class="note m-blend">Real numbers through {asOf}: {mine.games} games this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">Real numbers through {asOf}, from this season’s {mine.games} games only. Expect these to swing a lot this early, which is why the likely ranges are so wide.</p>
@@ -505,6 +506,7 @@ const coachSince = coach && (team as any).coach_since
   <script type="application/json" id="team-places" set:html={JSON.stringify(places)}></script>
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>
   <script type="application/json" id="team-recaps" set:html={JSON.stringify(recapIds)}></script>
+  <ShareTeam abbr={abbr!} />
 </Base>
 
 <script is:inline>
