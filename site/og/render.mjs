@@ -39,8 +39,6 @@ const tint = (hex, k) => {
   const n = parseInt(hex.replace('#', ''), 16), mix = (c) => Math.round(c * k + 255 * (1 - k));
   return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map(mix).map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 };
-// A leading + or minus is set in the sans: the static Fraunces instance draws its + badly at this size.
-const signed = (v) => (/^[+\u2212\u2013-]/.test(v) ? [h('span', { fontFamily: 'Hanken', fontWeight: 600, marginRight: 2 }, v[0] === '+' ? '+' : '\u2212'), v.slice(1)] : [v]);
 // Headline size from its length, so one or two lines always fit.
 const fit = (s, sizes) => sizes.find(([n]) => (s ?? '').length <= n)?.[1] ?? sizes[sizes.length - 1][1];
 
@@ -56,67 +54,53 @@ function frame(body, note, extra = null) {
       h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note ?? 'sparelinechange.com')));
 }
 
-// One side of a game: colour bar, big abbreviation, nickname and record (or the score beside it).
+// One side of the scoreboard: colour bar, big abbreviation and nickname, with the score (post-game) beside it.
 function side(t, right, score) {
   const ab = h('div', { flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start' },
-    h('div', { width: 112, height: 10, borderRadius: 5, background: t.color }),
-    h('div', { fontFamily: 'Hanken', fontWeight: 700, fontSize: 116, lineHeight: 1, letterSpacing: '-0.02em', marginTop: 14 }, t.ab),
-    h('div', { fontSize: 26, color: C.ink2, marginTop: 8 }, [t.nick, t.rec].filter(Boolean).join(' · ')));
+    h('div', { width: 132, height: 12, borderRadius: 6, background: t.color }),
+    h('div', { fontFamily: 'Hanken', fontWeight: 700, fontSize: 150, lineHeight: 1, letterSpacing: '-0.02em', marginTop: 18 }, t.ab),
+    h('div', { fontSize: 30, color: C.ink2, marginTop: 10 }, t.nick));
   if (score == null) return ab;
-  const n = h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 132, lineHeight: 1, letterSpacing: '-0.02em', margin: right ? '0 34px 0 0' : '0 0 0 34px', paddingTop: 8 }, String(score));
+  const n = h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 190, lineHeight: 1, letterSpacing: '-0.02em', margin: right ? '0 40px 0 0' : '0 0 0 40px' }, String(score));
   return h('div', { alignItems: 'center' }, right ? [n, ab] : [ab, n]);
 }
 
+// Preview and post-game: the matchup (and final score) as a scoreboard, the date above. Nothing that changes with the
+// story, so the image a link shows is the same however late someone shares it.
 function game(d, final) {
   const mid = final
-    ? kicker(d.end === 'OT' ? 'Final · OT' : d.end === 'SO' ? 'Final · SO' : 'Final', { fontSize: 24 })
-    : h('div', { fontFamily: 'Fraunces', fontSize: 48, color: C.ink3, paddingBottom: 34 }, 'at');
+    ? kicker(d.end === 'OT' ? 'Final · OT' : d.end === 'SO' ? 'Final · SO' : 'Final', { fontSize: 26 })
+    : h('div', { fontFamily: 'Fraunces', fontSize: 64, color: C.ink3, paddingBottom: 30 }, 'at');
   return frame(h('div', { flexDirection: 'column', flex: 1 },
-    kicker([final ? 'Post-game' : 'Game preview', d.date, final ? d.venue : null].filter(Boolean).join(' · ')),
-    h('div', { justifyContent: 'space-between', alignItems: 'center', marginTop: 26 }, side(d.away, false, final ? d.away.score : null), mid, side(d.home, true, final ? d.home.score : null)),
-    h('div', { flex: 1 }),
-    d.head ? disp(d.head, fit(d.head, [[36, 58], [62, 48], [200, 42]]), { maxHeight: 112, overflow: 'hidden' }) : null,
-  ), d.note);
+    kicker([final ? 'Post-game' : 'Game preview', d.date].join(' · ')),
+    h('div', { flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }, side(d.away, false, final ? d.away.score : null), mid, side(d.home, true, final ? d.home.score : null)),
+  ), d.venue);
 }
-
-// A rating lane: label, track with the league-average tick and his or their dot, rank underneath.
-function lane(l, colour) {
-  return h('div', { flexDirection: 'column', flex: 1, minWidth: 0 },
-    h('div', { fontSize: 25, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden' }, l.label),
-    h('div', { position: 'relative', height: 26, marginTop: 10, alignItems: 'center' },
-      h('div', { position: 'absolute', left: 0, right: 0, top: 10, height: 6, borderRadius: 3, background: C.track }),
-      h('div', { position: 'absolute', left: '50%', top: 5, width: 3, height: 16, background: C.ink3, opacity: 0.6 }),
-      h('div', { position: 'absolute', left: `${Math.min(Math.max(l.pct, 3), 97)}%`, top: 0, width: 26, height: 26, marginLeft: -13, borderRadius: 13, background: C.sheet, alignItems: 'center', justifyContent: 'center' },
-        h('div', { width: 20, height: 20, borderRadius: 10, background: colour }))),
-    h('div', { justifyContent: 'space-between', fontSize: 19, color: C.ink3, marginTop: 8, letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600 },
-      h('div', {}, l.ends?.[0] ?? ''), h('div', { color: C.ink2 }, l.rank ?? ''), h('div', {}, l.ends?.[1] ?? '')));
-}
-const lanes = (ls, colour) => (ls?.length ? h('div', { gap: 48, marginTop: 'auto' }, ls.map((l) => lane(l, colour))) : null);
 
 // The big faint letters behind a name (a team's abbreviation, a player's sweater number), as on the page headers.
-const ghost = (s, colour, size, sans = false) => h('div', { position: 'absolute', right: 44, top: sans ? -size * 0.06 : -size * 0.16, fontFamily: sans ? 'Hanken' : 'Fraunces Big', fontWeight: sans ? 700 : 600, fontSize: size, lineHeight: 1, letterSpacing: '-0.04em', color: tint(colour, sans ? 0.08 : 0.16) }, s);
+const ghost = (s, colour, size, sans = false, k = null) => h('div', { position: 'absolute', right: 44, top: sans ? -size * 0.04 : -size * 0.14, fontFamily: sans ? 'Hanken' : 'Fraunces Big', fontWeight: sans ? 700 : 600, fontSize: size, lineHeight: 1, letterSpacing: '-0.04em', color: tint(colour, k ?? (sans ? 0.1 : 0.2)) }, s);
 
 function team(d) {
-  return frame(h('div', { flexDirection: 'column', flex: 1 },
-    kicker(d.kick),
-    disp(d.name, fit(d.name, [[18, 84], [24, 72], [99, 62]]), { marginTop: 18 }),
-    d.words ? disp(d.words, 46, { color: d.color, marginTop: 14 }) : null,
-    lanes(d.lanes, d.color),
-  ), d.note, ghost(d.abbr, d.color, 250, true));
+  return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end' },
+    h('div', { width: 132, height: 12, borderRadius: 6, background: d.color }),
+    disp(d.name, fit(d.name, [[18, 104], [24, 88], [99, 74]]), { marginTop: 26 }),
+    d.kick ? h('div', { fontSize: 30, color: C.ink2, marginTop: 14 }, d.kick) : null,
+  ), d.note, ghost(d.abbr, d.color, 300, true));
 }
 
+// Player: name, position and club, his sweater number big in the club's colour; with a portrait he stands on the
+// sheet's bottom edge in front of the number, as on his page.
 function player(d) {
-  const stats = h('div', { gap: 52, marginTop: 30 }, d.stats.map(([v, k]) => h('div', { flexDirection: 'column' },
-    h('div', { fontFamily: 'Fraunces', fontWeight: 650, fontSize: 60, lineHeight: 1 }, ...signed(String(v))),
-    h('div', { fontSize: 19, fontWeight: 600, color: C.ink3, letterSpacing: '0.07em', marginTop: 8, textTransform: 'uppercase' }, k))));
-  return frame(h('div', { flexDirection: 'column', flex: 1 },
+  const photo = d.photo
+    ? [ghost(d.number != null ? String(d.number) : '', d.color, 420, false, 0.16),
+       img(d.photo, { position: 'absolute', right: 70, bottom: -2, width: 400, height: 400 })]
+    : d.number != null ? ghost(String(d.number), d.color, 420, false, 0.9) : null;
+  return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end', maxWidth: 640 },
     kicker(d.kick),
-    disp(d.name, fit(d.name, [[16, 84], [22, 72], [99, 60]]), { marginTop: 16 }),
-    h('div', { fontSize: 26, color: C.ink2, marginTop: 10, alignItems: 'center' },
-      h('div', { width: 14, height: 14, borderRadius: 7, background: d.color, marginRight: 12 }), d.sub),
-    d.stats?.length ? stats : null,
-    d.note2 ? h('div', { fontFamily: 'Literata', fontSize: 30, color: C.ink2, marginTop: 34 }, d.note2) : lanes(d.lanes, d.color),
-  ), d.note, d.number != null ? ghost(String(d.number), d.color, 380) : null);
+    disp(d.name, fit(d.name, [[14, 92], [20, 78], [99, 64]]), { marginTop: 16 }),
+    h('div', { fontSize: 30, color: C.ink2, marginTop: 16, alignItems: 'center' },
+      h('div', { width: 16, height: 16, borderRadius: 8, background: d.color, marginRight: 14 }), d.sub),
+  ), d.note, photo);
 }
 
 // Pages with no card of their own (Games, League, Methods...): the logo, the page's name and what it is for.

@@ -29,7 +29,10 @@ const route = Astro.url.pathname.slice(base.length).replace(/\/$/, '');
 const ogCard: OgCard = Astro.props.og ?? (route === '' ? { kind: 'home' } : { kind: 'page', kick: SITE_NAME, title, text: Astro.props.description });
 const ogJson = JSON.stringify(ogCard);
 const ogImage = new URL(`${base}og/${route || 'home'}.png?v=${createHash('sha1').update(OG_REV + ogJson).digest('hex').slice(0, 10)}`, Astro.site).href;
-const ogAlt = ogCard.kind === 'home' ? SITE_NAME : 'head' in ogCard ? `${ogCard.away.ab} at ${ogCard.home.ab}: ${ogCard.head}` : `${'name' in ogCard ? ogCard.name : ogCard.title} on ${SITE_NAME}`;
+const ogAlt = ogCard.kind === 'home' ? SITE_NAME
+  : ogCard.kind === 'final' ? `${ogCard.away.ab} ${ogCard.away.score}, ${ogCard.home.ab} ${ogCard.home.score}, final`
+  : ogCard.kind === 'preview' ? `${ogCard.away.ab} at ${ogCard.home.ab}, ${ogCard.date}`
+  : `${'name' in ogCard ? ogCard.name : ogCard.title} on ${SITE_NAME}`;
 const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(t.abbr), n: t.nick }]));
 ---
 <!doctype html>
