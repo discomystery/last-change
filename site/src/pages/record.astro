@@ -8,7 +8,7 @@ import track from '../../public/data/track.json';
 import { teamPaint } from '../lib/teams';
 
 type Count = { held: number; partly: number; missed: number };
-type Latest = { game_id: number; date: string; away: string; home: string; kind: string; head: string; call: string | null; verdict: keyof Count; usual: string | null; tonight: string | null };
+type Latest = { game_id: number; date: string; away: string; home: string; kind: string; head: string; said?: string; title?: string; call: string | null; verdict: keyof Count; usual: string | null; tonight: string | null };
 type CallSet = { tally: Count; kinds: Record<string, Count>; weeks: ({ week: string } & Count)[]; games: number; latest: Latest[] };
 type Band = { band: string; games: number; said: number; won: number; lo: number; hi: number };
 type Win = { games: number; picked: number; hit_rate: number; home_rate: number; bands: Band[]; puck?: { games: number; picked: number }; seasons?: number[] };
@@ -23,16 +23,16 @@ const day = (iso: string, opts: Intl.DateTimeFormatOptions = { month: 'short', d
 const n = total(calls.tally);
 
 const kindInfo: Record<string, { label: string; rule: string }> = {
-  clash: { label: 'Strength meets weakness', rule: 'Held up if the team reached their usual level' },
-  edge: { label: 'One team comes out ahead', rule: 'Held up if they won by half their usual margin' },
-  contrast: { label: 'One team comes out ahead', rule: 'Held up if they won by half their usual margin' },
-  duel: { label: 'Strength against strength', rule: 'Held up if the side we picked won out, judged against the league average' },
-  changed: { label: 'Not the team you remember', rule: 'Held up if the team played more like this season than their blended level' },
-  history: { label: 'A goalie record that’s a coincidence', rule: 'Held up if his night was closer to his usual than to that record' },
-  pace: { label: 'Pace of the game', rule: 'Held up if the game ran at the teams’ usual pace (newer previews: faster or slower than either team’s usual)' },
-  physical: { label: 'A physical game', rule: 'Held up if the hit score reached the teams’ usual' },
-  matchup: { label: 'Line matching', rule: 'Held up if the coach matched lines as usual at home' },
-  rest: { label: 'Rested against tired', rule: 'Held up if the rested team got at least their usual share of the 5-on-5 chances' },
+  clash: { label: 'Strength meets weakness', rule: 'Called it if the team reached their usual level' },
+  edge: { label: 'One team comes out ahead', rule: 'Called it if they won by half their usual margin' },
+  contrast: { label: 'One team comes out ahead', rule: 'Called it if they won by half their usual margin' },
+  duel: { label: 'Strength against strength', rule: 'Called it if the side we picked won out, judged against the league average' },
+  changed: { label: 'Not the team you remember', rule: 'Called it if the team played more like this season than their blended level' },
+  history: { label: 'A goalie record that’s a coincidence', rule: 'Called it if his night was closer to his usual than to that record' },
+  pace: { label: 'Pace of the game', rule: 'Called it if the game ran at the teams’ usual pace (newer previews: faster or slower than either team’s usual)' },
+  physical: { label: 'A physical game', rule: 'Called it if the hit score reached the teams’ usual' },
+  matchup: { label: 'Line matching', rule: 'Called it if the coach matched lines as usual at home' },
+  rest: { label: 'Rested against tired', rule: 'Called it if the rested team got at least their usual share of the 5-on-5 chances' },
 };
 const kindRows = (s: CallSet) => {
   const merged: Record<string, Count> = {};
@@ -47,7 +47,7 @@ const kindRows = (s: CallSet) => {
 };
 const V = ['held', 'partly', 'missed'] as const;
 const mark = { held: '✓', partly: '≈', missed: '✕' } as const;
-const word = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen' } as const;
+const word = { held: 'Called it', partly: 'Close', missed: 'Missed' } as const;
 const plural = (k: number, one: string, many = one + 's') => `${k} ${k === 1 ? one : many}`;
 // One puck per call, held first: filled ink like the site's quality pips, partly half filled, missed an empty one.
 const pucks = (c: Count) => V.flatMap((v) => Array.from({ length: c[v] }, () => v));
@@ -83,13 +83,13 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
         <div class="sc-main">
           <p class="eyebrow">{seasonLabel} so far</p>
           <p class="hero">{pct(calls.tally.held, n)}<span class="pc">%</span></p>
-          <p class="hero-sub">of the previews’ calls held up</p>
+          <p class="hero-sub">of the previews’ calls we got right</p>
           <dl class="counts">
             {V.map((v) => <div><dt><i class:list={['pk', v]} aria-hidden="true"></i>{word[v]}</dt><dd>{calls.tally[v]}</dd></div>)}
           </dl>
           <p class="sub">{plural(n, 'call')} in {plural(calls.games, 'game')}{track.waiting > 0 && <> · {plural(track.waiting, 'preview')} waiting on {track.waiting === 1 ? 'its game' : 'their games'}</>}</p>
         </div>
-        <div class="sc-grid" role="img" aria-label={`${calls.tally.held} held up, ${calls.tally.partly} partly, ${calls.tally.missed} didn’t happen`}>
+        <div class="sc-grid" role="img" aria-label={`${calls.tally.held} called, ${calls.tally.partly} close, ${calls.tally.missed} missed`}>
           {pucks(calls.tally).map((v) => <i class:list={['pk', v]}></i>)}
         </div>
       </div>
@@ -105,10 +105,10 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
             <li class:list={['card', 'kind', { thin: t < THIN }]}>
               <div class="k-top">
                 <h3>{label}</h3>
-                <p class="k-pct" title={`${c.held} held up, ${c.partly} partly, ${c.missed} didn’t happen`}><strong>{pct(c.held, t)}%</strong><span>of {t}</span></p>
+                <p class="k-pct" title={`${c.held} called, ${c.partly} close, ${c.missed} missed`}><strong>{pct(c.held, t)}%</strong><span>of {t}</span></p>
               </div>
               <p class="k-rule">{rule}</p>
-              <div class="k-pucks" role="img" aria-label={`${c.held} held up, ${c.partly} partly, ${c.missed} didn’t happen`}>
+              <div class="k-pucks" role="img" aria-label={`${c.held} called, ${c.partly} close, ${c.missed} missed`}>
                 {pucks(c).map((v) => <i class:list={['pk', v]}></i>)}
               </div>
             </li>
@@ -118,15 +118,15 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
     ) : <p class="note">{emptyText}</p>}
   </Section>
 
-  <Section id="weeks" title="Week by week" placeholder={false} takeaway="The share of each week’s calls that held up. The dotted line is half.">
+  <Section id="weeks" title="Week by week" placeholder={false} takeaway="The share of each week’s calls we got right. The dotted line is half.">
     {n > 0 ? (
       <div class="card weeks-card">
         <div class="weeks" style={`--n:${calls.weeks.length}`}>
           <span class="half" aria-hidden="true"></span>
           {calls.weeks.map((w, k) => (
-            <div class="wk" title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+            <div class="wk" title={`${w.held} called, ${w.partly} close, ${w.missed} missed`}>
               <p class="wp">{pct(w.held, total(w))}%</p>
-              <div class="col" role="img" aria-label={`Week of ${day(w.week)}: ${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`} style={`--w:${k}`}>
+              <div class="col" role="img" aria-label={`Week of ${day(w.week)}: ${w.held} called, ${w.partly} close, ${w.missed} missed`} style={`--w:${k}`}>
                 {(['missed', 'partly', 'held'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
               </div>
               <p class="wl">{day(w.week)}</p>
@@ -137,16 +137,16 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
         <div class="wrows">
           <span class="half-r" aria-hidden="true"></span>
           {calls.weeks.map((w, k) => (
-            <div class="wr" title={`${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`}>
+            <div class="wr" title={`${w.held} called, ${w.partly} close, ${w.missed} missed`}>
               <p class="wr-l">{day(w.week)}<span>{plural(total(w), 'call')}</span></p>
-              <div class="wr-bar" role="img" aria-label={`Week of ${day(w.week)}: ${w.held} held up, ${w.partly} partly, ${w.missed} didn’t happen`} style={`--w:${k}`}>
+              <div class="wr-bar" role="img" aria-label={`Week of ${day(w.week)}: ${w.held} called, ${w.partly} close, ${w.missed} missed`} style={`--w:${k}`}>
                 {(['held', 'partly', 'missed'] as const).map((v) => w[v] > 0 && <span class={v} style={`flex-grow:${w[v]}`}></span>)}
               </div>
               <p class="wr-p">{pct(w.held, total(w))}%</p>
             </div>
           ))}
         </div>
-        <p class="wkey"><span><i class="held"></i>Held up</span><span><i class="partly"></i>Partly</span><span><i class="missed"></i>Didn’t happen</span></p>
+        <p class="wkey"><span><i class="held"></i>Called it</span><span><i class="partly"></i>Close</span><span><i class="missed"></i>Missed</span></p>
       </div>
     ) : <p class="note">{emptyText}</p>}
   </Section>
@@ -174,8 +174,17 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
                       <li>
                         <span class:list={['vchip', c.verdict]} title={word[c.verdict]}><span aria-hidden="true">{mark[c.verdict]}</span><span class="vh">{word[c.verdict]}</span></span>
                         <div class="lc">
-                          <p class="lh">{c.head}</p>
-                          {c.call && <p class="lcall">{c.call}</p>}
+                          {c.said && c.title ? (
+                            <>
+                              <p class="lsaid">We said {c.said}</p>
+                              <p class="lh">{c.title}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p class="lh">{c.head}</p>
+                              {c.call && <p class="lcall">{c.call}</p>}
+                            </>
+                          )}
                         </div>
                         {shown(c.tonight) && (
                           <dl class="nums">
@@ -359,6 +368,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   .vchip.partly { color: var(--ink); }
   .vchip.missed { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
   .lh { font: 600 18px / 1.35 var(--display); }
+  .lsaid { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin: 0 0 2px; }
   .lcall { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin-top: 3px; }
   .nums { display: flex; gap: 18px; text-align: right; }
   .nums dt { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); white-space: nowrap; }

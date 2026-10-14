@@ -23,7 +23,7 @@ const TIPS: [string, string][] = [
 ];
 const pattern = new RegExp(`(${TIPS.map(([t]) => t).join('|')})`, 'i');
 const parts = (text: string) => text.split(pattern).map((p) => ({ p, tip: TIPS.find(([t]) => t.toLowerCase() === p.toLowerCase())?.[1] }));
-const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;
+const label = { held: 'Called it', partly: 'Close', missed: 'Missed', na: 'Can’t judge', pending: 'Still coming in' } as const;
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–', pending: '…' } as const;
 const v = c.verdict ?? 'na';
 const L = c.lane;
@@ -128,7 +128,7 @@ const teamCls = (t: string | null | undefined) => (t ? `t-${side(t)}` : 't-none'
   .t-none { --team: var(--ink-3); }
 
   .mc-grade { display: grid; gap: 4px; }
-  .mc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-height: 25px; }
+  .mc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 25px; }
   .mc .mc-caps { flex: 1 1 12em; min-width: 0; font: 700 12.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); }
   .verdict { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
   .verdict.held { background: var(--ink); color: var(--sheet); }

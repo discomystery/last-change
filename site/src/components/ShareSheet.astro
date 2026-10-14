@@ -10,7 +10,7 @@ import type { GameData } from '../lib/shareCard';
 import { jobsFor, scoresFor } from '../lib/gameFiles';
 
 type Lane = GameData['calls'][number]['lane'];
-type Call = { head: string; title?: string; plain?: string; verdict: string | null; lane?: Lane };
+type Call = { head: string; said?: string; title?: string; plain?: string; verdict: string | null; lane?: Lane };
 interface Props {
   r: { game_id: number; start: string; away: string; home: string; venue: string; end: string; score: Record<string, number>; calls: Call[]; story?: { head: string; paras: string[] } | null; replays?: { xg: Record<string, number> } | null };
   replays: { away: number; tie: number; home: number } | null;
@@ -47,7 +47,7 @@ const data: Omit<GameData, 'id'> & { id: number } = {
   lede: r.story?.paras?.[0] ?? null,
   teams,
   replays: replays && r.replays ? { ...replays, head: replayHead, xg: r.replays.xg } : null,
-  calls: graded.map((c) => ({ said: c.head, title: c.title ?? c.plain ?? c.head, verdict: c.verdict as 'held' | 'partly' | 'missed', lane: c.lane ?? null })),
+  calls: graded.map((c) => ({ said: c.said ?? `the preview’s “${c.head}”`, title: c.title ?? c.plain ?? c.head, verdict: c.verdict as 'held' | 'partly' | 'missed', lane: c.lane ?? null })),
   best,
   people,
 };

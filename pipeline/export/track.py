@@ -47,7 +47,7 @@ def call_record(recaps: list[dict]) -> dict:
             s["kinds"][c["kind"]][v] += 1
             s["weeks"][week_of(r["date"])][v] += 1
             s["latest"].append({"game_id": r["game_id"], "date": r["date"], "away": r["away"], "home": r["home"], "kind": c["kind"],
-                                "head": c["head"], "call": c.get("call"), "verdict": v, "usual": c.get("usual"), "tonight": c.get("tonight")})
+                                "head": c["head"], "call": c.get("call"), "said": c.get("said"), "title": c.get("title"), "verdict": v, "usual": c.get("usual"), "tonight": c.get("tonight")})
     s["kinds"] = dict(s["kinds"])
     s["weeks"] = [{"week": w, **n} for w, n in sorted(s["weeks"].items())]
     s["latest"] = s["latest"][::-1][:LATEST]
