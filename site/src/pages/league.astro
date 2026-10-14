@@ -354,7 +354,7 @@ const _ = ordinal;
                   <TeamLink abbr={t.abbr} class="rname"><span class="full">{t.name}</span><span class="ab">{t.abbr}</span></TeamLink>
                   <div class="sline"><span class="sband"></span><span class="slg"></span><span class="sdot"></span></div>
                   <span class="snums">
-                    {modes.map((m) => { const v = s(m); return <span class={`m-${m}`}>{v && v.share !== null ? <><strong>{v.share.toFixed(1)}%</strong> <span>{v.n} of {x[m]!.goals}</span>{out(m) && <span class="beyond" data-tip="Outside luck’s range for a league-average team with this many goals." tabindex="0">beyond luck</span>}</> : <span class="n">no goals yet</span>}</span>; })}
+                    {modes.map((m) => { const v = s(m); return <span class={`m-${m}`}>{v && v.share !== null ? <><strong>{v.share.toFixed(1)}%</strong> <span>{v.n} of {x[m]!.goals}</span>{out(m) && <span class="beyond chip" data-tip="Outside luck’s range for a league-average team with this many goals." tabindex="0">beyond luck</span>}</> : <span class="n">no goals yet</span>}</span>; })}
                   </span>
                 </li>
               );
@@ -587,7 +587,7 @@ const _ = ordinal;
   html[data-mode='season'] .sranks .sdot { left: calc(var(--sd) * 1%); opacity: var(--so); }
   .sranks .slg { left: calc(var(--ba) * 1%); }
   html[data-mode='season'] .sranks .slg { left: calc(var(--sa) * 1%); }
-  .beyond { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 7px; cursor: help; }
+  .beyond { cursor: help; }
 
   /* The big table. Sticky heading rows and team column inside its own scroll box; shading follows the trait's scale. */
   .tctl { display: flex; flex-wrap: wrap; gap: 0 28px; align-items: center; }

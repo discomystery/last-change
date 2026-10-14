@@ -170,7 +170,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       <div class="brand">
         <span class="brand-name">
           <a class="brand-logo" href={base} aria-label="Spare Line Change, home"><Logo /></a>
-          <span class="beta" tabindex="0" data-tip="Spare Line Change is in beta: pages and numbers are still being built and checked, so some may change.">Beta</span>
+          <span class="beta chip" tabindex="0" data-tip="Spare Line Change is in beta: pages and numbers are still being built and checked, so some may change.">Beta</span>
         </span>
         <nav class="site-nav" aria-label="Site">
           <SiteTools />
@@ -686,10 +686,6 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .crumbs { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 18px 0 12px; font: 400 13px var(--ui); color: var(--ink-2); }
   .crumbs a { color: inherit; }
   .crumbs [aria-current] { color: var(--ink); font-weight: 600; }
-  /* Round link buttons under a rink header (previous and next games, the preview). */
-  .pill { font: 500 13px var(--ui); text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
-  a.pill:hover { border-color: var(--ink); }
-  .pill.none { background: none; color: var(--ink-3); }
   /* The game's day, set large under a rink header on preview and post-game pages. */
   .when-day { font: 600 20px/1.2 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-bottom: 2px; }
   .when-day + p strong { color: var(--ink); font-weight: 600; }
@@ -704,7 +700,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .wordmark-note { font-size: 12px; color: var(--ink-3); }
   /* The quiet "Beta" pill beside the wordmark, in the same style as the other small pill tags. */
   .brand-name { display: inline-flex; align-items: center; gap: 8px; }
-  .beta { font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); background: var(--track); border-radius: 999px; padding: 4px 8px; cursor: help; }
+  .beta { cursor: help; }
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
   .foot-spell { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 2px; }
   .foot-spell .term { margin-right: 2px; }
@@ -776,8 +772,33 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .key span { display: inline-flex; align-items: center; gap: 6px; }
   .key .avg::before { content: ''; width: 2px; height: 14px; background: var(--ink); opacity: 0.5; border-radius: 1px; display: inline-block; }
   .key .rng::before { content: ''; width: 22px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team, var(--ink)) 45%, var(--track)); display: inline-block; }
-  .chip { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
-  .chip.solid { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+  /* PILLS (Sora, 2026-10-14): five shared styles, defined here only. Components add layout (margins, widths), never
+     their own fill, outline or type. 1. Team pill: which team a note is about. */
+  .teampill { display: inline-block; background: color-mix(in oklab, var(--team) 14%, transparent); color: var(--ink); padding: 1px 9px; border-radius: 999px; font: 600 13px/1.6 var(--ui); text-decoration: none; white-space: nowrap; margin-right: 2px; }
+  a.teampill:hover { background: color-mix(in oklab, var(--team) 26%, transparent); }
+  .teampill b { font-weight: 700; letter-spacing: 0.04em; }
+  .teampill .sep { margin: 0 6px; color: var(--ink-3); }
+  /* 2. Verdict pill: how something turned out. Filled = best, solid outline = middling, dashed = a miss; team colour
+     only for a huge night, grey fill for a rough one. Calls (.verdict, .vchip) and report cards (.pc-sum). */
+  .verdict, .vchip, .pc-sum { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 700 12.5px/1 var(--ui); padding: 5px 11px; border-radius: 999px; border: 2px solid var(--ink); background: none; color: var(--ink); white-space: nowrap; }
+  :is(.verdict, .vchip).held, .pc-sum.did { background: var(--ink); color: var(--sheet); }
+  :is(.verdict, .vchip).partly, .pc-sum.mixed { border-color: var(--ink-2); }
+  :is(.verdict, .vchip):is(.missed, .na, .pending, .note-only), .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  .pc-sum.huge { background: var(--team); border-color: var(--team); color: var(--sheet); }
+  .pc-sum.rough { background: var(--ink-3); border-color: var(--ink-3); color: var(--sheet); }
+  /* 3. Tag: a quiet grey label. Capitals for a word or two; .phrase for a short phrase in normal case; .solid for the
+     one that should stand out. */
+  .chip { display: inline-block; font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 8px; border-radius: 999px; background: var(--track); color: var(--ink-2); white-space: nowrap; vertical-align: 1px; }
+  .chip.phrase { text-transform: none; letter-spacing: 0.01em; font-size: 12px; }
+  .chip.solid { background: var(--ink); color: var(--sheet); }
+  /* 4. Rank badge: a player's standing (Elite, Top 10...). */
+  .rank { display: inline-block; font: 700 11px/1 var(--ui); letter-spacing: 0.03em; padding: 3px 7px; border-radius: 999px; background: var(--ink); color: var(--sheet); white-space: nowrap; vertical-align: 2px; text-decoration: none; }
+  /* 5. Button pill: anything tapped to go somewhere or switch a view. Dark when it is the one selected. (The menu's
+     team pill, .tpill, keeps its own outline: it is the one control on every page.) */
+  .pill { display: inline-block; font: 600 13px/1 var(--ui); padding: 7px 13px; border-radius: 999px; border: 0; background: var(--track); color: var(--ink-2); white-space: nowrap; text-decoration: none; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+  a.pill:hover, button.pill:hover { background: var(--rule); color: var(--ink); }
+  .pill[aria-current], .pill.on { background: var(--ink); color: var(--sheet); }
+  .pill.none { background: none; color: var(--ink-3); cursor: default; }
 
   /* The obvious fold: a full-width bar that opens and closes a longer set. */
   .fold { margin-top: 18px; }

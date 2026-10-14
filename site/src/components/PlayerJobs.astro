@@ -193,13 +193,9 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .pc-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
-  .pc-sum { margin-left: auto; font: 700 12px var(--ui); padding: 3px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
-  .pc-sum.did { background: var(--ink); color: var(--sheet); }
+  .pc-sum { margin-left: auto; }
   .how { margin-top: 16px; }
   .how-body { display: grid; gap: 8px; padding-top: 12px; }
-  .pc-sum.rough { background: var(--ink-3); border-color: var(--ink-3); color: var(--sheet); }
-  .pc-sum.huge { background: var(--team); border-color: var(--team); color: var(--sheet); }
-  .pc-sum.didnt { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
   .pc-night { font: 500 14px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
   .pc-box { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
   .pc-box div { display: grid; gap: 0; }

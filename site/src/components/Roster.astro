@@ -29,7 +29,7 @@ const outLine = out.filter((r) => r.status !== 'not_listed' || r.key);
                 <li class={r.out ? 'is-out' : ''}>
                   <span class="ro-num">{r.number ?? ''}</span>
                   <span class="ro-name">{r.page ? <PLink id={r.id} name={r.name} /> : r.name}<span class="ro-pos">{posWord[r.pos ?? ''] ?? ''}</span></span>
-                  {r.tag ? <span class="ro-tag" tabindex="0" data-tip={r.tip}>{r.tag}</span> : <span class="ro-stat">{r.line}{r.toi !== null && <> · {clock(r.toi)}</>}</span>}
+                  {r.tag ? <span class="ro-tag chip phrase" tabindex="0" data-tip={r.tip}>{r.tag}</span> : <span class="ro-stat">{r.line}{r.toi !== null && <> · {clock(r.toi)}</>}</span>}
                 </li>
               ))}
             </ul>
@@ -53,6 +53,6 @@ const outLine = out.filter((r) => r.status !== 'not_listed' || r.key);
   .ro-num { color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; font-size: 12px; }
   .ro-pos { margin-left: 6px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
   .ro-stat { color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .ro-tag { font: 600 11px var(--ui); padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--ink); white-space: nowrap; cursor: help; }
+  .ro-tag { cursor: help; }
   .is-out .ro-name { color: var(--ink-2); }
 </style>

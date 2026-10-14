@@ -52,7 +52,7 @@
 .sc-vp { display: inline-block; font: 700 21px 'Hanken Grotesk'; padding: 4px 14px; border-radius: 999px; border: 3px solid var(--ink); white-space: nowrap; vertical-align: 5px; margin-right: 12px; }
 .sc-vp.held { background: var(--ink); color: var(--sheet); }
 .sc-vp.partly { border-color: var(--ink2); color: var(--ink); }
-.sc-vp.missed { border-color: var(--ink3); color: var(--ink2); }
+.sc-vp.missed { border-style: dashed; border-color: var(--ink3); color: var(--ink2); }
 .sc-vp.big { font-size: 24px; padding: 10px 24px; vertical-align: 0; margin: 0; }
 .sc-vp.fill { background: var(--team); border-color: var(--team); color: #fff; }
 .shc.dark .sc-vp.fill { color: #0a121a; }

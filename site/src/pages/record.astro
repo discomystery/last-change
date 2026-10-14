@@ -167,7 +167,7 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
                       <a class="tlink" href={`${base}team/${g.home}/`}><i class="tdot" style={`--tc:${teamPaint(g.home)}`}></i>{g.home}</a>
                       <span class="g-day">{day(g.date, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                     </p>
-                    <a class="g-link" href={`${base}recap/${g.game_id}/`}>Post-game <span aria-hidden="true">›</span></a>
+                    <a class="g-link pill" href={`${base}recap/${g.game_id}/`}>Post-game <span aria-hidden="true">›</span></a>
                   </header>
                   <ol class="g-calls">
                     {g.calls.map((c) => (
@@ -359,14 +359,9 @@ const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], [
   .tdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--tc); margin-right: 6px; vertical-align: 1px; }
   .at { font-weight: 500; color: var(--ink-3); }
   .g-day { font-weight: 500; color: var(--ink-2); margin-left: 6px; }
-  .g-link { font: 600 13px var(--ui); color: var(--ink-2); padding: 5px 12px; border-radius: 999px; background: var(--track); white-space: nowrap; transition: background-color 0.15s ease; }
-  .g-link:hover { background: var(--rule); color: var(--ink); }
   .g-calls > li { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 14px 18px; }
   .g-calls > li + li { border-top: 1px solid var(--rule); }
-  .vchip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; margin-top: 1px; }
-  .vchip.held { background: var(--ink); color: var(--sheet); }
-  .vchip.partly { color: var(--ink); }
-  .vchip.missed { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .vchip { margin-top: 1px; }
   .lh { font: 600 18px / 1.35 var(--display); }
   .lsaid { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin: 0 0 2px; }
   .lcall { font: 400 15px / 1.5 var(--body); color: var(--ink-2); margin-top: 3px; }

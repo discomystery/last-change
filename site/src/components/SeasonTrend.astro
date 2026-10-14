@@ -75,7 +75,7 @@ const levels: { v: number; words: string }[] = t.change
         const info = fpInfo[r.key];
         return (
           <li class="card tr-trait">
-            <div class="tr-th"><span class="tr-name">{info.label}</span><span class:list={['tr-tag', r.tag]}>{r.tag === 'new' ? 'New this season' : 'Carried over'}</span></div>
+            <div class="tr-th"><span class="tr-name">{info.label}</span><span class:list={['tr-tag chip', { solid: r.tag === 'new' }]}>{r.tag === 'new' ? 'New this season' : 'Carried over'}</span></div>
             <div class="ends"><span>{info.lo}</span><span>{info.hi}</span></div>
             <div class="lanes">
               <span class="lane" style={`--a:${r.then.pct};--b:${r.now.pct}`} data-tip={`${sn(season - 1)}: ${ordinal(r.then.rank)} of 32. This season: ${ordinal(r.now.rank)}.`}>
@@ -295,8 +295,6 @@ const levels: { v: number; words: string }[] = t.change
   .tr-trait { display: grid; gap: 10px; align-content: start; }
   .tr-th { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .tr-name { font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
-  .tr-tag { font: 600 11px var(--ui); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--ink-2); }
-  .tr-tag.new { background: var(--ink); color: var(--sheet); }
   .tr-trait .lanes { display: block; }
   .tr-trait .lane { display: block; cursor: default; --team: inherit; }
   .tr-ranks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin: 0; font: 400 14px var(--ui); color: var(--ink-2); }
