@@ -190,7 +190,7 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
         nick = previews.names(places)
         out["lane"] = lane(top, (f"{nick.get(bot, places[bot])} ahead", f"{nick.get(top, places[top])} ahead"), 0.0, ("Even", ""),
                            (unit(gap), f"Usual {sv(gap)}"), (unit(v), f"Tonight {sv(v)}"), ref=(unit(gap / 2), f"Needed {sv(gap / 2)}"),
-                           tip=f"How far {places[top]} were ahead tonight (the filled dot) against their usual gap (the ring). Holding needed half "
+                           tip=f"How far {places[top]} {'were' if places[top].startswith('NY ') else 'was'} ahead tonight (the filled dot) against their usual gap (the ring). Holding needed half "
                                "the usual gap (the dotted mark); ahead by less is partly; behind, it didn’t happen.")
         if scaled:
             name = previews.SCORES[k]

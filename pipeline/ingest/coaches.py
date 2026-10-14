@@ -5,6 +5,11 @@ the one behind the bench before that game, not today's. One request per finished
 skip fetching and use what is saved.
 
 Table: data/tables/{season}/coaches.parquet with game_id, date, team, coach.
+
+Games not played yet are recorded too (ingest/game_rosters.py reads the same right rail for today's and tomorrow's
+games and hands the coaches here), and rewritten until the game is final: the rail names the coach behind the bench
+tonight, so the first game after a firing names the new coach (eye test on 2025-26, 2026-10-13: the preview of the Kings'
+first game after Jim Hiller was fired still said "Jim Hiller likes to pick matchups").
 """
 import httpx
 import polars as pl
@@ -19,8 +24,9 @@ def path(season: int):
     return TABLES / str(season) / "coaches.parquet"
 
 
-def _rows(game: dict) -> list[dict]:
-    info = get(f"{NHL_WEB}/v1/gamecenter/{game['game_id']}/right-rail").json().get("gameInfo") or {}
+def _rows(game: dict, info: dict | None = None) -> list[dict]:
+    if info is None:
+        info = get(f"{NHL_WEB}/v1/gamecenter/{game['game_id']}/right-rail").json().get("gameInfo") or {}
     out = []
     for side in ("home", "away"):
         name = ((info.get(f"{side}Team") or {}).get("headCoach") or {}).get("default")
@@ -47,6 +53,38 @@ def update(season: int) -> dict:
     if rows:
         pl.concat([old, pl.DataFrame(rows, schema=SCHEMA)]).sort("date", "game_id", "team").write_parquet(path(season))
     return {"games": games.height - missing, "missing": missing}
+
+
+def record(season: int, rows: list[dict]) -> None:
+    """Save coaches read from a game's right rail before it is final (ingest/game_rosters.py); replaces the game's rows."""
+    if not rows:
+        return
+    old = pl.read_parquet(path(season)) if path(season).exists() else pl.DataFrame(schema=SCHEMA)
+    ids = {r["game_id"] for r in rows}
+    pl.concat([old.filter(~pl.col("game_id").is_in(list(ids))), pl.DataFrame(rows, schema=SCHEMA)]).sort("date", "game_id", "team").write_parquet(path(season))
+
+
+def for_game(season: int, game_id: int, team: str, day: str) -> dict | None:
+    """The coach behind `team`'s bench in this game (from its own right rail when saved, else his latest finished
+    game before `day`), with `games` and `home` (games this season he has coached the club before `day`, all and at
+    home) and `first` (his first game with the club this season after someone else had coached it: a change behind
+    the bench). None if nothing is saved."""
+    if not path(season).exists():
+        return None
+    t = pl.read_parquet(path(season)).filter(pl.col("team") == team)
+    own = t.filter(pl.col("game_id") == game_id)
+    before = t.filter(pl.col("date") < day[:10]).sort("date", "game_id")
+    name = own["coach"][0] if own.height else (before["coach"][-1] if before.height else None)
+    if not name:
+        return None
+    mine = before.filter(pl.col("coach") == name)
+    games = TABLES / str(season) / "games.parquet"
+    homes = set()
+    if games.exists() and mine.height:
+        g = pl.read_parquet(games, columns=["game_id", "home"])
+        homes = set(g.filter(pl.col("game_id").is_in(mine["game_id"].to_list()) & (pl.col("home") == team))["game_id"].to_list())
+    return {"coach": name, "games": mine.height, "home": len(homes), "first": mine.height == 0 and before.height > 0,
+            "after": before["coach"][-1] if before.height and before["coach"][-1] != name else None}
 
 
 def as_of(season: int, before: str) -> dict[str, str]:

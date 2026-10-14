@@ -243,10 +243,17 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
     if m == "matchup_share":
         if "opp_lines" not in chk:
             return {"verdict": "na", "happened": "This call was saved before the site recorded the visitors’ lines, so it can’t be checked."}
-        sec = matchup_seconds(S, gid, chk)
-        total = sum(sec.values())
         names = ", ".join(S.name.get(i, "?").split(" ", 1)[-1] for i in chk["unit_ids"])
         opp_place = places.get(claim["opp"], claim["opp"])
+        # A call about a group that never took the ice can't be judged (eye test on 2025-26, 2026-10-13: a pair "held"
+        # with one of its two defensemen scratched).
+        out = [i for i in [*chk["unit_ids"], *chk.get("opp_ids", [])] if (gid, i) not in S.dressed]
+        if out:
+            who = " and ".join(S.full.get(i, "?") for i in out[:2])
+            return {"verdict": "na", "happened": f"{who} didn’t play, so the matchup this call described never happened.",
+                    "usual": f"{base}%", "tonight": "–"}
+        sec = matchup_seconds(S, gid, chk)
+        total = sum(sec.values())
         if total < MIN_MATCHUP_SEC:
             return {"verdict": "na", "happened": f"{team}’s {chk['unit']} ({names}) spent only {clock(total)} against {opp_place}’s usual lines, too little to judge.",
                     "usual": f"{base}%", "tonight": "–"}

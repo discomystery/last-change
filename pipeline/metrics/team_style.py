@@ -265,7 +265,11 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
     k = stabilization(w)
     now, last = _matrix(per_game(season, w)), _matrix(per_game(season - 1, w))
     if idle:
-        now |= {tid: np.empty((0, len(COLS))) for tid in last if tid not in now}
+        # only clubs on this season's schedule: a franchise that changed its NHL id (Utah, 2025-26) would otherwise
+        # count twice and rank someone 33rd of 32
+        sched = TABLES / str(season) / "games.parquet"
+        clubs = set(pl.read_parquet(sched, columns=["home_id", "away_id"]).unpivot()["value"].to_list()) if sched.exists() else set(last)
+        now |= {tid: np.empty((0, len(COLS))) for tid in last if tid not in now and tid in clubs}
     league_last = {dim: float(np.nanmean([_values(m)[dim] for m in last.values()])) for dim in DIMS}
     rng = np.random.default_rng(season)
     in_net = _goalie_priors(season, k["goalie"]["k_games"], league_last["goalie"])

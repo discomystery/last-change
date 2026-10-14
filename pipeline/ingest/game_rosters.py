@@ -43,8 +43,12 @@ def _dressed(season: int, game: dict) -> list[dict]:
              "status": "dressed"} for p in ps.iter_rows(named=True) if p["team_id"] in side]
 
 
-def _scratches(game: dict) -> list[dict]:
+def _scratches(game: dict, bench: list | None = None) -> list[dict]:
+    """The game's scratches; a game not yet final also adds tonight's head coaches to `bench` (ingest/coaches.py)."""
     info = get(f"{NHL_WEB}/v1/gamecenter/{game['game_id']}/right-rail").json().get("gameInfo") or {}
+    if bench is not None and game.get("state") not in FINAL_STATES:
+        from pipeline.ingest import coaches
+        bench += coaches._rows(game, info)
     out = []
     for side in ("home", "away"):
         for p in (info.get(f"{side}Team") or {}).get("scratches") or []:
@@ -79,16 +83,18 @@ def update(season: int, day: str | None = None) -> dict:
     games = (pl.DataFrame(nhl.season_games(season))
              .filter(pl.col("game_type").is_in([REGULAR, PLAYOFFS]) & ~pl.col("game_id").is_in(list(done)))
              .filter(pl.col("state").is_in(list(FINAL_STATES)) | ((pl.col("date") >= day) & (pl.col("date") <= soon))))
-    rows, fetched, missing = [], [], 0
+    rows, fetched, missing, bench = [], [], 0, []
     for g in games.sort("date", "game_id").iter_rows(named=True):
         try:
-            rows += rows_for(season, g, _scratches(g))
+            rows += rows_for(season, g, _scratches(g, bench))
             fetched.append(g["game_id"])
         except (httpx.HTTPError, RuntimeError):
             missing += 1  # tried again next run
     if fetched:
         keep = old.filter(~pl.col("game_id").is_in(fetched))
         pl.concat([keep, pl.DataFrame(rows, schema=SCHEMA)]).sort("date", "game_id", "team", "player_id").write_parquet(path(season))
+    from pipeline.ingest import coaches
+    coaches.record(season, bench)
     return {"games": len(fetched), "missing": missing}
 
 

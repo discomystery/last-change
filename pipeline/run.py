@@ -58,6 +58,8 @@ def update(season: int) -> dict:
     out["names"] = respell(season)
     if season == CURRENT_SEASON:
         out["coaches"] = coaches.update(season)  # who was behind each bench, for matchup calls
+        from pipeline.ingest import standings_daily
+        out["standings_days"] = standings_daily.update(season)  # the table after each game day, for the playoff race
         out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
         out["availability"] = availability_update(season)
     out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
