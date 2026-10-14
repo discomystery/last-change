@@ -224,10 +224,26 @@ def _availability(season: int, day: str) -> dict[str, dict[int, dict]]:
     av = av.filter(pl.col("date") == av["date"].max())
     out = {}
     from pipeline.export.changes import LONG_GONE  # missed games in a row with nothing reported: out all the same
-    gone = pl.col("status").is_in(list(REPORTED_OUT)) | ((pl.col("status") != "playing") & (pl.col("games_missed") >= LONG_GONE))
+    # A player no club lists any more (unsigned, retired: Quick) is gone, not out: never "the Rangers are without him".
+    gone = (pl.col("status") != "no_club") & (pl.col("status").is_in(list(REPORTED_OUT)) | ((pl.col("status") != "playing") & (pl.col("games_missed") >= LONG_GONE)))
     for r in av.filter(gone).iter_rows(named=True):
         out.setdefault(r["team"], {})[r["player_id"]] = r
     return out
+
+
+@lru_cache(maxsize=8)
+def _elsewhere(season: int, day: str, teams: tuple[str, str]) -> set[int]:
+    """Players who as of `day` are with neither club, or with no NHL club at all: a preview never names them as if
+    they were part of tonight's game (a check on every item, whatever detector wrote it)."""
+    f = TABLES / str(season) / "availability.parquet"
+    if not f.exists():
+        return set()
+    av = pl.read_parquet(f, columns=["date", "team", "player_id", "status"]).filter(pl.col("date") <= day)
+    if not av.height:
+        return set()
+    av = av.filter(pl.col("date") == av["date"].max())
+    here = set(av.filter(pl.col("team").is_in(list(teams)) & (pl.col("status") != "no_club"))["player_id"].to_list())
+    return set(av["player_id"].to_list()) - here
 
 
 @lru_cache(maxsize=8)
@@ -244,7 +260,8 @@ def _out_notes(season: int, day: str) -> dict[str, list[dict]]:
 
 def _starters_out(season: int, day: str, tid: int, out: dict[int, dict]) -> list[dict]:
     """Goalies who are out (reported, or missing a run of games) and started at least a fifth of the club's games (and
-    three or more) this season or last, with that share."""
+    three or more) this season or last, with that share. A goalie new to the club counts when he was that for his
+    club last season (Korpisalo, the Rangers' backup after 28 starts for Boston; Sora, 2026-10-14), marked `new`."""
     from pipeline.metrics import goalies
     keep = []
     for pid, r in out.items():
@@ -253,11 +270,19 @@ def _starters_out(season: int, day: str, tid: int, out: dict[int, dict]) -> list
         for s in (season, season - 1):
             if not (TABLES / str(s) / "events.parquet").exists():
                 continue
-            starts = goalies.per_game(s).filter(pl.col("started") & (pl.col("date") < day) & (pl.col("team_id") == tid))
+            started = goalies.per_game(s).filter(pl.col("started") & (pl.col("date") < day))
+            starts = started.filter(pl.col("team_id") == tid)
             mine = starts.filter(pl.col("goalie_id") == pid).height
             if starts.height and mine >= 3 and mine / starts.height >= 0.2:  # a regular backup is news too (Demko: 24%)
                 keep.append({**r, "share": mine / starts.height})
                 break
+            if s == season - 1 and not mine:  # last season with another club: his share of that club's starts
+                his = started.filter(pl.col("goalie_id") == pid).group_by("team_id").len()
+                if his.height:
+                    club, n = his.sort("len").row(-1)
+                    total = started.filter(pl.col("team_id") == club).height
+                    if n >= 3 and n / total >= 0.2:
+                        keep.append({**r, "share": n / total, "new": True})
     return keep
 
 
@@ -375,7 +400,9 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             ids = [r["player_id"] for r in sorted(keepers, key=lambda r: -r["share"])][:3]
             names_ = [N.get(i) or changes._name(next(r for r in keepers if r["player_id"] == i)) for i in ids]
             items[:] = [x for x in items if x.get("pid") not in ids]
-            text = (f"{_cap(W.the(t))} are without both of their usual goalies, {names_[0]} and {names_[1]}." if len(ids) == 2
+            new = any(r.get("new") for r in keepers if r["player_id"] in ids)  # a goalie new to the club isn't "usual" yet
+            text = (f"{_cap(W.the(t))} are without their top two goalies, {names_[0]} and {names_[1]}." if len(ids) == 2 and new
+                    else f"{_cap(W.the(t))} are without both of their usual goalies, {names_[0]} and {names_[1]}." if len(ids) == 2
                     else f"{_cap(W.the(t))} are without three of their goalies: {_and(names_)}.")
             nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
             if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
@@ -834,6 +861,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     out_last = {N[p].split(" ", 1)[-1] for p in facts["out"] if N.get(p)}
     still = [x for x in still if not any(f" {nm} " in " " + x["text"] for nm in out_last)]  # already an "Out"
     items = sorted(facts["items"] + ([blood] if blood else []) + still, key=lambda i: -i["score"])
+    gone = _elsewhere(season, start, (away, home))
+    items = [i for i in items if not gone & set(i.get("pids") or [i.get("pid")])]
     picked, per, seen = [], {}, set()
     for i in items:
         if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
