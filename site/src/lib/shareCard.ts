@@ -86,7 +86,7 @@ export function gameCard(g: GameData, theme: Theme) {
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said ${esc(c.said)}</div>
-<div class="sc-h sc-fit${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
+<div class="sc-h${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span><span class="sc-ht">${esc(c.title)}</span></div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
   const lede = !g.calls.length && g.lede ? `<div class="sc-serif sc-lede" data-opt="4">${esc(g.lede)}</div>` : '';
   const best = g.best ? `<div class="sc-watch" data-opt="1"><span class="sc-tag">Best night</span>${esc(g.best)}</div>` : '';
   return shell(theme, '', `<div class="sc-kick">${end} · ${esc(g.date)} · ${esc(g.venue)}</div>
@@ -314,6 +314,27 @@ function fit(card: HTMLElement) {
     const wraps = () => chips.some((c) => c.offsetTop > chips[0].offsetTop + 2);
     let size = chips.length ? parseFloat(getComputedStyle(chips[0]).fontSize) : 0;
     while (chips.length && wraps() && size > 22) { size -= 1; chips.forEach((c) => { c.style.fontSize = `${size}px`; c.style.paddingInline = `${Math.round(size * 0.75)}px`; }); }
+  }
+  // Pin wrapped lines where the page broke them: the image is drawn a hair narrower than the layout,
+  // so a title right at the edge would otherwise come out on one line with a gap under it.
+  for (const el of card.querySelectorAll<HTMLElement>('.sc-ht')) {
+    const words = (el.textContent ?? '').split(' ');
+    el.innerHTML = words.map((w) => `<span>${esc(w)}</span>`).join(' ');
+    const lines: string[][] = [];
+    let top = -1;
+    for (const sp of el.querySelectorAll('span')) {
+      if (sp.offsetTop !== top) { lines.push([]); top = sp.offsetTop; }
+      lines[lines.length - 1].push(sp.textContent ?? '');
+    }
+    // No last line of one or two words: borrow from the line above while it keeps three.
+    for (let i = lines.length - 1; i > 0; i--) while (lines[i].length < 3 && lines[i - 1].length > 3) lines[i].unshift(lines[i - 1].pop()!);
+    el.innerHTML = lines.map((l) => `<span style="white-space:nowrap">${esc(l.join(' '))}</span>`).join('<br>');
+    // The pill lines up with the first line of the title, not the whole block.
+    const pill = el.previousElementSibling as HTMLElement | null;
+    if (pill) {
+      const half = (pill.offsetHeight - parseFloat(getComputedStyle(el).lineHeight)) / 2;
+      if (half > 0) el.style.paddingTop = `${half}px`; else pill.style.marginTop = `${-half}px`;
+    }
   }
   const sheet = card.querySelector<HTMLElement>('.sc-sheet')!;
   const opts = [...card.querySelectorAll<HTMLElement>('[data-opt]')].sort((a, b) => Number(a.dataset.opt) - Number(b.dataset.opt));
