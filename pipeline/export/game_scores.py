@@ -154,7 +154,7 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
             pd=pl.col("pen_drawn"), pt=pl.col("pen_taken"), fw=pl.col("fow"), fl=pl.col("fol"), ixg=pl.col("ixg"), miss=pl.col("miss"),
             gf=pl.col("on_gf"), ga=pl.col("on_ga"), oxf=pl.col("t_xgf") - pl.col("on_xgf"), oxa=pl.col("t_xga") - pl.col("on_xga"),
             ppf=pl.col("pp_xgf"), ppa=pl.col("pp_xga"), pkf=pl.col("sh_xgf"), pka=pl.col("sh_xga"),
-            ppx=league["pp"] * pl.col("sec_pp"), pkx=league["pp"] * pl.col("sec_pk")))
+            ppx=league["pp"] * pl.col("sec_pp"), ppxa=league["sh"] * pl.col("sec_pp"), pkx=league["pp"] * pl.col("sec_pk"), pkxf=league["sh"] * pl.col("sec_pk")))
     roster = pl.read_parquet(TABLES / str(season) / "players.parquet").select("game_id", "player_id", "team_id", "pos")
     gk = goalies.filter(pl.col("shots") >= G_MIN_SHOTS).join(roster, on=["game_id", "player_id"]).select(
         "game_id", "player_id", "team_id", "pos", *[pl.lit(0.0).alias(c) for c in (*ST_GOALS, "sheet", "play", "special", "usage")],
