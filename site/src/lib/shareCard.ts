@@ -299,6 +299,13 @@ function fit(card: HTMLElement) {
     let size = parseFloat(getComputedStyle(el).fontSize);
     while (el.scrollWidth > el.clientWidth + 1 && size > 16) { size -= 2; el.style.fontSize = `${size}px`; }
   }
+  // Chips that wrap onto a second row get smaller until they fit on one (down to 20px), before anything is dropped.
+  for (const row of card.querySelectorAll<HTMLElement>('.sc-chips')) {
+    const chips = [...row.children] as HTMLElement[];
+    const wraps = () => chips.some((c) => c.offsetTop > chips[0].offsetTop + 2);
+    let size = chips.length ? parseFloat(getComputedStyle(chips[0]).fontSize) : 0;
+    while (chips.length && wraps() && size > 20) { size -= 1; chips.forEach((c) => { c.style.fontSize = `${size}px`; c.style.paddingInline = `${Math.round(size * 0.75)}px`; }); }
+  }
   const sheet = card.querySelector<HTMLElement>('.sc-sheet')!;
   const opts = [...card.querySelectorAll<HTMLElement>('[data-opt]')].sort((a, b) => Number(a.dataset.opt) - Number(b.dataset.opt));
   while (sheet.scrollHeight > sheet.clientHeight + 1 && opts.length) opts.shift()!.remove();
