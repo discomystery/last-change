@@ -1,4 +1,5 @@
 ---
+import { srcInfo, srcPhrase } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
 // Team page: next game, results and schedule, season trend, fingerprint, lines, special teams, goalies, goal sources.
 import Base from '../../layouts/Base.astro';
@@ -109,17 +110,6 @@ type SrcSide = { goals: number; sources: Record<string, Src> };
 type HowTeam = { sources: Record<'blend' | 'season', Record<'for' | 'against', SrcSide>> | null };
 const how = (howData.teams as unknown as Record<string, HowTeam>)[abbr!];
 const lgSrc = howData.league_sources as Record<string, number>;
-const srcPhrase: Record<string, string> = { other: 'everyday even-strength play', pp: 'the power play', rebound: 'rebounds', en: 'empty nets', turnover: 'turnovers', ea: 'play with the goalie pulled', sh: 'shorthanded play', faceoff: 'faceoff wins' };
-const srcInfo: [string, string, string][] = [
-  ['other', 'Everyday even-strength play', 'Even-strength goals that were not a rebound and did not come within five seconds of a turnover or an offensive-zone faceoff win. Rush goals land here too: the league’s game data records too little between the blue lines to pick them out.'],
-  ['pp', 'Power play', 'Goals scored with more skaters on the ice than the opponent.'],
-  ['rebound', 'Rebound', 'Goals scored within three seconds of a teammate’s shot on goal.'],
-  ['en', 'Empty net', 'Goals into a net with no goalie in it.'],
-  ['turnover', 'Off a turnover', 'Even-strength goals within five seconds of winning the puck (a takeaway, or the opponent’s giveaway) with no stoppage in between.'],
-  ['ea', 'Goalie pulled', 'Goals scored with their own goalie off for an extra skater.'],
-  ['sh', 'Shorthanded', 'Goals scored with fewer skaters on the ice than the opponent.'],
-  ['faceoff', 'Off a faceoff win', 'Even-strength goals within five seconds of winning a faceoff in the offensive zone.'],
-];
 const srcSides = [['for', `${team.place}’s goals`], ['against', `goals against ${team.place}`]] as const;
 const srcMax = (key: string, mode: 'blend' | 'season') => {
   const vals = (['for', 'against'] as const).flatMap((side) => { const x = how.sources?.[mode]?.[side]?.sources[key]; return x ? [x.share ?? 0, x.band[1] ?? 0] : []; });
@@ -166,7 +156,7 @@ const coachSince = coach && (team as any).coach_since
     <div class="tickets" id="tickets"></div>
   </section>
 
-  <Section id="form" title="Results and schedule" placeholder={false} takeaway={`Every game of ${team.place}’ season beside a map of where it’s played. The map plays the season so far, the next road trip, a trip abroad or the full season; the list opens at today.`}>
+  <Section id="form" title="Results and schedule" placeholder={false} takeaway={`Every game of ${team.place}’s season beside a map of where it’s played. The map plays the season so far, the next road trip, a trip abroad or the full season; the list opens at today.`}>
     <Fragment slot="explain">
       <p>Each game is placed where it’s played, so a game abroad, like the Global Series in Europe, gets its own city even when the league lists it as a home game. Distances are straight-line flights between arenas: from home to the first game, game to game, and back home at the end of a trip or the season. A road trip is a run of games away from home. A back-to-back is a game the day after another one.</p>
     </Fragment>
@@ -174,7 +164,7 @@ const coachSince = coach && (team as any).coach_since
   </Section>
 
   {trend && (
-    <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} have come from, and whether this season’s team is a new version of it.`}>
+    <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} has come from, and whether this season’s team plays a new way.`}>
       <Fragment slot="explain">
         <p><strong>What the line measures.</strong> Every shot gets a chance of going in, based on where and how it was taken. Add those chances up for both teams at 5-on-5 and take {team.place}’s share: 50% is an even game, 60% means the chances tilted 60-40 their way. It is adjusted for the score and home ice, because a team that is behind pushes harder. The thick line is a running average of that share over each stretch of {trend.window} games.</p>
         <p><strong>Normal ups and downs.</strong> The hatched band shows how far a {trend.window}-game stretch wanders from a team’s level on bounces alone, measured by shuffling the games of 2023-24 to 2025-26. A line inside it doesn’t mean anything changed.</p>
@@ -372,7 +362,7 @@ const coachSince = coach && (team as any).coach_since
           </div>
           <div class="card">
             <h3 class="st-h">Penalty kill</h3>
-            <p class="n m-blend">Kills allow {mine.dims.pk.blend.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.blend.rank)} of 32 (this season and last).</p>
+            <p class="n m-blend">Kills allow {mine.dims.pk.blend.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.blend.rank)} of 32 (blended with last season).</p>
             <p class="n m-season">Kills allow {mine.dims.pk.season.v.toFixed(1)} expected goals per 60, {ordinal(mine.dims.pk.season.rank)} of 32 this season.</p>
             <PkRoles roles={(sp as any).pk_roles} />
           </div>

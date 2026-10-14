@@ -236,7 +236,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
         <PlayerReport p={p} place={team?.place ?? p.team} />
 
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
-          <Fragment slot="explain">{modes.map(([m, mw]) => <p class={`note m-${m}`}>Listed only when we can be confident he is above or below average. Numbers from {mw}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>)}</Fragment>
+          <Fragment slot="explain">{modes.map(([m, mw]) => <p class={`note m-${m}`}>Listed only when we can be confident he is above or below average. Numbers {m === 'blend' ? 'blended with last season' : 'from this season'}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>)}</Fragment>
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
@@ -326,7 +326,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                     <AreaMap id={`am-${m}`} areas={a.areas} shots={s.shots}
                       tip={(k, x) => x ? `${areaName[k]}: ${x.shots} ${x.shots === 1 ? 'shot' : 'shots'}, ${x.goals} ${x.goals === 1 ? 'goal' : 'goals'}. ${Math.round(x.share)}% of his shots come from here; the average ${s.group === 'D' ? 'defenseman' : 'forward'} takes ${Math.round(x.avg)}% from here.` : areaName[k]}
                       label={(x) => String(x.shots)} shade={shade} />
-                    <p class="n mapcap">{a.n} unblocked shots, {mw}, from his point of view. {a.areas.outside.shots > 0 && `${a.areas.outside.shots} more from outside the zone.`} Empty nets left out.</p>
+                    <p class="n mapcap">{a.n} shots on goal or wide, {mw}, from his point of view. {a.areas.outside.shots > 0 && `${a.areas.outside.shots} more from outside the zone.`} Empty nets left out.</p>
                   </div>
                 );
               })}

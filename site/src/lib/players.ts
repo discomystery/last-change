@@ -61,7 +61,7 @@ export const TRAITS: Record<string, TraitInfo> = {
   chances: { group: 'Scoring', short: (v) => `${v.toFixed(2)} expected goals /60`, label: 'Creating his own chances', lo: 'Few chances', hi: 'Dangerous', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 at 5-on-5`,
     tip: 'How dangerous his own shots are, added up: expected goals from shots he takes, per 60 minutes at 5-on-5. Shot volume and shot location both count.' },
   finishing: { group: 'Scoring', short: (v) => `${sign(v, 1)} goals above expected /100 shots`, label: 'Finishing', lo: 'Below expected', hi: 'Sniper', say: (v) => `${sign(v, 1)} goals above expected per 100 shots`,
-    tip: 'Goals he scores compared with what an average shooter would score from the same shots, per 100 unblocked shots (empty nets left out). Finishing takes a long time to tell apart from luck, so small samples are pulled hard toward average.' },
+    tip: 'Goals he scores compared with what an average shooter would score from the same shots, per 100 shots on goal or wide (empty nets left out). Finishing takes a long time to tell apart from luck, so small samples are pulled hard toward average.' },
   playmaking: { group: 'Scoring', short: (v) => `${v.toFixed(2)} first assists /60`, label: 'Setting up goals', lo: 'Rarely sets up', hi: 'Playmaker', say: (v) => `${v.toFixed(2)} first assists per 60 at 5-on-5`,
     tip: 'First assists (the last pass before a goal) per 60 minutes at 5-on-5.' },
   powerPlay: { group: 'Special teams', short: (v) => `${v.toFixed(2)} expected goals /60`, label: 'Power-play chances', lo: 'Quiet', hi: 'Threat', say: (v) => `${v.toFixed(2)} expected goals from his own shots per 60 on the power play`,

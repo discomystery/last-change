@@ -61,7 +61,7 @@ UNIT = {"shooting": "shot attempts at 5-on-5", "chances": "expected goals from h
         "defImpact": "expected goals per 60 allowed during his 5-on-5 shifts", "pp": "expected goals per 60 on the power play",
         "pk": "expected goals per 60 allowed on the penalty kill"}
 RAW_COL = {"hits": "hits", "blocks": "blocks", "takeaways": "takes"}
-LABEL = {"shooting": "Shooting", "chances": "Getting to dangerous spots", "hits": "Hitting", "blocks": "Blocking shots",
+LABEL = {"shooting": "Shooting", "chances": "Creating his own chances", "hits": "Hitting", "blocks": "Blocking shots",
          "takeaways": "Taking the puck away", "faceoffs": "Faceoffs", "offImpact": "Creating chances at 5-on-5",
          "defImpact": "Preventing chances at 5-on-5", "pp": "Power play", "pk": "Kills penalties"}
 

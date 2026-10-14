@@ -138,7 +138,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
       document.getElementById('r-hi').textContent = i.hi;
       const split = all.length && !all.every((r) => r.vs === g);
       document.getElementById('r-who').textContent = all.length
-        ? `${all.length} ${i.who[g]} rated ${m === 'blend' ? 'over this season and last' : 'this season'}, through ${asOf}.` + (i.rule ? ` It counts only players with ${i.rule[m]}.` : '') + (split ? ' On this rating centers and wingers are compared with their own kind, so the dots show where each sits among his own group.' : '')
+        ? `${all.length} ${i.who[g]} rated ${m === 'blend' ? 'blended with last season' : 'this season'}, through ${asOf}.` + (i.rule ? ` It counts only players with ${i.rule[m]}.` : '') + (split ? ' On this rating centers and wingers are compared with their own kind, so the dots show where each sits among his own group.' : '')
         : `No ${groupWord[g]} are rated on this one.`;
       const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
       let xs = all.filter((x) => { const p = who.get(x.id); return (!team.value || p.t === team.value) && words.every((w) => fold(p.n).includes(w)); });

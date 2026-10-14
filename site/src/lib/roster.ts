@@ -13,7 +13,7 @@ export type RosterPlayer = { id: number; name: string; pos: string | null; numbe
 export type Row = RosterPlayer & { group: 'F' | 'D' | 'G'; out: boolean; tag: string; tip: string; line: string; toi: number | null; page: boolean };
 
 export const asOf: string = (data as any).date;
-const months = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const day = (iso: string) => { const [, m, d] = iso.split('-').map(Number); return `${months[m - 1]} ${d}`; };
 
 const REPORT_TAG: Record<string, string> = {
@@ -39,9 +39,9 @@ export function describe(p: RosterPlayer): { tag: string; tip: string; out: bool
     case 'suspended': return { tag: 'Suspended', out: true, tip: `Suspended.${missed}${said}` };
     case 'personal': return { tag: 'Personal leave', out: true, tip: `Away for personal or family reasons.${missed}${said}` };
     case 'scratched': return { tag: 'Scratched', out: true, tip: `On the game-day roster but did not dress. The league does not say why, and no injury has been reported.${missed}` };
-    case 'off_roster': return { tag: 'Not in the lineup', out: true, tip: `Listed by the club but left off the game-day roster, which usually means injured reserve. No injury has been reported.${missed}` };
+    case 'off_roster': return { tag: 'Not in the lineup', out: true, tip: `Listed by the club but left off the game-day roster. No injury has been reported.${missed}` };
     case 'not_listed': if (minors) return { tag: /\(AHL\)/.test(minors) ? 'In the AHL' : 'In the minors', out: true, tip: `Assigned to ${minors} on ${day(r!.date)}.${missed}` };
-      return { tag: 'Off the NHL roster', out: true, tip: `The club holds his rights but its NHL roster does not list him: usually in the minors, sometimes a long-term injury. Nothing has been reported.${missed}` };
+      return { tag: 'Off the NHL roster', out: true, tip: `The club holds his rights but their NHL roster does not list him: usually in the minors, sometimes a long-term injury. Nothing has been reported.${missed}` };
     case 'no_club': return { tag: 'No NHL club', out: false, tip: 'A regular here last season. No NHL club lists him now, and he has not played this season. The data cannot say why (unsigned, retired or playing abroad).' };
     default: return { tag: '', out: false, tip: '' };
   }

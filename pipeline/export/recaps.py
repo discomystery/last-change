@@ -321,7 +321,7 @@ def measure_changed(S: Season, gid: int, claim: dict, places: dict) -> dict:
     beyond = (lambda a, b: a > b) if chk["direction"] == "above" else (lambda a, b: a < b)
     verdict = "held" if beyond(v, base) else "missed"
     return {"verdict": verdict,
-            "happened": f"On {previews.EDGE[k][3]}, {T} had {show(v)}, against {show(base)} over this season and last and {show(season)} this season alone.",
+            "happened": f"On {previews.EDGE[k][3]}, {T} had {show(v)}, against {show(base)} blended with last season and {show(season)} this season alone.",
             "usual": show(base), "tonight": show(v), "_v": v}
 
 

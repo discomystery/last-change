@@ -1,4 +1,5 @@
 ---
+import { srcInfo } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
@@ -135,16 +136,6 @@ type Src = { n: number; share: number | null };
 type SrcSide = { goals: number; sources: Record<string, Src> };
 const SR = srcData.teams as unknown as Record<string, { sources: Record<'blend' | 'season', Record<'for' | 'against', SrcSide>> | null }>;
 const lgSrc = srcData.league_sources as Record<string, number>;
-const srcInfo: [string, string, string][] = [
-  ['other', 'Everyday even-strength play', 'Even-strength goals that were not a rebound and did not come within five seconds of a turnover or an offensive-zone faceoff win.'],
-  ['pp', 'Power play', 'Goals scored with more skaters on the ice than the opponent.'],
-  ['rebound', 'Rebound', 'Goals scored within three seconds of a teammate’s shot on goal.'],
-  ['en', 'Empty net', 'Goals into a net with no goalie in it.'],
-  ['turnover', 'Off a turnover', 'Even-strength goals within five seconds of winning the puck, with no stoppage in between.'],
-  ['ea', 'Goalie pulled', 'Goals scored with their own goalie off for an extra skater.'],
-  ['sh', 'Shorthanded', 'Goals scored with fewer skaters on the ice than the opponent.'],
-  ['faceoff', 'Off a faceoff win', 'Even-strength goals within five seconds of winning a faceoff in the offensive zone.'],
-];
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
 const story = snap.story;
@@ -196,7 +187,7 @@ import ShareButton from '../../components/ShareButton.astro';
         <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
-    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
