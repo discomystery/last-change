@@ -113,7 +113,8 @@ def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
         pl.col("xg").fill_null(0.0),
         goalie=pl.when(pl.col("is_home")).then(pl.col("away_goalie")).otherwise(pl.col("home_goalie")))
     at_goalie = sh.filter(pl.col("goalie").is_not_null())
-    own = at_goalie.filter(pl.col("p1").is_not_null()).group_by("game_id", pl.col("p1").alias("player_id")).agg(pl.col("xg").sum().alias("ixg"))
+    own = at_goalie.filter(pl.col("p1").is_not_null()).group_by("game_id", pl.col("p1").alias("player_id")).agg(
+        pl.col("xg").sum().alias("ixg"), (pl.col("type") == "missed-shot").sum().alias("miss"))
     g, a1, a2 = SPLIT
     goals = sh.filter(pl.col("type") == "goal").select("game_id", "p1", "p2", "p3")
     # Credit per goal: the split, with a missing assist's share going to the players who are credited.
@@ -122,7 +123,7 @@ def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
         w = (pl.when(pl.col("p2").is_null()).then(w_none).when(pl.col("p3").is_null()).then(w_one).otherwise(w_two))
         parts.append(goals.filter(pl.col(col).is_not_null()).select("game_id", pl.col(col).alias("player_id"), w.alias("credit")))
     credit = pl.concat(parts).group_by("game_id", "player_id").agg(pl.col("credit").sum())
-    skaters = own.join(credit, on=["game_id", "player_id"], how="full", coalesce=True).with_columns(pl.col("ixg", "credit").fill_null(0.0))
+    skaters = own.join(credit, on=["game_id", "player_id"], how="full", coalesce=True).with_columns(pl.col("ixg", "credit").fill_null(0.0), pl.col("miss").fill_null(0))
     goalies = at_goalie.group_by("game_id", pl.col("goalie").alias("player_id")).agg(
         pl.col("xg").sum().alias("xga"), (pl.col("type") == "goal").sum().alias("ga"), pl.len().alias("shots"))
     return skaters, goalies
@@ -134,7 +135,8 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
     credit, goalies = shot_credit(season)
     ctx = usage(season, ratings) if ratings else pl.DataFrame(schema={"game_id": pl.Int64, "player_id": pl.Int64, "ctx": pl.Float64})
     d = pg.join(credit, on=["game_id", "player_id"], how="left").join(ctx, on=["game_id", "player_id"], how="left").join(
-        special_on_ice(season), on=["game_id", "player_id"], how="left").with_columns(pl.col("ixg", "credit", "ctx", "sh_xgf", *ST_COLS).fill_null(0.0))
+        special_on_ice(season), on=["game_id", "player_id"], how="left").with_columns(
+        pl.col("ixg", "credit", "ctx", "sh_xgf", *ST_COLS, "pen_drawn", "pen_taken", "fow", "fol").fill_null(0.0), pl.col("miss").fill_null(0))
     off_share = pl.col("sec5") / (pl.col("t_sec5") - pl.col("sec5")).clip(MIN_OFF)
     rel = (pl.col("on_xgf") - pl.col("on_xga")) - ((pl.col("t_xgf") - pl.col("on_xgf")) - (pl.col("t_xga") - pl.col("on_xga"))) * off_share
     sk = d.select(
@@ -146,15 +148,31 @@ def table(season: int, ratings: dict[int, tuple[float, float]], league: dict[str
                         + GOALS_ON_ICE * ((pl.col("pp_gf") - pl.col("pp_ga")) - (league["pp_g"] - league["sh_g"]) * pl.col("sec_pp")
                                           + (pl.col("pk_gf") - pl.col("pk_ga")) - (league["sh_g"] - league["pp_g"]) * pl.col("sec_pk"))),
         usage=-PLAY * 0.5 * pl.col("ctx"),
-        net=pl.lit(0.0))
+        net=pl.lit(0.0),
+        # What went into the parts, named in the breakdown sentences so nothing that moves the number is hidden.
+        facts=pl.struct(
+            pd=pl.col("pen_drawn"), pt=pl.col("pen_taken"), fw=pl.col("fow"), fl=pl.col("fol"), ixg=pl.col("ixg"), miss=pl.col("miss"),
+            gf=pl.col("on_gf"), ga=pl.col("on_ga"), oxf=pl.col("t_xgf") - pl.col("on_xgf"), oxa=pl.col("t_xga") - pl.col("on_xga"),
+            ppf=pl.col("pp_xgf"), ppa=pl.col("pp_xga"), pkf=pl.col("sh_xgf"), pka=pl.col("sh_xga"),
+            ppx=league["pp"] * pl.col("sec_pp"), pkx=league["pp"] * pl.col("sec_pk")))
     roster = pl.read_parquet(TABLES / str(season) / "players.parquet").select("game_id", "player_id", "team_id", "pos")
     gk = goalies.filter(pl.col("shots") >= G_MIN_SHOTS).join(roster, on=["game_id", "player_id"]).select(
         "game_id", "player_id", "team_id", "pos", *[pl.lit(0.0).alias(c) for c in (*ST_GOALS, "sheet", "play", "special", "usage")],
-        net=pl.col("xga") - pl.col("ga").cast(pl.Float64))
+        net=pl.col("xga") - pl.col("ga").cast(pl.Float64), facts=pl.lit(None, dtype=sk.schema["facts"]))
     out = pl.concat([sk, gk], how="vertical_relaxed").with_columns(
         score=pl.sum_horizontal("sheet", "play", "special", "usage", "net"),
         grp=pl.when(pl.col("pos") == "G").then(pl.lit("G")).when(pl.col("pos") == "D").then(pl.lit("D")).otherwise(pl.lit("F")))
     return out
+
+
+FACT_INTS = ("pd", "pt", "fw", "fl", "miss", "gf", "ga")
+
+
+def facts(f: dict) -> dict:
+    """The ingredients of a skater's parts for the breakdown sentences: counts as whole numbers, chances to two decimals,
+    zeros left out."""
+    out = {k: (int(v) if k in FACT_INTS else round(v, 2)) for k, v in f.items() if v}
+    return {k: v for k, v in out.items() if v}
 
 
 def league_rates(season: int) -> dict[str, float]:
@@ -206,7 +224,8 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
                 "id": r["player_id"], "name": names.get(r["player_id"], "?"), "team": abbr.get(r["team_id"]), "pos": r["pos"],
                 "score": round(r["score"], 2), "pct": pct(r["grp"], r["score"]),
                 "parts": {k: round(r[k], 2) for k in (("net",) if r["pos"] == "G" else ("sheet", "play", "special", "usage"))},
-                **({"st": st} if (st := {k: int(r[k]) for k in ST_GOALS if r[k]}) else {})})
+                **({"st": st} if (st := {k: int(r[k]) for k in ST_GOALS if r[k]}) else {}),
+                **({"f": facts(r["facts"])} if r["facts"] else {})})
         units = {g["away"]: lines(gid, g["away_id"]), g["home"]: lines(gid, g["home_id"])}
         (OUT / f"{gid}.json").write_text(json.dumps({"game_id": gid, "away": g["away"], "home": g["home"], "players": players, "units": units}, separators=(",", ":"), ensure_ascii=False))
     return {"games": now["game_id"].n_unique()}

@@ -5,7 +5,10 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 
-type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number }; st?: { pp_gf?: number; pp_ga?: number; pk_gf?: number; pk_ga?: number } };
+type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number }; st?: { pp_gf?: number; pp_ga?: number; pk_gf?: number; pk_ga?: number }; f?: Facts };
+// What went into each part (game_scores.facts): penalties drawn and taken, faceoffs, own shots, 5-on-5 goals with him on,
+// his team's chances with him on the bench, special-teams chances both ways and what an average unit gets in his time.
+type Facts = Partial<Record<'pd' | 'pt' | 'fw' | 'fl' | 'ixg' | 'miss' | 'gf' | 'ga' | 'oxf' | 'oxa' | 'ppf' | 'ppa' | 'pkf' | 'pka' | 'ppx' | 'pkx', number>>;
 type Unit = { kind: 'F' | 'D'; n: number; ids: number[]; sec: number; xgf: number; xga: number };
 type Scores = { game_id: number; away: string; home: string; players: Row[]; units?: Record<string, Unit[]> };
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
@@ -35,20 +38,34 @@ const pieces = (r: Row): Piece[] => (r.pos === 'G'
   ? [{ key: 'net', label: 'Saves', mix: 100, v: r.score }]
   : PARTS.map((p) => ({ ...p, v: val(r, p.key) })));
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
-// One or two plain sentences per part, from the same game's report card, naming tonight's opponent.
-const why = (r: Row, k: string, opp: string) => {
-  const c = cards.get(r.id), b = c?.box ?? {};
+// Plain sentences per part, from the same game's report card and the Swing file, naming tonight's opponent. Every
+// count that moves a part is named in its sentence, so nothing behind the number is hidden.
+const ch = (f: number | undefined, a: number | undefined) => (f || a ? `chances ${(f ?? 0).toFixed(1)}–${(a ?? 0).toFixed(1)}` : 'no chances either way');
+const pens = (n: number) => `${n} ${n === 1 ? 'penalty' : 'penalties'}`;
+const about = (v = 0) => (v < 0.1 ? 'under 0.1' : v.toFixed(1));
+const why = (r: Row, k: string, opp: string, own: string) => {
+  const c = cards.get(r.id), b = c?.box ?? {}, f = r.f ?? {};
   if (k === 'net') return `Stopped ${(b.sa ?? 0) - (b.ga ?? 0)} of ${b.sa ?? 0} ${opp} shots, ${Math.abs(r.score).toFixed(1)} goals ${r.score >= 0 ? 'more' : 'fewer'} than an average goalie would on the same chances.`;
   if (k === 'sheet') {
     const pts = [b.g ? plural(b.g, 'goal') : '', b.a ? plural(b.a, 'assist') : ''].filter(Boolean).join(', ');
-    return `${pts || 'No points'}. ${plural(b.sog ?? 0, 'shot')} on goal.`;
+    const sog = b.sog ?? 0;
+    const shots = [sog ? `${plural(sog, 'shot')} on goal` : '', f.miss ? (sog ? `${f.miss} more that missed` : `${plural(f.miss, 'shot')} that missed`) : ''].filter(Boolean).join(' and ');
+    const worth = (f.ixg ?? 0) >= 0.05 ? `, worth ${f.ixg!.toFixed(1)} expected goals` : '';
+    const pen = f.pt && f.pd ? `Took ${pens(f.pt)} and drew ${f.pd}.` : f.pt ? `Took ${pens(f.pt)}.` : f.pd ? `Drew ${pens(f.pd)}.` : '';
+    const fo = f.fw || f.fl ? `Won ${f.fw ?? 0} of ${(f.fw ?? 0) + (f.fl ?? 0)} faceoffs.` : '';
+    return [`${pts || 'No points'}.`, shots ? `${shots[0].toUpperCase()}${shots.slice(1)}${worth}.` : 'No shots.', pen, fo].filter(Boolean).join(' ');
   }
   if (k === 'play') {
-    const u = r.parts.usage ?? 0, pm = b.pm ?? 0;
+    const u = r.parts.usage ?? 0;
     const co = Math.abs(u) < 0.05 ? '' : u > 0 ? `, a little back for facing ${opp}’s best` : `, a little off for easy minutes against ${opp}`;
-    return c ? `${c.toi5} against ${opp}. Chances ${(b.xgf ?? 0).toFixed(1)}–${(b.xga ?? 0).toFixed(1)}, plus-minus ${pm > 0 ? '+' : pm < 0 ? '−' : ''}${Math.abs(pm)}${co}.` : `His 5-on-5 minutes against ${opp}${co}.`;
+    const bench = f.oxf || f.oxa ? ` With him on the bench, ${own}’s chances were ${(f.oxf ?? 0).toFixed(1)}–${(f.oxa ?? 0).toFixed(1)}.` : '';
+    const on = `${ch(b.xgf, b.xga)[0].toUpperCase()}${ch(b.xgf, b.xga).slice(1)} and goals ${f.gf ?? 0}–${f.ga ?? 0} with him on${co}.`;
+    return c ? `${c.toi5} against ${opp}. ${on}${bench}` : `Against ${opp}: goals ${f.gf ?? 0}–${f.ga ?? 0} with him on${co}.${bench}`;
   }
-  const t = [c && c.toi_pp !== '0:00' ? `${c.toi_pp} on the power play` : '', c && c.toi_pk !== '0:00' ? `${c.toi_pk} killing penalties` : ''].filter(Boolean).join(' and ');
+  const t = [
+    c && c.toi_pp !== '0:00' ? `${c.toi_pp} on the power play: ${ch(f.ppf, f.ppa)}, where an average unit creates ${about(f.ppx)}.` : '',
+    c && c.toi_pk !== '0:00' ? `${c.toi_pk} killing penalties: ${ch(f.pkf, f.pka)}, where an average kill allows ${about(f.pkx)}.` : '',
+  ].filter(Boolean).map((x) => `${x[0].toUpperCase()}${x.slice(1)}`).join(' ');
   const st = r.st ?? {};
   const goals = [
     st.pp_gf ? `${st.pp_gf === 1 ? 'a' : st.pp_gf} power-play goal${st.pp_gf === 1 ? '' : 's'}` : '',
@@ -57,7 +74,7 @@ const why = (r: Row, k: string, opp: string) => {
     st.pk_ga ? `${st.pk_ga === 1 ? 'a' : st.pk_ga} power-play goal${st.pk_ga === 1 ? '' : 's'} against` : '',
   ].filter(Boolean);
   const on = goals.length ? ` On the ice for ${goals.length > 1 ? `${goals.slice(0, -1).join(', ')} and ${goals.at(-1)}` : goals[0]}.` : '';
-  return t ? `${t}.${on} Measured against an average unit.` : 'No special-teams time.';
+  return t ? `${t}${on}` : 'No special-teams time.';
 };
 const order = d ? [d.away, d.home] : [];
 const one = (v: number) => (Math.round(v * 10) === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
@@ -158,7 +175,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
                         <p class="sw-sch"><span>{p.key === 'net' ? 'Saves' : p.label}</span><b>{one(p.v)}</b></p>
                         <div class="sw-lane" data-k={p.key} data-me={r.id} aria-hidden="true"><i class="me" style={`left:${pos(p.v)}%`}></i></div>
                         <p class="sw-ends" aria-hidden="true"><span>Cost them</span><span>Swung it</span></p>
-                        <p class="sw-sen">{why(r, p.key, place(order.find((t) => t !== r.team) ?? ''))} <b>{rank(r, p.key)}.</b></p>
+                        <p class="sw-sen">{why(r, p.key, place(order.find((t) => t !== r.team) ?? ''), place(r.team))} <b>{rank(r, p.key)}.</b></p>
                       </div>
                     ))}
                   </div>
