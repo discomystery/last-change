@@ -2,7 +2,8 @@
 import Logo from '../components/Logo.astro';
 import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
-import PrefSwitches from '../components/PrefSwitches.astro';
+import SiteTools from '../components/SiteTools.astro';
+import { teamPaint } from '../lib/teams';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
 interface Props { title: string; description?: string; section?: Section }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
@@ -17,7 +18,9 @@ const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
 const SITE_NAME = 'Spare Line Change';
 const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
-const teamList = teams as { abbr: string; name: string }[];
+const teamList = teams as { abbr: string; name: string; nick: string }[];
+// For the settings script: each club's colour (light-dark() pair) and nickname, for the team pill and its page link.
+const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(t.abbr), n: t.nick }]));
 ---
 <!doctype html>
 <html lang="en">
@@ -170,40 +173,18 @@ const teamList = teams as { abbr: string; name: string }[];
           <span class="beta" tabindex="0" data-tip="Spare Line Change is in beta: pages and numbers are still being built and checked, so some may change.">Beta</span>
         </span>
         <nav class="site-nav" aria-label="Site">
-          <a id="my-team-link" class="my-team" href={base} data-base={base} hidden></a>
+          <SiteTools />
           {tabs.map((t) => t.soon
             ? <span class="soon" tabindex="0" data-tip={t.soon}>{t.label}</span>
             : <a href={`${base}${t.href}`} aria-current={cur(t.id)}>{t.label}</a>)}
           <a class="minor" href={`${base}methods/`} aria-current={cur('methods')}>Methods</a>
         </nav>
       </div>
-      <button type="button" class="prefs-toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs">Settings</button>
-      <div class="prefs" id="prefs" aria-label="Your settings">
-        <label class="pref">
-          <span>Your team</span>
-          <select id="team-pick">
-            <option value="">Choose a team</option>
-            {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
-          </select>
-        </label>
-        <div class="pref">
-          <span class="term" tabindex="0" data-tip="Blended mixes this season with last, leaning more on this season as its games pile up, so early numbers don’t swing wildly. This season shows this season alone.">Seasons</span>
-          <div class="mode" role="group" aria-label="Which seasons the numbers use">
-            <button type="button" data-pref="mode" data-value="blend">Blended</button>
-            <button type="button" data-pref="mode" data-value="season">This season</button>
-          </div>
-        </div>
-        <div class="pref">
-          <span class="term" tabindex="0" data-tip="Two kinds of numbers are adjusted before they’re shown. Hits, giveaways, takeaways and blocks are counted by each arena’s scorer, and some count more generously than others. Shot rates are weighted for the score and home ice, because teams that are behind shoot more. Adjusted shows both as scores, where 100 is league average. Recorded shows the numbers exactly as the scorers counted them.">Adjusted stats</span>
-          <div class="mode" role="group" aria-label="Adjusted scores or recorded numbers">
-            <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
-            <button type="button" data-pref="arena" data-value="raw">Recorded</button>
-          </div>
-        </div>
-      </div>
     </header>
-    <div class="prefs-pin"><PrefSwitches /></div>
+    <div class="navpin"><SiteTools menu /></div>
     <main><slot /></main>
+    <div class="dock">
+    <button type="button" class="setrow" data-prefs-open aria-haspopup="dialog" aria-expanded="false" aria-controls="prefs"><span class="tp-dot" aria-hidden="true"></span><span class="tp-ab">Your team</span><span class="sr-st"><span aria-hidden="true">·</span> <b data-show="mode"></b> <span aria-hidden="true">·</span> <b data-show="arena"></b></span><span class="sr-go">Settings<svg viewBox="0 0 11 7" aria-hidden="true"><path d="M1 6l4.5-4.5L10 6" /></svg></span></button>
     <nav class="tabbar" aria-label="Site">
       <a href={base} aria-current={cur('home')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" /></svg>Home</a>
       <a href={`${base}games/`} aria-current={cur('games')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>Games</a>
@@ -211,12 +192,51 @@ const teamList = teams as { abbr: string; name: string }[];
       <a href={`${base}players/`} aria-current={cur('players')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></svg>Players</a>
       <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
     </nav>
+    </div>
     <div class="more" id="more" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
       <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
       <a href={`${base}methods/`}>Methods</a>
     </div>
+    <div class="prefs-scrim" id="prefs-scrim" hidden></div>
+    <div class="prefs" id="prefs" role="dialog" aria-label="Your settings" hidden>
+      <div class="prefs-top"><b>Your settings</b><button type="button" class="prefs-done" data-prefs-close>Done</button></div>
+      <div class="set">
+        <div class="set-h"><label for="team-pick">Your team</label><a id="my-team-link" class="set-link" href={base} data-base={base} hidden></a></div>
+        <select id="team-pick">
+          <option value="">Choose a team</option>
+          {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
+        </select>
+      </div>
+      <hr />
+      <div class="set">
+        <div class="set-h"><span id="set-mode">Seasons</span></div>
+        <div class="mode seg" role="group" aria-labelledby="set-mode">
+          <button type="button" data-pref="mode" data-value="blend">Blended</button>
+          <button type="button" data-pref="mode" data-value="season">This season</button>
+        </div>
+        <p class="set-why">Blended mixes this season with last, leaning more on this season as its games pile up, so early numbers don’t swing wildly.</p>
+      </div>
+      <div class="set">
+        <div class="set-h"><span id="set-arena">Adjusted stats</span></div>
+        <div class="mode seg" role="group" aria-labelledby="set-arena">
+          <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
+          <button type="button" data-pref="arena" data-value="raw">Recorded</button>
+        </div>
+        <p class="set-why">Adjusted evens out generous arena scorers and teams that shoot more when behind, and shows scores where 100 is league average. Recorded shows the numbers as counted.</p>
+      </div>
+      <p class="set-foot">Saved on this device.</p>
+    </div>
+    <nav class="navmenu" id="navmenu" aria-label="Every page" hidden>
+      <a href={base} aria-current={cur('home')}>Home</a>
+      {tabs.map((t) => t.soon
+        ? <span class="soon">{t.label} <em>coming soon</em></span>
+        : <a href={`${base}${t.href}`} aria-current={cur(t.id)}>{t.label}</a>)}
+      <hr />
+      <a class="minor" href={`${base}methods/`} aria-current={cur('methods')}>Methods</a>
+    </nav>
+    <script type="application/json" id="team-info" set:html={JSON.stringify(teamInfo)}></script>
     <footer class="site-foot">
       <a class="foot-logo" href={base} aria-label="Spare Line Change, home"><Logo mark /></a>
       <p>Game data: NHL. Expected goals are calculated with Spare Line Change’s <a href={`${base}methods/`}>own model</a>.</p>
@@ -233,15 +253,33 @@ const teamList = teams as { abbr: string; name: string }[];
         const defaults = { team: '', mode: 'blend', arena: 'adjusted', spell: window.lcSpell.get() };
         const read = (k) => { try { return localStorage.getItem('lc-' + k) || defaults[k]; } catch { return defaults[k]; } };
         const root = document.documentElement;
+        const info = JSON.parse(document.getElementById('team-info').textContent);
+        const words = { mode: { blend: 'Blended', season: 'This season' }, arena: { adjusted: 'Adjusted', raw: 'Recorded' } };
+        // Every team pill (and the phone's settings row) shows the team in its colour; a pill names a setting only when
+        // it is off its usual value, so a pill reading just "CAR" means the usual numbers. The phone row names both.
+        const paint = () => {
+          const team = root.dataset.team || '';
+          const off = ['mode', 'arena'].filter((k) => (root.dataset[k] ?? defaults[k]) !== defaults[k]).map((k) => words[k][root.dataset[k]]);
+          document.querySelectorAll('.tpill, .setrow').forEach((p) => {
+            p.classList.toggle('no-team', !team);
+            p.style.setProperty('--team', team && info[team] ? info[team].c : 'transparent');
+            p.querySelector('.tp-ab').textContent = team || 'Your team';
+            const chg = p.querySelector('.tp-chg');
+            if (chg) { chg.textContent = off.join(' · '); chg.hidden = !off.length; }
+            p.querySelectorAll('[data-show]').forEach((b) => (b.textContent = words[b.dataset.show][root.dataset[b.dataset.show] ?? defaults[b.dataset.show]]));
+            p.setAttribute('aria-label', `Your team and settings: ${team ? info[team]?.n ?? team : 'no team picked'}, ${words.mode[root.dataset.mode ?? defaults.mode]}, ${words.arena[root.dataset.arena ?? defaults.arena]}`);
+          });
+        };
         const apply = (k, v) => {
           root.dataset[k] = v;
           document.querySelectorAll(`[data-pref="${k}"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === v)));
           if (k === 'spell') window.lcSpell.set(v);
-          if (k === 'team') document.getElementById('team-pick').value = v;
           if (k === 'team') {
+            document.getElementById('team-pick').value = v;
             ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
-            if (v) document.getElementById('my-team-link').textContent = v;
+            if (v) document.getElementById('my-team-link').textContent = `${info[v]?.n ?? v} page →`;
           }
+          if (k !== 'spell') paint();
         };
         const set = (k, v) => {
           try { localStorage.setItem('lc-' + k, v); } catch {}
@@ -252,20 +290,69 @@ const teamList = teams as { abbr: string; name: string }[];
         Object.keys(defaults).forEach((k) => apply(k, read(k)));
         document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
         document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
+
+        // Pop-up panels: the settings menu (from any team pill or the phone's settings row) and the page list (from the
+        // three-line icon). On computers each opens under the button that opened it and follows it while scrolling;
+        // on phones the settings menu is a sheet just above the tab bar.
+        const phone = matchMedia('(max-width: 719px)');
+        const prefs = document.getElementById('prefs'), scrim = document.getElementById('prefs-scrim'), nav = document.getElementById('navmenu');
         const more = document.getElementById('more'), moreBtn = document.getElementById('more-toggle');
-        const setMore = (open) => { more.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
-        moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(more.hidden); });
+        let open = null; // { panel, opener }
+        const place = () => {
+          if (!open) return;
+          const { panel, opener } = open;
+          if (panel === prefs && phone.matches) { panel.style.left = panel.style.top = ''; return; }
+          const r = opener.getBoundingClientRect();
+          if (r.bottom < 0 || r.top > innerHeight || (!r.width && !r.height)) return close();
+          const w = panel.offsetWidth;
+          const right = panel === nav || r.left + r.width / 2 > innerWidth / 2;
+          const left = Math.max(8, Math.min(innerWidth - w - 8, right ? r.right - w + 6 : r.left - 16));
+          panel.style.left = left + 'px';
+          panel.style.top = r.bottom + 10 + 'px';
+          panel.style.setProperty('--ax', Math.round(r.left + r.width / 2 - left) + 'px');
+        };
+        const close = () => {
+          if (!open) return;
+          const { panel, opener } = open;
+          panel.hidden = true;
+          scrim.hidden = true;
+          root.classList.remove('sheet-open');
+          document.querySelectorAll('[aria-controls="' + panel.id + '"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+          open = null;
+          if (panel.contains(document.activeElement)) opener.focus();
+        };
+        const show = (panel, opener) => {
+          const again = open && open.panel === panel && open.opener === opener;
+          close();
+          setMore(false);
+          if (again) return;
+          open = { panel, opener };
+          panel.hidden = false;
+          opener.setAttribute('aria-expanded', 'true');
+          if (panel === prefs && phone.matches) { scrim.hidden = false; root.classList.add('sheet-open'); }
+          place();
+        };
+        document.querySelectorAll('[data-prefs-open]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); show(prefs, b); }));
+        document.querySelectorAll('[data-nav-open]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); show(nav, b); }));
+        document.querySelectorAll('[data-prefs-close]').forEach((b) => b.addEventListener('click', close));
+        scrim.addEventListener('click', close);
+        document.addEventListener('click', (e) => { if (open && !open.panel.contains(e.target)) close(); });
+        addEventListener('scroll', () => { if (open) requestAnimationFrame(place); }, { passive: true });
+        addEventListener('resize', () => { if (open) place(); });
+        phone.addEventListener?.('change', close);
+
+        const setMore = (on) => { more.hidden = !on; moreBtn.setAttribute('aria-expanded', String(on)); };
+        moreBtn.addEventListener('click', (e) => { e.stopPropagation(); const on = more.hidden; close(); setMore(on); });
         document.addEventListener('click', (e) => { if (!more.hidden && !more.contains(e.target)) setMore(false); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
-        // Once the settings strip has scrolled away, the two switches stay at the top of the screen (beside the pinned
-        // section menu, or on their own in .prefs-pin).
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setMore(false); close(); } });
+        // Once the top menu has scrolled away, the team pill and page-list icon ride at the right of the pinned section
+        // menu, or on their own in .navpin on pages without one.
         const head = document.querySelector('.site-head');
         if (head && 'IntersectionObserver' in window) new IntersectionObserver(([e]) => root.classList.toggle('prefs-away', !e.isIntersecting)).observe(head);
-        const toggle = document.getElementById('prefs-toggle');
-        toggle.addEventListener('click', () => {
-          const open = document.getElementById('prefs').classList.toggle('open');
-          toggle.setAttribute('aria-expanded', String(open));
-        });
+        // The phone's bottom dock (settings row and tab bar): its height keeps the page, the More list and the
+        // settings sheet clear of it.
+        const dock = document.querySelector('.dock');
+        if (dock && 'ResizeObserver' in window) new ResizeObserver(() => root.style.setProperty('--dock-h', dock.offsetHeight + 'px')).observe(dock);
       })();
     </script>
     <script is:inline>
@@ -485,47 +572,91 @@ const teamList = teams as { abbr: string; name: string }[];
   .site-nav a[aria-current='page'] { border-bottom-color: var(--ink); }
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
-  .site-nav .my-team { border: 1px solid var(--ink); border-radius: 999px; padding: 3px 11px; }
-  /* The team pill fills in on hover (like the Preview buttons) instead of picking up the tabs' underline colour on its bottom edge. */
-  .site-nav .my-team:hover { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
-  .tabbar, .more { display: none; }
+  .tabbar, .more, .dock { display: none; }
   @media (max-width: 719px) {
     .site-nav { display: none; }
-    body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-    .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--sheet); border-top: 1px solid var(--rule); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+    body { padding-bottom: var(--dock-h, calc(102px + env(safe-area-inset-bottom))); }
+    .dock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
+    .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--sheet); border-top: 1px solid var(--rule); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
     .tabbar a, .tabbar button { display: grid; justify-items: center; gap: 3px; font: 600 11px var(--ui); color: var(--ink-3); text-decoration: none; background: none; border: 0; padding: 4px 0; cursor: pointer; }
     .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
     .tabbar [aria-current='page'], .tabbar button[aria-expanded='true'] { color: var(--ink); }
     .tabbar [aria-current='page'] svg { stroke-width: 2.4; }
-    .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
+    .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(var(--dock-h, calc(102px + env(safe-area-inset-bottom))) + 8px); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
     .more a, .more .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
     .more a:hover { background: var(--track); }
     .more .soon { color: var(--ink-3); font-weight: 500; }
     .more em { font-style: normal; font-size: 12px; margin-left: 6px; }
   }
-  .prefs { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; padding: 10px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; font: 400 13px var(--ui); color: var(--ink-2); }
-  .prefs-toggle { display: none; justify-self: start; font: 600 13px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
-  .prefs-toggle::after { content: ' ▾'; }
-  .prefs-toggle[aria-expanded='true']::after { content: ' ▴'; }
-  @media (max-width: 719px) {
-    .prefs-toggle { display: inline-block; }
-    .prefs:not(.open) { display: none; }
+  /* Team pill (SiteTools.astro): the team in its colour, any setting off its usual value, a chevron. It opens the
+     settings menu. Beside it, once the top menu has scrolled away, a quiet three-line icon opens the page list. */
+  .tools { display: inline-flex; align-items: center; gap: 6px; }
+  .tpill { display: inline-flex; align-items: center; gap: 7px; font: 600 14px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 3px 10px 3px 9px; cursor: pointer; white-space: nowrap; transition: background-color 0.15s, color 0.15s; }
+  .tpill:hover, .tpill[aria-expanded='true'] { background: var(--ink); color: var(--sheet); }
+  .tpill.no-team { border-style: dashed; }
+  .tp-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--team, transparent); flex: none; }
+  .no-team .tp-dot { display: none; }
+  .tp-chg { font-weight: 500; color: var(--ink-2); }
+  .tp-chg::before { content: '·'; margin-right: 7px; color: var(--ink-3); }
+  .tpill:is(:hover, [aria-expanded='true']) .tp-chg, .tpill:is(:hover, [aria-expanded='true']) .tp-chg::before { color: inherit; opacity: 0.8; }
+  .tp-chev { width: 10px; height: 7px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: rotate 0.15s; }
+  .tpill[aria-expanded='true'] .tp-chev { rotate: 180deg; }
+  .tmenu { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); cursor: pointer; transition: color 0.15s, background-color 0.15s; }
+  .tmenu svg { width: 15px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+  .tmenu:hover { color: var(--ink); }
+  .tmenu[aria-expanded='true'] { color: var(--ink); background: var(--track); }
+  /* Pages without a pinned section menu: pill and icon float at the top right once the top menu has scrolled away. */
+  .navpin { position: fixed; z-index: 30; top: 0; right: 0; padding: 10px 16px; visibility: hidden; opacity: 0; transition: opacity 0.2s, visibility 0s 0.2s; pointer-events: none; }
+  .navpin .tools { background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: 999px; padding: 4px; }
+  html.prefs-away:not(:has(.secnav-pin)) .navpin { visibility: visible; opacity: 1; transition: opacity 0.2s; pointer-events: auto; }
+  /* The settings menu and the page list: cards that open under their button (Base's script places them), with a
+     small pointer at --ax. */
+  .prefs, .navmenu { position: fixed; z-index: 45; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; box-shadow: 0 10px 30px rgba(15, 28, 43, 0.16); font-family: var(--ui); }
+  .prefs:not([hidden]) { display: grid; gap: 14px; width: min(340px, calc(100vw - 16px)); padding: 16px; }
+  .prefs::before, .navmenu::before { content: ''; position: absolute; top: -7px; left: calc(var(--ax, 40px) - 6px); width: 12px; height: 12px; background: var(--sheet); border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); rotate: 45deg; }
+  .prefs-top { display: none; }
+  .set { display: grid; gap: 6px; }
+  .set-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .set-link { text-transform: none; letter-spacing: 0; font: 600 13px var(--ui); color: var(--ink); border-radius: 5px; }
+  .set-link:hover { background: var(--track); box-shadow: 0 0 0 3px var(--track); }
+  .set select { font: 600 15px var(--ui); color: var(--ink); background-color: var(--sheet); border: 1px solid var(--ink); border-radius: 10px; padding: 8px 12px; width: 100%; cursor: pointer; }
+  .mode.seg { display: grid; grid-template-columns: 1fr 1fr; }
+  .mode.seg button { font-size: 14px; padding: 6px 10px; }
+  .set-why { font: 400 12.5px/1.4 var(--ui); color: var(--ink-3); }
+  .set-foot { font: 400 12px var(--ui); color: var(--ink-3); }
+  .prefs hr, .navmenu hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+  .navmenu:not([hidden]) { display: grid; width: 230px; padding: 8px; font: 600 15px var(--ui); }
+  .navmenu a, .navmenu .soon { padding: 9px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .navmenu a:hover { background: var(--track); }
+  .navmenu a[aria-current='page'] { background: var(--track); }
+  .navmenu .soon { color: var(--ink-3); font-weight: 500; }
+  .navmenu em { font-style: normal; font-size: 12px; }
+  .navmenu hr { margin: 6px 4px; }
+  .navmenu .minor { font-weight: 500; color: var(--ink-2); }
+  .prefs-scrim { position: fixed; inset: 0; z-index: 39; background: rgba(15, 25, 38, 0.35); }
+  @media (prefers-color-scheme: dark) {
+    .prefs, .navmenu { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+    .prefs-scrim { background: rgba(0, 0, 0, 0.5); }
   }
-  .mode.sm { padding: 1px; }
-  .mode.sm button { font-size: 12px; padding: 3px 9px; }
-  .pswitch { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  /* Pinned switches on pages without a pinned section menu: top right on wide screens, a slim bar on phones. */
-  .prefs-pin { position: fixed; z-index: 30; top: 0; right: 0; padding: 8px 16px; visibility: hidden; opacity: 0; transition: opacity 0.2s, visibility 0s 0.2s; pointer-events: none; }
-  html.prefs-away:not(:has(.secnav-pills.pinned)) .prefs-pin { visibility: visible; opacity: 1; transition: opacity 0.2s; pointer-events: auto; }
-  .prefs-pin .pswitch { background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-radius: 999px; padding: 4px; }
+  /* Phones: a slim settings row sits on top of the tab bar and always names the team and both settings; tapping it
+     slides the settings menu up as a sheet just above the tab bar. */
+  .setrow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 16px; font: 600 14px var(--ui); color: var(--ink); text-align: left; cursor: pointer; border: 0; border-top: 1px solid var(--rule); background: color-mix(in oklab, var(--sheet) 92%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .setrow .sr-st { font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .setrow .sr-st b { font-weight: 600; color: var(--ink); }
+  .setrow .sr-go { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--ui); color: var(--ink-2); flex: none; }
+  .setrow .sr-go svg { width: 11px; height: 7px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .setrow[aria-expanded='true'] .sr-go svg { rotate: 180deg; }
   @media (max-width: 719px) {
-    .prefs-pin { left: 0; padding: 0; padding-top: env(safe-area-inset-top, 0px); }
-    .prefs-pin .pswitch { justify-content: center; border-radius: 0; padding: 7px 16px; border-bottom: 1px solid var(--rule); }
-    html.prefs-away:has(.secnav-bar.secnav-bar) .prefs-pin { visibility: hidden; opacity: 0; pointer-events: none; }
+    .navpin { display: none; }
+    .prefs:not([hidden]) { left: 0; right: 0; top: auto; width: auto; bottom: var(--dock-h, calc(102px + env(safe-area-inset-bottom))); border: 0; border-radius: 20px 20px 0 0; padding: 14px 16px 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); max-height: calc(100dvh - var(--dock-h, 102px) - 40px); overflow-y: auto; }
+    html.motion .prefs:not([hidden]) { animation: sheet-up 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .prefs::before { display: none; }
+    .prefs-top { display: flex; align-items: baseline; justify-content: space-between; }
+    .prefs-top b { font: 600 20px var(--display); font-variation-settings: 'SOFT' 100; }
+    .prefs-done { font: 600 14px var(--ui); color: var(--ink-2); background: none; border: 0; padding: 4px 0 4px 12px; cursor: pointer; }
+    .navmenu { display: none !important; }
   }
-  .pref { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .pref > span { font-weight: 600; }
-  .prefs select { font: 600 13px var(--ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--ink); border-radius: 999px; padding: 6px 10px; max-width: 100%; }
+  @keyframes sheet-up { from { translate: 0 24px; opacity: 0; } }
   .mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--sheet); }
   .mode button { font: 600 13px var(--ui); color: var(--ink); background: none; border: 0; border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .mode button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }

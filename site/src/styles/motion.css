@@ -1,12 +1,12 @@
 /* Gentle motion, for fun. Everything here is decoration: with reduced motion asked for, without
    JavaScript, or in automated browsers the page looks exactly as it would without this file. */
 
-/* Page changes: a soft cross-fade between pages, with the header and phone tab bar held still.
+/* Page changes: a soft cross-fade between pages, with the header and phone tab bar (with its settings row) held still.
    Browsers without cross-document view transitions simply load the next page as before. */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition { navigation: auto; }
   .site-head { view-transition-name: site-head; }
-  .tabbar { view-transition-name: tabbar; }
+  .dock { view-transition-name: dock; }
   ::view-transition-old(root) { animation: 160ms ease-in both lc-fade-out; }
   ::view-transition-new(root) { animation: 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both lc-rise-in; }
 }
