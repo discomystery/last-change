@@ -1,0 +1,41 @@
+---
+// The team page's goalie share card: the same goalie card as his own page (lib/goalieShare.ts), for whichever goalie
+// the Goalies section's menu shows.
+import { goalieCard } from '../lib/goalieShare';
+import teamsData from '../../public/data/teams.json';
+import goalieData from '../../public/data/goalies.json';
+import index from '../../public/data/players/index.json';
+import type { GoalieCardData } from '../lib/shareCard';
+
+interface Props { abbr: string }
+const { abbr } = Astro.props;
+const team = teamsData.find((t) => t.abbr === abbr);
+const P = new Map((index as { id: number; name: string; number?: number | null }[]).map((p) => [p.id, p]));
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }).format(new Date(goalieData.generated_at));
+const list = ((goalieData.teams as unknown as Record<string, { id: number; name: string; blend: any }[]>)[abbr] ?? []);
+const cards: Record<string, GoalieCardData> = {};
+for (const g of list) {
+  const who = P.get(g.id);
+  const number = who?.number ?? null;
+  const d = goalieCard({ name: who?.name ?? g.name, number, sub: [number != null ? `#${number}` : null, 'Goalie', team?.name ?? abbr].filter(Boolean).join(' · '), team: abbr, goalie: g, asOf });
+  if (d) cards[g.id] = d;
+}
+---
+<script type="application/json" id="share-goalies" set:html={JSON.stringify(cards).replace(/</g, '\\u003c')} />
+<script>
+  import type { GoalieCardData } from '../lib/shareCard';
+  import { openShare, onShare, slug } from '../lib/shareSheet';
+  const cards = JSON.parse(document.getElementById('share-goalies')!.textContent!) as Record<string, GoalieCardData>;
+  const pick = document.getElementById('g-pick') as HTMLSelectElement | null;
+  const btn = document.querySelector<HTMLElement>('.share-btn[data-share="goalie"]');
+  // Only goalies with a start this season and last have a card; the link hides for the others.
+  const sync = () => { if (btn && pick) btn.hidden = !cards[pick.value]; };
+  pick?.addEventListener('change', sync);
+  sync();
+  onShare('goalie', () => {
+    const d = pick && cards[pick.value];
+    if (!d) return;
+    openShare({ title: `Share ${d.name}`, file: `spare-line-change-${slug(d.name)}.png`, key: `goalie:${pick!.value}`,
+      make: async (t) => { const lib = await import('../lib/shareCard'); return lib.render(lib.goalieCard(d, t)); } });
+  });
+</script>

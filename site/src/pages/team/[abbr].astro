@@ -39,6 +39,8 @@ import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
 import SeasonMap from '../../components/SeasonMap.astro';
 import ShareTeam from '../../components/ShareTeam.astro';
+import ShareGoalies from '../../components/ShareGoalies.astro';
+import ShareButton from '../../components/ShareButton.astro';
 import { trendFor } from '../../lib/trend';
 
 export function getStaticPaths() {
@@ -389,6 +391,7 @@ const coachSince = coach && (team as any).coach_since
       <>
         <div class="pick"><span>Show</span>
           <select id="g-pick" aria-label="Goalie">{goalies.map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
+          <ShareButton kind="goalie" label="Share this goalie" class="gshare" />
         </div>
         {goalies.map((g, gi) => (
           <div data-g={g.id} hidden={gi !== 0}>
@@ -507,6 +510,7 @@ const coachSince = coach && (team as any).coach_since
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>
   <script type="application/json" id="team-recaps" set:html={JSON.stringify(recapIds)}></script>
   <ShareTeam abbr={abbr!} />
+  <ShareGoalies abbr={abbr!} />
 </Base>
 
 <script is:inline>
@@ -602,6 +606,7 @@ const coachSince = coach && (team as any).coach_since
 </script>
 
 <style>
+  .pick :global(.gshare) { margin-left: auto; }
   /* Name card: the team's name and record, with the plain-English intro (Intro.astro) as the card's second half. */
   .tcard { position: relative; overflow: hidden; isolation: isolate; margin-top: 4px; padding: 26px 28px 22px; }
   .tcard.joined { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
