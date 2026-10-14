@@ -33,11 +33,13 @@
 .sc-ab { font-weight: 750; font-size: 72px; line-height: 1; }
 .sc-n { font-family: 'Fraunces', serif; font-weight: 600; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; font-size: 150px; line-height: 1; }
 .sc-midw { font-size: 24px; letter-spacing: 0.07em; color: var(--ink3); font-weight: 650; }
-.sc-run { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 44px; align-items: center; margin-top: 26px; padding: 28px 0; border-top: 2px solid var(--rule); border-bottom: 2px solid var(--rule); }
+.sc-run { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 44px; align-items: center; margin-top: 24px; padding: 24px 0; border-top: 2px solid var(--rule); border-bottom: 2px solid var(--rule); }
 .sc-dots { display: grid; grid-template-columns: repeat(10, 16px); gap: 6px; }
 .sc-dots i { width: 16px; height: 16px; border-radius: 50%; display: block; }
-.sc-rpc { margin-top: 18px; font: 400 30px/1.35 'Literata', serif; color: var(--ink2); }
-.sc-rpc b { font-weight: 700; }
+.sc-rpc { display: flex; gap: 30px; align-items: baseline; margin-top: 16px; font: 600 25px 'Hanken Grotesk'; color: var(--ink2); white-space: nowrap; }
+.sc-rpc b { font: 600 60px/1 'Fraunces'; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; margin-right: 10px; }
+.sc-say { margin-top: 16px; font: 400 21px/1.4 'Literata', serif; color: var(--ink2); }
+.sc-say b { font-weight: 700; }
 .sc-lede { font-size: 30px; line-height: 1.45; color: var(--ink2); margin-top: 26px; }
 .sc-call { padding: 18px 0; border-top: 2px solid var(--rule); }
 .sc-call:first-child { border-top: 0; }
