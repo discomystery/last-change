@@ -47,7 +47,8 @@ if (!isG && p.traits && p.stats?.season) {
   skater = {
     id: p.id, name: p.name, last, number: p.number, sub: sub([p.age ? String(p.age) : null]), place, own, asOf,
     stats: [[st.gp, 'GP'], [st.g, 'G'], [st.a, 'A'], [st.p, 'P'], [clock(st.toi), 'TOI']],
-    chips: duties.map((j) => j.label),
+    // The card's heading already says what they count on him for, so the chips drop the "at 5-on-5" tail to fit one row.
+    chips: duties.map((j) => j.label.replace(/ at 5-on-5$/, '')),
     modes: Object.fromEntries(modes.map((m) => [m, { lanes: lanes(m), tiles: tiles(m) }])) as PlayerCardData['modes'],
   };
 }
