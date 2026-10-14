@@ -23,7 +23,7 @@ const TIPS: [string, string][] = [
 ];
 const pattern = new RegExp(`(${TIPS.map(([t]) => t).join('|')})`, 'i');
 const parts = (text: string) => text.split(pattern).map((p) => ({ p, tip: TIPS.find(([t]) => t.toLowerCase() === p.toLowerCase())?.[1] }));
-const label = { held: 'Held up', partly: 'Partly', missed: 'Didn’t happen', na: 'Can’t judge', pending: 'Still coming in' } as const;
+const label = { held: 'Called it', partly: 'Close', missed: 'Missed', na: 'Can’t judge', pending: 'Still coming in' } as const;
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–', pending: '…' } as const;
 const v = c.verdict ?? 'na';
 const L = c.lane;

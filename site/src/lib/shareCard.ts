@@ -29,7 +29,7 @@ const signed = (v: number) => { const r = Math.round(v * 10) / 10; return r > 0 
 const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
 const pillWord: Record<string, string> = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' };
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
-const verdictPill = { held: '✓ Held up', partly: '≈ Partly', missed: '✕ Didn’t happen' } as const;
+const verdictPill = { held: '✓ Called it', partly: '≈ Close', missed: '✕ Missed' } as const;
 const group = (pos: string) => (pos === 'D' ? 'defensemen’s' : pos === 'G' ? 'goalies’' : 'forwards’');
 // "How each Hurricane swung the game", or "each Lightning player" where the nickname has no singular.
 const one = (nick: string) => (/[^s]s$/.test(nick) && nick !== 'Blues' ? nick.slice(0, -1) : `${nick} player`);
@@ -85,7 +85,7 @@ export function gameCard(g: GameData, theme: Theme) {
 <div class="sc-say">${replaySay(g, col)}</div></div></div>` : '';
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
-  const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said: ${esc(c.said)}</div>
+  const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said ${esc(c.said)}</div>
 <div class="sc-h${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
   const lede = !g.calls.length && g.lede ? `<div class="sc-serif sc-lede" data-opt="4">${esc(g.lede)}</div>` : '';
   const best = g.best ? `<div class="sc-watch" data-opt="1"><span class="sc-tag">Best night</span>${esc(g.best)}</div>` : '';

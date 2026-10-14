@@ -12,7 +12,7 @@ from pipeline.export import previews
 
 LEVEL = {  # level calls (a strength meeting a soft spot): metric -> verdict -> (title, plain sentence)
     "volume": {"held": (["{Xc} piled up the shots", "{Xc} kept the shots coming", "Shots, as promised"], "{X} got to their usual volume of shots, as the call said."),
-               "partly": ("More than most, short of their usual", "{X} outshot an average team’s pace, but not their own usual."),
+               "partly": ("More shots than most teams, but not {Xp} usual", "{X} outshot an average team’s pace, but not their own usual."),
                "missed": ("{Xc} never got the shots going", "{X} took fewer shots than an average NHL team would have.")},
     "quality": {"held": ("{Xc} got their looks", "{Xp} shots were at least as dangerous as usual."),
                 "partly": ("Decent looks, not their best", "{Xp} shots were more dangerous than an average team’s, but not up to their usual."),
@@ -25,16 +25,32 @@ LEVEL = {  # level calls (a strength meeting a soft spot): metric -> verdict -> 
            "missed": (["{Yp} kill won that one", "{Yp} kill stood tall", "{Xp} power play went quiet"], "{Xp} power play created less than an average one would have.")},
 }
 DUEL = {  # lean -> verdict -> (title, plain)
-    "offense": {"held": (["{Xc} got theirs", "The attack won out", "{Xc} got through anyway"], "{X} beat the league average on {oname}, even against {Y}."),
-                "missed": (["{Yc} held the line", "The defense won out", "{Yc} won the standoff"], "{Y} kept {X} under the league average on {oname}.")},
+    "offense": {"held": (["{Xc} got theirs", "{Xc} got through anyway"], "{X} beat the league average on {oname}, even against {Y}."),
+                "missed": (["{Yc} held the line", "{Yc} won the standoff"], "{Y} kept {X} under the league average on {oname}.")},
     "defense": {"held": ("{Yc} held the line", "{Y} kept {X} under the league average on {oname}, as we leaned."),
                 "missed": ("{Xc} broke through", "{X} beat the league average on {oname} anyway.")},
 }
 CHANGED = {"held": ("Still the new {Xn}", "On {name}, {X} looked like this season’s team, not the old one."),
            "missed": ("Back to the old {Xn}", "On {name}, {X} looked more like the team from last season.")}
-EDGE = {"held": (["{topc} had the edge", "{topc} won that battle", "{topc} pulled away", "{topc} came out on top"], "{top} came out clearly ahead on {name}, as the gap between these two suggested."),
-        "partly": (["{topc} edged it, barely", "Closer than the gap said", "{topc} by a nose"], "{top} came out ahead on {name}, but by less than the usual gap between these two."),
-        "missed": (["{botc} flipped it", "{botc} turned it around", "{botc} bucked the trend", "{botc} won that one instead"], "{bot} came out ahead on {name}, against the run of the season.")}
+EDGE = {"held": "{top} came out clearly ahead on {name}, as the gap between these two suggested.",
+        "partly": "{top} came out ahead on {name}, but by less than the usual gap between these two.",
+        "missed": "{bot} came out ahead on {name}, against the run of the season."}
+# Edge titles name what was won (Sora, 2026-10-14: "Boston won that one instead" didn't say what "that one" was):
+# trait -> (held, partly, missed), the team at the better end coming in as {top}, the other as {bot}.
+EDGE_TITLES = {
+    "volume": ("{topc} won the shot battle", "{topc} won the shot battle, barely", "{botc} won the shot battle instead"),
+    "suppression": ("{topc} kept the shots down better", "{topc} allowed fewer shots, barely", "{botc} allowed fewer shots instead"),
+    "quality": ("{topc} got the better looks", "{topc} got the better looks, barely", "{botc} got the better looks instead"),
+    "qualityAllowed": ("{topc} allowed fewer dangerous shots", "{topc} allowed fewer dangerous shots, barely", "{botc} allowed fewer dangerous shots instead"),
+    "point": ("{topc} leaned on point shots", "{topc} leaned on point shots, barely", "{botc} leaned on point shots more instead"),
+    "dShots": ("{topp} defensemen did more of the shooting", "{topp} defensemen shot more, but only just", "{botp} defensemen did more of the shooting instead"),
+    "inClose": ("{topc} got in closer", "{topc} got in closer, barely", "{botc} got in closer instead"),
+    "forecheck": ("{topc} won the forecheck", "{topc} won the forecheck, barely", "{botc} won the forecheck instead"),
+    "physical": ("{topc} won the hitting battle", "{topc} outhit them, barely", "{botc} won the hitting battle instead"),
+    "depth": ("{topc} spread the minutes deeper", "{topc} spread the minutes deeper, barely", "{botc} spread the minutes deeper instead"),
+    "pp": ("{topcp} power play made more chances", "{topcp} power play made more chances, barely", "{botcp} power play made more chances instead"),
+    "pk": ("{topcp} kill gave up less", "{topcp} kill gave up less, barely", "{botcp} kill gave up less instead"),
+}
 PACE = {"above": {"held": ("A track meet, as billed", "The game ran faster than either team usually plays."),
                   "partly": ("Quick, but no track meet", "The game moved faster than an average NHL game, just not as fast as {bar} usually plays."),
                   "missed": ("It never took off", "The game ran slower than an average NHL game.")},
@@ -44,19 +60,94 @@ PACE = {"above": {"held": ("A track meet, as billed", "The game ran faster than 
 PHYSICAL = {"held": ("Bodies flew", "The two teams hit at least as much as they usually do."),
             "partly": ("Physical, not punishing", "There was more hitting than in an average game, but less than these two usually bring."),
             "missed": ("Quieter than billed", "There was less hitting than in an average NHL game.")}
-MATCHUP = {"held": ("The matchup happened", "{Hc} sent {group} out against {Op} {line} as often as they usually do at home."),
-           "partly": ("Some of the matchup", "{Hc} sent {group} out against {Op} {line} more than they would with no line matching, but less than usual."),
-           "missed": ("No sign of the matchup", "{Hc} sent {group} out against {Op} {line} less than they would with no line matching.")}
+MATCHUP = {"held": ("{coach} got {his} matchup", "{Hc} sent {group} out against {Op} {line} as often as they usually do at home."),
+           "partly": ("{group} saw {Op} {line} some of the time", "{Hc} sent {group} out against {Op} {line} more than they would with no line matching, but less than usual."),
+           "missed": ("{group} barely saw {Op} {line}", "{Hc} sent {group} out against {Op} {line} less than they would with no line matching.")}
 HISTORY = {"held": ("The usual {G}", "{G} played like his usual self, not like his record against {O}. Just a coincidence, as we said."),
-           "missed": ("The record held up again", "{Gp} night looked more like his record against {O} than his usual. Three seasons of evidence say it’s still a coincidence.")}
+           "missed": ("{G} struggled against {O} again", "{Gp} night looked more like his record against {O} than his usual. Three seasons of evidence say it’s still a coincidence.")}
 REST = {"held": (["Fresh legs told", "The rested team showed it", "Tired legs showed"], "{R} got a bigger share of the chances than they usually do, against a tired {Tn} team."),
         "missed": ("{Tc} shrugged it off", "{T} held their own despite playing last night.")}
+# "We said ...": the prediction in a fan's words, for wherever a graded call is shown in one line (share cards, Track
+# record), so the grade beside it can't read as contradicting a headline that was only the call's stakes ("The
+# Capitals can't afford to take penalties"). Sora, 2026-10-14. Lowercase start: it follows "We said".
+SAID_CLASH = {
+    "pp": "{Xp} power play would get its usual chances against {Yp} shaky kill",
+    "quality": "{X} would get their usual good looks against a {Yn} team that gives them up",
+    "volume": "{X} would fire away at a {Yn} team that gives up shots",
+    "turnover": "{X} would feed on {Yp} turnovers",
+}
+DUEL_SIDES = {"volume": ("shooters", "defense"), "quality": ("shooters", "defense"), "pp": ("power play", "kill")}  # attack, defense
+SAID_EDGE = {
+    "volume": "{top} would outshoot {bot}", "suppression": "{top} would allow fewer shots than {bot}",
+    "quality": "{top} would get better looks than {bot}", "qualityAllowed": "{top} would allow fewer dangerous shots than {bot}",
+    "point": "{top} would lean on point shots more than {bot}", "dShots": "{topp} defensemen would do more of the shooting than {botp}",
+    "inClose": "{top} would get more of their shots from in close than {bot}", "forecheck": "{top} would forecheck harder than {bot}",
+    "physical": "{top} would outhit {bot}", "depth": "{top} would spread their ice time deeper than {bot}",
+    "pp": "{topp} power play would make more chances than {botp}", "pk": "{topp} penalty kill would give up less than {botp}",
+}
 LINE = {"L1": "first line", "L2": "second line", "L3": "third line", "L4": "fourth line"}
 
 # Each trait's scale ends, worse (or lower) on the left; `flip` puts lower figures on the right where lower is better.
 ENDS = {**{k: (v[1].capitalize(), v[2].capitalize()) for k, v in previews.EDGE.items()},
         "turnover": ("Patient", "Opportunist"), "pace": ("Slog", "Track meet"), "physical": ("Finesse", "Bruising")}
 LOWER_BETTER = {"suppression", "qualityAllowed", "pk"}
+
+
+def _coach(S, gid: int, team: str) -> str | None:
+    """Last name of tonight's head coach for `team`, or None when nothing is saved."""
+    try:
+        from pipeline.ingest import coaches
+        c = coaches.for_game(S.season, gid, team, S.games[gid]["date"])
+    except Exception:
+        return None
+    return c["coach"] if c else None
+
+
+def said(S, gid: int, claim: dict, places: dict) -> str | None:
+    """The prediction behind a call, in plain words, without numbers ("the Hurricanes’ power play would get its usual
+    chances against the Capitals’ shaky kill"). None for a kind with no wording."""
+    kind, m, chk = claim["kind"], claim.get("metric"), claim.get("check") or {}
+    w = _words(claim, places)
+    if kind == "clash" and m in SAID_CLASH and "Y" in w:
+        return SAID_CLASH[m].format(**w)
+    if kind == "duel" and m in DUEL_SIDES and "Y" in w:
+        att, dfn = DUEL_SIDES[m]
+        lean = claim.get("lean") or ("offense" if chk.get("direction") == "above" else "defense")
+        a, d = f"{w['Xp']} {att}", f"{w['Yp']} {dfn}"
+        return f"{a} would win the standoff with {d}" if lean == "offense" else f"{d} would win the standoff with {a}"
+    if kind in ("edge", "contrast") and chk.get("team") and chk.get("opp"):
+        k = chk.get("metric", m)
+        tw = previews.team_words(chk["team"], places, "top") | previews.team_words(chk["opp"], places, "bot")
+        if k in SAID_EDGE:
+            return SAID_EDGE[k].format(**tw)
+        name = previews.EDGE.get(k, (k,))[0]
+        return f"{tw['top']} would come out ahead of {tw['bot']} on {name}"
+    if kind == "changed" and "X" in w:
+        name = previews.CHANGED.get(m, (m,))[0]
+        return f"{w['X']} would look like this season’s team on {name}, not last season’s"
+    if kind == "pace":
+        return ("this one would be a track meet, faster than either team usually plays" if chk.get("direction") == "above"
+                else "this one would be a grind, slower than either team usually plays")
+    if kind == "physical":
+        return "bodies would fly, with both teams hitting as much as they usually do"
+    if kind == "matchup":
+        H = previews.team_words(claim["team"], places, "H")
+        O = previews.team_words(claim["opp"], places, "O")
+        coach = _coach(S, gid, claim["team"])
+        who = coach or H["H"]
+        group = previews._and([S.name.get(i, "?").split(" ", 1)[-1] for i in chk.get("unit_ids", [])]) or f"their {chk.get('unit', 'line')}"
+        return f"{who} would send {group} out against {O['Op']} {LINE.get(chk.get('opp_line'), 'line')} again"
+    if kind == "history":
+        G = previews._last(S.name.get(chk.get("goalie_id"), "") or "") or "their goalie"
+        O = previews.team_words(claim["opp"], places, "O")
+        if chk.get("record", 0) < chk.get("baseline", 0):
+            return f"{previews._poss(G)} rough record against {O['O']} was a coincidence, and he’d look like himself"
+        return f"{previews._poss(G)} hold on {O['O']} wouldn’t last"
+    if kind == "rest" and claim.get("opp"):
+        R = previews.team_words(claim["team"], places, "R")
+        T = previews.team_words(claim["opp"], places, "T")
+        return f"the rested {R['Rn']} would take advantage of {T['Tp']} tired legs"
+    return None
 
 
 def _fmt(t: str, **w) -> str:
@@ -102,6 +193,17 @@ def lane(team: str | None, ends, center: float, avg_label: tuple, usual: tuple, 
 
 
 def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict:
+    """`_present`, plus `said`: the prediction in plain words, for the "We said" line."""
+    out = _present(S, gid, claim, res, places, fp)
+    try:
+        if (txt := said(S, gid, claim, places)):
+            out["said"] = txt
+    except (KeyError, TypeError, ValueError):  # an old snapshot missing a field: the line falls back to the headline
+        pass
+    return out
+
+
+def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict:
     """Adds `title`, `plain`, `lane` and `saw` to a graded call (and rewrites `happened`, the technical grade, for
     calls quoted as scores). Calls that can't be judged keep their reason as the plain sentence."""
     v = res.pop("_v", None)
@@ -181,7 +283,10 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
         k = chk.get("metric", m)
         name = previews.EDGE.get(k, (k,))[0]
         w["name"] = ("the " + name) if k in ("pp", "pk") else name
-        title, plain = EDGE[verdict]
+        w |= {"topcp": previews._poss(w["topc"]), "botcp": previews._poss(w["botc"])}
+        title = EDGE_TITLES.get(k, ("{topc} came out ahead", "{topc} came out ahead, barely", "{botc} came out ahead instead"))[
+            ("held", "partly", "missed").index(verdict)]
+        plain = EDGE[verdict]
         gap = chk["gap"]
         idx = k in previews.INDEX_TRAITS
         unit = (lambda x: 100 * x / league) if scaled and league else (lambda x: x)
@@ -255,6 +360,8 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
         o = claim["opp"]
         w |= {**previews.team_words(claim["team"], places, "H"), **previews.team_words(o, places, "O")}
         w["line"] = LINE.get(chk.get("opp_line"), "line")
+        coach = _coach(S, gid, claim["team"])
+        w |= {"coach": previews._last(coach) if coach else w["Hc"], "his": "his" if coach else "their"}
         w["group"] = previews._and([S.name.get(i, "?").split(" ", 1)[-1] for i in chk.get("unit_ids", [])]) or f"their {chk.get('unit', 'line')}"
         title, plain = MATCHUP[verdict]
         thr = chk["threshold"]
@@ -266,6 +373,8 @@ def present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dict
         w = {"G": G, "Gp": previews._poss(G), **previews.team_words(claim["opp"], places, "O")}
         title, plain = HISTORY[verdict]
         rec = chk["record"]
+        if verdict == "missed" and rec > base:  # his good record held: he had their number again
+            title = "{G} had {Op} number again"
         fs = lambda x: f"{x:.3f}".lstrip("0")
         out["lane"] = lane(claim["team"], None, base, None, (base, f"Usual {fs(base)}"), (v, f"Tonight {fs(v)}"), ref=(rec, f"Vs {places.get(claim['opp'], claim['opp'])} {fs(rec)}"),
                            tip="His save percentage tonight (the filled dot), his usual (the ring) and his record against this team (the dotted mark). "
@@ -329,7 +438,9 @@ def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: s
             better_top, better_bot = gt < gb, gb < gt
         favoured_top = verdict in ("held", "partly")
         if (favoured_top and better_bot) or (not favoured_top and better_top):
-            title = "{topc} won the chances, {botc} the goals" if favoured_top else "{botc} won the chances, {topc} the goals"
+            unit = "power play" if m == "pp" else "kill"
+            win, lose = ("{topcp}", "{botcp}") if favoured_top else ("{botcp}", "{topcp}")
+            title = f"{win} {unit} won the chances, {lose} won the goals"
             what = "power play" if m == "pp" else "penalty kill"
             won, lost = ("{top}", "{bot}") if favoured_top else ("{bot}", "{top}")
             plain = (f"{won} made the better chances on the {what}, but {lost} came out ahead where it counts." if m == "pp" else
@@ -348,10 +459,11 @@ def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: s
     pp_did_well = verdict in ("held", "partly") if kind == "clash" or lean == "offense" else verdict == "missed"
     T = places.get(pp_team, pp_team)
     if pp_did_well and g == 0 and n:
-        title = "Chances, but no goal"
+        title = "Some chances, no goal" if verdict == "partly" else "The chances came, the goals didn’t"
         plain += f" They didn’t score on it, though: 0 for {n}."
     elif not pp_did_well and g:
-        title = "{Xp} power play scored anyway" if "X" in w else title
+        times = {1: "once", 2: "twice"}.get(g, f"{g} times")
+        title = f"Not much of a power play, but it scored {times}"
         plain += f" {T} still went {g} for {n} on the power play."
     elif n:
         plain += f" {T} went {g} for {n} on the power play."
