@@ -344,7 +344,6 @@ def _named_changes(season: int):
         held = set(av.select("date", "team", "player_id").iter_rows())
     ids = team_ids(season)
     from pipeline.metrics import relevancy
-    stars = relevancy.standouts(season)
     f = TABLES / str(season) / "player_game.parquet"
     dressed = set(pl.read_parquet(f).select("game_id", "team_id", "player_id").iter_rows()) if f.exists() else set()
 
@@ -360,6 +359,7 @@ def _named_changes(season: int):
         # a long time, or never seen with this club) or his usual night is worth little by the ratings ("small").
         # Readers still want to hear he was out.
         shown = {x["id"] for k in res for x in res[k]}
+        stars = relevancy.standouts(season, day)  # the stars as of that morning, not as we know them now
         res["stars"] = [{"id": int(q), "name": names[q], "why": "small" if w["worth"].get(q, NAMED) < NAMED else "priced"} for q in stars
                         if q not in shown and q in names and (day, team, q) in held and (gid, ids.get(team), q) not in dressed][:2]
         return res

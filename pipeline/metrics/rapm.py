@@ -231,11 +231,24 @@ def _run(seasons: list[int], lam: float, weights: dict[int, float] | None) -> pl
 
 @lru_cache(maxsize=8)
 def _chain(through: int) -> dict[int, tuple[float, float, float, float]]:
-    """Each player's (offense, defense column, their sds) after chaining full seasons FIRST_SEASON..through."""
+    """Each player's (offense, defense column, their sds) after chaining full seasons FIRST_SEASON..through. Chains
+    that end in a finished season are kept between runs (report cards, Swing, relevancy and player pages all ask)."""
     if through < FIRST_SEASON or not (TABLES / str(through) / "stints.parquet").exists():
         return {}
+    cache = _cache_path(list(range(FIRST_SEASON, through + 1)), CHAIN_LAMBDA, {"chain": 1})
+    if cache is not None:
+        USED.add(cache.name)
+        if cache.exists():
+            t = pl.read_parquet(cache)
+            return {p: (a, b, c, d) for p, a, b, c, d in t.iter_rows()}
     prior = _chain(through - 1)
-    return {**prior, **_fit_from(stretches(through), prior)}
+    out = {**prior, **_fit_from(stretches(through), prior)}
+    if cache is not None:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        ids = list(out)
+        pl.DataFrame({"player_id": ids, **{k: [out[p][i] for p in ids] for i, k in enumerate(("off", "def", "off_sd", "def_sd"))}},
+                     schema={"player_id": pl.Int64, "off": pl.Float64, "def": pl.Float64, "off_sd": pl.Float64, "def_sd": pl.Float64}).write_parquet(cache)
+    return out
 
 
 def _fit_from(st: pl.DataFrame, prior: dict[int, tuple[float, float, float, float]]) -> dict[int, tuple[float, float, float, float]]:
@@ -249,6 +262,7 @@ def _fit_from(st: pl.DataFrame, prior: dict[int, tuple[float, float, float, floa
     return {p: (float(b[i]), float(b[n + i]), float(sd[i]), float(sd[n + i])) for i, p in enumerate(players)}
 
 
+@lru_cache(maxsize=16)
 def chained(season: int, before: str | None = None) -> pl.DataFrame:
     """Ratings that remember: everything up to the end of last season carried forward, updated with this season's
     5-on-5 play (only games before `before` if given). Same columns as `run`; sec5 is this season's 5v5 seconds."""

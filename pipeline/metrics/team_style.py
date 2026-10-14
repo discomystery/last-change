@@ -5,12 +5,14 @@ by an amount that depends on how repeatable the trait is (measured from split ha
 Goaltending is the exception: it starts from the goalies who have actually played for the team this season,
 each judged on his own last season, because a team's goaltending follows its goalies, not the logo.
 """
+import gzip
+import json
 from functools import lru_cache
 
 import numpy as np
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
+from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, TABLES
 from pipeline.metrics import adjust, rink_bias
 
 # name -> (numerator columns, denominator columns, multiplier, higher is "more/better" for the percentile)
@@ -257,6 +259,14 @@ def _pct(value: float, league: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * below, 1, 99))
 
 
+def _scheduled_clubs(season: int) -> set[int]:
+    path = RAW / str(season) / "schedule.json.gz"
+    if not path.exists():
+        return set()
+    with gzip.open(path, "rt") as f:
+        return {g[k] for g in json.load(f) if g.get("game_type") == 2 for k in ("home_id", "away_id")}
+
+
 def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
     """With `idle`, teams that have not played yet this season are included too: their blended estimate is last
     season pulled toward the league, and their season-only estimate is empty (None). Used for previews rebuilt as of
@@ -266,9 +276,9 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
     now, last = _matrix(per_game(season, w)), _matrix(per_game(season - 1, w))
     if idle:
         # only clubs on this season's schedule: a franchise that changed its NHL id (Utah, 2025-26) would otherwise
-        # count twice and rank someone 33rd of 32
-        sched = TABLES / str(season) / "games.parquet"
-        clubs = set(pl.read_parquet(sched, columns=["home_id", "away_id"]).unpivot()["value"].to_list()) if sched.exists() else set(last)
+        # count twice and rank someone 33rd of 32. The whole schedule, not the games table: a rebuilt preview cuts
+        # that back to games already played, which would leave out every club before its first game.
+        clubs = _scheduled_clubs(season) or set(last)
         now |= {tid: np.empty((0, len(COLS))) for tid in last if tid not in now and tid in clubs}
     league_last = {dim: float(np.nanmean([_values(m)[dim] for m in last.values()])) for dim in DIMS}
     rng = np.random.default_rng(season)
