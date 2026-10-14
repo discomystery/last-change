@@ -1156,6 +1156,18 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         lead_max[home] = max(lead_max[home], d)
         lead_max[away] = max(lead_max[away], -d)
     comeback = lead_max[loser] >= 2
+    # A big lead that nearly got away (Sora, 2026-10-14: Edmonton led Vancouver 8-2 and won 9-7 after the Canucks
+    # scored four straight): the winner led by 3+, then the loser cut it by 3+ goals to within one or two, never level.
+    rally = None
+    margins = [(g["hs"] - g["as"]) * (1 if winner == home else -1) for g in goals]
+    if lead_max[winner] >= 3:
+        top = margins.index(lead_max[winner])
+        low = min(margins[top:])
+        if 1 <= low <= 2 and lead_max[winner] - low >= 3:
+            at = top + margins[top:].index(low)
+            peak, cut = goals[top], goals[at]
+            rally = {"peak": (max(peak["hs"], peak["as"]), min(peak["hs"], peak["as"])), "cut": (max(cut["hs"], cut["as"]), min(cut["hs"], cut["as"])),
+                     "run": at - top, "lgoals": sum(side(g) == loser for g in goals[top + 1:at + 1])}
     gl = {x["team"]: x for x in r.get("goalies", []) if x.get("started")}
     so_pid, so_how = _so_winner(_shootout(gid, season), row["home_id"][0] if winner == home else row["away_id"][0]) if end == "SO" else (None, "")
     keeper_goals = [g for g in goals if g["goalie"]]  # a goalie scoring: a handful a decade, always the lead
@@ -1180,12 +1192,18 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         elif storylines.natural_hat(goals) == pid:  # three in a row, nobody else scoring (Sora's notes, 2026-10-14)
             heads.append((96, f"A natural hat trick for {last(pid)}"))
         else:
-            heads.append((95, pk([f"A hat trick for {last(pid)}{hats}", f"{last(pid)} bags a hat trick", f"Three for {last(pid)}"], "hat")))
+            heads.append((95, pk([f"A hat trick for {last(pid)}{hats}", f"{last(pid)} bags a hat trick", f"{last(pid)} lights the lamp three times"], "hat")))
     wg = gl.get(winner)
     if ls == 0 and wg:
         G_ = last(wg["id"]) or wg["name"].split(" ", 1)[-1]
-        heads.append((92, f"{G_} stands on his head against {L_}" if (wg.get("saves") or 0) >= 35 else
+        heads.append((92, f"{G_} stops all {wg['saves']} to blank {L_}" if (wg.get("saves") or 0) >= 35 else
                       pk([f"{G_} shuts out {L_}", f"{G_} slams the door on {L_}", f"{G_} blanks {L_}"], "so")))
+    elif wg and (wg.get("gsax") or 0) >= 2.5:  # a goalie who carried the win: 2.5+ goals saved above expected
+        G_ = last(wg["id"]) or wg["name"].split(" ", 1)[-1]
+        heads.append((89, pk([f"{G_} stands on his head", f"{G_} stands on his head against {L_}"], "soh")))
+    if rally:
+        Ln_ = W.nick.get(loser, loser)
+        heads.append((86, pk([f"{W_} hold off a {Ln_} charge", f"{W_} survive a {Ln_} rally", f"{W_} hang on against {L_}"], "rally")))
     if share is not None and share <= 0.35 and ws - ls <= 2:
         thief = wg["name"].split(" ", 1)[-1] if wg and (wg.get("gsax") or 0) >= 1 else None
         where = f" {W.at(home)}" if winner == away else ""
@@ -1237,13 +1255,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         first = goals[0]
         early3 = next((g for g in goals if abs(g["hs"] - g["as"]) >= 3), None)
         held_on = early3 and all(abs(g["hs"] - g["as"]) >= 2 for g in goals[goals.index(early3):])
-        if early3 and early3["period"] == 1 and side(early3) == winner and held_on:
+        if early3 and early3["period"] == 1 and side(early3) == winner and held_on and not rally and ws - ls >= 3:
             s1.append(pk([f"{_cap(W.the(winner))} had this one put away early.", f"{_cap(W.the(winner))} had this one wrapped up early."]
                          + (["This one was over almost before it started."] if ls <= 1 else []), "early"))
-        opened = pk(["opened the scoring", "struck first", "got things started", "drew first blood"], "open")
+        opened = pk(["opened the scoring", "struck first", "lit the lamp first", "drew first blood"], "open")
         if first["period"] <= 3:  # a lone overtime goal is told once, as the winner
             if first["p1"] in twice:
-                s1.append(f"{name(first['p1'])} scored twice, starting with the opener{on_ps(first)} {_when(first)}.")
+                s1.append(f"{name(first['p1'])} {pk(['scored twice', 'lit the lamp twice'], 'twice')}, starting with the opener{on_ps(first)} {_when(first)}.")
             elif side(first) == loser:  # the headline names the winner, so say whose goal this was
                 s1.append(f"{_cap(W.poss(loser))} {name(first['p1'])} {opened}{on_ps(first)} {_when(first)}.")
             else:
@@ -1305,11 +1323,17 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         s1 += _shape(goals, side, W, name, winner, end)
         # A hot opening line for the nights fans talk about the next morning, each earned by the goals themselves
         # (Sora, 2026-10-14): a three-goal comeback, a tie with the goalie pulled that went on to win, a six-goal rout.
+        if rally:
+            (a1, b1), (a2, b2) = rally["peak"], rally["cut"]
+            run = (f"scored {num(rally['run'])} straight" if rally["lgoals"] == rally["run"] else f"scored {num(rally['lgoals'])} of the next {num(rally['run'])}")
+            s1.append(f"{_cap(W.the(winner))} led {a1}-{b1}, then {W.the(loser)} {run} to make it {a2}-{b2}, and {W.the(winner)} had to hang on.")
         pulled_tie = any(g["own_extra"] and g["hs"] == g["as"] and g["period"] == 3 and side(g) == winner for g in goals)
         if comeback and lead_max[loser] >= 3:
             s1.insert(0, pk([f"Never count {W.the(winner)} out.", "What a comeback."], "hot"))
         elif pulled_tie and end in ("OT", "SO"):
             s1.insert(0, pk(["What a finish.", "Talk about a finish."], "hot"))
+        elif rally and rally["peak"][0] - rally["peak"][1] >= 4:
+            s1.insert(0, pk([f"{_cap(W.the(loser))} almost pulled off something wild.", f"This one got way too interesting for {W.the(winner)}."], "hot"))
         elif ws - ls >= 6:
             s1.insert(0, pk([f"An ugly night for {W.the(loser)}.", f"{_cap(W.the(loser))} will want to forget this one fast."], "hot"))
         for g in goals:  # penalty shots (eye test, 2026-10-13: Eichel's tying penalty-shot goal went untold)

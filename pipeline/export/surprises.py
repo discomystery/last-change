@@ -554,7 +554,7 @@ def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
             en = non_en[t] < goals[t]
             body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
     else:
-        head = f"A night to forget for {N}" if gl["gsax"] <= -3 else f"A rough night for {N}"
+        head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
         body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
     n = every("gsax", gl["gsax"])
     body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n} starts."
