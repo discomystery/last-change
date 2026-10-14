@@ -36,8 +36,8 @@
 .sc-run { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 44px; align-items: center; margin-top: 26px; padding: 28px 0; border-top: 2px solid var(--rule); border-bottom: 2px solid var(--rule); }
 .sc-dots { display: grid; grid-template-columns: repeat(10, 16px); gap: 6px; }
 .sc-dots i { width: 16px; height: 16px; border-radius: 50%; display: block; }
-.sc-rpc { display: flex; gap: 30px; align-items: baseline; margin-top: 22px; font: 600 25px 'Hanken Grotesk'; color: var(--ink2); white-space: nowrap; }
-.sc-rpc b { font: 600 66px/1 'Fraunces'; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; margin-right: 10px; }
+.sc-rpc { margin-top: 18px; font: 400 30px/1.35 'Literata', serif; color: var(--ink2); }
+.sc-rpc b { font-weight: 700; }
 .sc-lede { font-size: 30px; line-height: 1.45; color: var(--ink2); margin-top: 26px; }
 .sc-call { padding: 18px 0; border-top: 2px solid var(--rule); }
 .sc-call:first-child { border-top: 0; }

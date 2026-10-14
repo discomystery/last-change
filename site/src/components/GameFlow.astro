@@ -1,24 +1,30 @@
 ---
 // "How it unfolded" on post-game pages: the game replayed in game time from data/flow/{id}.json (pipeline/export/flow.py),
 // fetched when the section comes near so the shots and shifts are not copied into the page. Two views of the same shots
-// (expected goals piling up, or each team's pressure), a rink that fills in with them, a scoreboard with power-play tags,
-// big chances and goals called out as they happen, and every shift folded away underneath. Playback runs on game time:
-// quiet stretches skate by, the clock slows into dangerous chances and stops for a beat on goals. Pausing, or tapping a
-// moment on the chart, shows who was on the ice; that moment stays until another tap or a replay. Visitors who ask for
-// less motion see the finished chart and can still tap through it.
+// (expected goals piling up, or each team's pressure), a rink that fills in with them (blocked shots on request), a
+// scoreboard with the skaters on each side, a strip of calls (goals, big chances, penalties) that slides with the clock,
+// every shift folded away under the chart, and the shootout, if there was one. Playback runs on game time: quiet stretches
+// skate by, the clock slows into dangerous chances and stops for a beat on goals, then the shootout plays round by round.
+// Pausing, or tapping a moment on the chart, shows who was on the ice; that moment stays until another tap or a replay.
+// Visitors who ask for less motion see the finished chart and can still tap through it.
+// Design (Sora, 2026-10-14, mock-up "How It Unfolded, Revised"): the chart runs the full width and slides over to line up
+// with the shift chart when that opens (which then takes the on-ice table's place); penalties live only in the calls strip,
+// tinted with the soft version of the penalized team's color; hovering the rink moves the chart, never the page under it.
 interface Props { id: number; away: string; home: string; awayName: string; homeName: string; score: [number, number]; end: string }
 const { id, away, home, awayName, homeName, score, end } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 <div class="card gflow" id="gflow" data-src={`${base}data/flow/${id}.json`} data-away={away} data-home={home} data-an={awayName} data-hn={homeName} data-score={score.join(',')} data-end={end}>
-  <div class="pick gf-pick"><span>Show the game as</span><select id="gf-view" aria-label="Chart"><option value="pile">chances piling up</option><option value="ice">who had the ice</option></select></div>
+  <div class="pick gf-pick"><span>Show the game as</span><select id="gf-view" aria-label="Chart"><option value="pile">chances piling up</option><option value="ice">who had the ice</option></select><span class="gf-blk" hidden>with</span><select id="gf-blk" class="gf-blk" aria-label="Blocked shots" hidden><option value="0">shots only</option><option value="1">blocked shots too</option></select></div>
   <div class="gf-bar">
     <button class="gf-play" type="button" id="gf-play" aria-label="Play the game"><svg viewBox="0 0 10 10" id="gf-pi" aria-hidden="true"><path d="M1.5 0.5 9.5 5 1.5 9.5Z" /></svg></button>
+    <span class="gf-str off" id="gf-str" aria-live="polite"></span>
     <div class="gf-board" aria-live="polite"><span class="gf-clk" id="gf-clk">Final</span><span class="gf-sc" id="gf-sc"></span></div>
   </div>
-  <div class="gf-calls" id="gf-calls" aria-live="polite"></div>
+  <div class="gf-calls" id="gf-calls" aria-live="polite"><div class="gf-track" id="gf-track"></div></div>
   <div class="gf-stage" id="gf-stage"><p class="gf-wait">Loading the game…</p></div>
   <div class="gf-key" id="gf-key"></div>
+  <div class="gf-so" id="gf-so" hidden></div>
 </div>
 
 <style is:global>
@@ -30,43 +36,58 @@ const base = import.meta.env.BASE_URL;
   .gf-play { flex: none; width: 30px; height: 30px; padding: 0; color: var(--sheet); background: var(--ink); border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
   .gf-play svg { width: 11px; height: 11px; fill: currentColor; }
   .gf-play:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  /* Skaters on each side at the chart's moment, away first like the score, numbers in team colors. */
+  .gf-str { font: 600 13px var(--ui); color: var(--ink-2); background: var(--ice); border-radius: 999px; padding: 4px 10px; white-space: nowrap; font-variant-numeric: tabular-nums; transition: opacity 0.2s; }
+  .gf-str b { font-weight: 800; font-size: 14px; }
+  .gf-str .x { font-weight: 500; color: var(--ink-3); }
+  .gf-str.off { opacity: 0; }
   .gf-board { display: flex; align-items: center; gap: 12px; margin-left: auto; white-space: nowrap; font: 600 15px var(--ui); font-variant-numeric: tabular-nums; }
-  .gf-clk { color: var(--ink-3); width: 6.6em; text-align: right; white-space: nowrap; }
+  .gf-clk { color: var(--ink-3); min-width: 6.6em; text-align: right; white-space: nowrap; }
   .gf-sc { display: inline-flex; gap: 8px; align-items: center; }
   .gf-n { font: 600 22px/1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; min-width: 0.75em; text-align: center; display: inline-block; }
   .gf-n.bump { animation: gf-bump 0.7s cubic-bezier(0.3, 1.8, 0.5, 1); }
   @keyframes gf-bump { 0% { transform: scale(1); } 30% { transform: scale(1.7); } 100% { transform: scale(1); } }
   .gf-pp { font: 800 10px var(--ui); letter-spacing: 0.08em; color: #fff; background: var(--c); border-radius: 4px; padding: 2px 5px; opacity: 0; transform: scale(0.6); transition: opacity 0.25s, transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1); }
   .gf-pp.on { opacity: 1; transform: none; }
-  /* Phones: the clock and score share one row with the play button, so everything tightens to fit 360 px. */
+  /* Phones: the play button and the skaters share the first row, the clock and score the second. */
   @media (max-width: 480px) {
-    .gf-bar, .gf-board { gap: 8px; }
-    .gf-board { font-size: 13.5px; min-width: 0; }
-    .gf-clk { width: 5.9em; }
+    .gf-bar { flex-wrap: wrap; row-gap: 8px; gap: 8px; }
+    .gf-str { font-size: 12px; padding: 3px 9px; margin-right: auto; }
+    .gf-board { order: 3; width: 100%; justify-content: space-between; margin-left: 0; font-size: 13.5px; gap: 8px; }
+    .gf-clk { text-align: left; min-width: 0; }
     .gf-sc { gap: 5px; }
     .gf-n { font-size: 20px; }
     .gf-pp { font-size: 9px; padding: 2px 4px; letter-spacing: 0.05em; }
   }
-  .gf-calls { height: 28px; margin-top: 10px; display: flex; gap: 6px; align-items: center; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
-  .gf-chip { flex: none; max-width: 340px; overflow: hidden; white-space: nowrap; font: 600 13px var(--ui); padding: 4px 11px; border-radius: 999px; background: var(--track); color: var(--ink); transition: opacity 0.4s; animation: gf-chipin 0.5s cubic-bezier(0.25, 1.2, 0.4, 1); }
+  /* The calls strip is every call, newest first, slid so the latest one at the chart's moment sits at the left. */
+  .gf-calls { position: relative; height: 30px; margin-top: 10px; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
+  .gf-track { display: flex; gap: 6px; align-items: center; height: 100%; transition: transform 0.35s cubic-bezier(0.25, 1, 0.4, 1); }
+  .gf-chip { flex: none; max-width: 340px; overflow: hidden; white-space: nowrap; font: 600 13px var(--ui); padding: 4px 11px; border-radius: 999px; background: var(--track); color: var(--ink); border: 0; cursor: pointer; transition: opacity 0.3s; }
   .gf-chip.old { opacity: 0.55; }
+  .gf-chip.later { opacity: 0; pointer-events: none; }
   .gf-chip .t { color: var(--ink-3); font-weight: 500; margin-right: 6px; }
   .gf-chip.goal { background: var(--c); color: #fff; letter-spacing: 0.02em; }
   .gf-chip.goal .t { color: rgba(255, 255, 255, 0.75); }
   .gf-chip.goal b { font-weight: 800; margin-right: 6px; letter-spacing: 0.08em; }
-  @keyframes gf-chipin { from { max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; } }
+  .gf-chip.pen { background: color-mix(in srgb, var(--c) 20%, var(--sheet)); }
+  .gf-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   .gf-stage { position: relative; margin-top: 6px; }
   .gf-stage svg { width: 100%; height: auto; display: block; touch-action: pan-y; overflow: visible; }
+  .gf-chart:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 6px; }
   .gf-ax { font: 500 11px var(--ui); fill: var(--ink-3); }
   .gf-axh { font: 600 10px var(--ui); letter-spacing: 0.08em; fill: var(--ink-3); }
   .gf-lab { font: 600 11.5px var(--ui); fill: var(--ink-2); }
-  .gf-gl { transition: opacity 0.2s; }
-  .gf-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--sheet); font: 500 12px/1.4 var(--ui); padding: 6px 9px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity 0.12s; z-index: 3; }
+  .gf-gl { transition: opacity 0.2s; cursor: pointer; }
+  .gf-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--sheet); font: 500 12.5px/1.45 var(--ui); padding: 7px 10px; border-radius: 8px; width: max-content; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity 0.12s; z-index: 3; }
   .gf-tip.on { opacity: 1; }
+  .gf-tip .tt { opacity: 0.65; }
+  .gf-tip .gw { font-weight: 800; letter-spacing: 0.07em; font-size: 11px; }
   .gf-key { display: flex; gap: 6px 16px; flex-wrap: wrap; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 10px; }
   .gf-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); }
   .gf-key .ring { background: none; border: 2px solid var(--ink-2); width: 7px; height: 7px; }
   .gf-key .hollow { background: none; border: 1.5px dashed var(--ink-3); width: 8px; height: 8px; }
+  .gf-key .sq { border-radius: 2px; width: 8px; height: 8px; background: var(--ink-2); }
+  .gf-key .box { background: none; border: 1.5px solid var(--ink-2); border-radius: 3px; width: 8px; height: 10px; }
   .gf-sname { font: 500 9.5px var(--ui); fill: var(--ink-3); transition: fill 0.2s; }
   .gf-sname.on, .gf-sname.hl { fill: var(--ink); font-weight: 700; }
   .gf-sgrp { font: 700 8px var(--ui); fill: var(--ink-3); letter-spacing: 0.06em; }
@@ -80,7 +101,7 @@ const base = import.meta.env.BASE_URL;
   @keyframes gf-gflash { 0%, 40% { opacity: 1; filter: brightness(1.25) saturate(1.3); } }
   @keyframes gf-gname { 0%, 50% { fill: var(--ink); font-weight: 800; } }
   .gf-onice { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin-top: 10px; padding: 0 14px; border-radius: 10px; background: var(--ice); font: 500 13.5px/1.45 var(--ui); max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.35s ease, opacity 0.3s, padding 0.3s; }
-  .gf-onice.on { max-height: 260px; opacity: 1; padding-block: 12px; }
+  .gf-onice.on { max-height: 280px; opacity: 1; padding-block: 12px; }
   .gf-onice p { margin: 0; }
   .gf-onice .ic-t { grid-column: 1 / -1; font: 600 11px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
   .gf-onice .ic { border-left: 3px solid var(--c); padding-left: 10px; min-width: 0; }
@@ -88,16 +109,13 @@ const base = import.meta.env.BASE_URL;
   .gf-onice .ic-h span { font-weight: 500; font-size: 12px; color: var(--ink-3); }
   .gf-onice .ic p b { display: inline-block; width: 16px; color: var(--ink-3); font-size: 11px; }
   .gf-onice .ltag { font: 700 10px var(--ui); color: var(--ink-2); background: var(--sheet); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
-  .gf-onice .none { color: var(--ink-3); font-style: italic; }
+  .gf-onice .none, .gf-onice .bx { color: var(--ink-3); font-style: italic; }
   @media (max-width: 560px) { .gf-onice { grid-template-columns: 1fr; } }
-  details.gf-fold { margin-top: 12px; }
-  details.gf-fold summary { list-style: none; cursor: pointer; text-align: center; padding: 2px; }
-  details.gf-fold summary span { display: inline-block; font: 500 12.5px var(--ui); color: var(--ink-2); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 12px; transition: border-color 0.15s, color 0.15s; }
-  details.gf-fold summary:hover span { border-color: var(--ink-3); color: var(--ink); }
-  details.gf-fold summary::-webkit-details-marker { display: none; }
-  details.gf-fold summary span::after { content: ' +'; }
-  details.gf-fold[open] summary span::after { content: ' −'; }
-  details.gf-fold[open] .gf-fold-body { animation: gf-lab 0.35s ease; }
+  .gflow .gf-fold { margin-top: 12px; }
+  .gflow .gf-fold[open] > summary { margin-bottom: 10px; }
+  .gflow .gf-fold-body { position: relative; }
+  .gflow .gf-fold[open] .gf-fold-body { animation: gf-lab 0.35s ease; }
+  .gf-rink { position: relative; max-width: 760px; margin: 14px auto 0; }
   .gf-shot, .gf-gp, .gf-gl text { transform-box: fill-box; transform-origin: center; }
   .gf-pop { animation: gf-popa 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) backwards; }
   .gf-pop-big { animation: gf-popa 0.6s cubic-bezier(0.25, 2.2, 0.45, 1) backwards; }
@@ -111,13 +129,42 @@ const base = import.meta.env.BASE_URL;
   @keyframes gf-flash { from { opacity: 0.55; } to { opacity: 0; } }
   .gf-label-in { animation: gf-lab 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) backwards; }
   @keyframes gf-lab { from { opacity: 0; transform: translateY(6px); } }
+  /* Shootout: rounds as columns, a filled puck for a goal, a ring for a save, dashed for a miss. */
+  .gf-so { position: relative; margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; transition: opacity 0.3s; }
+  .gf-so.wait { opacity: 0.35; }
+  .gf-so-h { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+  .gf-so-h h3 { font: 600 18px var(--display); font-variation-settings: 'SOFT' 100; margin: 0; }
+  .gf-so-h p { margin: 0; font: 500 13.5px var(--ui); color: var(--ink-2); }
+  .gf-so-scroll { overflow-x: auto; }
+  .gf-so-grid { display: grid; grid-template-columns: auto repeat(var(--n), minmax(58px, 1fr)) auto; align-items: center; gap: 8px 6px; margin-top: 12px; font: 500 12px var(--ui); }
+  .gf-so-team { font: 700 14px var(--ui); white-space: nowrap; padding-right: 6px; }
+  .gf-so-team span { display: block; font: 500 11.5px var(--ui); color: var(--ink-3); }
+  .gf-so-rd { text-align: center; font: 600 10px var(--ui); letter-spacing: 0.08em; color: var(--ink-3); }
+  .gf-so-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; transition: opacity 0.3s, transform 0.4s cubic-bezier(0.3, 1.8, 0.5, 1); }
+  .gf-so-cell.hide { opacity: 0; transform: scale(0.4); }
+  .gf-so-cell i { width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box; }
+  .gf-so-cell i.g { background: var(--c); }
+  .gf-so-cell i.s { border: 2px solid var(--c); }
+  .gf-so-cell i.m { border: 2px dashed var(--ink-3); }
+  .gf-so-cell span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+  .gf-so-cell.win span { color: var(--ink); font-weight: 700; }
+  .gf-so-tot { font: 600 22px var(--display); font-variation-settings: 'SOFT' 100; padding-left: 6px; }
+  @media (max-width: 480px) {
+    .gf-so-grid { grid-template-columns: auto repeat(var(--n), minmax(46px, 1fr)) auto; gap: 8px 4px; }
+    .gf-so-team span { white-space: normal; max-width: 64px; line-height: 1.25; }
+    .gf-so-tot { padding-left: 2px; }
+  }
   @media (prefers-reduced-motion: reduce) { .gflow *, .gflow *::before, .gflow *::after { animation: none !important; transition: none !important; } }
 </style>
 
 <script>
-  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number };
+  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number; type: string; ast: string[] };
   type Skater = { id: number; n: string; h: number; grp: string; s: [number, number][]; toi: number };
-  type Flow = { game_id: number; len: number; shots: (number | null)[][]; pp: number[][]; players: { id: number; n: string; h: number; grp: string; s: number[] }[]; goalies: { id: number; n: string; h: number; s: number[] }[]; names?: Record<string, string> };
+  type Pen = { t: number; h: number; who: string; drawn: string; min: number; code: string; what: string; served: string; pid: number | null; end: number };
+  type Block = { t: number; h: number; x: number; y: number; who: string; shooter: string };
+  type Attempt = { h: number; who: string; gk: string; res: number; type: string };
+  type Flow = { game_id: number; len: number; shots: any[][]; pp: number[][]; players: { id: number; n: string; h: number; grp: string; s: number[] }[]; goalies: { id: number; n: string; h: number; s: number[] }[];
+    blocks?: any[][]; pens?: any[][]; str?: number[][]; so?: any[][]; names?: Record<string, string> };
 
   const host = document.getElementById('gflow') as HTMLElement | null;
   if (host) start(host);
@@ -131,40 +178,71 @@ const base = import.meta.env.BASE_URL;
     const tag = (s: Shot) => (s.en ? 'EN' : s.st > 0 ? 'PP' : s.st < 0 ? 'SH' : '');
     const clock = (t: number) => { t = Math.floor(t); if (t >= 3600) { const s = t - 3600; return `OT ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; } const p = Math.min(2, Math.floor(t / 1200)), s = t - p * 1200; return `${['1st', '2nd', '3rd'][p]} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
     const clockMS = (s: number) => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
     const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const DANGER = 0.15;
     const narrow = () => host.clientWidth < 560;
     const $ = (id: string) => document.getElementById(id) as HTMLElement;
-    const stage = $('gf-stage'), selV = $('gf-view') as HTMLSelectElement, btn = $('gf-play');
+    const stage = $('gf-stage'), selV = $('gf-view') as HTMLSelectElement, selB = $('gf-blk') as HTMLSelectElement, btn = $('gf-play');
     const ds = host.dataset;
     const sc = (ds.score ?? '0,0').split(',').map(Number);
     const endWord = ds.end && ds.end !== 'REG' ? ds.end : '';
     let g: any = null;
     let S: any = null; // the current drawing
     let anim: any = null;
-    let paused: { ms: number; t: number; i: number } | null = null; // where a paused game stopped
+    let paused: { ms: number; t: number } | null = null; // where a paused game stopped
     let pinned: number | null = null; // a moment the reader tapped or dragged to
+    let T = Infinity; // the moment on show (Infinity = the final)
+    let soN = Infinity; // shootout attempts on show
+    let shiftOpen = false;
 
     function load() {
       fetch(ds.src!).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }).then((f: Flow) => {
         const names: Record<string, string> = { ...(f.names ?? {}) };
         for (const p of [...f.players, ...f.goalies]) names[p.id] = p.n;
+        const nm = (id: any) => (id == null ? '' : names[String(id)] ?? '');
         const pairs = (s: number[]) => { const o: [number, number][] = []; for (let i = 0; i < s.length; i += 2) o.push([s[i], s[i + 1]]); return o; };
+        const END = Math.max(3600, f.len);
+        const pp = f.pp.map(([h, a, b]) => ({ h, a, b }));
         g = {
-          away: ds.away, home: ds.home, an: ds.an, hn: ds.hn, score: sc, end: endWord, len: f.len,
-          shots: f.shots.map(([t, h, xg, gl, x, y, who, en, st]) => ({ t, h, xg, g: gl, x, y, who: names[String(who)] ?? '', en, st: st ?? NaN }) as Shot),
-          pp: f.pp.map(([h, a, b]) => ({ h, a, b })),
+          away: ds.away, home: ds.home, an: ds.an, hn: ds.hn, score: sc, end: endWord, len: f.len, END,
+          shots: f.shots.map(([t, h, xg, gl, x, y, who, en, st, type, a1, a2]) => ({ t, h, xg, g: gl, x, y, who: nm(who), en, st: st ?? NaN, type: type ?? '', ast: [a1, a2].filter((a) => a != null).map(nm) }) as Shot),
+          pp,
           players: f.players.map((p) => { const s = pairs(p.s); return { ...p, s, toi: s.reduce((v, [a, b]) => v + b - a, 0) }; }) as Skater[],
           gk: f.goalies.map((p) => ({ ...p, s: pairs(p.s) })),
+          blocks: (f.blocks ?? []).map(([t, h, x, y, who, shooter]) => ({ t, h, x, y, who: nm(who), shooter: nm(shooter) }) as Block),
+          pens: (f.pens ?? []).map(([t, h, pid, drawn, min, code, what, served]) => {
+            // time in the box: to the end of the power play it caused (a power-play goal ends a minor), else the full penalty
+            const q = pp.find((q) => q.h !== h && Math.abs(q.a - t) <= 3);
+            const out = q && (min ?? 2) <= 2 ? q.b : t + (min ?? 2) * 60;
+            return { t, h, pid: pid ?? null, who: nm(pid), drawn: nm(drawn), min: min ?? 2, code: code ?? '', what: (what ?? '').replace(/-/g, ' '), served: nm(served), end: Math.min(END, out) } as Pen;
+          }),
+          str: f.str ?? [],
+          so: (f.so ?? []).map(([h, who, gk, res, type]) => ({ h, who: nm(who), gk: nm(gk), res, type: type ?? '' }) as Attempt),
         };
         // older files carry no strength: read it from the power-play stretches (a power-play goal ends the stretch)
         for (const s of g.shots as Shot[]) if (Number.isNaN(s.st)) { const p = s.en ? null : g.pp.find((q: any) => s.t >= q.a && s.t <= q.b); s.st = p ? (p.h === s.h ? 1 : -1) : 0; }
+        // a pulled goalie: a gap of 10+ seconds in his shifts inside a period
+        g.pulled = [];
+        for (const gk of g.gk) for (let i = 1; i < gk.s.length; i++) { const a = gk.s[i - 1][1], b = gk.s[i][0]; if (b - a >= 10 && Math.floor(a / 1200) === Math.floor((b - 1) / 1200)) g.pulled.push({ h: gk.h, a, b }); }
+        if (g.blocks.length) host.querySelectorAll('.gf-blk').forEach((e) => (e as HTMLElement).hidden = false);
+        T = END; soN = g.so.length;
         draw();
         watchForPlay();
       }).catch(() => { stage.innerHTML = '<p class="gf-wait">The game’s shots could not be loaded.</p>'; btn.hidden = true; });
     }
 
     function tipFor(box: HTMLElement) { let t = box.querySelector(':scope > .gf-tip') as HTMLElement; if (!t) { t = document.createElement('div'); t.className = 'gf-tip'; box.append(t); } return { show(x: number, y: number, html: string) { t.innerHTML = html; const w = t.offsetWidth, bw = box.clientWidth; t.style.left = Math.max(w / 2, Math.min(bw - w / 2, x)) + 'px'; t.style.top = y + 'px'; t.classList.add('on'); }, hide() { t.classList.remove('on'); } }; }
+    const above = (el: Element, box: Element): [number, number] => { const a = el.getBoundingClientRect(), b = box.getBoundingClientRect(); return [a.left + a.width / 2 - b.left, a.top - b.top]; };
+    const kind = (t: string) => !t ? 'Shot' : t === 'tip-in' ? 'Tip-in' : t === 'deflected' ? 'Deflection' : t === 'wrap-around' ? 'Wraparound' : t === 'between-legs' ? 'Between-the-legs shot' : `${cap(t)} shot`;
+    const aPct = (p: number) => (/^(8|11|18)/.test(String(p)) ? 'an' : 'a');
+    const strWord = (s: Shot) => (s.en ? '' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : '');
+    const shotTip = (s: Shot) => {
+      const pct = Math.round(s.xg * 100), team = s.h ? g.home : g.away;
+      const chance = s.en ? 'at an empty net' : pct < 1 ? 'under a 1% chance of scoring' : `${aPct(pct)} ${pct}% chance of scoring`;
+      return `<span class="tt">${clock(s.t)}</span><br>${s.g ? '<span class="gw">GOAL</span> · ' : ''}<b>${s.who}</b> (${team})<br>${kind(s.type)}, ${chance}${strWord(s)}${s.g ? `<br>${s.ast.length ? `Assists: ${s.ast.join(', ')}` : 'Unassisted'}` : ''}`;
+    };
+    const blockTip = (b: Block) => `<span class="tt">${clock(b.t)}</span><br><b>${b.who}</b> (${b.h ? g.away : g.home}) blocked ${b.shooter ? `${last(b.shooter)}’s` : 'a'} shot`;
 
     // goal names in rows that never collide; a dry run on a detached group sizes the space
     function goalRows(parent: Element, goals: Shot[], X: (t: number) => number, y0: number, maxX: number) {
@@ -175,7 +253,7 @@ const base = import.meta.env.BASE_URL;
         while (rows.some(([a, b, rr]) => rr === r && a0 < b && b0 > a)) r++;
         rows.push([a0, b0, r]);
         const y = y0 + r * 16;
-        const gg = mk('g', { class: 'gf-gl' }, parent);
+        const gg = mk('g', { class: 'gf-gl', 'data-shot': g.shots.indexOf(s) }, parent);
         mk('circle', { cx: x, cy: y - 4, r: 4, fill: C[s.h] }, gg);
         txt(gg, flip ? x - 8 : x + 8, y, name, 'gf-lab', flip ? 'end' : 'start');
         els.push([s, gg]);
@@ -183,162 +261,237 @@ const base = import.meta.env.BASE_URL;
       return { n: rows.reduce((m, r) => Math.max(m, r[2] + 1), 0), els };
     }
 
-    function frame(svg: Element, X: (t: number) => number, END: number, T: number, B: number) {
-      for (const p of g.pp) mk('rect', { x: X(p.a), y: T, width: Math.max(2, X(p.b) - X(p.a)), height: B - T, fill: C[p.h], 'fill-opacity': 0.1 }, svg);
-      [1200, 2400, 3600].filter((t) => t < END).forEach((t, i) => mk('line', { x1: X(t), x2: X(t), y1: T, y2: B, stroke: i === 1 ? 'var(--line-red)' : 'var(--line-blue)', 'stroke-width': 3 }, svg));
-      const per: [number, number, string][] = [[0, 1200, '1ST'], [1200, 2400, '2ND'], [2400, 3600, '3RD']]; if (END > 3600) per.push([3600, END, 'OT']);
-      for (const [a, b, l] of per) txt(svg, (X(a) + X(b)) / 2, B + 18, l, 'gf-axh', 'middle');
-    }
+    // the chart's sizes: full width on its own, its start slid over to the shift chart's names when that is open
+    const dims = () => { const n = narrow(); const W = n ? 440 : Math.round(Math.min(1000, Math.max(720, host.clientWidth - 36))); return { W, Lfull: n ? 24 : 32, Lshift: n ? 76 : 104, R: W - (g.so.length ? (n ? 38 : 50) : 14) }; };
 
-    function draw() {
-      stop(); paused = null; pinned = null;
-      const view = selV.value;
-      stage.replaceChildren();
-      const W = narrow() ? 440 : Math.round(Math.min(1000, Math.max(720, host.clientWidth - 36))), L = narrow() ? 30 : 104, R = W - 14, END = Math.max(3600, g.len);
+    function renderChart(svg: any, L: number) {
+      svg.replaceChildren();
+      const view = selV.value, END = g.END, { W, R } = dims();
       const X = (t: number) => L + (R - L) * t / END;
       const goals: Shot[] = g.shots.filter((s: Shot) => s.g);
       const up = goals.filter((s) => !s.h), dn = goals.filter((s) => s.h);
-      const svg = mk('svg', { role: 'img' }, stage);
-      let T: number, B: number, VH: number;
+      let T0: number, B: number, VH: number;
       const lines = [0, 1].map((h) => { let v = 0; const pts: [number, number][] = [[0, 0]]; for (const s of g.shots) if (s.h === h && !s.en) { v += s.xg; pts.push([s.t, v]); } return pts; });
       const cum = (h: number, t: number) => { let v = 0; for (const [tt, vv] of lines[h]) if (tt <= t) v = vv; return v; };
       let names: [Shot, any][] = [], curves: any[] = [], yAt: (s: Shot) => number;
+      const frame = (Tt: number, Bb: number) => {
+        for (const p of g.pp) mk('rect', { x: X(p.a), y: Tt, width: Math.max(2, X(p.b) - X(p.a)), height: Bb - Tt, fill: C[p.h], 'fill-opacity': 0.1 }, svg);
+        g.pulled.forEach((p: any, i: number) => mk('rect', { x: X(p.a), y: Tt + 1, width: X(p.b) - X(p.a), height: Bb - Tt - 2, rx: 3, fill: C[p.h], 'fill-opacity': 0, stroke: C[p.h], 'stroke-width': 1.2, 'data-net': i }, svg));
+        [1200, 2400, 3600].filter((t) => t < END).forEach((t, i) => mk('line', { x1: X(t), x2: X(t), y1: Tt, y2: Bb, stroke: i === 1 ? 'var(--line-red)' : 'var(--line-blue)', 'stroke-width': 3 }, svg));
+        if (g.so.length) {
+          const x0 = R + 8, x1 = W - 2, made = [0, 1].map((h) => g.so.filter((a: Attempt) => a.h === h && a.res === 1).length);
+          mk('rect', { x: x0, y: Tt, width: x1 - x0, height: Bb - Tt, rx: 6, fill: 'var(--track)', 'fill-opacity': 0.6, 'data-so': 1, style: 'cursor:pointer' }, svg);
+          [0, 1].forEach((h) => { const t = txt(svg, (x0 + x1) / 2, (Tt + Bb) / 2 + (h ? 16 : -6), made[h], 'gf-lab gf-son', 'middle'); t.style.fill = C[h]; t.style.font = '600 15px var(--display)'; });
+        }
+      };
       if (view === 'pile') {
         const nAll = goalRows(mk('g'), goals, X, 0, W).n;
-        T = 30 + nAll * 16; B = T + 200; VH = B + 28;
-        svg.setAttribute('aria-label', 'Expected goals adding up through the game');
-        frame(svg, X, END, T, B);
-        const ymax = Math.max(2, Math.ceil(Math.max(cum(0, END), cum(1, END)) + 0.3)); const Y = (v: number) => B - (B - T) * v / ymax;
-        for (let v = 0; v <= ymax; v++) { mk('line', { x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: 'var(--rule)' }, svg); txt(svg, L - 8, Y(v) + 4, v, 'gf-ax', 'end'); }
-        txt(svg, L, T - 8 - nAll * 16 + 2, 'EXPECTED GOALS', 'gf-axh');
+        T0 = 30 + nAll * 16; B = T0 + 200; VH = B + 24;
+        svg.setAttribute('aria-label', 'Expected goals adding up through the game. Arrow keys step from shot to shot.');
+        frame(T0, B);
+        const ymax = Math.max(2, Math.ceil(Math.max(cum(0, END), cum(1, END)) + 0.3)); const Y = (v: number) => B - (B - T0) * v / ymax;
+        for (let v = 0; v <= ymax; v++) { mk('line', { x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: 'var(--rule)' }, svg); txt(svg, L - 6, Y(v) + 4, v, 'gf-ax', 'end'); }
+        txt(svg, L, T0 - 8 - nAll * 16 + 2, 'EXPECTED GOALS', 'gf-axh');
         curves = lines.map((pts, h) => { let d = `M${X(0)},${Y(0)}`; for (const [t, v] of pts.slice(1)) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`; d += `H${X(END)}`; return mk('path', { d, fill: 'none', stroke: C[h], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg); });
-        names = goalRows(svg, goals, X, T - 10 - (nAll - 1) * 16, W).els;
+        names = goalRows(svg, goals, X, T0 - 10 - (nAll - 1) * 16, W).els;
         yAt = (s) => Y(cum(s.h, s.t));
       } else {
         const nUp = goalRows(mk('g'), up, X, 0, W).n, nDn = goalRows(mk('g'), dn, X, 0, W).n;
-        T = 34 + nUp * 16; B = T + 210; const M = (T + B) / 2; VH = B + 38 + nDn * 16 + 18;
-        svg.setAttribute('aria-label', 'Each team’s pressure through the game');
-        frame(svg, X, END, T, B);
+        T0 = 34 + nUp * 16; B = T0 + 210; const M = (T0 + B) / 2; VH = B + 46 + nDn * 16 + 8;
+        svg.setAttribute('aria-label', 'Each team’s pressure through the game. Arrow keys step from shot to shot.');
+        frame(T0, B);
         const STEP = 15, HALF = 150, grid: number[] = []; for (let t = 0; t <= END; t += STEP) grid.push(t);
         const dens = [0, 1].map((h) => grid.map((t) => g.shots.reduce((sum: number, s: Shot) => { if (s.h !== h || s.en) return sum; const d = Math.abs(s.t - t); return d < HALF ? sum + s.xg * (1 - d / HALF) : sum; }, 0)));
-        const ymax = Math.max(0.45, ...dens.flat()) * 1.05, H = (v: number) => (M - T - 6) * v / ymax;
+        const ymax = Math.max(0.45, ...dens.flat()) * 1.05, H = (v: number) => (M - T0 - 6) * v / ymax;
         mk('line', { x1: L, x2: R, y1: M, y2: M, stroke: 'var(--ink-3)' }, svg);
         curves = [0, 1].map((h) => { const sg = h ? 1 : -1; let d = `M${X(0)},${M}`; grid.forEach((t, i) => d += `L${X(t).toFixed(1)},${(M + sg * H(dens[h][i])).toFixed(1)}`); d += `L${X(END)},${M}Z`; return mk('path', { d, fill: C[h], 'fill-opacity': 0.75, stroke: C[h], 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, svg); });
-        txt(svg, L, T - 8 - nUp * 16 + 2, `${g.an.toUpperCase()} PRESSING ↑`, 'gf-axh'); txt(svg, L, VH - 2, `↓ ${g.hn.toUpperCase()} PRESSING`, 'gf-axh');
-        names = [...goalRows(svg, up, X, T - 10 - (nUp - 1) * 16, W).els, ...goalRows(svg, dn, X, B + 40, W).els];
-        yAt = (s) => (s.h ? B - 10 : T + 10);
+        txt(svg, L, T0 - 8 - nUp * 16 + 2, `${g.an.toUpperCase()} PRESSING ↑`, 'gf-axh'); txt(svg, L, VH - 2, `↓ ${g.hn.toUpperCase()} PRESSING`, 'gf-axh');
+        names = [...goalRows(svg, up, X, T0 - 10 - (nUp - 1) * 16, W).els, ...goalRows(svg, dn, X, B + 42, W).els];
+        yAt = (s) => (s.h ? B - 10 : T0 + 10);
         for (const s of goals) mk('line', { x1: X(s.t), x2: X(s.t), y1: M, y2: yAt(s), stroke: C[s.h], 'stroke-dasharray': '2 2', class: 'gf-gstem', 'data-t': s.t }, svg);
       }
+      // period labels sit right under the baseline
+      const per: [number, number, string][] = [[0, 1200, '1ST'], [1200, 2400, '2ND'], [2400, 3600, '3RD']]; if (END > 3600) per.push([3600, END, 'OT']);
+      for (const [a, b, l] of per) txt(svg, (X(a) + X(b)) / 2, B + 16, l, 'gf-axh', 'middle');
+      if (g.so.length) txt(svg, (R + 8 + W - 2) / 2, B + 16, 'SO', 'gf-axh', 'middle');
       svg.setAttribute('viewBox', `0 0 ${W} ${VH}`);
-      const goalMarks: [Shot, any][] = goals.map((s) => [s, mk('circle', { cx: X(s.t), cy: yAt(s), r: 6, fill: 'var(--sheet)', stroke: C[s.h], 'stroke-width': 3, class: 'gf-gp' }, svg)]);
+      const goalMarks: [Shot, any][] = goals.map((s) => [s, mk('circle', { cx: X(s.t), cy: yAt(s), r: 6, fill: 'var(--sheet)', stroke: C[s.h], 'stroke-width': 3, class: 'gf-gp', 'data-shot': g.shots.indexOf(s), style: 'cursor:pointer' }, svg)]);
       const fx = mk('g', {}, svg);
-      const cur = mk('line', { y1: T, y2: B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: 0 }, svg);
+      const cur = mk('line', { y1: T0, y2: B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: 0, 'pointer-events': 'none' }, svg);
+      return { W, L, R, X, T: T0, B, VH, curves, names, goalMarks, fx, cur, cum, yAt };
+    }
+
+    function draw() {
+      stop(); paused = null; pinned = null; T = g.END; soN = g.so.length;
+      const END = g.END;
+      stage.replaceChildren();
+      const svg = mk('svg', { role: 'img', class: 'gf-chart', tabindex: 0 }, stage);
+      const d0 = dims();
+      let CH = renderChart(svg, shiftOpen ? d0.Lshift : d0.Lfull);
 
       const ice = document.createElement('div'); ice.className = 'gf-onice'; ice.setAttribute('aria-live', 'polite'); stage.append(ice);
-      // the rink, marked like a real one: goal lines, creases, nets, trapezoids, face-off circles with hash marks, all nine dots
-      const rk = mk('svg', { viewBox: '-104 -46 208 92', role: 'img', 'aria-label': 'Shots on the rink' }, stage); rk.style.marginTop = '10px'; rk.style.maxWidth = '760px'; rk.style.marginInline = 'auto';
-      mk('rect', { x: -100, y: -42.5, width: 200, height: 85, rx: 28, fill: 'var(--sheet)' }, rk);
+      // every shift, folded away right under the chart so the two time lines meet
+      const L2 = d0.Lshift, X2 = (t: number) => L2 + (d0.R - L2) * t / END;
+      const SH = shifts(d0.W, L2, d0.R, X2, END, () => dots);
+
+      // the rink, marked like a real one and clipped to the boards so nothing runs past them
+      const rw = document.createElement('div'); rw.className = 'gf-rink'; stage.append(rw);
+      const rk = mk('svg', { viewBox: '-104 -46 208 92', role: 'img', 'aria-label': 'Shots on the rink' }, rw);
+      const RINK = 'M-72 -42.5H72A28 28 0 0 1 100 -14.5V14.5A28 28 0 0 1 72 42.5H-72A28 28 0 0 1 -100 14.5V-14.5A28 28 0 0 1 -72 -42.5Z';
+      const cid = `gf-boards-${g.away}${g.home}`;
+      mk('path', { d: RINK, fill: 'var(--sheet)' }, rk);
+      mk('path', { d: RINK }, mk('clipPath', { id: cid }, mk('defs', {}, rk)));
+      const sheet = mk('g', { 'clip-path': `url(#${cid})` }, rk);
       const red = 'var(--line-red)', blue = 'var(--line-blue)', thin = { fill: 'none', stroke: red, 'stroke-width': 0.5 };
-      mk('path', { d: 'M-10 42.5 A10 10 0 0 1 10 42.5', ...thin }, rk); // referee crease
+      mk('path', { d: 'M-10 42.5 A10 10 0 0 1 10 42.5', ...thin }, sheet); // referee crease
       for (const sd of [-1, 1]) {
         const gx = 89 * sd;
-        mk('line', { x1: gx, x2: gx, y1: -38.5, y2: 38.5, stroke: red, 'stroke-width': 0.6 }, rk);
-        mk('path', { d: `M${gx} -4 H${gx - 4.5 * sd} A1.5 1.5 0 0 ${sd > 0 ? 0 : 1} ${gx - 6 * sd} -2.5 V2.5 A1.5 1.5 0 0 ${sd > 0 ? 0 : 1} ${gx - 4.5 * sd} 4 H${gx}`, fill: blue, 'fill-opacity': 0.35, stroke: red, 'stroke-width': 0.4 }, rk); // crease
-        mk('rect', { x: sd > 0 ? 89 : -92.3, y: -3, width: 3.3, height: 6, rx: 1, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 0.5 }, rk); // net
-        mk('path', { d: `M${gx} -11 L${100 * sd} -14 M${gx} 11 L${100 * sd} 14`, ...thin }, rk); // trapezoid
+        mk('line', { x1: gx, x2: gx, y1: -43, y2: 43, stroke: red, 'stroke-width': 0.6 }, sheet); // the boards end it in the corners
+        mk('path', { d: `M${gx} -4 H${gx - 4.5 * sd} A1.5 1.5 0 0 ${sd > 0 ? 0 : 1} ${gx - 6 * sd} -2.5 V2.5 A1.5 1.5 0 0 ${sd > 0 ? 0 : 1} ${gx - 4.5 * sd} 4 H${gx}`, fill: blue, 'fill-opacity': 0.35, stroke: red, 'stroke-width': 0.4 }, sheet); // crease
+        mk('rect', { x: sd > 0 ? 89 : -92.3, y: -3, width: 3.3, height: 6, rx: 1, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 0.5 }, sheet); // net
+        mk('path', { d: `M${gx} -11 L${101 * sd} -14 M${gx} 11 L${101 * sd} 14`, ...thin }, sheet); // trapezoid
         for (const cy of [-22, 22]) {
           const cx = 69 * sd;
-          mk('circle', { cx, cy, r: 15, ...thin }, rk);
-          mk('circle', { cx, cy, r: 1, fill: red }, rk);
-          mk('path', { d: `M${cx - 3} ${cy - 15} v-2 M${cx + 3} ${cy - 15} v-2 M${cx - 3} ${cy + 15} v2 M${cx + 3} ${cy + 15} v2 M${cx - 6} ${cy - 1.5} h-3 v-2 M${cx + 6} ${cy - 1.5} h3 v-2 M${cx - 6} ${cy + 1.5} h-3 v2 M${cx + 6} ${cy + 1.5} h3 v2`, ...thin }, rk); // hash marks
-          mk('circle', { cx: 20 * sd, cy, r: 1, fill: red }, rk); // neutral-zone dots
+          mk('circle', { cx, cy, r: 15, ...thin }, sheet);
+          mk('circle', { cx, cy, r: 1, fill: red }, sheet);
+          mk('path', { d: `M${cx - 3} ${cy - 15} v-2 M${cx + 3} ${cy - 15} v-2 M${cx - 3} ${cy + 15} v2 M${cx + 3} ${cy + 15} v2 M${cx - 6} ${cy - 1.5} h-3 v-2 M${cx + 6} ${cy - 1.5} h3 v-2 M${cx - 6} ${cy + 1.5} h-3 v2 M${cx + 6} ${cy + 1.5} h3 v2`, ...thin }, sheet); // hash marks
+          mk('circle', { cx: 20 * sd, cy, r: 1, fill: red }, sheet); // neutral-zone dots
         }
-        mk('line', { x1: 25 * sd, x2: 25 * sd, y1: -42.5, y2: 42.5, stroke: blue, 'stroke-width': 2 }, rk);
+        mk('line', { x1: 25 * sd, x2: 25 * sd, y1: -43, y2: 43, stroke: blue, 'stroke-width': 2 }, sheet);
       }
-      mk('line', { x1: 0, x2: 0, y1: -42.5, y2: 42.5, stroke: red, 'stroke-width': 2 }, rk);
-      mk('circle', { cx: 0, cy: 0, r: 15, fill: 'none', stroke: blue, 'stroke-width': 0.5 }, rk);
-      mk('circle', { cx: 0, cy: 0, r: 0.8, fill: blue }, rk);
-      mk('rect', { x: -100, y: -42.5, width: 200, height: 85, rx: 28, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 0.9 }, rk);
+      mk('line', { x1: 0, x2: 0, y1: -43, y2: 43, stroke: red, 'stroke-width': 2 }, sheet);
+      mk('circle', { cx: 0, cy: 0, r: 15, fill: 'none', stroke: blue, 'stroke-width': 0.5 }, sheet);
+      mk('circle', { cx: 0, cy: 0, r: 0.8, fill: blue }, sheet);
+      const dotsG = mk('g', { 'clip-path': `url(#${cid})` }, rk), blkG = mk('g', { 'clip-path': `url(#${cid})` }, rk);
+      mk('path', { d: RINK, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 0.9 }, rk);
+      const ringG = mk('g', { 'pointer-events': 'none' }, rk);
       const rfx = mk('g', {}, rk);
-      const ppNow = (t: number) => { const p = g.pp.find((q: any) => t >= q.a && t < q.b); return p ? p.h : -1; };
-      let ppShown = -2;
-      const setPP = (t: number) => { const h = t >= END ? -1 : ppNow(t); if (h === ppShown) return; ppShown = h; [0, 1].forEach((i) => document.getElementById('gf-pp' + i)?.classList.toggle('on', i === h)); };
       // home shots attack the right-hand net, visitors' the left
-      const dots: [Shot, any, number, number][] = g.shots.map((s: Shot) => {
-        const x = s.h ? s.x : -s.x, y = s.h ? s.y : -s.y;
-        const c = mk('circle', { cx: x, cy: y, r: (1.1 + Math.sqrt(s.xg) * 5.2).toFixed(2), class: 'gf-shot', fill: C[s.h], 'fill-opacity': s.g ? 0.25 : s.en ? 0 : 0.6, stroke: s.g || s.en ? C[s.h] : 'none', 'stroke-width': s.g ? 2 : 0.7, 'stroke-dasharray': s.en && !s.g ? '1.6 1.2' : 'none' }, rk);
+      const at = (h: number, x: number, y: number) => [h ? x : -x, h ? y : -y];
+      const dots: [Shot, any, number, number][] = g.shots.map((s: Shot, i: number) => {
+        const [x, y] = at(s.h, s.x, s.y);
+        const c = mk('circle', { cx: x, cy: y, r: (1.1 + Math.sqrt(s.xg) * 5.2).toFixed(2), class: 'gf-shot', fill: C[s.h], 'fill-opacity': s.g ? 0.25 : s.en ? 0 : 0.6, stroke: s.g || s.en ? C[s.h] : 'none', 'stroke-width': s.g ? 2 : 0.7, 'stroke-dasharray': s.en && !s.g ? '1.6 1.2' : 'none', 'data-shot': i, style: 'cursor:pointer' }, dotsG);
         if (s.g) c.setAttribute('r', Math.max(3.2, +c.getAttribute('r')));
         return [s, c, x, y];
       });
-      // phones: the charts keep their full width and the shift chart makes its own room for names
-      const L2 = narrow() ? 76 : L, X2 = (t: number) => L2 + (R - L2) * t / END;
-      const SH = shifts(W, L2, R, X2, END, () => dots);
+      // blocked shots, at the spot of the block, in the blocking team's color
+      const blks: [Block, any][] = selB.value === '1' ? g.blocks.map((b: Block, i: number) => { const [x, y] = at(b.h, b.x, b.y); return [b, mk('rect', { x: x - 1.25, y: y - 1.25, width: 2.5, height: 2.5, rx: 0.4, fill: C[1 - b.h], 'fill-opacity': 0.9, 'data-blk': i, style: 'cursor:pointer' }, blkG)]; }) : [];
+      const ring = (s: Shot | null) => { ringG.replaceChildren(); if (!s) return; const d = dots.find((q) => q[0] === s)!; mk('circle', { cx: d[2], cy: d[3], r: +d[1].getAttribute('r') + 2.2, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 0.8 }, ringG); };
 
       const keyEl = $('gf-key'); keyEl.replaceChildren();
-      const item = (cls: string, label: string, c?: string) => { const sp = document.createElement('span'); if (c) sp.style.setProperty('--c', c); sp.innerHTML = `<i${cls ? ` class="${cls}"` : ''}></i>`; sp.append(label); keyEl.append(sp); };
-      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal, ringed in the scoring team’s color'); item('hollow', 'Shot at an empty net');
-      for (const s of ['Bigger dot = better chance', 'Shaded = power play']) { const sp = document.createElement('span'); sp.textContent = s; keyEl.append(sp); }
+      const item = (cls: string | null, label: string, c?: string) => { const sp = document.createElement('span'); if (c) sp.style.setProperty('--c', c); sp.innerHTML = cls == null ? '' : `<i${cls ? ` class="${cls}"` : ''}></i>`; sp.append(label); keyEl.append(sp); };
+      item('', g.an, C[0]); item('', g.hn, C[1]); item('ring', 'Goal'); item('hollow', 'Shot at an empty net');
+      if (blks.length) item('sq', 'Blocked shot');
+      item(null, 'Bigger dot = better chance'); item(null, 'Shaded = power play');
+      if (g.pulled.length) item('box', 'Net empty');
 
+      // ---- the scoreboard and the skaters on each side ----
+      // at a goal's own second, the strength it was scored at (a power play ends with the goal)
+      const goalSec = new Set((g.shots as Shot[]).filter((s) => s.g).map((s) => s.t));
+      const strAt = (t: number) => { const before = goalSec.has(t); let v = g.str[0]; for (const r of g.str) if (before ? r[0] < t : r[0] <= t) v = r; return v as number[] | undefined; };
+      let ppShown = -2;
+      const setPP = (t: number) => {
+        const v = t >= END ? undefined : strAt(t);
+        const h = !v || !v[3] || !v[4] || v[1] === v[2] ? -1 : v[1] > v[2] ? 0 : 1;
+        if (h !== ppShown) { ppShown = h; [0, 1].forEach((i) => document.getElementById('gf-pp' + i)?.classList.toggle('on', i === h)); }
+        const el = $('gf-str');
+        if (!v) { el.classList.add('off'); return; }
+        const [, a, hm, ga, gh] = v, pulled = !ga ? 0 : !gh ? 1 : -1;
+        const words = pulled >= 0 ? `${[g.away, g.home][pulled]} goalie pulled` : h >= 0 ? `${[g.away, g.home][h]} power play` : a === 5 ? 'even strength' : 'even';
+        el.className = 'gf-str';
+        el.innerHTML = `<b style="color:${C[0]}">${a}</b> on <b style="color:${C[1]}">${hm}</b><span class="x"> · ${words}</span>`;
+        el.title = `${g.an} ${a} skaters, ${g.hn} ${hm} skaters${pulled >= 0 ? `, ${[g.an, g.hn][pulled]} net empty` : ''}`;
+      };
       const board = (t: number) => {
+        const goals = g.shots.filter((s: Shot) => s.g);
         const n = [0, 0]; for (const s of goals) if (s.t <= t) n[s.h]++;
-        if (t >= END) { n[0] = g.score[0]; n[1] = g.score[1]; }
-        $('gf-clk').textContent = t >= END ? (g.end ? `Final (${g.end})` : 'Final') : clock(t);
+        const final = t >= END && soN >= g.so.length;
+        if (final) { n[0] = g.score[0]; n[1] = g.score[1]; }
+        $('gf-clk').textContent = final ? (g.end ? `Final (${g.end})` : 'Final') : t >= END ? 'Shootout' : clock(t);
         const box = $('gf-sc');
         if (!box.dataset.ready) { box.dataset.ready = '1'; box.innerHTML = `<span class="gf-pp" id="gf-pp0" style="--c:${C[0]}">PP</span><span style="color:${C[0]}">${g.away}</span><span class="gf-n" id="gf-n0">0</span><span>–</span><span class="gf-n" id="gf-n1">0</span><span style="color:${C[1]}">${g.home}</span><span class="gf-pp" id="gf-pp1" style="--c:${C[1]}">PP</span>`; ppShown = -2; }
         [0, 1].forEach((h) => { const el = $('gf-n' + h); if (el.textContent !== String(n[h])) el.textContent = String(n[h]); });
       };
-      // show the game up to time t (no effects)
-      const show = (t: number) => {
-        for (const [s, c] of dots) c.style.opacity = s.t <= t ? 1 : 0;
-        for (const [s, c] of goalMarks) c.style.opacity = s.t <= t ? 1 : 0;
-        for (const [s, e] of names) e.style.opacity = s.t <= t ? 1 : 0;
+
+      // ---- the calls strip: goals, big chances and penalties, newest first, slid to the moment on show ----
+      const calls: { t: number; h: number; el: HTMLElement; so?: boolean }[] = [];
+      const track = $('gf-track'); track.replaceChildren();
+      const addCall = (t: number, h: number, cls: string, html: string, so = false) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gf-chip' + (cls ? ' ' + cls : ''); b.style.setProperty('--c', C[h]); b.innerHTML = html; b.addEventListener('click', () => { stop(); pinned = so ? null : t; showAt(so ? END : t); iceAt(pinned); }); calls.push({ t, h, el: b, so }); };
+      for (const s of g.shots as Shot[]) {
+        if (s.g) addCall(s.t, s.h, 'goal', `<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : ''}`);
+        else if (s.xg >= DANGER && !s.en) addCall(s.t, s.h, '', `<span class="t">${clock(s.t)}</span>Big chance · ${s.who}, ${Math.round(s.xg * 100)}%`);
+      }
+      for (const p of g.pens as Pen[]) addCall(p.t, p.h, 'pen', `<span class="t">${clock(p.t)}</span>${p.code === 'BEN' || !p.who ? 'Bench penalty' : `Penalty · ${p.who}`}`);
+      const soWin = g.so.filter((a: Attempt) => a.res === 1).at(-1);
+      if (soWin) addCall(END, soWin.h, 'goal', `<span class="t">Shootout</span><b>WINNER</b>${soWin.who}`, true);
+      calls.sort((a, b) => b.t - a.t || (b.so ? 1 : 0) - (a.so ? 1 : 0));
+      for (const c of calls) track.append(c.el);
+      const slide = (t: number) => {
+        const shown = (c: typeof calls[0]) => (c.so ? t >= END && soN >= g.so.length : c.t <= t);
+        const k = calls.findIndex(shown);
+        calls.forEach((c, i) => { const v = shown(c); c.el.classList.toggle('later', !v); c.el.classList.toggle('old', v && i > k); c.el.tabIndex = v ? 0 : -1; });
+        track.style.transform = k < 0 ? 'translateX(-100%)' : `translateX(${-calls[k].el.offsetLeft}px)`;
+      };
+
+      // ---- show the game up to time t (no effects) ----
+      const clipFor = (t: number) => (t >= END ? '' : `inset(0 ${(100 - (CH.X(t) - CH.L) / (CH.R - CH.L) * 100).toFixed(2)}% 0 0)`);
+      const chartAt = (t: number) => {
+        CH.curves.forEach((p: any) => p.style.clipPath = clipFor(t));
+        for (const [s, e] of CH.goalMarks) e.style.opacity = s.t <= t ? 1 : 0;
+        for (const [s, e] of CH.names) e.style.opacity = s.t <= t ? 1 : 0;
         svg.querySelectorAll('.gf-gstem').forEach((e: any) => e.style.opacity = +e.dataset.t <= t ? 1 : 0);
-        const clip = t >= END ? '' : `inset(0 ${(100 - (X(t) - L) / (R - L) * 100).toFixed(2)}% 0 0)`;
-        curves.forEach((p) => p.style.clipPath = clip);
-        cur.setAttribute('opacity', t < END ? 1 : 0); cur.setAttribute('x1', X(t)); cur.setAttribute('x2', X(t));
-        board(t); setPP(t); SH.at(t);
+        svg.querySelectorAll('.gf-son').forEach((e: any) => e.style.opacity = t >= END ? 1 : 0);
+        CH.cur.setAttribute('opacity', t < END ? 1 : 0); CH.cur.setAttribute('x1', CH.X(Math.min(t, END))); CH.cur.setAttribute('x2', CH.X(Math.min(t, END)));
+        board(t); setPP(t); slide(t);
+      };
+      const showAt = (t: number) => {
+        T = t;
+        for (const [s, c] of dots) { const v = s.t <= t; c.style.opacity = v ? 1 : 0; c.style.pointerEvents = v ? '' : 'none'; }
+        for (const [b, e] of blks) { const v = b.t <= t; e.style.opacity = v ? 1 : 0; e.style.pointerEvents = v ? '' : 'none'; }
+        chartAt(t); SH.at(t); soShow();
       };
 
       // effects for one shot during playback
       const fire = (s: Shot) => {
-        const d = dots.find((q) => q[0] === s)!, x = X(s.t);
+        const d = dots.find((q) => q[0] === s)!, x = CH.X(s.t);
         d[1].style.opacity = 1;
         d[1].classList.remove('gf-pop', 'gf-pop-big', 'gf-pop-goal'); void d[1].getBBox();
         if (s.g) {
           d[1].classList.add('gf-pop-goal');
           [2.4, 3.6].forEach((k, i) => { const r = mk('circle', { cx: d[2], cy: d[3], r: 4.5, class: 'gf-ripple big', stroke: C[s.h], 'stroke-width': 1.6 - i * 0.5 }, rfx); r.style.setProperty('--s', k); r.style.animationDelay = i * 150 + 'ms'; setTimeout(() => r.remove(), 1700); });
-          const gm = goalMarks.find((q) => q[0] === s)![1]; gm.style.opacity = 1; gm.classList.remove('gf-pop-goal'); void gm.getBBox(); gm.classList.add('gf-pop-goal');
-          const r2 = mk('circle', { cx: x, cy: yAt(s), r: 7, class: 'gf-ripple big', stroke: C[s.h], 'stroke-width': 2.5 }, fx); r2.style.setProperty('--s', 4); setTimeout(() => r2.remove(), 1500);
-          const nm = names.find((q) => q[0] === s)![1]; nm.style.opacity = 1; nm.classList.remove('gf-label-in'); void nm.getBBox(); nm.classList.add('gf-label-in');
-          svg.querySelectorAll('.gf-gstem').forEach((e: any) => { if (+e.dataset.t === s.t) e.style.opacity = 1; });
-          const flash = mk('rect', { x: x - 6, y: T, width: 12, height: B - T, fill: C[s.h], class: 'gf-flash' }, fx); setTimeout(() => flash.remove(), 1000);
-          chip(`<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : ''}`, C[s.h], true); SH.goal(s);
-          board(s.t + 0.01);
+          const gm = CH.goalMarks.find((q: any) => q[0] === s)![1]; gm.style.opacity = 1; gm.classList.remove('gf-pop-goal'); void gm.getBBox(); gm.classList.add('gf-pop-goal');
+          const r2 = mk('circle', { cx: x, cy: CH.yAt(s), r: 7, class: 'gf-ripple big', stroke: C[s.h], 'stroke-width': 2.5 }, CH.fx); r2.style.setProperty('--s', 4); setTimeout(() => r2.remove(), 1500);
+          const nm = CH.names.find((q: any) => q[0] === s)![1]; nm.style.opacity = 1; nm.classList.remove('gf-label-in'); void nm.getBBox(); nm.classList.add('gf-label-in');
+          const flash = mk('rect', { x: x - 6, y: CH.T, width: 12, height: CH.B - CH.T, fill: C[s.h], class: 'gf-flash' }, CH.fx); setTimeout(() => flash.remove(), 1000);
+          SH.goal(s);
           const n = $('gf-n' + s.h); n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump');
         } else if (s.xg >= DANGER && !s.en) {
           d[1].classList.add('gf-pop-big');
           const r = mk('circle', { cx: d[2], cy: d[3], r: 4, class: 'gf-ripple', stroke: C[s.h], 'stroke-width': 1.2 }, rfx); r.style.setProperty('--s', 3.4); setTimeout(() => r.remove(), 1000);
-          const flash = mk('rect', { x: x - 3, y: T, width: 6, height: B - T, fill: C[s.h], class: 'gf-flash' }, fx); flash.style.animationDuration = '0.6s'; setTimeout(() => flash.remove(), 700);
-          chip(`<span class="t">${clock(s.t)}</span>Big chance · ${s.who}, ${Math.round(s.xg * 100)}%`, null, false);
+          const flash = mk('rect', { x: x - 3, y: CH.T, width: 6, height: CH.B - CH.T, fill: C[s.h], class: 'gf-flash' }, CH.fx); flash.style.animationDuration = '0.6s'; setTimeout(() => flash.remove(), 700);
         } else {
           d[1].classList.add('gf-pop');
         }
       };
 
-      // pacing: weight per game second, slower near dangerous chances, plus a stop on goals
+      // pacing: weight per game second, slower near dangerous chances, plus a stop on goals, then the shootout
+      const goals = g.shots.filter((s: Shot) => s.g);
       const per = new Float64Array(END + 1).fill(1);
       for (const s of g.shots as Shot[]) { if (s.en && !s.g) continue; const k = 26 * Math.pow(Math.max(0, s.xg - 0.03), 1.1); if (k <= 0) continue; for (let t = Math.max(0, s.t - 25); t <= Math.min(END, s.t + 6); t++) { const d = (t - s.t) / (t < s.t ? 9 : 3); per[t] += k * Math.exp(-d * d); } }
-      const wsum = per.reduce((a, b) => a + b, 0), BASE = Math.max(9000, 14000 - goals.length * 750), msPer = BASE / wsum, PAUSE = 750;
-      const realAt = new Float64Array(END + 2); let acc = 0; const gsec = new Set(goals.map((s) => Math.floor(s.t)));
+      const wsum = per.reduce((a, b) => a + b, 0), BASE = Math.max(9000, 14000 - goals.length * 750), msPer = BASE / wsum, PAUSE = 750, SO_STEP = 750;
+      const realAt = new Float64Array(END + 2); let acc = 0; const gsec = new Set(goals.map((s: Shot) => Math.floor(s.t)));
       for (let t = 0; t <= END; t++) { realAt[t] = acc; acc += per[t] * msPer + (gsec.has(t) ? PAUSE : 0); }
       realAt[END + 1] = acc;
+      const total = acc + (g.so.length ? g.so.length * SO_STEP + 300 : 0);
       const gameAt = (ms: number) => { let lo = 0, hi = END + 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (realAt[mid] <= ms) lo = mid; else hi = mid - 1; } if (lo > END) return END; const span = per[lo] * msPer, into = ms - realAt[lo]; return Math.min(END, lo + Math.min(1, into / span)); };
+      const soAt = (ms: number) => (ms < realAt[END + 1] ? 0 : Math.min(g.so.length, Math.floor((ms - realAt[END + 1]) / SO_STEP) + 1));
 
-      // who was on the ice at a moment: shown when the game is paused, or at a moment the reader picks on the chart
+      // who was on the ice at a moment: shown when the game is paused, or at a moment the reader picks on the chart;
+      // the full shift chart already says so while it is open, so the table stays away then
       const ORDER = ['L1', 'L2', 'L3', 'L4', 'XF', 'P1', 'P2', 'P3', 'XD'];
       const onAt = <P extends { s: [number, number][] }>(list: P[], t: number) => list.filter((p) => p.s.some(([a, b]) => t >= a && t < b));
       const iceAt = (t: number | null) => {
-        if (t == null || t >= END) { ice.classList.remove('on'); return; }
+        if (t == null || t >= END || shiftOpen) { ice.classList.remove('on'); return; }
         const cols = [0, 1].map((h) => {
           const gk = onAt(g.gk.filter((p: any) => p.h === h), t)[0] as any;
           // on a change the shift records can overlap by a second; keep the most recent arrivals
@@ -347,28 +500,89 @@ const base = import.meta.env.BASE_URL;
           const fw = sk.filter((p) => p.grp[0] === 'L' || p.grp === 'XF'), dd = sk.filter((p) => p.grp[0] === 'P' || p.grp === 'XD');
           const tags = (ps: Skater[]) => [...new Set(ps.map((p) => p.grp).filter((x) => x[0] !== 'X'))].map((x) => `<span class="ltag">${x}</span>`).join('');
           const list = (ps: Skater[]) => ps.map((p) => last(p.n)).join(' · ') || '<span class="none">none</span>';
+          const box = (g.pens as Pen[]).filter((p) => p.h === h && p.who && p.code !== 'BEN' && t >= p.t && t < p.end).map((p) => last(p.who));
           return `<div class="ic" style="--c:${C[h]}"><p class="ic-h">${h ? g.hn : g.an}<span>${sk.length} skaters${gk ? '' : ', net empty'}</span></p>
-            <p><b>F</b>${list(fw)}${tags(fw)}</p><p><b>D</b>${list(dd)}${tags(dd)}</p><p><b>G</b>${gk ? last(gk.n) : '<span class="none">pulled for an extra skater</span>'}</p></div>`;
+            <p><b>F</b>${list(fw)}${tags(fw)}</p><p><b>D</b>${list(dd)}${tags(dd)}</p><p><b>G</b>${gk ? last(gk.n) : '<span class="none">pulled for an extra skater</span>'}</p>${box.length ? `<p class="bx">In the box: ${[...new Set(box)].join(', ')}</p>` : ''}</div>`;
         });
         ice.innerHTML = `<p class="ic-t">On the ice at ${clock(t)}</p>${cols.join('')}`;
         ice.classList.remove('on'); void ice.offsetWidth; ice.classList.add('on');
       };
-      const tip = tipFor(stage);
-      S = { END, show, fire, gameAt, setPP, SH, iceAt, X, L, R, svg, shots: g.shots, tip, cur };
-      show(END);
 
-      const tAt = (e: PointerEvent) => { const b = svg.getBoundingClientRect(); const x = (e.clientX - b.left) / b.width * W; return Math.max(0, Math.min(END, (x - L) / (R - L) * END)); };
-      // a tap, click or drag pins that moment until another one or a replay; plain mouse hover only previews it
-      svg.addEventListener('pointerdown', (e: PointerEvent) => { if (anim) return; pinned = tAt(e); });
-      svg.addEventListener('pointermove', (e: PointerEvent) => { if (anim) return; const b = svg.getBoundingClientRect(); const t = tAt(e); if (e.pointerType !== 'mouse' || e.buttons) pinned = t; show(t); iceAt(t); tip.show(X(t) / W * b.width, T / VH * b.height, `<b>${clock(t)}</b> · ${g.away} ${cum(0, t).toFixed(1)} · ${g.home} ${cum(1, t).toFixed(1)} expected goals`); });
-      svg.addEventListener('pointerleave', () => { if (anim) return; tip.hide(); const at = pinned ?? (paused ? paused.t : null); if (at != null) { show(at); iceAt(at); } else { show(END); iceAt(null); } });
+      const tip = tipFor(stage), rinkTip = tipFor(rw);
+      const restAt = () => pinned ?? (paused ? paused.t : null);
+      const shotOf = (el: Element | null) => { const e = el?.closest('[data-shot]') as HTMLElement | SVGElement | null; return e ? g.shots[+(e as any).dataset.shot] as Shot : null; };
+      const tAt = (e: PointerEvent) => { const b = svg.getBoundingClientRect(); const x = (e.clientX - b.left) / b.width * CH.W; return Math.max(0, Math.min(END, (x - CH.L) / (CH.R - CH.L) * END)); };
+
+      // the chart: a tap, click or drag pins that moment until another one or a replay; plain mouse hover only previews it.
+      // Pointing at a goal names it and rings its shot on the rink.
+      svg.addEventListener('pointerdown', (e: PointerEvent) => {
+        if (anim) return;
+        if ((e.target as Element).closest('[data-so]')) { $('gf-so').scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); return; }
+        const s = shotOf(e.target as Element); pinned = s ? s.t : tAt(e);
+      });
+      svg.addEventListener('pointermove', (e: PointerEvent) => {
+        if (anim) return;
+        const b = svg.getBoundingClientRect();
+        const s = shotOf(e.target as Element), net = (e.target as Element).closest('[data-net]') as SVGElement | null;
+        if (s) { showAt(s.t); iceAt(s.t); ring(s); const [x, y] = above(e.target as Element, stage); tip.show(x, y, shotTip(s)); return; }
+        ring(null);
+        if (net) { const p = g.pulled[+net.dataset.net!]; tip.show(e.clientX - stage.getBoundingClientRect().left, CH.T / CH.VH * b.height, `<b>${p.h ? g.hn : g.an} net empty</b><br>${clock(p.a)} to ${clock(p.b)}, goalie pulled for an extra skater`); }
+        const t = tAt(e); if (e.pointerType !== 'mouse' || e.buttons) pinned = t;
+        showAt(t); iceAt(t);
+        if (!net) tip.show(CH.X(t) / CH.W * b.width, CH.T / CH.VH * b.height, `<b>${clock(t)}</b> · ${g.away} ${CH.cum(0, t).toFixed(1)} · ${g.home} ${CH.cum(1, t).toFixed(1)} expected goals`);
+      });
+      svg.addEventListener('pointerleave', () => { if (anim) return; tip.hide(); ring(null); const r = restAt(); showAt(r ?? END); iceAt(r); });
+      // the keyboard steps from shot to shot; Home and End jump to the start and the final
+      const stops = [...new Set((g.shots as Shot[]).map((s) => s.t))].sort((a, b) => a - b);
+      svg.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return;
+        e.preventDefault(); stop();
+        const cur = restAt() ?? (e.key === 'ArrowRight' ? -1 : END + 1);
+        let t = e.key === 'Home' ? 0 : e.key === 'End' ? END : e.key === 'ArrowRight' ? stops.find((s) => s > cur) : [...stops].reverse().find((s) => s < cur);
+        if (t == null) t = e.key === 'ArrowRight' ? END : 0;
+        pinned = t >= END ? null : t; showAt(t); iceAt(pinned);
+        const s = (g.shots as Shot[]).filter((q) => q.t === t).sort((a, b) => b.g - a.g || b.xg - a.xg)[0], b = svg.getBoundingClientRect();
+        ring(s ?? null);
+        if (s) tip.show(CH.X(t) / CH.W * b.width, CH.T / CH.VH * b.height, shotTip(s)); else tip.hide();
+      });
+      svg.addEventListener('blur', () => { tip.hide(); ring(null); });
+
+      // the rink: pointing at a shot names it and moves the chart, clock and score to it; the rink itself and the
+      // on-ice table stay as they are, so nothing moves out from under the pointer
+      rk.addEventListener('pointermove', (e: PointerEvent) => {
+        const s = shotOf(e.target as Element), be = (e.target as Element).closest('[data-blk]') as SVGElement | null;
+        const b = be ? g.blocks[+be.dataset.blk!] as Block : null;
+        if (!s && !b) { rinkTip.hide(); if (!anim) chartAt(T); return; }
+        const [x, y] = above(e.target as Element, rw); rinkTip.show(x, y, s ? shotTip(s) : blockTip(b!));
+        if (!anim) chartAt((s ?? b)!.t);
+      });
+      rk.addEventListener('pointerleave', () => { rinkTip.hide(); if (!anim) chartAt(T); });
+
+      // the shift chart opening slides the chart's start over so the two time lines meet; closing slides it back
+      let tween = 0;
+      const slideTo = (Lto: number) => {
+        cancelAnimationFrame(tween);
+        const L0 = CH.L, t0 = performance.now(), DUR = CALM ? 0 : 480, ease = (u: number) => 1 - Math.pow(1 - u, 3);
+        const step = (now: number) => { const u = DUR ? Math.min(1, (now - t0) / DUR) : 1; CH = renderChart(svg, L0 + (Lto - L0) * ease(u)); S.CH = CH; chartAt(T); if (u < 1) tween = requestAnimationFrame(step); };
+        tween = requestAnimationFrame(step);
+      };
+      SH.fold.addEventListener('toggle', () => {
+        if (shiftOpen === SH.fold.open) return;
+        shiftOpen = SH.fold.open; tip.hide();
+        iceAt(shiftOpen ? null : restAt());
+        const d = dims(); slideTo(shiftOpen ? d.Lshift : d.Lfull);
+      });
+
+      S = { END, showAt, fire, gameAt, soAt, total, iceAt, tip, get CH() { return CH; }, set CH(v) { CH = v; } };
+      showAt(END);
     }
 
-    // Every shift: one row per skater, grouped by tonight's lines and pairs, on the same time axis as the chart above
+    // Every shift: one row per skater, grouped by tonight's lines and pairs, on the same time axis as the chart above it.
+    // A player's time in the box is outlined on his row.
     function shifts(W: number, L: number, R: number, X: (t: number) => number, END: number, getDots: () => [Shot, any, number, number][]) {
-      const fold = document.createElement('details'); fold.className = 'gf-fold'; fold.innerHTML = '<summary><span>Show every shift</span></summary>'; stage.append(fold);
-      fold.addEventListener('toggle', () => { fold.querySelector('summary span')!.textContent = fold.open ? 'Hide every shift' : 'Show every shift'; });
-      const inner = document.createElement('div'); inner.className = 'gf-fold-body'; inner.style.position = 'relative'; fold.append(inner);
+      const fold = document.createElement('details'); fold.className = 'fold gf-fold'; fold.open = shiftOpen;
+      fold.innerHTML = '<summary><span class="closed">Show every shift</span><span class="opened">Hide every shift</span></summary>'; stage.append(fold);
+      const inner = document.createElement('div'); inner.className = 'gf-fold-body'; fold.append(inner);
       const svg = mk('svg', { role: 'img', 'aria-label': 'Every skater’s shifts through the game' }, inner);
       const RH = 7.5, STEP = 10, GAP = 6, ORDER = ['L1', 'L2', 'L3', 'L4', 'XF', 'P1', 'P2', 'P3', 'XD'];
       const rows: { p: Skater; y: number; g?: any; name?: any }[] = []; let y = 6;
@@ -389,7 +603,7 @@ const base = import.meta.env.BASE_URL;
       const VH = y + 8;
       svg.setAttribute('viewBox', `0 0 ${W} ${VH}`);
       for (const p of g.pp) mk('rect', { x: X(p.a), y: bandTop[0] - 4, width: Math.max(2, X(p.b) - X(p.a)), height: VH - 10 - bandTop[0], fill: C[p.h], 'fill-opacity': 0.1 }, svg);
-      [1200, 2400, 3600].filter((t) => t < END).forEach((t, i) => mk('line', { x1: X(t), x2: X(t), y1: bandTop[0] - 4, y2: VH - 14, stroke: i === 1 ? 'var(--line-red)' : 'var(--line-blue)', 'stroke-width': 2 }, svg));
+      [1200, 2400, 3600].filter((t) => t < END).forEach((t, i) => mk('line', { x1: X(t), x2: X(t), y1: bandTop[0] - 4, y2: VH - 14, stroke: i === 1 ? 'var(--line-red)' : 'var(--line-blue)', 'stroke-width': 3 }, svg));
       const goalLines: [Shot, any][] = (g.shots as Shot[]).filter((s) => s.g).map((s) => [s, mk('line', { x1: X(s.t), x2: X(s.t), y1: bandTop[0] - 4, y2: VH - 14, stroke: C[s.h], 'stroke-width': 1.5, 'stroke-dasharray': '3 2' }, svg)]);
       const cid = `gf-shc-${g.away}${g.home}`; const clipR = mk('rect', { x: L, y: 0, width: R - L, height: VH }, mk('clipPath', { id: cid }, mk('defs', {}, svg)));
       const bars = mk('g', { 'clip-path': `url(#${cid})` }, svg);
@@ -397,6 +611,7 @@ const base = import.meta.env.BASE_URL;
         r.g = mk('g', { class: 'gf-srow' }, bars);
         mk('rect', { x: L, y: r.y, width: R - L, height: RH, fill: 'var(--track)', opacity: 0.5, class: 'gf-strack' }, r.g);
         for (const [a, b] of r.p.s) mk('rect', { x: X(a).toFixed(1), y: r.y, width: Math.max(0.8, X(b) - X(a)).toFixed(1), height: RH, rx: 1.5, fill: C[r.p.h], class: 'gf-sbar' }, r.g);
+        for (const p of g.pens as Pen[]) if (p.pid === r.p.id && p.code !== 'BEN') mk('rect', { x: (X(p.t) + 0.5).toFixed(1), y: r.y + 0.6, width: Math.max(1, X(p.end) - X(p.t) - 1).toFixed(1), height: RH - 1.2, rx: 1.5, fill: 'none', stroke: C[r.p.h], 'stroke-width': 1.1 }, r.g);
         const nm = last(r.p.n); r.name = txt(svg, L - 6, r.y + RH - 0.5, W < 600 && nm.length > 10 ? nm.slice(0, 9) + '…' : nm, 'gf-sname', 'end');
       }
       const cur = mk('line', { y1: bandTop[0] - 4, y2: VH - 14, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: 0 }, svg);
@@ -406,7 +621,7 @@ const base = import.meta.env.BASE_URL;
         lastT = t;
         const full = t >= END;
         clipR.setAttribute('width', full ? R - L : Math.max(0, X(t) - L));
-        cur.setAttribute('x1', X(t)); cur.setAttribute('x2', X(t)); cur.setAttribute('opacity', full ? 0 : 1);
+        cur.setAttribute('x1', X(Math.min(t, END))); cur.setAttribute('x2', X(Math.min(t, END))); cur.setAttribute('opacity', full ? 0 : 1);
         for (const r of rows) { const o = !full && on(r.p, t); r.g.classList.toggle('on', o); r.name.classList.toggle('on', o); }
         svg.classList.toggle('live', !full);
         for (const [s, l] of goalLines) l.style.opacity = s.t <= t ? 1 : 0;
@@ -421,20 +636,53 @@ const base = import.meta.env.BASE_URL;
         const r = rowAt(e); rows.forEach((q) => { q.g.classList.toggle('hl', q === r); q.name.classList.toggle('hl', q === r); }); svg.classList.toggle('picking', !!r);
         if (!r) { tip.hide(); return; }
         const b = svg.getBoundingClientRect(), sb = inner.getBoundingClientRect();
-        tip.show(e.clientX - sb.left, b.top - sb.top + (r.y / VH) * b.height, `<b>${r.p.n}</b> · ${clockMS(r.p.toi)} on the ice · ${r.p.s.length} shifts`);
-        if (!anim) for (const [s, c] of getDots()) c.style.opacity = on(r.p, s.t) || r.p.s.some(([, bb]) => s.t === bb) ? 1 : 0.08;
+        const box = (g.pens as Pen[]).filter((p) => p.pid === r.p.id && p.code !== 'BEN').length;
+        tip.show(e.clientX - sb.left, b.top - sb.top + (r.y / VH) * b.height, `<b>${r.p.n}</b> · ${clockMS(r.p.toi)} on the ice · ${r.p.s.length} shifts${box ? ` · ${box} penalt${box > 1 ? 'ies' : 'y'}, outlined` : ''}`);
+        if (!anim) for (const [s, c] of getDots()) c.style.opacity = s.t <= lastT && (on(r.p, s.t) || r.p.s.some(([, bb]) => s.t === bb)) ? 1 : s.t <= lastT ? 0.08 : 0;
       });
       svg.addEventListener('pointerleave', () => { rows.forEach((q) => { q.g.classList.remove('hl'); q.name.classList.remove('hl'); }); svg.classList.remove('picking'); tip.hide(); if (!anim) for (const [s, c] of getDots()) c.style.opacity = s.t <= lastT ? 1 : 0; });
-      return { at, goal };
+      return { at, goal, fold };
     }
 
-    function chip(html: string, c: string | null, goal: boolean) {
-      const box = $('gf-calls');
-      const el = document.createElement('span'); el.className = 'gf-chip' + (goal ? ' goal' : ''); el.innerHTML = html; if (c) el.style.setProperty('--c', c);
-      box.prepend(el);
-      [...box.children].forEach((k, i) => { k.classList.toggle('old', i > 0); if (i > 5) k.remove(); });
+    // ---- the shootout ----
+    function soShow() {
+      const box = $('gf-so');
+      if (!g.so.length) { box.hidden = true; return; }
+      if (!box.dataset.ready) {
+        box.dataset.ready = '1'; box.hidden = false;
+        const rounds = Math.ceil(g.so.length / 2), first = g.so[0].h;
+        const by = [0, 1].map((h) => g.so.filter((a: Attempt) => a.h === h) as Attempt[]);
+        const made = [0, 1].map((h) => by[h].filter((a) => a.res === 1).length);
+        const win = made[1] > made[0] ? 1 : 0, winner = g.so.filter((a: Attempt) => a.res === 1 && a.h === win).at(-1) as Attempt;
+        const name = [g.an, g.hn], abbr = [g.away, g.home];
+        let html = `<div class="gf-so-h"><h3>Shootout</h3><p>${winner ? `${last(winner.who)}’s goal in round ${Math.ceil((g.so.indexOf(winner) + 1) / 2)} won it for the ${name[win]}, ${Math.max(...made)}–${Math.min(...made)}.` : ''}</p></div><div class="gf-so-scroll"><div class="gf-so-grid" style="--n:${rounds}"><span></span>`;
+        for (let r = 1; r <= rounds; r++) html += `<span class="gf-so-rd">ROUND ${r}</span>`;
+        html += '<span></span>';
+        for (const h of [first, 1 - first]) {
+          html += `<div class="gf-so-team" style="color:${C[h]}">${abbr[h]}<span>${h === first ? 'shot first · ' : ''}on ${last(by[h][0]?.gk ?? '')}</span></div>`;
+          for (let r = 0; r < rounds; r++) {
+            const a = by[h][r];
+            if (!a) { html += '<span></span>'; continue; }
+            const i = g.so.indexOf(a);
+            html += `<div class="gf-so-cell${a === winner ? ' win' : ''}" data-i="${i}" style="--c:${C[h]}" tabindex="0"><i class="${a.res === 1 ? 'g' : a.res === 0 ? 's' : 'm'}"></i><span>${last(a.who)}</span></div>`;
+          }
+          html += `<span class="gf-so-tot" style="color:${C[h]}" data-h="${h}">${made[h]}</span>`;
+        }
+        box.innerHTML = html + '</div></div>';
+        const tip = tipFor(box);
+        box.querySelectorAll<HTMLElement>('.gf-so-cell').forEach((el) => {
+          const i = +el.dataset.i!, a = g.so[i] as Attempt;
+          const show = () => { const [x, y] = above(el, box); tip.show(x, y, `<span class="tt">Round ${Math.ceil((i + 1) / 2)}</span><br><b>${a.who}</b> (${abbr[a.h]})<br>${a.type ? kind(a.type) + ', ' : ''}${a.res === 1 ? 'scored on' : a.res === 0 ? 'saved by' : 'missed against'} ${a.gk}`); };
+          el.addEventListener('pointerenter', show); el.addEventListener('focus', show);
+          el.addEventListener('pointerleave', () => tip.hide()); el.addEventListener('blur', () => tip.hide());
+        });
+      }
+      const n = T >= g.END ? soN : 0;
+      box.classList.toggle('wait', T < g.END);
+      box.querySelectorAll<HTMLElement>('.gf-so-cell').forEach((el) => el.classList.toggle('hide', T >= g.END && +el.dataset.i! >= n));
+      const made = [0, 1].map((h) => g.so.slice(0, T >= g.END ? n : g.so.length).filter((a: Attempt) => a.h === h && a.res === 1).length);
+      box.querySelectorAll<HTMLElement>('.gf-so-tot').forEach((el) => el.textContent = String(made[+el.dataset.h!]));
     }
-    const clearCalls = () => $('gf-calls').replaceChildren();
 
     let done = false;
     const ICON = { play: '<path d="M1.5 0.5 9.5 5 1.5 9.5Z"/>', pause: '<path d="M1.5 0.5h2.6v9H1.5zM5.9 0.5h2.6v9H5.9z"/>', again: '<path d="M8.6 5a3.6 3.6 0 1 1-1-2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M8.9 0.9v2.4H6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>' };
@@ -445,26 +693,23 @@ const base = import.meta.env.BASE_URL;
     function stop(asPause?: boolean) {
       if (!anim) return;
       cancelAnimationFrame(anim.raf);
-      if (asPause) { paused = { ms: performance.now() - anim.t0, t: anim.t, i: anim.i }; S.iceAt(anim.t); }
+      if (asPause) { paused = { ms: performance.now() - anim.t0, t: anim.t }; S.iceAt(anim.t); }
       anim = null; setBtn(false);
     }
     function play() {
       if (!S) return;
       if (anim) { stop(true); return; }
-      if (CALM) { S.show(S.END); return; }
+      if (CALM) { soN = g.so.length; S.showAt(S.END); return; }
       const from = paused; paused = null; pinned = null; S.iceAt(null); S.tip.hide();
-      if (!from) { S.show(0); clearCalls(); }
-      anim = { raf: 0, t0: performance.now() - (from ? from.ms : 0), i: from ? from.i : 0, t: from ? from.t : 0 }; done = false; setBtn(true);
-      const shots = S.shots;
+      const shots = g.shots as Shot[];
+      if (!from) { soN = 0; S.showAt(0); }
+      anim = { raf: 0, t0: performance.now() - (from ? from.ms : 0), i: shots.filter((s) => s.t <= (from ? from.t : -1)).length, t: from ? from.t : 0 }; done = false; setBtn(true);
       const step = (now: number) => {
-        const t = S.gameAt(now - anim.t0); anim.t = t;
-        // advance the drawing without resetting effects
-        const clip = t >= S.END ? '' : `inset(0 ${(100 - (S.X(t) - S.L) / (S.R - S.L) * 100).toFixed(2)}% 0 0)`;
-        S.svg.querySelectorAll('path').forEach((p: any) => p.style.clipPath = clip);
-        S.cur.setAttribute('x1', S.X(t)); S.cur.setAttribute('x2', S.X(t)); S.cur.setAttribute('opacity', t < S.END ? 1 : 0);
-        $('gf-clk').textContent = clock(t); S.setPP(t); S.SH.at(t);
+        const ms = now - anim.t0, t = S.gameAt(ms); anim.t = t;
+        soN = S.soAt(ms); S.showAt(t);
+        // the shots already shown stay; new ones get their effects
         while (anim.i < shots.length && shots[anim.i].t <= t) { S.fire(shots[anim.i]); anim.i++; }
-        if (t < S.END) anim.raf = requestAnimationFrame(step); else { anim = null; done = true; setBtn(false); S.show(S.END); }
+        if (ms < S.total) anim.raf = requestAnimationFrame(step); else { anim = null; done = true; setBtn(false); soN = g.so.length; S.showAt(S.END); }
       };
       anim.raf = requestAnimationFrame(step);
     }
@@ -476,6 +721,7 @@ const base = import.meta.env.BASE_URL;
     }
     btn.addEventListener('click', play);
     selV.addEventListener('change', () => { if (!g) return; draw(); play(); });
+    selB.addEventListener('change', () => { if (!g) return; draw(); });
     let drawnAt = host.clientWidth; addEventListener('resize', () => { const w = host.clientWidth; if (g && !anim && (narrow() !== drawnAt < 560 || Math.abs(w - drawnAt) > 120)) { drawnAt = w; draw(); } });
     // fetch the game when the section is close
     if ('IntersectionObserver' in window) { const near = new IntersectionObserver((es) => { if (es[0].isIntersecting) { near.disconnect(); load(); } }, { rootMargin: '600px 0px' }); near.observe(host); } else load();

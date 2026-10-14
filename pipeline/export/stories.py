@@ -463,8 +463,11 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                               "score": 30, "pid": None})
         # missing: a regular this season who sat out the latest game(s)
         res = out["form"][t]["res"]
-        if len(res) >= 3:
-            team_games = [r["game_id"] for r in res]
+        # only games the player table has (a game that failed to build would otherwise make everyone "missing":
+        # COL at DAL 2026-10-13 listed ten Stars and ten Avalanche, Sora 2026-10-14)
+        built = set(P.filter((pl.col("season") == season) & (pl.col("team") == t))["game_id"].to_list())
+        team_games = [r["game_id"] for r in res if r["game_id"] in built]
+        if len(team_games) >= 3:
             per = this.group_by("player_id").agg(gp=pl.len(), toi=pl.col("sec").mean(), pos=pl.col("pos").first(),
                                                  last=pl.col("game_id").max())
             gone = {}  # players who missed the same stretch share one item (Sora, 2026-10-12)
@@ -477,6 +480,8 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                     if missed >= 1 and r["gp"] >= 2:
                         gone.setdefault(missed, []).append((72 + (top - grp["player_id"].to_list().index(r["player_id"])), r["player_id"]))
             for missed, who in gone.items():
+                if len(who) > MISSING_MAX:
+                    continue  # that many regulars out at once is a data gap, not a story
                 who.sort(key=lambda x: -x[0])
                 when = "latest game" if missed == 1 else f"last {num(missed)} games"
                 names = [N[p] for _, p in who]
@@ -516,6 +521,7 @@ def _new_coach(gid: int, teams: tuple[str, str], day: str, W: Words, season: int
     return out
 
 
+MISSING_MAX = 4  # most regulars one "Missing" item names; more than that means the lineup data is incomplete
 MILESTONE_NEAR = 2  # goals, assists or points away from a round hundred
 
 

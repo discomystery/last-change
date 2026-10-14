@@ -187,7 +187,7 @@ def shifts_problems(rows: list[dict], pbp: dict, box: dict) -> int:
     for side in ("homeTeam", "awayTeam"):
         for group in ("forwards", "defense", "goalies"):
             for pl in box["playerByGameStats"][side][group]:
-                official = clock_to_seconds(pl["toi"])
+                official = clock_to_seconds(pl.get("toi") or "0:00")  # a dressed player who never took a shift has no toi (L'Heureux, COL at DAL 2026-10-13)
                 if official or pl["playerId"] in toi:
                     bad += abs(toi.get(pl["playerId"], 0) - official) > 5
     return bad
