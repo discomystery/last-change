@@ -120,8 +120,11 @@ def every(k: str, dev: float) -> int:
 
 def rarity(k: str, dev: float) -> str:
     n = every(k, dev)
-    return f"A team strays this far about once every {n} games." if n < 1000 else \
-        "A team strays this far less than once in a thousand games."
+    # A team plays 82 games, so "once every 100+" is rarer than once a season for any one club (Sora, 2026-10-14: say
+    # how rare it really is, the way a fan would).
+    tail_ = " That’s rarer than once a season for any one team." if n >= 100 else ""
+    return (f"A team strays this far about once every {n} games.{tail_}" if n < 1000 else
+            "A team strays this far less than once in a thousand games. You may never see it again.")
 
 
 def classify(usual: float, x: float, mid: float, sd: float, standing: float | None = None, own: float = 0.0, opp: float = 0.0) -> str:
@@ -545,15 +548,18 @@ def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
             head = f"{N} stole one" if stole else f"A big night for {N}"
             body = f"{N} stopped all {shots}, through overtime."
         else:
-            head = f"{N} stole one" if stole else f"A big night for {N}"
+            head = f"{N} stole one" if stole else f"{N} stood on his head" if gl["gsax"] >= 3 else f"A big night for {N}"
             body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
         if stole:
             en = non_en[t] < goals[t]
             body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
     else:
-        head = f"A rough night for {N}"
+        head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
         body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
-    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {every('gsax', gl['gsax'])} starts."
+    n = every("gsax", gl["gsax"])
+    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n} starts."
+    if n >= 100:  # a busy starter makes about 60 starts: at 1 in 100 a start, fewer than half see one in a season
+        body += " Most starters don’t get one a season."
     score_ = max(abs(z), SMALL) if blank else abs(z)  # a shutout is always worth a mention when nothing bigger happened
     return _item("goalie", score_, "rare", head, body)
 
