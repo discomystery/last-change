@@ -2,7 +2,7 @@
 // The post-game page's share sheet: what each "Share" link makes (the game, a team's Swing, one player's night), drawn
 // in the visitor's browser by lib/shareCard.ts. This file only hands over the game's own facts; the Swing and report
 // card numbers are read from data/scores and data/jobs when someone opens a card.
-import '../styles/shareCard.css';
+import ShareDialog from './ShareDialog.astro';
 import { cardColours } from '../lib/teams';
 import teamsData from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
@@ -54,137 +54,32 @@ const data: Omit<GameData, 'id'> & { id: number } = {
 };
 ---
 <script type="application/json" id="share-data" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
-<div class="sh-scrim" id="sh-scrim" hidden>
-  <div class="sh-dlg" role="dialog" aria-modal="true" aria-labelledby="sh-t">
-    <div class="sh-grab" aria-hidden="true"></div>
-    <div class="sh-top"><h3 id="sh-t">Share</h3><button type="button" class="sh-x" id="sh-x" aria-label="Close">×</button></div>
-    <div class="sh-prev"><div class="sh-frame"><img id="sh-img" alt="" width="1080" height="1350" hidden /><span class="sh-wait" id="sh-wait">Making the card…</span></div></div>
-    <div class="sh-row"><span class="sh-lbl">Card colors</span>
-      <span class="sh-seg" role="group" aria-label="Card colors"><button type="button" data-c="light">Light</button><button type="button" data-c="dark">Dark</button></span></div>
-    <button type="button" class="sh-go" id="sh-go" disabled>Download image</button>
-  </div>
-</div>
+<ShareDialog />
 <script>
-  import type { GameData, Theme } from '../lib/shareCard';
+  import type { GameData } from '../lib/shareCard';
+  import { openShare, onShare, slug, type Theme } from '../lib/shareSheet';
   // The card maker (and the library that turns it into a picture) loads on the first Share tap, not with the page.
   const lib = () => import('../lib/shareCard');
 
   const g = JSON.parse(document.getElementById('share-data')!.textContent!) as GameData;
-  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-  const scrim = $('sh-scrim'), img = $<HTMLImageElement>('sh-img'), wait = $('sh-wait'), go = $<HTMLButtonElement>('sh-go'), title = $('sh-t');
-  // Phones hand the picture to their own share sheet; computers download it.
-  const probe = () => { try { return !!navigator.canShare?.({ files: [new File([''], 'x.png', { type: 'image/png' })] }); } catch { return false; } };
-  const phone = matchMedia('(pointer: coarse)').matches && probe();
-  go.textContent = phone ? 'Share' : 'Download image';
-
-  type Ask = { kind: 'game' | 'swing' | 'night'; team?: string; id?: number };
-  let ask: Ask | null = null, theme: Theme = 'light', made: { blob: Blob; url: string; key: string } | null = null, turn = 0;
-  const shots = new Map<string, Promise<Blob>>();
-  const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const name = (a: Ask) => {
-    const day = g.date.replace(/^\w+, /, '');
-    const base = `${g.away}-at-${g.home}-${slug(day)}`;
-    return `spare-line-change-${a.kind === 'game' ? base : a.kind === 'swing' ? `${base}-swing-${a.team}` : `${slug(g.people[a.id!]?.[0] ?? String(a.id))}-${base}`}.png`;
-  };
-  const make = (a: Ask, t: Theme): Promise<Blob> => {
-    const key = `${a.kind}:${a.team ?? a.id ?? ''}:${t}`;
-    if (!shots.has(key)) {
-      const p = (async () => {
-        const { gameCard, swingCard, nightCard, render, load } = await lib();
-        if (a.kind === 'game') return render(gameCard(g, t));
-        if (a.kind === 'swing') return render(swingCard(g, await load(g, 'scores'), a.team!, t));
-        const [s, j] = await Promise.all([load(g, 'scores').catch(() => null), load(g, 'jobs')]);
-        return render(nightCard(g, s as never, j as never, a.id!, t));
-      })();
-      p.catch(() => shots.delete(key));
-      shots.set(key, p);
-    }
-    return shots.get(key)!;
-  };
-  const paint = async () => {
-    const me = ++turn;
-    document.querySelectorAll<HTMLButtonElement>('.sh-seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === theme)));
-    img.hidden = true; wait.hidden = false; wait.textContent = 'Making the card…'; go.disabled = true;
-    try {
-      const blob = await make(ask!, theme);
-      if (me !== turn) return;
-      if (made) URL.revokeObjectURL(made.url);
-      made = { blob, url: URL.createObjectURL(blob), key: name(ask!) };
-      img.src = made.url; img.hidden = false; wait.hidden = true; go.disabled = false;
-    } catch {
-      if (me === turn) wait.textContent = 'The card couldn’t be made. Please try again.';
-    }
-  };
-  const close = () => { scrim.hidden = true; turn++; document.documentElement.style.overflow = ''; };
-  const open = (a: Ask, label: string) => {
-    ask = a; title.textContent = label;
-    theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    scrim.hidden = false; document.documentElement.style.overflow = 'hidden';
-    paint();
-  };
-  document.addEventListener('click', (e) => {
-    const el = e.target instanceof Element ? e.target : null;
-    const b = el?.closest<HTMLElement>('.share-btn');
-    if (b) {
-      const kind = b.dataset.share;
-      if (kind === 'game') open({ kind: 'game' }, 'Share this game');
-      else if (kind === 'swing') {
-        const team = (document.getElementById('sw-team') as HTMLSelectElement | null)?.value ?? g.away;
-        const nick = g.teams[team].nick;
-        open({ kind: 'swing', team }, `Share the ${nick}${nick.endsWith('s') ? '’' : '’s'} Swing`);
-      } else if (kind === 'night') {
-        const id = Number(b.dataset.id);
-        open({ kind: 'night', id }, `Share ${g.people[id]?.[0] ?? 'his'}’s night`.replace('his’s', 'his'));
-      }
-      return;
-    }
-    const c = el?.closest<HTMLButtonElement>('.sh-seg button');
-    if (c) { theme = c.dataset.c as Theme; paint(); return; }
-    if (el === scrim || el?.closest('#sh-x')) close();
+  const game = `${g.away}-at-${g.home}-${slug(g.date.replace(/^\w+, /, ''))}`;
+  const file = (s: string) => `spare-line-change-${s}.png`;
+  onShare('game', () => openShare({ title: 'Share this game', file: file(game), key: 'game',
+    make: async (t: Theme) => { const { gameCard, render } = await lib(); return render(gameCard(g, t)); } }));
+  onShare('swing', () => {
+    const team = (document.getElementById('sw-team') as HTMLSelectElement | null)?.value ?? g.away;
+    const nick = g.teams[team].nick;
+    openShare({ title: `Share the ${nick}${nick.endsWith('s') ? '’' : '’s'} Swing`, file: file(`${game}-swing-${team}`), key: `swing:${team}`,
+      make: async (t) => { const { swingCard, render, load } = await lib(); return render(swingCard(g, await load(g, 'scores'), team, t)); } });
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !scrim.hidden) close(); });
-  go.addEventListener('click', async () => {
-    if (!made) return;
-    const file = new File([made.blob], made.key, { type: 'image/png' });
-    if (phone && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); } catch { /* closed without sharing */ }
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = made.url; a.download = made.key;
-    document.body.appendChild(a); a.click(); a.remove();
+  onShare('night', (b) => {
+    const id = Number(b.dataset.id);
+    const who = g.people[id]?.[0];
+    openShare({ title: who ? `Share ${who}’s night` : 'Share his night', file: file(`${slug(who ?? String(id))}-${game}`), key: `night:${id}`,
+      make: async (t) => {
+        const { nightCard, render, load } = await lib();
+        const [s, j] = await Promise.all([load(g, 'scores').catch(() => null), load(g, 'jobs')]);
+        return render(nightCard(g, s as never, j as never, id, t));
+      } });
   });
 </script>
-<style is:global>
-  .share-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 5px; text-decoration-thickness: 1px; }
-  .share-btn:hover, .share-btn:focus-visible { color: var(--ink); text-decoration-color: var(--ink-3); }
-  .share-btn svg { flex: none; }
-  .sec-share { margin-left: auto; }
-  .share-btn.icon { width: 30px; height: 30px; justify-content: center; padding: 0; border-radius: 50%; color: var(--ink-3); text-decoration: none; }
-  .share-btn.icon:hover, .share-btn.icon:focus-visible { background: var(--track); color: var(--ink); }
-  .sh-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(15, 25, 38, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .sh-scrim[hidden] { display: none; }
-  .sh-dlg { background: var(--sheet); border-radius: 20px; width: min(420px, 100%); max-height: calc(100% - 8px); overflow: auto; padding: 18px 18px 20px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
-  .sh-grab { display: none; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto; }
-  .sh-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .sh-top h3 { font: 600 20px var(--display); }
-  .sh-x { flex: none; border: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--track); color: var(--ink-2); font: 500 18px var(--ui); cursor: pointer; }
-  .sh-prev { background: var(--ice, var(--bg)); border-radius: 14px; padding: 14px; display: flex; justify-content: center; }
-  .sh-frame { width: 100%; max-width: 290px; aspect-ratio: 4 / 5; display: grid; place-items: center; }
-  .sh-frame img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16); }
-  .sh-frame img[hidden], .sh-wait[hidden] { display: none; }
-  .sh-wait { font: 500 14px var(--ui); color: var(--ink-3); text-align: center; padding: 0 12px; }
-  .sh-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .sh-lbl { font: 500 14px var(--ui); color: var(--ink-2); }
-  .sh-seg { display: inline-flex; background: var(--track); border-radius: 999px; padding: 3px; }
-  .sh-seg button { border: 0; background: none; font: 600 13px var(--ui); color: var(--ink-2); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
-  .sh-seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
-  .sh-go { border: 0; background: var(--ink); color: var(--sheet); font: 600 16px var(--ui); border-radius: 12px; padding: 13px; cursor: pointer; }
-  .sh-go:disabled { opacity: 0.5; cursor: default; }
-  @media (max-width: 719px) {
-    .sh-scrim { align-items: flex-end; padding: 0; }
-    .sh-dlg { width: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
-    .sh-grab { display: block; }
-    .sh-frame { max-width: 250px; }
-  }
-</style>

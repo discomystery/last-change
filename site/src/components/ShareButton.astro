@@ -1,0 +1,7 @@
+---
+// A quiet Share link: what it shares is in `kind` (and `id`), read by the page's share script. `icon` draws only the
+// arrow, for tight spots like report cards.
+interface Props { kind: string; label?: string; id?: string | number; icon?: boolean; tip?: string; class?: string }
+const { kind, label = 'Share', id, icon = false, tip, class: cls } = Astro.props;
+---
+<button type="button" class:list={['share-btn', icon && 'icon', cls]} data-share={kind} data-id={id} aria-label={icon ? label : undefined} data-tip={tip}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg>{!icon && <span>{label}</span>}</button>

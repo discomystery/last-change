@@ -1,0 +1,126 @@
+---
+// The player page's share card (lib/shareCard.ts): a skater's player card, or a goalie's goalie card. Everything on it
+// is worked out here from the same data the page shows; the skater card follows the visitor's Seasons setting.
+import ShareDialog from './ShareDialog.astro';
+import { cardColours } from '../lib/teams';
+import { clock } from '../lib/format';
+import { standouts, ordinal, posWord, type Skater, type Mode } from '../lib/players';
+import { cardsFor } from '../lib/reportCards';
+import teamsData from '../../public/data/teams.json';
+import goalieData from '../../public/data/goalies.json';
+import type { GoalieCardData, PlayerCardData, ScaleLane, Tile } from '../lib/shareCard';
+
+interface Props { p: any }
+const { p } = Astro.props;
+const team = teamsData.find((t) => t.abbr === p.team);
+const place = team?.place ?? p.team;
+const own = cardColours(p.team, p.team).own[p.team];
+const last = p.last ?? p.name.split(' ').slice(-1)[0];
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }).format(new Date(p.generated_at));
+const sub = (extra: (string | null)[]) => [p.number != null ? `#${p.number}` : null, posWord[p.pos] ?? p.pos, team?.name ?? p.team, ...extra].filter(Boolean).join(' · ');
+const isG = p.group === 'G';
+const modes: Mode[] = ['blend', 'season'];
+
+let skater: PlayerCardData | null = null;
+if (!isG && p.traits && p.stats?.season) {
+  const s = p as Skater;
+  const st = s.stats.season!;
+  // Share-of-scoring tiles, as in "What he carries": goals he's in on, then power-play goals (else his own goals, shots).
+  const INFO: Record<string, [string, string]> = { inOn: ['Goals he’s in on', 'goals'], pp: ['Power-play goals', 'PP goals'], goals: ['Goals he scores', 'goals'], shots: ['Shots on goal', 'shots'] };
+  const TIERS: [number, string, string][] = [[10, 'One of a kind', 'v1'], [32, 'Load-bearing', 'v2'], [64, 'Major piece', 'v3'], [128, 'Contributor', 'v4'], [Infinity, 'Spread around', 'v5']];
+  const tiles = (mode: Mode): Tile[] => {
+    const all = (p.carries?.tiles?.[mode] ?? []) as { key: string; num: number; den: number; v: number; rank: number | null; mates: [string, number, number][] }[];
+    const by = Object.fromEntries(all.map((x) => [x.key, x]));
+    const two = ['inOn', 'pp', 'goals', 'shots'].map((k) => by[k]).filter((x) => x && x.den > 0).slice(0, 2);
+    const max = Math.max(1, ...two.flatMap((x) => x.mates.map((m) => m[1])), ...two.map((x) => x.v)) * 1.08;
+    return two.map((x) => {
+      const tier = x.rank == null ? null : TIERS.find(([n]) => x.rank! <= n)!;
+      return { label: INFO[x.key][0], v: x.v, sub: `${x.num} of ${x.den} ${INFO[x.key][1]}${x.rank != null ? ` · ${ordinal(x.rank)} in the NHL` : ''}`,
+        tier: tier?.[1] ?? null, cls: tier?.[2] ?? 'v5', mates: x.mates.map((m) => [Math.round((1000 * m[1]) / max) / 10, !!m[2]] as [number, boolean]) };
+    });
+  };
+  const lanes = (mode: Mode): ScaleLane[] => standouts(s, mode).best.slice(0, 2).map((x) => ({
+    label: x.info.label, rank: x.rank ? `${ordinal(x.rank)} of ${x.of} ${x.vs}` : `${ordinal(x.pct)} percentile`,
+    pct: x.pct, lo: x.est?.lo ?? null, hi: x.est?.hi ?? null, ends: [x.info.lo, x.info.hi],
+  }));
+  const duties = (cardsFor(p.id, p.team)[0]?.card?.jobs ?? []) as { label: string }[];
+  skater = {
+    id: p.id, name: p.name, last, number: p.number, sub: sub([p.age ? String(p.age) : null]), place, own, asOf,
+    stats: [[st.gp, 'GP'], [st.g, 'G'], [st.a, 'A'], [st.p, 'P'], [clock(st.toi), 'TOI']],
+    chips: duties.map((j) => j.label),
+    modes: Object.fromEntries(modes.map((m) => [m, { lanes: lanes(m), tiles: tiles(m) }])) as PlayerCardData['modes'],
+  };
+}
+
+let goalie: GoalieCardData | null = null;
+const g = isG ? p.goalie?.blend : null;
+if (g && g.starts > 0) {
+  type G = { name: string; blend: any };
+  const gd = goalieData as unknown as { min_starts: { blend: number }; league: { x: number; y: number; name: string; team: string }[]; teams: Record<string, G[]> };
+  const mates = (gd.teams[p.team] ?? []).filter((x) => x.name !== p.goalie.name && x.blend.xga60 != null && x.blend.gsax60 != null);
+  // The league chart, scaled as on team pages: the median goalie's team in the middle across, zero up and down.
+  const lg = gd.league;
+  const gx = [...lg.map((q) => q.x), g.xga60 ?? 0], gy = [...lg.map((q) => Math.abs(q.y)), Math.abs(g.gsax60 ?? 0)];
+  const x0 = Math.min(...gx) - 0.1, x1 = Math.max(...gx) + 0.1, yMax = Math.max(...gy) + 0.1;
+  const xMid = [...lg.map((q) => q.x)].sort((a, b) => a - b)[Math.floor(lg.length / 2)];
+  const yHi = yMax * 1.22, yLo = -yHi;
+  const X = (v: number) => Math.round((1000 * (v - x0)) / (x1 - x0)) / 10, Y = (v: number) => Math.round((1000 * (yHi - v)) / (yHi - yLo)) / 10;
+  const lastName = (n: string) => n.split('. ').slice(-1)[0];
+  const quad = g.xga60 != null && g.gsax60 != null ? {
+    mid: [X(xMid), Y(0)] as [number, number],
+    league: lg.filter((q) => q.team !== p.team).map((q) => [X(q.x), Y(q.y)] as [number, number]),
+    mates: mates.map((m) => [X(m.blend.xga60), Y(m.blend.gsax60), lastName(m.name)] as [number, number, string]),
+    me: [X(g.xga60), Y(g.gsax60), lastName(p.goalie.name)] as [number, number, string],
+  } : null;
+  // Save % by kind of shot against every goalie with enough starts: league dots, teammates as rings, him as the dot.
+  const pool = Object.entries(gd.teams).flatMap(([t, list]) => list.map((x) => ({ ...x, team: t }))).filter((x) => x.blend.starts >= gd.min_starts.blend);
+  const svOf = (x: any, key: string) => (key === 'all' ? x.sv : x.tiers?.[key]?.sv) as number | null;
+  const f3 = (v: number) => v.toFixed(3).replace(/^0/, '');
+  const sv = ([['all', 'All shots'], ['low', 'Low-danger'], ['medium', 'Medium-danger'], ['high', 'High-danger']] as const).flatMap(([key, label]) => {
+    const mine = svOf(g, key);
+    if (mine == null) return [];
+    const others = pool.filter((x) => !(x.team === p.team && x.name === p.goalie.name)).map((x) => ({ v: svOf(x.blend, key), team: x.team })).filter((x) => x.v != null) as { v: number; team: string }[];
+    const vals = [...others.map((x) => x.v), mine];
+    const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const span = Math.max(...vals.map((v) => Math.abs(v - mu))) * 1.04 || 1;
+    const P = (v: number) => Math.round(10 * (50 + (50 * (v - mu)) / span)) / 10;
+    return [{ label, val: f3(mine), rank: `${ordinal(1 + others.filter((x) => x.v > mine).length)} of ${vals.length}`,
+      dots: others.filter((x) => x.team !== p.team).map((x) => P(x.v)), mates: others.filter((x) => x.team === p.team).map((x) => P(x.v)), me: P(mine) }];
+  });
+  const pct = (k: string) => g.pct?.[k] as number | null | undefined;
+  const lane = (k: string, label: string, ends: [string, string]): ScaleLane[] => (pct(k) == null ? [] : [{ label, rank: `${ordinal(pct(k)!)} pct`, pct: pct(k)!, ends }]);
+  const b = g.bins as number[];
+  const sg = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
+  goalie = {
+    name: p.name, number: p.number, sub: sub([]), own, asOf,
+    stats: [[g.starts, 'Starts'], [g.sv == null ? '–' : f3(g.sv), 'Sv%'], [sg(g.gsax), 'GSAx'], ...(g.qs == null ? [] : [[`${g.qs}%`, 'Quality starts'] as [string, string]])],
+    quad, sv,
+    work: [...lane('busy', 'How busy he is', ['Quiet', 'Under siege']), ...lane('danger', 'Shot danger', ['Sheltered', 'Exposed'])],
+    reb: lane('rebounds', 'Rebound control', ['Loose', 'Smothers it'])[0] ?? null,
+    night: b?.length === 6 ? [b[0] + b[1], b[2] + b[3], b[4] + b[5]] : null, starts: g.starts,
+  };
+}
+const data = skater ? { kind: 'player', d: skater } : goalie ? { kind: 'goalie', d: goalie } : null;
+---
+{data && (
+  <>
+    <script type="application/json" id="share-player" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
+    <ShareDialog />
+  </>
+)}
+<script>
+  import type { GoalieCardData, PlayerCardData } from '../lib/shareCard';
+  import { openShare, onShare, mode, slug } from '../lib/shareSheet';
+  const el = document.getElementById('share-player');
+  if (el) {
+    const { kind, d } = JSON.parse(el.textContent!) as { kind: 'player'; d: PlayerCardData } | { kind: 'goalie'; d: GoalieCardData };
+    onShare('player', () => {
+      const m = kind === 'player' ? mode() : 'blend';
+      openShare({ title: kind === 'player' ? 'Share this player' : 'Share this goalie', file: `spare-line-change-${slug(d.name)}${m === 'season' ? '-this-season' : ''}.png`, key: `${kind}:${m}`,
+        make: async (t) => {
+          const lib = await import('../lib/shareCard');
+          return lib.render(kind === 'player' ? lib.playerCard(d as PlayerCardData, m, t) : lib.goalieCard(d as GoalieCardData, t));
+        } });
+    });
+  }
+</script>
