@@ -118,10 +118,10 @@ export function mountSeasonMap(root) {
       }
       if (j === now) ol.append(el('li', { class: 'today', text: 'Today' }));
       const res = g.final ? el('span', { class: 'res' }, el('b', { text: g.out }), ` ${g.score}${g.ot ? ' ' + g.ot : ''}`) : el('span', { class: 'res', text: tF.format(g.t) });
-      const where = PL[g.city] && g.city.startsWith('@') ? el('span', { class: 'pill vn', title: `Played at ${g.venue}`, text: abroadOf(g.city) ? `in ${placeOf(g.city)}` : g.venue }) : null;
+      const where = PL[g.city] && g.city.startsWith('@') ? el('span', { class: 'chip phrase', title: `Played at ${g.venue}`, text: abroadOf(g.city) ? `in ${placeOf(g.city)}` : g.venue }) : null;
       const who = el('span', { class: 'who' }, el('span', { class: 'va', text: g.isHome ? 'vs' : 'at' }),
         el('a', { href: g.href, style: `--oc:${g.oc}`, title: g.link ? `${g.link}: ${D.names[g.opp]}` : `${dayF.format(g.t)} on the Games page` }, D.teamPlaces[g.opp] ?? g.opp),
-        where, g.tonight ? el('span', { class: 'pill tn', text: 'Tonight' }) : null, g.b2b ? el('span', { class: 'pill', title: 'Second game on back-to-back days', text: 'B2B' }) : null);
+        where, g.tonight ? el('span', { class: 'chip solid', text: 'Tonight' }) : null, g.b2b ? el('span', { class: 'chip', title: 'Second game on back-to-back days', text: 'B2B' }) : null);
       const r = el('li', { class: `r${g.away ? ' road' : ''}${g.final ? ' past' : ''}${j === now ? ' now' : ''}`, 'data-j': j }, el('span', { class: 'd' }, mdF.format(g.t)), who, res);
       ol.append(r); rows.push(r);
     });

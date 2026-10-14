@@ -243,7 +243,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
             const say = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
               ? <><span class="a-adj">{it.info.short(it.est.index ?? 100)}</span><span class="a-raw">{it.info.rawShort!(it.est.raw!)}</span></>
               : <>{it.info.short(it.v)}</>;
-            const tagOf = (it: (typeof x.best)[number]) => rankTag(it.rank) && <span class="rk" tabindex="0" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span>;
+            const tagOf = (it: (typeof x.best)[number]) => rankTag(it.rank) && <span class="rk rank" tabindex="0" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span>;
             const cmpTip = (it: (typeof x.best)[number], lower = false) => it.edge ? compared(it.pct, it.info.up ?? 'more than', it.info.down ?? 'less than', it.vs, lower) : compared(it.pct, 'better than', 'behind', it.vs, lower);
             const cmpOf = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
               ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
@@ -291,7 +291,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   const cur = unplayed || !e.season ? e.blend : e.season;
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season?.ok }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const x = e[m]; const tag = x && rankTag(x.rank, x.ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, x.vs)} data-tip={rankTip(x.rank, x.of, t.label, peerOf(k, x.vs ?? s.group))}>{tag}</a>; })}</span></span></span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const x = e[m]; const tag = x && rankTag(x.rank, x.ok); return tag && <a class={`rk rank rk-${m}`} href={rankHref(k, x.vs)} data-tip={rankTip(x.rank, x.of, t.label, peerOf(k, x.vs ?? s.group))}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class:list={['lane', { noseason: cur !== e.season }]} style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${cur.pct};--clo:${cur.lo};--chi:${cur.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => (
@@ -392,7 +392,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   const bp = b?.pct ?? 50, cp = c?.pct ?? 50;
                   return (
                     <li class:list={['card', 'fpc', 'mini', { thin: !(b?.ok || c?.ok) }]}>
-                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <a class={`rk rk-${m}`} href={rankHref(k, e!.vs)} data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</a>; })}</span></span></span>
+                      <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const e = s.edge![m]?.[k]; const tag = rankTag(e?.rank, e?.ok); return tag && <a class={`rk rank rk-${m}`} href={rankHref(k, e!.vs)} data-tip={rankTip(e!.rank!, e!.of, t.label, peerWord[e!.vs ?? s.group])}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class="lane" style={`--b:${bp};--blo:${bp};--bhi:${bp};--c:${cp};--clo:${cp};--chi:${cp}`}><span class="whisk"></span><span class="dot"></span></div></div>
                       {modes.map(([m]) => { const e = s.edge![m]?.[k]; return (
@@ -638,7 +638,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   .sw-l { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
   .sw-l em { font-style: normal; color: var(--ink-3); }
   .mini .fpc-name { font-size: 18px; }
-  .rk { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: var(--sheet); font: 700 11px/1.7 var(--ui); letter-spacing: 0.03em; vertical-align: 2px; white-space: nowrap; cursor: help; }
+  .rk { margin-left: 8px; cursor: help; }
   .nw { white-space: nowrap; }
   .rk.rk-season { display: none; }
   html[data-mode='season'] .rk.rk-season { display: inline-block; }

@@ -66,7 +66,7 @@ const teamCls = (t: string | null | undefined) => (t ? `t-${side(t)}` : 't-none'
           </div>
         )}
         {c.chips?.length ? (
-          <p class="chips">{c.chips.map((ch) => <span class={`rchip term ${teamCls(ch.team)}`} tabindex="0" data-tip={ch.tip}><b>{ch.team}</b>{ch.text}</span>)}</p>
+          <p class="chips">{c.chips.map((ch) => <span class={`teampill term ${teamCls(ch.team)}`} tabindex="0" data-tip={ch.tip}><b>{ch.team}</b><span class="sep" aria-hidden="true">·</span>{ch.text}</span>)}</p>
         ) : (
           <>
             {c.nums && <p class="u-nums">{c.nums}</p>}
@@ -123,17 +123,12 @@ const teamCls = (t: string | null | undefined) => (t ? `t-${side(t)}` : 't-none'
   .u-nums { font: 400 13px/1.45 var(--ui); color: var(--ink-3); margin: 0; }
   .u-src { font: 400 12px/1.45 var(--ui); color: var(--ink-3); margin: -6px 0 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
-  .rchip { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--ui); color: var(--ink-2); background: color-mix(in oklab, var(--team) 12%, transparent); padding: 5px 9px; border-radius: 999px; text-decoration: none; cursor: help; }
-  .rchip b { font: 700 11px/1 var(--ui); letter-spacing: 0.04em; color: var(--ink); background: color-mix(in oklab, var(--team) 30%, transparent); padding: 3px 5px; border-radius: 999px; margin-left: -5px; }
   .t-none { --team: var(--ink-3); }
 
   .mc-grade { display: grid; gap: 4px; }
   .mc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 25px; }
   .mc .mc-caps { flex: 1 1 12em; min-width: 0; font: 700 12.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink); }
-  .verdict { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 700 13px var(--ui); padding: 4px 11px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
-  .verdict.held { background: var(--ink); color: var(--sheet); }
-  .verdict.partly { border-color: var(--ink-2); }
-  .verdict.missed, .verdict.na, .verdict.pending { border-style: dashed; color: var(--ink-2); border-color: var(--ink-3); }
+  .verdict { flex: none; }
   .beyond { margin: 0; font: 400 15px/1.5 var(--body); color: var(--ink-2); }
   @media (min-width: 760px) {
     .mc-two { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; column-gap: 28px; row-gap: 0; }

@@ -15,7 +15,7 @@ const tip = toi_sec === null || n === 0
     : `One of the team’s lines in ${n} of the last ${games} games, averaging ${clock(toi_sec)} together in those.${rank} ${clock(seconds)} together in all.`;
 ---
 <span class="unit-toi">
-  {isNew && <span class="unit-new" data-tip={tip} tabindex="0">New</span>}
+  {isNew && <span class="unit-new chip" data-tip={tip} tabindex="0">New</span>}
   {toi_sec === null || n === 0
     ? <><strong>{clock(seconds)}</strong> in all</>
     : isNew

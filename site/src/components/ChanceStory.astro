@@ -14,7 +14,7 @@ const final = Math.round(beats[beats.length - 1].end);
 <div class="cs" data-team={team} data-other={other}>
   <div class="cs-head">
     <p class="mini-h">Our win chance, kept hidden until the final</p>
-    <button type="button" class="cs-toggle" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
+    <button type="button" class="cs-toggle pill" hidden><span class="to-list">Show every step at once</span><span class="to-story">Play it as a story</span></button>
   </div>
 
   <div class="cs-story card" hidden>
@@ -31,7 +31,7 @@ const final = Math.round(beats[beats.length - 1].end);
     <ol class="cs-texts" aria-live="polite">
       {beats.map((b, i) => (
         <li class:list={['cs-text', { on: i === 0 }]} data-end={b.end.toFixed(2)} data-before={b.before.toFixed(2)} data-pts={b.pts}>
-          <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts">{signed(b.pts)}</span>}</p>
+          <p class="cs-title">{b.label}{!b.sum && b.key !== 'start' && <span class="cs-pts chip phrase">{signed(b.pts)}</span>}</p>
           <p class="cs-line">{b.key === 'end' ? <span class="cs-out">{outcome}</span> : b.short}</p>
         </li>
       ))}
@@ -132,7 +132,6 @@ const final = Math.round(beats[beats.length - 1].end);
 <style>
   .cs { margin-top: 22px; }
   .cs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
-  .cs-toggle { font: 500 13px var(--ui); color: var(--ink-2); background: var(--track); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   .cs-toggle:hover { color: var(--ink); background: var(--rule); }
   .cs .to-list, .cs.as-story .to-story { display: none; }
   .cs.as-story .to-list { display: inline; }
@@ -155,7 +154,6 @@ const final = Math.round(beats[beats.length - 1].end);
   .cs-text { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); transition: opacity 0.45s, transform 0.45s; pointer-events: none; }
   .cs-text.on { opacity: 1; transform: none; transition-delay: 0.2s; pointer-events: auto; }
   .cs-title { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
-  .cs-pts { font: 700 11.5px var(--ui); color: var(--ink); background: var(--track); border-radius: 999px; padding: 1px 8px; letter-spacing: 0.02em; }
   .cs-line { font: 400 16px/1.45 var(--body); color: var(--ink-2); margin: 0; text-wrap: pretty; }
   .cs-out { font: 600 20px/1.3 var(--display); color: var(--ink); }
   .cs-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }

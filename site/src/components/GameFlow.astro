@@ -108,7 +108,7 @@ const base = import.meta.env.BASE_URL;
   .gf-onice .ic-h { font-weight: 700; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
   .gf-onice .ic-h span { font-weight: 500; font-size: 12px; color: var(--ink-3); }
   .gf-onice .ic p b { display: inline-block; width: 16px; color: var(--ink-3); font-size: 11px; }
-  .gf-onice .ltag { font: 700 10px var(--ui); color: var(--ink-2); background: var(--sheet); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+  .gf-onice .ltag { margin-left: 6px; }
   .gf-onice .none, .gf-onice .bx { color: var(--ink-3); font-style: italic; }
   @media (max-width: 560px) { .gf-onice { grid-template-columns: 1fr; } }
   .gflow .gf-fold { margin-top: 12px; }
@@ -498,7 +498,7 @@ const base = import.meta.env.BASE_URL;
           const startOf = (p: Skater) => p.s.find(([a, b]) => t >= a && t < b)![0];
           const sk = onAt(g.players.filter((p: Skater) => p.h === h) as Skater[], t).sort((a, b) => startOf(b) - startOf(a)).slice(0, gk ? 5 : 6).sort((a, b) => ORDER.indexOf(a.grp) - ORDER.indexOf(b.grp));
           const fw = sk.filter((p) => p.grp[0] === 'L' || p.grp === 'XF'), dd = sk.filter((p) => p.grp[0] === 'P' || p.grp === 'XD');
-          const tags = (ps: Skater[]) => [...new Set(ps.map((p) => p.grp).filter((x) => x[0] !== 'X'))].map((x) => `<span class="ltag">${x}</span>`).join('');
+          const tags = (ps: Skater[]) => [...new Set(ps.map((p) => p.grp).filter((x) => x[0] !== 'X'))].map((x) => `<span class="ltag chip">${x}</span>`).join('');
           const list = (ps: Skater[]) => ps.map((p) => last(p.n)).join(' · ') || '<span class="none">none</span>';
           const box = (g.pens as Pen[]).filter((p) => p.h === h && p.who && p.code !== 'BEN' && t >= p.t && t < p.end).map((p) => last(p.who));
           return `<div class="ic" style="--c:${C[h]}"><p class="ic-h">${h ? g.hn : g.an}<span>${sk.length} skaters${gk ? '' : ', net empty'}</span></p>
