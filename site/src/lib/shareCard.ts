@@ -61,16 +61,12 @@ function lane(L: Lane, col: string) {
 }
 
 // "Replay this game's chances 100 times and Carolina wins 52 of them." The
-// game's winner leads; ties are regulation draws.
+// game's winner, whatever the replays say; the counts row above gives the rest.
 function replaySay(g: GameData, col: (t: string) => string) {
   const rp = g.replays!;
   const win = g.score[g.home] > g.score[g.away] ? g.home : g.away;
-  const lose = win === g.home ? g.away : g.home;
-  const n = (t: string) => (t === g.home ? rp.home : rp.away);
-  const team = (t: string) => `<b style="color:${col(t)}">${esc(g.teams[t].place)}</b>`;
-  const num = (v: number, c: string) => `<b style="color:${c}">${v}</b>`;
-  const tie = rp.tie ? `, and ${num(rp.tie, 'var(--ink)')} ${rp.tie === 1 ? 'ends' : 'end'} tied after regulation` : '';
-  return `Replay this game\u2019s chances 100 times and ${team(win)} wins ${num(n(win), col(win))} of them. ${team(lose)} wins ${num(n(lose), col(lose))}${tie}.`;
+  const n = win === g.home ? rp.home : rp.away;
+  return `Replay this game\u2019s chances 100 times and <b style="color:${col(win)}">${esc(g.teams[win].place)}</b> wins <b style="color:${col(win)}">${n}</b> of them. Expected goals: ${esc(g.teams[g.away].place)} ${rp.xg[g.away].toFixed(1)}, ${esc(g.teams[g.home].place)} ${rp.xg[g.home].toFixed(1)}.`;
 }
 
 export function gameCard(g: GameData, theme: Theme) {
@@ -85,8 +81,8 @@ export function gameCard(g: GameData, theme: Theme) {
   const dots = rp ? [...Array(rp.away).fill(col(g.away)), ...Array(rp.tie).fill('var(--track)'), ...Array(rp.home).fill(col(g.home))] : [];
   const run = rp ? `<div class="sc-run" data-opt="3"><div class="sc-dots">${dots.map((c) => `<i style="background:${c}"></i>`).join('')}</div>
 <div><div class="sc-kick" style="margin-bottom:12px">Run it back</div><div class="sc-disp sc-fit" style="font-size:34px;line-height:1.15">${esc(rp.head)}</div>
-<div class="sc-rpc">${replaySay(g, col)}</div>
-<div class="sc-serif sc-fit" style="font-size:22px;color:var(--ink2);margin-top:14px">Expected goals: ${esc(g.teams[g.away].place)} ${rp.xg[g.away].toFixed(1)}, ${esc(g.teams[g.home].place)} ${rp.xg[g.home].toFixed(1)}.</div></div></div>` : '';
+<div class="sc-rpc"><span><b style="color:${col(g.away)}">${rp.away}</b>${esc(g.teams[g.away].place)}</span><span><b style="color:var(--ink3)">${rp.tie}</b>even</span><span><b style="color:${col(g.home)}">${rp.home}</b>${esc(g.teams[g.home].place)}</span></div>
+<div class="sc-say">${replaySay(g, col)}</div></div></div>` : '';
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said: ${esc(c.said)}</div>

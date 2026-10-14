@@ -603,12 +603,12 @@ const coachSince = coach && (team as any).coach_since
   .tcard .coach-name { color: var(--ink-2); font-weight: 600; }
   .tcard .coach-name, .tcard .coach-since { white-space: nowrap; }
   .tcard h1 { margin: 0; font-size: 40px; line-height: 1.1; }
-  .tcard .tabbr { position: absolute; z-index: -1; right: 230px; bottom: -48px; font: 700 170px/1 var(--ui); letter-spacing: -0.03em; color: color-mix(in oklab, var(--team) 14%, var(--sheet)); pointer-events: none; user-select: none; }
-  .tcard-wrap :global(.tstory) { max-width: none; margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 4px 28px 24px; }
+  .tcard .tabbr { position: absolute; z-index: -1; right: 14px; bottom: -48px; font: 700 170px/1 var(--ui); letter-spacing: -0.03em; color: color-mix(in oklab, var(--team) 14%, var(--sheet)); pointer-events: none; user-select: none; }
+  .tcard-wrap :global(.tstory) { max-width: none; margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; }
   @media (max-width: 719px) {
     .tcard { padding: 20px 16px 16px; }
     .tcard h1 { font-size: 30px; }
     .tcard .tabbr { font-size: 104px; bottom: -22px; right: 8px; }
-    .tcard-wrap :global(.tstory) { padding: 2px 16px 18px; }
+    .tcard-wrap :global(.tstory) { padding: 16px; }
   }
 </style>

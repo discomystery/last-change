@@ -255,6 +255,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
       <div class="card meter" id="replays">
         <p class="mini-h">Run it back</p>
         <h3 class="h">{replayHead}</h3>
+        <div class="rp-chart">
         <div class="rp-head">
           <div class="rp-counts">
             <span class="t-away"><b data-k="t-away">{replays.away}</b> {place(away)}</span>
@@ -265,6 +266,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
         </div>
         <div class="replays" role="img" aria-label={`Of 100 games like this, ${place(away)} wins ${replays.away}, ${place(home)} wins ${replays.home}, and ${replays.tie} are tied after regulation.`}>
           {dots.map((d) => <i class={d === 'tie' ? 'tie' : `t-${d}`}></i>)}
+        </div>
         </div>
         <div class="meter-text">
           <p>{replayBody}</p>
@@ -477,6 +479,14 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .rp-again:disabled { opacity: 0.4; cursor: default; }
   .rp-again svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .meter-text > p:not(.detail) { margin-bottom: 4px; }
+  /* Wide screens: the dots and the words sit side by side instead of leaving the card's right half empty. */
+  @media (min-width: 880px) {
+    .meter { display: grid; grid-template-columns: minmax(0, 520px) minmax(260px, 1fr); grid-template-areas: 'label label' 'head head' 'chart text'; column-gap: 44px; align-items: start; }
+    .meter > .mini-h { grid-area: label; }
+    .meter > .h { grid-area: head; }
+    .rp-chart { grid-area: chart; }
+    .meter-text { grid-area: text; margin-top: 14px; padding-left: 44px; border-left: 1px solid var(--rule); align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+  }
   .job-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 8px; }
   .job-name { font: 700 20px/1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .job-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); }
