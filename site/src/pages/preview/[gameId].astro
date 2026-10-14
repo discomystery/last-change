@@ -4,6 +4,7 @@ import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
+import { previewOg } from '../../lib/og';
 import Explain from '../../components/Explain.astro';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
@@ -148,7 +149,7 @@ const _ = ordinal;
 import SharePreview from '../../components/SharePreview.astro';
 import ShareButton from '../../components/ShareButton.astro';
 ---
-<Base section="games" title={`${away} at ${home} preview`}>
+<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any, { [away]: rec(away), [home]: rec(home) })}>
   <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">

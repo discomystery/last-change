@@ -137,6 +137,14 @@ jobs:
             gh issue create --title "$title" --body "The nightly workflow's tests failed on $(git rev-parse --short HEAD), so nothing was saved or published: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Every update fails the same way until main is fixed."
           fi
 
+      - name: Restore link-preview images from the last build
+        # site/og/integration.mjs redraws only the cards that changed; the rest come from this cache.
+        uses: actions/cache@v4
+        with:
+          path: site/og/.cache
+          key: og-${{ github.run_id }}
+          restore-keys: og-
+
       - name: Build the site
         run: |
           npm ci --prefix site

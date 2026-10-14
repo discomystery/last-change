@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .astro/
+site/og/.cache/
 .DS_Store
 
 # Local data cache (published to the data branch, not main)

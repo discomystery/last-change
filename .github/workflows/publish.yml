@@ -55,6 +55,14 @@ jobs:
       - name: Run the pipeline tests
         run: uv run --project pipeline pytest -q pipeline/tests
 
+      - name: Restore link-preview images from the last build
+        # site/og/integration.mjs redraws only the cards that changed; the rest come from this cache.
+        uses: actions/cache@v4
+        with:
+          path: site/og/.cache
+          key: og-${{ github.run_id }}
+          restore-keys: og-
+
       - name: Build the site
         run: |
           npm ci --prefix site

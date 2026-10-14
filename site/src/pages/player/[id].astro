@@ -2,6 +2,7 @@
 // Player page. Skaters: role first, then what he does better or worse than others at his position, every rating,
 // his shots, and NHL EDGE tracking. Goalies: role, the goalie card and where the shots he faces come from.
 import Base from '../../layouts/Base.astro';
+import { playerOg } from '../../lib/og';
 import Section from '../../components/Section.astro';
 import Portrait from '../../components/Portrait.astro';
 import AreaMap from '../../components/AreaMap.astro';
@@ -115,7 +116,7 @@ const statRow = (x: any) => (isG ? null : x);
 // Share link: skaters with a season line and ratings, goalies with a start (components/SharePlayer.astro makes the card).
 const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.stats?.season);
 ---
-<Base section="players" title={`${p.name} · ${p.team}`} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
+<Base section="players" title={`${p.name} · ${p.team}`} og={playerOg(p)} description={`${p.name}: role, strengths and weak spots against other ${words}, shots and skating.`}>
   <AreaShapes />
   <div class="player" style={`--team:${teamPaint(p.team)}`}>
     {/* Name card: name, season line and stats on the left; his photo standing on the card's bottom edge (on phones,
