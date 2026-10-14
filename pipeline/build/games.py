@@ -1,5 +1,6 @@
 """Build the per-season tables (games, players, shifts check, stints, events) from raw responses."""
 import statistics
+import sys
 
 import polars as pl
 
@@ -59,7 +60,7 @@ def build_game(season: int, game: dict) -> dict:
     for side in ("homeTeam", "awayTeam"):
         for group in ("forwards", "defense", "goalies"):
             for p in box["playerByGameStats"][side][group]:
-                official = clock_to_seconds(p["toi"])
+                official = clock_to_seconds(p.get("toi") or "0:00")  # no toi for a dressed player who never took a shift
                 if official == 0 and p["playerId"] not in shift_toi:
                     continue
                 toi_rows.append({"game_id": gid, "player_id": p["playerId"], "goalie": group == "goalies", "box_toi": official, "shift_toi": shift_toi.get(p["playerId"], 0)})
@@ -140,6 +141,8 @@ def build_season(season: int) -> dict:
             out = build_game(season, g)
         except Exception as exc:  # keep going; report every game that would not build
             failed.append({"game_id": g["game_id"], "error": repr(exc)})
+            # shown as an annotation on the Actions run, so a game that drops out of every table is noticed
+            print(f"::warning::game {g['game_id']} did not build: {exc!r}", file=sys.stderr)
             continue
         flips += out.pop("direction_flips")
         src = out.pop("shift_source")
