@@ -39,7 +39,6 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics import rapm
 
-RAPM_LAMBDA = 40000.0  # same ridge penalty as player pages (metrics/players.py)
 # Impact comes from rapm.chained (ratings that carry every season since 2023-24 forward); three seasons had been
 # steadier than two and closer to expert rankings (ESPN rho 0.54 -> 0.66).
 LAST_SEASON_GAMES = 30  # last season counts as at most this many games beside this season's

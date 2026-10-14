@@ -5,7 +5,7 @@
 // story written onto the chart: each season's share of the chances and how last season ended. Then each style trait
 // last season (open ring) against this season (filled dot), and the franchise's history since 1997-98 behind a fold.
 // The two-season chart is drawn in the browser so its labels stay readable at any width.
-import { fpInfo, ordinal } from '../data/mock';
+import { fpInfo, ordinal } from '../lib/traits';
 import Explain from './Explain.astro';
 interface Props { abbr: string; colour: string; place: string; t: any; window: number; band: [number, number]; season: number }
 const { abbr, colour, place, t, window: win, band, season } = Astro.props;

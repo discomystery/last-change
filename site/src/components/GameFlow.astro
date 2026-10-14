@@ -130,7 +130,7 @@ const base = import.meta.env.BASE_URL;
     const last = (n: string) => n.split('. ').slice(1).join('. ') || n;
     const tag = (s: Shot) => (s.en ? 'EN' : s.st > 0 ? 'PP' : s.st < 0 ? 'SH' : '');
     const clock = (t: number) => { t = Math.floor(t); if (t >= 3600) { const s = t - 3600; return `OT ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; } const p = Math.min(2, Math.floor(t / 1200)), s = t - p * 1200; return `${['1st', '2nd', '3rd'][p]} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-    const clockMS = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    const clockMS = (s: number) => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
     const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const DANGER = 0.15;
     const narrow = () => host.clientWidth < 560;

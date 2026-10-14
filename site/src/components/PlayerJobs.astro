@@ -7,6 +7,7 @@ import Gloss from './Gloss.astro';
 import Section from './Section.astro';
 import PLink from './PLink.astro';
 import { peerOf } from '../lib/players';
+import { jobsFor } from '../lib/gameFiles';
 
 type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
@@ -17,8 +18,7 @@ type Jobs = { game_id: number; away: string; home: string; players: Card[]; stoo
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string; goalies?: boolean }
 const { gameId, place, side, goalies = false } = Astro.props;
 
-const files = import.meta.glob<{ default: Jobs }>('../../public/data/jobs/2*.json', { eager: true });
-const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const d = jobsFor<Jobs>(gameId);
 const order = d ? [d.away, d.home] : [];
 const SHOWN = 6; // cards visible before the fold, per team (most ice time first)
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;

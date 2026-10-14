@@ -91,10 +91,6 @@ def _day(d: str) -> str:
     return f"{MON[int(m) - 1]} {int(dd)}"
 
 
-def _season_name(s: int) -> str:
-    return f"{s}-{str(s + 1)[-2:]}"
-
-
 # ---------------------------------------------------------------- games and the change test
 
 def games(season: int) -> pl.DataFrame:
@@ -187,7 +183,7 @@ def last_season_traits(season: int) -> dict[str, dict[str, dict]]:
         for tid, v in vals.items():
             x = v[dim]
             better = int((league > x).sum() if higher else (league < x).sum())
-            out.setdefault(abbr[tid], {})[dim] = {"v": round(x, 4), "pct": round(100 * (len(league) - better - 0.5) / len(league)), "rank": better + 1}
+            out.setdefault(abbr[tid], {})[dim] = {"v": round(x, 4), "pct": round(team_style._pct(x, league, higher)), "rank": better + 1}
     return out
 
 

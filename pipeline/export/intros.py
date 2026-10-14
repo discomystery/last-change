@@ -51,10 +51,6 @@ def _num(n: int) -> str:
     return WORDS[n] if 0 <= n < len(WORDS) else str(n)
 
 
-def _season_name(s: int) -> str:
-    return f"{s}-{str(s + 1)[-2:]}"
-
-
 def _teams() -> dict[str, dict]:
     return {t["abbr"]: t for t in json.loads((SITE_DATA / "teams.json").read_text())}
 
@@ -82,23 +78,6 @@ def _for(t: dict) -> str:
 def _in(t: dict) -> str:
     """"in Columbus", "in New York", "on Long Island": where the club plays, never the team's name."""
     return wording.at(t["place"])
-
-
-def _rank_words(rank: int, n: int = 32) -> str:
-    """A league rank in words, never a bare "14th of 32"."""
-    if rank == 1:
-        return "the best in the league"
-    if rank <= 3:
-        return "as good as anyone in the league"
-    if rank <= 8:
-        return "among the league's best"
-    if rank <= n // 2:
-        return "a bit better than average"
-    if rank <= n - 8:
-        return "a bit worse than average"
-    if rank <= n - 3:
-        return "among the league's worst"
-    return "as bad as anyone in the league"
 
 
 # ---------------------------------------------------------------- team history

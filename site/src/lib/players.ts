@@ -1,5 +1,4 @@
 // Player pages: labels, tooltips, scale ends and plain-language wording for every rating.
-import { clock } from './format';
 
 export type Est = { v: number; pct: number; lo: number; hi: number; ok: boolean; of: number; rank: number; vs?: string; index?: number | null; raw?: number; raw_pct?: number };
 export type EdgeEst = { v: number; pct: number; ok: boolean; of: number; avg: number; vs?: string; rank?: number };
@@ -102,10 +101,8 @@ export const EDGE: Record<string, TraitInfo> = {
     tip: 'Share of his even-strength ice time the puck spends in the offensive zone. Measured by NHL EDGE. His linemates and his usage (who he plays against, where his shifts start) shape this a lot.' },
 };
 
-export const ordinal = (n: number) => {
-  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
+export { ordinal } from './format';
+import { ordinal } from './format';
 /** League-rank tag for the very best in a comparison group: 1st, 2nd, 3rd, Top 5, Top 10. Nothing below that. */
 export const rankTag = (rank?: number, ok = true) => (!ok || !rank || rank > 10 ? null : rank <= 3 ? ordinal(rank) : rank <= 5 ? 'Top 5' : 'Top 10');
 export const rankTip = (rank: number, of: number, label: string, vs: string) => `${rank === 1 ? 'The best' : `${ordinal(rank)}-best`} of ${of} ${vs} at ${label.toLowerCase()}.`;
@@ -142,9 +139,3 @@ export const roleTip: Record<string, string> = {
   Point: 'Point: a second defenseman on the unit, alongside the quarterback.',
 };
 
-export const toiLine = (t: NonNullable<Role['toi']>) => {
-  const parts = [`${clock(t.toi5)} at 5-on-5`];
-  if (t.toi_pp >= 15) parts.push(`${clock(t.toi_pp)} on the power play`);
-  if (t.toi_pk >= 15) parts.push(`${clock(t.toi_pk)} shorthanded`);
-  return parts;
-};

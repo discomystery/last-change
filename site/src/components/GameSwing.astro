@@ -4,6 +4,8 @@
 import Section from './Section.astro';
 import PLink from './PLink.astro';
 import Pips from './Pips.astro';
+import { clock } from '../lib/format';
+import { jobsFor, scoresFor } from '../lib/gameFiles';
 
 type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number }; st?: { pp_gf?: number; pp_ga?: number; pk_gf?: number; pk_ga?: number } };
 type Unit = { kind: 'F' | 'D'; n: number; ids: number[]; sec: number; xgf: number; xga: number };
@@ -11,13 +13,11 @@ type Scores = { game_id: number; away: string; home: string; players: Row[]; uni
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string }
 const { gameId, place, side } = Astro.props;
 
-const files = import.meta.glob<{ default: Scores }>('../../public/data/scores/2*.json', { eager: true });
-const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const d = scoresFor<Scores>(gameId);
 // The report card's verdict sits beside the pucks, in the same pill as "Did they do their job?" below.
 type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
 type Card = { id: number; pill: Pill; toi5: string; toi_pp: string; toi_pk: string; box: { g?: number; a?: number; sog?: number; pm?: number; xgf?: number; xga?: number; sa?: number; ga?: number } };
-const jobFiles = import.meta.glob<{ default: { game_id: number; players: Card[] } }>('../../public/data/jobs/2*.json', { eager: true });
-const cards = new Map(Object.values(jobFiles).find((f) => f.default.game_id === gameId)?.default.players.map((c) => [c.id, c]) ?? []);
+const cards = new Map(jobsFor<{ players: Card[] }>(gameId)?.players.map((c) => [c.id, c]) ?? []);
 const pills = new Map([...cards].map(([i, c]) => [i, c.pill]));
 const pillWord = { huge: 'Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
 const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
@@ -62,7 +62,6 @@ const why = (r: Row, k: string, opp: string) => {
 const order = d ? [d.away, d.home] : [];
 const one = (v: number) => (Math.round(v * 10) === 0 ? '0.0' : v > 0 ? `+${v.toFixed(1)}` : `−${(-v).toFixed(1)}`);
 const two = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v < 0 ? `−${(-v).toFixed(2)}` : '0.00');
-const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const last = (r?: Row) => r?.name.replace(/^.\. /, '') ?? '?';
 const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
 const tip = (r: Row) => {

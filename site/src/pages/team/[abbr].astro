@@ -1,11 +1,10 @@
 ---
 import NoteText from '../../components/NoteText.astro';
-// Team page. Real: next game, results, schedule, last-game lines. Placeholder for now: the fingerprint.
+// Team page: next game, results and schedule, season trend, fingerprint, lines, special teams, goalies, goal sources.
 import Base from '../../layouts/Base.astro';
 import Section from '../../components/Section.astro';
 import teams from '../../../public/data/teams.json';
 import schedule from '../../../public/data/schedule.json';
-import lines from '../../../public/data/last_game_lines.json';
 import fpData from '../../../public/data/fingerprints.json';
 import goalieData from '../../../public/data/goalies.json';
 import previewIndex from '../../../public/data/previews/index.json';
@@ -33,7 +32,7 @@ import AreaShapes from '../../components/AreaShapes.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../lib/traits';
 import FpRow from '../../components/FpRow.astro';
 import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
@@ -55,7 +54,6 @@ const games = schedule.games.filter((g) => g.home === abbr || g.away === abbr);
 const finals = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
 const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === abbr).map((g) => g.id);
 const previewIds = previewIndex.filter((p) => !finals.has(p.id) && (p.home === abbr || p.away === abbr)).map((p) => p.id);
-const last = lines.teams.find((t) => t.team === abbr);
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
 const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));

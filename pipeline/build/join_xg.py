@@ -8,7 +8,6 @@ EVENT_MAP = {"SHOT": "shot-on-goal", "MISS": "missed-shot", "GOAL": "goal"}
 KEEP = ["xGoal", "xRebound", "xFroze", "xPlayContinuedInZone", "shotRebound", "shotGeneratedRebound", "shotGoalieFroze",
         "shotOnEmptyNet", "shotWasOnGoal", "timeSinceLastEvent", "lastEventCategory", "speedFromLastEvent",
         "arenaAdjustedShotDistance", "shotAngleAdjusted", "xCordAdjusted", "yCordAdjusted", "shooterLeftRight"]
-TOLERANCE_SECONDS = 2
 
 
 def run(season: int) -> dict:

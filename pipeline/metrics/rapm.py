@@ -146,26 +146,6 @@ def fit(X, y, w, lam: float, n_players: int, *, intervals: bool = True, prior: n
     return out
 
 
-def cross_validate(stints: pl.DataFrame, lams: list[float], folds: int = 5) -> dict[float, float]:
-    """Weighted squared error on held-out games for each penalty."""
-    games = np.array(sorted(stints["game_id"].unique().to_list()))
-    rng = np.random.default_rng(0)
-    fold = dict(zip(games, rng.integers(0, folds, len(games))))
-    X, y, w, players, _ = design(stints)
-    g = np.repeat(stints["game_id"].to_numpy(), 2)
-    f = np.array([fold[x] for x in g])
-    err = {}
-    for lam in lams:
-        tot = 0.0
-        for k in range(folds):
-            tr, te = f != k, f == k
-            m = fit(X[tr], y[tr], w[tr], lam, len(players), intervals=False)
-            pred = m["mean"] + X[te] @ m["beta"]
-            tot += float(np.sum(w[te] * (y[te] - pred) ** 2))
-        err[lam] = tot / float(np.sum(w))
-    return err
-
-
 INPUTS = ("games.parquet", "stints.parquet", "events.parquet", "shots_xg_own.parquet")  # everything stretches() reads
 
 

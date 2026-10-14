@@ -1,7 +1,7 @@
 ---
 // One fingerprint trait for a real two-team matchup: a dot per team on one scale, then each team's stat in words.
 // `c` carries the trait's label, tip, scale ends and `say`, plus each team's blended and season-only estimates keyed by abbreviation.
-import { ordinal, rawWords, scoreTraits } from '../data/mock';
+import { ordinal, rawWords, scoreTraits } from '../lib/traits';
 interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
 const { c, sides } = Astro.props;
 ---

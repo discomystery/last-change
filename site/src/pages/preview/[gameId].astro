@@ -34,7 +34,7 @@ import linesAll from '../../../public/data/lines.json';
 import goalieAll from '../../../public/data/goalies.json';
 import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../lib/traits';
 
 type Claim = { id: string; kind: string; head: string; body: string; call?: string; nums?: string; cite: string; check: object | null };
 // `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can

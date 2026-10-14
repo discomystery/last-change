@@ -1,4 +1,4 @@
-"""Write the JSON the website reads, starting with each team's last-game lines (team pages)."""
+"""Write the JSON the website reads."""
 import json
 from datetime import datetime, timezone
 
@@ -6,36 +6,11 @@ import polars as pl
 
 from pipeline.export import wording
 from pipeline.config import OFFLINE, SITE_DATA, TABLES
-from pipeline.metrics.lines import game_units
 
 
 def run(season: int) -> dict:
-    d = TABLES / str(season)
-    games = pl.read_parquet(d / "games.parquet").sort("game_id")
-    players = pl.read_parquet(d / "players.parquet")
-    built = set(pl.read_parquet(d / "events.parquet")["game_id"].unique().to_list())
-    teams = {}
-    for g in games.filter(pl.col("game_id").is_in(list(built))).iter_rows(named=True):
-        for side, abbr in (("home", g["home"]), ("away", g["away"])):
-            teams[abbr] = (g, side)  # later games overwrite earlier ones: ends as the most recent
-    out = []
-    for abbr, (g, side) in sorted(teams.items()):
-        units = game_units(season, g["game_id"])
-        roster = players.filter(pl.col("game_id") == g["game_id"])
-        name = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in roster.iter_rows(named=True)}
-
-        def rows(size, top):
-            picked = sorted(((k, v) for k, v in units[side].items() if len(k) == size), key=lambda kv: -kv[1]["sec"])[:top]
-            return [{"players": [name[i] for i in k], "seconds": v["sec"], "cf": v["cf"], "ca": v["ca"],
-                     "xgf": round(v["xgf"], 2), "xga": round(v["xga"], 2), "gf": v["gf"], "ga": v["ga"]} for k, v in picked]
-
-        opp = g["away"] if side == "home" else g["home"]
-        out.append({"team": abbr, "game_id": g["game_id"], "date": g["date"], "opponent": opp, "at_home": side == "home",
-                    "score": [g[f"{side}_score"], g["away_score" if side == "home" else "home_score"]],
-                    "five_on_five_seconds": units["five_on_five_seconds"], "lines": rows(3, 4), "pairs": rows(2, 3)})
-    payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "teams": out}
     SITE_DATA.mkdir(parents=True, exist_ok=True)
-    (SITE_DATA / "last_game_lines.json").write_text(json.dumps(payload, separators=(",", ":")))
+    (SITE_DATA / "last_game_lines.json").unlink(missing_ok=True)  # team pages read the last game's groups from lines.json
     if OFFLINE:  # keep the saved standings and schedule
         n_teams, n_games = len(json.loads((SITE_DATA / "teams.json").read_text())), len(json.loads((SITE_DATA / "schedule.json").read_text())["games"])
         add_coaches(season)
@@ -63,7 +38,7 @@ def run(season: int) -> dict:
     from pipeline.export import jobs
     jobs.run(season)  # post-game report cards: did each player do his jobs
     from pipeline.export import game_scores
-    game_scores.run(season)  # post-game Impact: one number per player, with its parts
+    game_scores.run(season)  # post-game Swing: one number per player, with its parts
     from pipeline.export import flow
     flow.run(season)  # post-game flow chart: every shot, power play and shift, read in the browser
     from pipeline.export import stories
@@ -72,7 +47,7 @@ def run(season: int) -> dict:
     track.run(season)  # the Track record page's season summary, from the post-game files
     from pipeline.export import intros
     intros.run()  # plain-English intros for team and player pages: reads the JSON written above
-    return {"teams": len(out), "team_list": n_teams, "schedule_games": n_games, "players": n_players}
+    return {"team_list": n_teams, "schedule_games": n_games, "players": n_players}
 
 
 def export_teams_and_schedule(season: int) -> tuple[int, int]:
@@ -158,7 +133,8 @@ def export_lines(season: int) -> int:
     from pipeline.metrics import units
 
     d = TABLES / str(season)
-    units.game_units(season)
+    if not (d / "game_units.parquet").exists():  # update, quick and publish build it before the export
+        units.game_units(season)
     usual = units.usual(season)
     games = pl.read_parquet(d / "games.parquet")
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}

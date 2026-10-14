@@ -2,7 +2,7 @@
 // One fingerprint trait as a compact row: name and rank on top, the scale with its end words underneath.
 // Tapping the row opens the stat in words. One side on team pages, two on previews (a lane per team).
 // `c` carries the trait's label, tip, scale ends and `say`, plus each side's blended and season-only estimates keyed by abbreviation.
-import { ordinal, rawWords, scoreTraits } from '../data/mock';
+import { ordinal, rawWords, scoreTraits } from '../lib/traits';
 interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
 const { c, sides } = Astro.props;
 // Score traits (100 is league average) say so in words, since a row has no room for the card's corner note.

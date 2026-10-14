@@ -30,7 +30,6 @@ FIRST = 1998  # the 1997-98 season
 SUMMARY_SEASONS = 5  # finished seasons kept for a team's reputation
 SUMMARY_KEYS = ("teamId", "teamFullName", "gamesPlayed", "powerPlayPct", "penaltyKillPct", "goalsForPerGame", "goalsAgainstPerGame",
                 "shotsForPerGame", "shotsAgainstPerGame")
-ROUNDS = {"none": 0, "R1": 1, "R2": 2, "R3": 3, "final": 4, "cup": 5}  # same scale as intros.team_history
 
 
 def _read(name: str):

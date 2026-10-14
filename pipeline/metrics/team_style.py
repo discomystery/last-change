@@ -5,6 +5,7 @@ by an amount that depends on how repeatable the trait is (measured from split ha
 Goaltending is the exception: it starts from the goalies who have actually played for the team this season,
 each judged on his own last season, because a team's goaltending follows its goalies, not the logo.
 """
+import copy
 import gzip
 import json
 from functools import lru_cache
@@ -219,7 +220,18 @@ def _values(mat: np.ndarray) -> dict[str, float]:
 
 
 def stabilization(w: pl.DataFrame) -> dict[str, dict]:
-    """How many games it takes for a trait to be half signal, from odd/even game splits of past team-seasons."""
+    """How many games it takes for a trait to be half signal, from odd/even game splits of past team-seasons. Kept for
+    the run, by the weights it was given (team_game.build clears it)."""
+    key = (tuple(FULL_SEASONS), w.hash_rows().sum())
+    if key not in _STABLE:
+        _STABLE[key] = _stabilization(w)
+    return copy.deepcopy(_STABLE[key])
+
+
+_STABLE: dict = {}
+
+
+def _stabilization(w: pl.DataFrame) -> dict[str, dict]:
     halves = {dim: ([], []) for dim in DIMS}
     for season in FULL_SEASONS:
         for mat in _matrix(per_game(season, w)).values():
@@ -255,8 +267,10 @@ def _goalie_priors(season: int, k: float, league: float) -> dict[int, float]:
 
 
 def _pct(value: float, league: np.ndarray, higher: bool) -> float:
-    below = (league < value).mean() if higher else (league > value).mean()
-    return float(np.clip(100 * below, 1, 99))
+    """Percentile of a value among the league's teams, ties counting half (mid-rank): the same formula for a team's
+    dot and the ends of its likely range, so the range is drawn around the dot."""
+    below = (league < value).sum() if higher else (league > value).sum()
+    return float(np.clip(100 * (below + 0.5 * (league == value).sum()) / len(league), 1, 99))
 
 
 def _scheduled_clubs(season: int) -> set[int]:
@@ -317,7 +331,7 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
                 lo, hi = np.nanpercentile(draws, [10, 90])
                 p_lo, p_hi = sorted((_pct(lo, league, higher), _pct(hi, league, higher)))
                 better = (league > v).sum() if higher else (league < v).sum()
-                dims[dim][mode] = {"v": round(v, 4), "pct": round(100 * (len(league) - better - 0.5) / len(league)), "lo": round(p_lo), "hi": round(p_hi), "rank": int(better) + 1,
+                dims[dim][mode] = {"v": round(v, 4), "pct": round(_pct(v, league, higher)), "lo": round(p_lo), "hi": round(p_hi), "rank": int(better) + 1,
                                    "index": round(100 * v / float(np.mean(league))) if np.mean(league) else None}
         teams[tid] = {"games": len(mat), "dims": dims}
     return {"season": season, "stabilization": k, "weights": w.to_dicts(), "teams": teams}
