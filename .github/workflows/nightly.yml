@@ -105,6 +105,21 @@ jobs:
             fi
           fi
 
+      - name: Raise the alarm if the site's players don't match the clubs' rosters
+        if: steps.mode.outputs.mode == 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # pipeline/export/roster_check.py compares the clubs' official rosters with the player pages just built.
+          text="$(uv run --project pipeline python -m pipeline.export.roster_check --alarm)"
+          if [ -n "$text" ]; then
+            echo "::warning title=Roster check::Some players the clubs list have no page or the wrong club on the site"
+            title="Roster check: the site's players don't match the clubs' rosters"
+            if [ -z "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number')" ]; then
+              gh issue create --title "$title" --body "$text"
+            fi
+          fi
+
       - name: Run the pipeline tests
         id: tests
         if: steps.mode.outputs.mode == 'full'

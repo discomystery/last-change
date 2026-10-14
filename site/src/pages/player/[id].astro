@@ -56,8 +56,9 @@ const s = p as Skater;
 const unplayed = !!p.unplayed;
 const listed = unplayed ? (((rosterData as any).teams[p.team] ?? []) as RosterPlayer[]).find((x) => x.id === p.id) : undefined;
 const out = listed ? describe(listed) : { tag: '', tip: '', out: false };
-const outTag = out.tag || 'Not playing yet';
-const outTip = out.tip || 'With the club, but has not dressed for a game this season.';
+const backup = isG && !!listed?.last; // dressed as the backup without getting into a game
+const outTag = out.tag || (backup ? 'Backup' : 'Not playing yet');
+const outTip = out.tip || (backup ? 'With the club and has dressed as the backup, but has not played in a game this season.' : 'With the club, but has not dressed for a game this season.');
 const hasStats = Object.keys((p as any).stats ?? {}).length > 0;
 const lastStats = (p as any).stats?.last as { gp: number; g: number; a: number; p: number; toi: number } | undefined;
 const words = isG ? 'goalies' : groupWord[s.group];
@@ -86,7 +87,7 @@ const strengthsBy = isG || !s.traits ? null : Object.fromEntries(modes.map(([m])
 
 // ---- Goalie ----
 type GMode = { starts: number; games: number; shots: number; goals: number; gsax: number; gsax60: number | null; sv: number | null; sa60: number | null; danger: number | null; bd60: number | null; reb?: number | null; reb_exp?: number | null; gap: number | null; long_wait: number | null; qs: number | null; rbs: number | null; bins: number[]; tiers: Record<string, { shots: number; sv: number | null }>; pct: Record<string, number | null> };
-const g = isG ? (p.goalie as { name: string; blend: GMode; season: GMode | null }) : null;
+const g = isG ? (p.goalie as { name: string; blend: GMode; season: GMode | null } | null) : null;
 const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
 const svp = (v: number | null) => (v === null ? '–' : v.toFixed(3).replace(/^0/, ''));
 const gSay: Record<string, (x: GMode) => string> = {
@@ -107,7 +108,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const nav = isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -141,14 +142,14 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamPaint(p.team)} class="pstory" />
     <SectionNav items={nav as [string, string][]} />
 
-    {!isG && !s.traits && (
+    {((!isG && !s.traits) || (isG && !g)) && (
       <Section id="role" title="Role" placeholder={false}>
         <div class="card prole">
           <dl class="rl">
             <div><dt>Status</dt><dd><p><span class="chip tag">{outTag}</span> {outTip}</p></dd></div>
           </dl>
         </div>
-        <p class="note">He has not played in the NHL this season or last, so there is nothing to rate him on yet. His page fills in once he dresses.</p>
+        <p class="note">He has not played in the NHL this season or last, so there is nothing to rate him on yet. His page fills in once he {isG ? 'plays' : 'dresses'}.</p>
       </Section>
     )}
 

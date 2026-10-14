@@ -80,6 +80,15 @@ def headshots(season: int) -> dict[int, str]:
     return dict(zip(t["player_id"].to_list(), t["headshot"].to_list()))
 
 
+def listed_today(season: int) -> dict[int, str]:
+    """Each player the clubs list on the latest recorded day, with his club: the official roster as it stands now."""
+    if not path(season).exists():
+        return {}
+    t = _read(season)
+    t = t.filter(pl.col("date") == t["date"].max())
+    return dict(zip(t["player_id"].to_list(), t["team"].to_list()))
+
+
 def team_on(season: int, player_id: int, day: str) -> str | None:
     """The club listing the player on the latest recorded day up to `day`; None if no club listed him that day
     (sent down, released) or nothing was recorded by then."""
