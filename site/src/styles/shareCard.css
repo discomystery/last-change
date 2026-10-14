@@ -45,7 +45,7 @@
 .sc-call:first-child { border-top: 0; }
 .sc-call:last-child { border-bottom: 2px solid var(--rule); }
 .sc-said { font: 500 18px/1.3 'Hanken Grotesk'; color: var(--ink3); margin-bottom: 6px; }
-.sc-h { font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 30px; line-height: 1.15; }
+.sc-h { font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 30px; line-height: 1.15; white-space: nowrap; }
 .sc-h.sm { font-size: 27px; }
 .sc-vp { display: inline-block; font: 700 21px 'Hanken Grotesk'; padding: 4px 14px; border-radius: 999px; border: 3px solid var(--ink); white-space: nowrap; vertical-align: 5px; margin-right: 12px; }
 .sc-vp.held { background: var(--ink); color: var(--sheet); }

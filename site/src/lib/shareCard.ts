@@ -86,7 +86,7 @@ export function gameCard(g: GameData, theme: Theme) {
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said ${esc(c.said)}</div>
-<div class="sc-h${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
+<div class="sc-h sc-fit${roomy ? '' : ' sm'}"><span class="sc-vp ${c.verdict}">${verdictPill[c.verdict]}</span>${esc(c.title)}</div>${roomy && c.lane ? `<div data-opt="2">${lane(c.lane, (c.lane.team && g.teams[c.lane.team] ? col(c.lane.team) : null) ?? 'var(--ink)')}</div>` : ''}</div>`).join('')}</div>` : '';
   const lede = !g.calls.length && g.lede ? `<div class="sc-serif sc-lede" data-opt="4">${esc(g.lede)}</div>` : '';
   const best = g.best ? `<div class="sc-watch" data-opt="1"><span class="sc-tag">Best night</span>${esc(g.best)}</div>` : '';
   return shell(theme, '', `<div class="sc-kick">${end} · ${esc(g.date)} · ${esc(g.venue)}</div>
