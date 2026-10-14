@@ -51,10 +51,6 @@ def _num(n: int) -> str:
     return WORDS[n] if 0 <= n < len(WORDS) else str(n)
 
 
-def _season_name(s: int) -> str:
-    return f"{s}-{str(s + 1)[-2:]}"
-
-
 def _teams() -> dict[str, dict]:
     return {t["abbr"]: t for t in json.loads((SITE_DATA / "teams.json").read_text())}
 
@@ -71,7 +67,7 @@ def _poss(t: dict) -> str:
     """"Carolina's", but "the Rangers'" for the two New York clubs (a place like "NY Rangers" reads badly)."""
     if t["place"].startswith("NY "):
         return f"the {_nick(t)}\u2019"
-    return f"{t['place']}'s"
+    return f"{t['place']}\u2019s"
 
 
 def _for(t: dict) -> str:
@@ -82,23 +78,6 @@ def _for(t: dict) -> str:
 def _in(t: dict) -> str:
     """"in Columbus", "in New York", "on Long Island": where the club plays, never the team's name."""
     return wording.at(t["place"])
-
-
-def _rank_words(rank: int, n: int = 32) -> str:
-    """A league rank in words, never a bare "14th of 32"."""
-    if rank == 1:
-        return "the best in the league"
-    if rank <= 3:
-        return "as good as anyone in the league"
-    if rank <= 8:
-        return "among the league's best"
-    if rank <= n // 2:
-        return "a bit better than average"
-    if rank <= n - 8:
-        return "a bit worse than average"
-    if rank <= n - 3:
-        return "among the league's worst"
-    return "as bad as anyone in the league"
 
 
 # ---------------------------------------------------------------- team history
@@ -175,7 +154,7 @@ STYLE = {
     "pointAllowed": ("collapse around the net and give up the point", "push out to take away the point shot"),
     "icing": (None, "ice the puck a lot to get out of trouble"),
     "pace": ("play fast, wide-open games", "grind games down"),
-    "forecheck": ("hound the puck in the other team's end", "sit back rather than forecheck"),
+    "forecheck": ("hound the puck in the other team’s end", "sit back rather than forecheck"),
     "physical": ("hit everything that moves", "play a finesse game"),
     "rough": ("get into a lot of chippy games", "keep things calm after the whistle"),
     "depth": ("roll all four lines", "lean hard on their top players"),
@@ -186,7 +165,7 @@ PAIRS = {
     ("volume", "lo", "quality", "hi"): "pick their spots, but get to the dangerous chances when they shoot",
     ("suppression", "hi", "qualityAllowed", "lo"): "give up very few shots, though the ones they allow are dangerous",
     ("suppression", "lo", "qualityAllowed", "hi"): "let the other team shoot, but mostly hopeful shots",
-    ("volume", "hi", "suppression", "hi"): "spend most of the night in the other team's end",
+    ("volume", "hi", "suppression", "hi"): "spend most of the night in the other team’s end",
     ("volume", "lo", "suppression", "lo"): "spend a lot of the night in their own end",
 }
 # Special teams, goaltending and discipline: a clause of their own, (good, bad).
@@ -286,27 +265,27 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
 
     # 1. The hook: last season and this one in a breath.
     if not gp:
-        hook = f"{_cap(X)} haven't played yet this season."
+        hook = f"{_cap(X)} haven’t played yet this season."
     elif last and last["playoffs"] == 5:
         hook = {"good": f"The defending champs are picking up right where they left off, {record} out of the gate.",
                 "even": f"The defending champs have had a so-so start at {record}.",
-                "bad": f"Life as defending champs has started slowly: they're {record}."}[rec]
+                "bad": f"Life as defending champs has started slowly: they’re {record}."}[rec]
     elif last and last["playoffs"] == 4:
-        hook = {"good": f"Last spring's runners-up look hungry: they're {record}.",
-                "even": f"Last spring's runners-up are {record}, still finding their feet.",
-                "bad": f"There's no Final hangover quite like this one: last spring's runners-up are {record}."}[rec]
+        hook = {"good": f"Last spring’s runners-up look hungry: they’re {record}.",
+                "even": f"Last spring’s runners-up are {record}, still finding their feet.",
+                "bad": f"There’s no Final hangover quite like this one: last spring’s runners-up are {record}."}[rec]
     elif dry >= 3:
-        hook = {"good": f"Could this be the year? {_cap(X)} haven't made the playoffs in {_num(dry)} seasons, but they're {record} so far.",
+        hook = {"good": f"Could this be the year? {_cap(X)} haven’t made the playoffs in {_num(dry)} seasons, but they’re {record} so far.",
                 "even": f"{_cap(X)} are {record}, still looking for their first playoff spot in {_num(dry)} seasons.",
                 "bad": f"The rebuild grinds on {_in(t)}: no playoffs in {_num(dry)} seasons, and a {record} start."}[rec]
     elif last and not last["playoffs"] and made:
         hook = {"good": f"After missing the playoffs last spring, {X} have bounced back to {record}.",
                 "even": f"After missing the playoffs last spring, {X} are {record}.",
-                "bad": f"Last season was one to forget {_in(t)}, and this one hasn't started much better: they're {record}."}[rec]
+                "bad": f"Last season was one to forget {_in(t)}, and this one hasn’t started much better: they’re {record}."}[rec]
     elif made == len(past) and past:
-        hook = {"good": _pick([f"Same old {nick}: {record}, and in the mix again.", f"{_cap(X)} are {record}, which is what we've come to expect."], *key),
+        hook = {"good": _pick([f"Same old {nick}: {record}, and in the mix again.", f"{_cap(X)} are {record}, which is what we’ve come to expect."], *key),
                 "even": f"{_cap(X)}, playoff regulars, are {record} so far.",
-                "bad": f"{_cap(X)} have made the playoffs {_num(max(running, len(past)))} years running, but they're {record} this time."}[rec]
+                "bad": f"{_cap(X)} have made the playoffs {_num(max(running, len(past)))} years running, but they’re {record} this time."}[rec]
     else:
         hook = f"{_cap(X)} are {record} so far."
     if run >= 3 and gp:
@@ -318,20 +297,20 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
         n, k = x["gp"], x["better"]
         most = "most" if k * 2 > n else "half" if k * 2 == n else "few"
         say = {
-            ("good", "good"): _pick(["And it's no mirage: they've had the better of the chances in {c}.", "They've earned it, too, with the better of the chances in {c}."], *key, "g").format(c=f"all {_num(n)} games" if k == n else f"{_num(k)} of their {_num(n)} games"),
+            ("good", "good"): _pick(["And it’s no mirage: they’ve had the better of the chances in {c}.", "They’ve earned it, too, with the better of the chances in {c}."], *key, "g").format(c=f"all {_num(n)} games" if k == n else f"{_num(k)} of their {_num(n)} games"),
             ("good", "even"): "The play has been closer than the record, though.",
-            ("good", "bad"): "Don't get too comfortable, though: they've been outchanced in most of those games, and that tends to catch up with a team.",
-            ("even", "good"): "They've played better than that record, too, winning the battle for chances more often than not.",
-            ("even", "even"): "That's about how they've played, too: some nights on top, some not.",
-            ("even", "bad"): "If anything the record is kind: they've been outchanced more often than not.",
-            ("bad", "good"): "The results haven't come yet, but they've had the better of the chances most nights, so don't write them off.",
-            ("bad", "even"): "They've played better than that, though, so a bit of luck could turn it around.",
-            ("bad", "bad"): "And honestly, they haven't played much better than that.",
+            ("good", "bad"): "Don’t get too comfortable, though: they’ve been outchanced in most of those games, and that tends to catch up with a team.",
+            ("even", "good"): "They’ve played better than that record, too, winning the battle for chances more often than not.",
+            ("even", "even"): "That’s about how they’ve played, too: some nights on top, some not.",
+            ("even", "bad"): "If anything the record is kind: they’ve been outchanced more often than not.",
+            ("bad", "good"): "The results haven’t come yet, but they’ve had the better of the chances most nights, so don’t write them off.",
+            ("bad", "even"): "They’ve played better than that, though, so a bit of luck could turn it around.",
+            ("bad", "bad"): "And honestly, they haven’t played much better than that.",
         }[(rec, play)]
         if most == "few" and play == "bad" and rec != "bad" and k == 0:
             say = say.replace("in most of those games", "in every one of those games")
         if gp < 10 and "though" not in say and "write them off" not in say:
-            say += " " + _pick(["Early days, of course.", "It's early, mind you.", "Small sample, sure."], *key, "early")
+            say += " " + _pick(["Early days, of course.", "It’s early, mind you.", "Small sample, sure."], *key, "early")
         out.append(say)
 
     # 3. How they play.
@@ -340,7 +319,7 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
         frame = _pick(["Expect them to {p}.", "Night to night, they {p}.", "On the ice, they {p}.", "Their game? They {p}."], *key, "style")
         out.append(frame.format(p=_and(phrases)))
     else:
-        out.append("Stylewise there's nothing extreme about them: a middle-of-the-road team in almost every way.")
+        out.append("Stylewise there’s nothing extreme about them: a middle-of-the-road team in almost every way.")
 
     # 4. Special teams and goaltending, only at the far ends.
     ext = team_extras(fp)
@@ -349,7 +328,7 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
         if "rough" in used and fp["dims"]["rough"]["blend"]["pct"] >= 50 and ("discipline", "hi") in ext:
             # "Chippy games" beside "they stay out of the box" reads like a contradiction (Sora, 2026-10-12): both are true
             # because the other team usually goes to the box at the same whistle, which creates no power play.
-            cl[ext.index(("discipline", "hi"))] = "apart from the chippy stuff, they're good at staying out of the box"
+            cl[ext.index(("discipline", "hi"))] = "apart from the chippy stuff, they’re good at staying out of the box"
         joint = " and " if len({end for _, end in ext}) == 1 else ", but "
         out.append(_cap(joint.join(cl)) + ".")
     return {"team": abbr, "name": t["name"], "text": out, "style": used + [k for k, _ in ext]}
@@ -362,14 +341,14 @@ LINE_WORD = {"L1": "top", "L2": "second", "L3": "third", "L4": "fourth", "P1": "
 # Standout skills (blend percentile 85+ among his peers, likely range clear of the middle). Base verbs after "he can"
 # would read oddly, so these complete "He ..." in the third person.
 SKILL = {
-    "offImpact": "tilts the ice when he's out there",
-    "defImpact": "shuts down the other team's chances",
+    "offImpact": "tilts the ice when he’s out there",
+    "defImpact": "shuts down the other team’s chances",
     "chances": "gets to dangerous scoring chances",
     "shooting": "shoots at every opportunity",
     "finishing": "finishes better than most",
     "playmaking": "sets up a lot of goals",
     "powerPlay": "is a real threat on the power play",
-    "ppImpact": "makes the power play better whenever he's on it",
+    "ppImpact": "makes the power play better whenever he’s on it",
     "shThreat": "stays dangerous even while killing penalties",
     "hits": "plays a heavy, physical game",
     "blocks": "throws himself in front of shots",
@@ -471,11 +450,11 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     # 1. Hook.
     run = f", with goals in {_num(gn)} straight" if gn >= 3 else f", with a point in {_num(pn)} straight" if pn >= 4 else ""
     if p.get("unplayed"):  # with the club but not dressed yet: never say why (the page's status tag does, when NHL.com has)
-        out.append(_pick([f"{last} hasn't played for {_for(team)} yet this season.", f"{last} has yet to play a game this season."], *key, "out"))
+        out.append(_pick([f"{last} hasn’t played for {_for(team)} yet this season.", f"{last} has yet to play a game this season."], *key, "out"))
     elif new:
         were = f"{_num(new['years'])} seasons with the {new['nick']}" if new["years"] >= 3 else f"a stop {wording.at(new['place'])}"
         if hot:
-            out.append(f"{last} has wasted no time {_in(team)}: after {were}, he's got {pts} points in {_num(gp)} games{run}.")
+            out.append(f"{last} has wasted no time {_in(team)}: after {were}, he’s got {pts} points in {_num(gp)} games{run}.")
         else:
             out.append(f"{last} is the new face {_in(team)}, after {were}.")
     elif hot and label == "elite":
@@ -484,9 +463,9 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
     elif hot:
         out.append(f"{last} has come out flying: {pts} points in {_num(gp)} games{run}.")
     elif cold:
-        out.append(f"It's been a quiet start for {last}: {_num(pts)} point{'s' if pts != 1 else ''} in {_num(gp)} games.")
+        out.append(f"It’s been a quiet start for {last}: {_num(pts)} point{'s' if pts != 1 else ''} in {_num(gp)} games.")
     elif label and len(full) < 3:
-        what = "one of the league's best" if label == "elite" else "a point-a-game player"
+        what = "one of the league’s best" if label == "elite" else "a point-a-game player"
         out.append(f"{last} is only in his {_nth(len(full) + 1)} season and already {what}.")
     elif label == "elite":
         out.append(f"{last} is one of the best {'defensemen' if p['pos'] == 'D' else 'players'} in the league, and {_for(team)} know{'' if team['place'].startswith('NY ') else 's'} it.")
@@ -511,8 +490,8 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
         goals30 = sum(1 for x in full if x["gp"] >= 60 and x["g"] * 82 / x["gp"] >= 30)
         years = len(seasons) - (seasons[-1]["season"] // 10000 == CURRENT_SEASON)
         if label and len(_full(seasons)) >= 3:
-            more = f", and he's scored 30 goals {_num(goals30)} times" if goals30 >= 2 and p["pos"] != "D" else ""
-            out.append(_pick(["None of this is new: he had {lp} points last season{m}.", "He's been doing this for years: {lp} points last season{m}."], *key, "cr").format(lp=lp, m=more))
+            more = f", and he’s scored 30 goals {_num(goals30)} times" if goals30 >= 2 and p["pos"] != "D" else ""
+            out.append(_pick(["None of this is new: he had {lp} points last season{m}.", "He’s been doing this for years: {lp} points last season{m}."], *key, "cr").format(lp=lp, m=more))
         elif label:
             out.append(f"He had {lp} points last season.")
         elif lp >= 45 or (p["pos"] == "D" and lp >= 35):
@@ -541,7 +520,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
         spell = sum(_seasons_span(s["first"], s["last"]) for s in former)
         drafted = p.get("draft_team") == opp
         if not since:
-            out.append(f"This one's personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
+            out.append(f"This one’s personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
         elif spell >= 2:
             out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
@@ -551,12 +530,12 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
         total = sum(g["points"] for g in vs)
         usual = sum(g["points"] for g in reg) / len(reg)
         if gn >= 3:
-            out.append(f"{_cap(O)} know him well: he's scored in {_num(gn)} straight games against them.")
+            out.append(f"{_cap(O)} know him well: he’s scored in {_num(gn)} straight games against them.")
         elif pn >= 5:
-            out.append(_pick([f"{_cap(O)} can't seem to keep him off the scoresheet: he's had a point in {_num(pn)} straight games against them, {pts} points in all.",
+            out.append(_pick([f"{_cap(O)} can’t seem to keep him off the scoresheet: he’s had a point in {_num(pn)} straight games against them, {pts} points in all.",
                               f"He loves seeing {O}: a point in {_num(pn)} straight meetings, {pts} points in that run."], p["id"], opp))
         elif len(vs) >= 10 and usual >= 0.4 and total / len(vs) >= 1.3 * usual:
-            out.append(f"He's always enjoyed playing {O}: {total} points in {len(vs)} career games against them.")
+            out.append(f"He’s always enjoyed playing {O}: {total} points in {len(vs)} career games against them.")
         elif len(vs) >= 10 and usual >= 0.6 and total / len(vs) <= 0.6 * usual:
             out.append(f"{_cap(O)} have had his number over the years: just {total} points in {len(vs)} career games.")
     return out
@@ -576,7 +555,7 @@ def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> 
                     continue
                 lo, hi = max(a["first"], b["first"]), min(a["last"], b["last"])
                 if hi >= lo and _seasons_span(lo, hi) >= 4:
-                    return [f"He'll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
+                    return [f"He’ll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
     return []
 
 

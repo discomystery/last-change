@@ -27,7 +27,11 @@ of the gap is really him. Those gaps are mostly bounces (true spread between pla
 game, against about 0.38 from chance for a ten-game absence; 7% of gaps clear the 5% chance bar), so the estimate
 leans hard on the player's relevancy and only moves far when the absence is long. It never feeds the number.
 """
+import hashlib
+import json
+from datetime import date as Date
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -35,7 +39,6 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics import rapm
 
-RAPM_LAMBDA = 40000.0  # same ridge penalty as player pages (metrics/players.py)
 # Impact comes from rapm.chained (ratings that carry every season since 2023-24 forward); three seasons had been
 # steadier than two and closer to expert rankings (ESPN rho 0.54 -> 0.66).
 LAST_SEASON_GAMES = 30  # last season counts as at most this many games beside this season's
@@ -210,16 +213,31 @@ def with_without(season: int, rel: pl.DataFrame, before: str | None = None) -> p
 
 GOALIE_SEASON_WEIGHT = (1.0, 0.8, 0.6)  # this season, last, the one before
 GOALIE_SHRINK_SHOTS = 1500  # unblocked shots of average goaltending added to each goalie's own record
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=64)
 def standouts(season: int = CURRENT_SEASON, before: str | None = None) -> dict[int, str]:
     """Skaters a fan would want told about when they are missing (star or franchise tier), by player id. Used only
-    to choose whom pages mention; the tier itself is never shown."""
+    to choose whom pages mention; the tier itself is never shown. Pages about a past game ask as of that day (no
+    hindsight); those lists are kept between runs, since the games before a past day don't change."""
+    cache = _standouts_path(season, before)
+    if cache is not None and cache.exists():
+        return {int(k): v for k, v in json.loads(cache.read_text()).items()}
     try:
         r = run(season, before)
     except Exception as e:  # no ratings yet: nobody is singled out
         print(f"standouts unavailable: {e!r}")
         return {}
-    return dict(r.filter(pl.col("tier").is_in(["star", "franchise"])).select("player_id", "tier").iter_rows())
+    out = dict(r.filter(pl.col("tier").is_in(["star", "franchise"])).select("player_id", "tier").iter_rows())
+    if cache is not None:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({str(k): v for k, v in out.items()}))
+    return out
+
+
+def _standouts_path(season: int, before: str | None) -> Path | None:
+    if before is None or before >= Date.today().isoformat():  # games before today may still be coming in
+        return None
+    h = hashlib.sha1(Path(__file__).read_bytes() + Path(rapm.__file__).read_bytes()).hexdigest()[:12]
+    return TABLES / "_cache" / f"standouts_{season}_{before}_{h}.json"
 
 
 GOALIE_TIERS = ((5, "franchise"), (15, "star"), (32, "core"), (64, "regular"))  # by league rank: the top five are the difference makers

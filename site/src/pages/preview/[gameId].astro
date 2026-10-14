@@ -1,4 +1,5 @@
 ---
+import { srcInfo } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
@@ -34,7 +35,7 @@ import linesAll from '../../../public/data/lines.json';
 import goalieAll from '../../../public/data/goalies.json';
 import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../lib/traits';
 
 type Claim = { id: string; kind: string; head: string; body: string; call?: string; nums?: string; cite: string; check: object | null };
 // `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
@@ -83,7 +84,7 @@ type MRow = { label: string; minutes: number; seconds: number; share: (number | 
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; seconds: number; share: number; rate: number; pct?: number };
 type LT = { games: number; settled?: { shuffled?: boolean }; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
 const LN = linesData.teams as unknown as Record<string, LT>;
-const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top defense pairs', P2: 'second defense pairs', P3: 'third defense pairs' };
 const lastName = (n: string) => n.split(' ').slice(1).join(' ');
 const awayLine = (j: number) => LN[away]?.units.find((u) => u.label === `L${j + 1}`);
 const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === label);
@@ -135,16 +136,6 @@ type Src = { n: number; share: number | null };
 type SrcSide = { goals: number; sources: Record<string, Src> };
 const SR = srcData.teams as unknown as Record<string, { sources: Record<'blend' | 'season', Record<'for' | 'against', SrcSide>> | null }>;
 const lgSrc = srcData.league_sources as Record<string, number>;
-const srcInfo: [string, string, string][] = [
-  ['other', 'Everyday even-strength play', 'Even-strength goals that were not a rebound and did not come within five seconds of a turnover or an offensive-zone faceoff win.'],
-  ['pp', 'Power play', 'Goals scored with more skaters on the ice than the opponent.'],
-  ['rebound', 'Rebound', 'Goals scored within three seconds of a teammate’s shot on goal.'],
-  ['en', 'Empty net', 'Goals into a net with no goalie in it.'],
-  ['turnover', 'Off a turnover', 'Even-strength goals within five seconds of winning the puck, with no stoppage in between.'],
-  ['ea', 'Goalie pulled', 'Goals scored with their own goalie off for an extra skater.'],
-  ['sh', 'Shorthanded', 'Goals scored with fewer skaters on the ice than the opponent.'],
-  ['faceoff', 'Off a faceoff win', 'Even-strength goals within five seconds of winning a faceoff in the offensive zone.'],
-];
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
 const story = snap.story;
@@ -196,7 +187,7 @@ import ShareButton from '../../components/ShareButton.astro';
         <ul>{notes.map((n) => <li><a class={`tpill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
       </div>
     )}
-    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.</p>
+    <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
@@ -362,7 +353,7 @@ import ShareButton from '../../components/ShareButton.astro';
     })}
   </Section>
 
-  <Section id="goalies" title="Goaltending" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
+  <Section id="goalies" title="Goalies" placeholder={false} takeaway="Is each goalie stopping more than he should, and what is his team asking him to face?">
     <Fragment slot="explain">
       <p class="note">{guessed ? 'The menus list every goalie on each team and open on the one we expect to start: NHL.com’s projected starter once its game-day preview is up (right about 9 times in 10 this season), otherwise our own guess from who has started lately and whether it is the second night of a back-to-back (right about 7 times in 10 in past seasons).' : 'The menus list every goalie on each team, busiest this season first; the site does not yet know who will start.'} Expected-goal models can’t see passes before a shot, so a goalie whose team gives up many cross-ice passes looks worse here than he really is.</p>
     </Fragment>
@@ -396,7 +387,7 @@ import ShareButton from '../../components/ShareButton.astro';
                 <div class="ghead">
                   <div class="ghead-text">
                     <p class="gname"><i></i><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots, {words}</span></p>
-                    <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                    <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Saving more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                   </div>
                   <Portrait id={g.id} size={96} class="g-photo" />
                 </div>

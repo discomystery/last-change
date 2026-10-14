@@ -4,7 +4,7 @@ import { standouts, roleTip, type Skater, type Mode } from './players';
 import goalieData from '../../public/data/goalies.json';
 import rosterData from '../../public/data/roster.json';
 import schedule from '../../public/data/schedule.json';
-import { goalieTraitInfo } from '../data/mock';
+import { goalieTraitInfo } from './traits';
 import { describe, type RosterPlayer } from './roster';
 
 const files = import.meta.glob('../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;

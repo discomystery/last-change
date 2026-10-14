@@ -7,6 +7,7 @@ import { cardColours } from '../lib/teams';
 import teamsData from '../../public/data/teams.json';
 import index from '../../public/data/players/index.json';
 import type { GameData } from '../lib/shareCard';
+import { jobsFor, scoresFor } from '../lib/gameFiles';
 
 type Lane = GameData['calls'][number]['lane'];
 type Call = { head: string; said?: string; title?: string; plain?: string; verdict: string | null; lane?: Lane };
@@ -21,10 +22,8 @@ const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const cc = cardColours(away, home);
 const teams = Object.fromEntries([away, home].map((a) => [a, { place: T[a]?.place ?? a, name: T[a]?.name ?? a, nick: T[a]?.nick ?? a, own: cc.own[a], match: cc.matchup[a] }]));
 
-const scoreFiles = import.meta.glob<{ default: { game_id: number; players: { id: number; pos: string; score: number }[] } }>('../../public/data/scores/2*.json', { eager: true });
-const jobFiles = import.meta.glob<{ default: { game_id: number; players: { id: number; box: { g: number; a: number } }[] } }>('../../public/data/jobs/2*.json', { eager: true });
-const scores = Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default;
-const jobs = Object.values(jobFiles).find((f) => f.default.game_id === r.game_id)?.default;
+const scores = scoresFor<{ players: { id: number; pos: string; score: number }[] }>(r.game_id);
+const jobs = jobsFor<{ players: { id: number; box: { g: number; a: number } }[] }>(r.game_id);
 const P = new Map((index as { id: number; name: string; number?: number | null }[]).map((p) => [p.id, p]));
 const ids = new Set([...(scores?.players ?? []), ...(jobs?.players ?? [])].map((p) => p.id));
 const people = Object.fromEntries([...ids].filter((id) => P.has(id)).map((id) => [id, [P.get(id)!.name, P.get(id)!.number ?? null]]));

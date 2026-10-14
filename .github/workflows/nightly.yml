@@ -73,13 +73,12 @@ jobs:
 
       - name: Restore the published numbers
         run: |
-          # A full update rewrites every file but the previews frozen at puck drop; a quick one keeps the rest as well.
+          # Start from what the last run published, never from the copy committed on main (it goes stale): a full
+          # update rewrites every file but the previews frozen at puck drop, and reads a few (teams.json) before it does.
           mkdir -p site/public/data
-          if [ "${{ steps.mode.outputs.mode }}" = quick ] && [ -d data/site_data ]; then
-            cp -R data/site_data/. site/public/data/
-          elif [ -d data/site_data/previews ]; then
+          if [ -d data/site_data ]; then
             rm -rf site/public/data/previews
-            cp -R data/site_data/previews site/public/data/previews
+            cp -R data/site_data/. site/public/data/
           fi
           rm -rf data/site_data
 
@@ -107,8 +106,21 @@ jobs:
           fi
 
       - name: Run the pipeline tests
+        id: tests
         if: steps.mode.outputs.mode == 'full'
         run: uv run --project pipeline pytest -q pipeline/tests
+
+      - name: Open an issue when the tests fail
+        # Nothing is saved or published after a failed test run, and every later run fails the same way until main
+        # is fixed (game nights included), so say so where someone will see it.
+        if: failure() && steps.tests.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Site updates stopped: the pipeline tests are failing"
+          if [ -z "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number')" ]; then
+            gh issue create --title "$title" --body "The nightly workflow's tests failed on $(git rev-parse --short HEAD), so nothing was saved or published: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Every update fails the same way until main is fixed."
+          fi
 
       - name: Build the site
         run: |

@@ -163,7 +163,7 @@ export function mountSeasonMap(root) {
     const label = (key) => (key.startsWith('@') ? PL[key].city : key);
 
     // Flat map.
-    const svg = el('svg:svg', { class: 'flat', role: 'img', 'aria-label': `Map of ${D.place}’ season` });
+    const svg = el('svg:svg', { class: 'flat', role: 'img', 'aria-label': `Map of ${D.place}’s season` });
     const borderP = el('svg:path', { class: 'border', d: ringsD(GEO.flat.border) });
     svg.append(el('svg:rect', { class: 'water', x: -400, y: -300, width: 1800, height: 1200 }), el('svg:path', { class: 'land', d: ringsD(GEO.flat.land) }), borderP);
     let insetFrame = null, insetG = null;
@@ -200,7 +200,7 @@ export function mountSeasonMap(root) {
 
     // Globe.
     const GW = 600;
-    const gsvg = el('svg:svg', { class: 'globe', role: 'img', 'aria-label': `Globe showing ${D.place}’ travel` });
+    const gsvg = el('svg:svg', { class: 'globe', role: 'img', 'aria-label': `Globe showing ${D.place}’s travel` });
     const gSphere = el('svg:path', { class: 'g-sphere' }), gGrat = el('svg:path', { class: 'g-grat' }), gLand = el('svg:path', { class: 'g-land' });
     const gLegs = el('svg:g'), gCities = el('svg:g');
     const gPlane = el('svg:g', { class: 'plane' }, el('svg:path', { d: PLANE, transform: 'scale(1.1)' }));
@@ -319,7 +319,7 @@ export function mountSeasonMap(root) {
         const where = now ? all[now - 1].city : home, nxt = all[now];
         return { js, end: where, view: [home, ...done.map((g) => g.city)], speed: 0.6, focus: now,
           stats: [[record(done), `record in ${done.length} ${pl(done.length, 'game', 'games')}`], [d0(m), `${U.many} flown`], [String(aw), pl(aw, 'game away from home', 'games away from home')], b2bs(done)],
-          note: [el('b', { text: done.length ? `${D.place} have played ${done.length} ${pl(done.length, 'game', 'games')}.` : `${D.place} haven’t played yet.` }), ` They’re ${where === home ? 'home' : 'in ' + placeOf(where)} now${nxt ? `, ${nxt.isHome ? 'hosting' : 'off to'} ${D.teamPlaces[nxt.opp]} next` : ''}.`] };
+          note: [el('b', { text: done.length ? `${D.place} has played ${done.length} ${pl(done.length, 'game', 'games')}.` : `${D.place} hasn’t played yet.` }), ` They’re ${where === home ? 'home' : 'in ' + placeOf(where)} now${nxt ? `, ${nxt.isHome ? 'hosting' : 'off to'} ${D.teamPlaces[nxt.opp]} next` : ''}.`] };
       }
       if (md === 'trip' || md === 'abroad') {
         const t = md === 'abroad' ? abroadTrip : nextTrip, js = []; for (let j = t[0]; j <= t[1]; j++) js.push(j);

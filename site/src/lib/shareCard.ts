@@ -3,6 +3,7 @@
 // share sheet, then handed to the phone's share sheet or downloaded. Nothing is made on the server.
 import { domToBlob } from 'modern-screenshot';
 import LOGO from '../assets/logo/full.svg?raw';
+import { signed } from './format';
 
 type Two = { light: string; dark: string };
 type Lane = { team: string | null; ends: [string, string] | null; avg: [number, ...unknown[]] | null; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
@@ -25,7 +26,6 @@ import type { Theme } from './shareSheet';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
-const signed = (v: number) => { const r = Math.round(v * 10) / 10; return r > 0 ? `+${r.toFixed(1)}` : r < 0 ? `−${(-r).toFixed(1)}` : '0.0'; };
 const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
 const pillWord: Record<string, string> = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' };
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
@@ -37,11 +37,11 @@ const one = (nick: string) => (/[^s]s$/.test(nick) && nick !== 'Blues' ? nick.sl
 // The same sentence the report card shows when the whole game and his usual jobs disagree.
 const nightNote = (c: Card) => {
   const quiet = c.summary === 'mixed' || c.summary === 'didnt';
-  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even though his usual jobs were quieter.';
-  if (c.night === 'good') return c.pill === 'big' ? ', on top of doing his usual jobs.' : ', so it counts for more.';
-  if (c.night === 'rough' && c.summary === 'did') return ', though he still did his usual jobs.';
+  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even if he didn’t handle all of his usual responsibilities.';
+  if (c.night === 'good') return c.pill === 'big' ? ', on top of handling his usual responsibilities.' : ', so it counts for more.';
+  if (c.night === 'rough' && c.summary === 'did') return ', though he still handled his usual responsibilities.';
   return '.';
 };
 
@@ -82,7 +82,7 @@ export function gameCard(g: GameData, theme: Theme) {
   const run = rp ? `<div class="sc-run" data-opt="3"><div class="sc-dots">${dots.map((c) => `<i style="background:${c}"></i>`).join('')}</div>
 <div><div class="sc-kick" style="margin-bottom:12px">Run it back</div><div class="sc-disp sc-fit" style="font-size:34px;line-height:1.15">${esc(rp.head)}</div>
 <div class="sc-rpc"><span><b style="color:${col(g.away)}">${rp.away}</b>${esc(g.teams[g.away].place)}</span><span><b style="color:var(--ink3)">${rp.tie}</b>even</span><span><b style="color:${col(g.home)}">${rp.home}</b>${esc(g.teams[g.home].place)}</span></div>
-<div class="sc-say">${replaySay(g, col)}</div></div></div>` : '';
+<div class="sc-rps">${replaySay(g, col)}</div></div></div>` : '';
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said ${esc(c.said)}</div>

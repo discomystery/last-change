@@ -54,9 +54,10 @@ def _team_ids(season: int) -> dict[str, int]:
     return out
 
 
-def _roles(season: int) -> dict[int, dict[int, dict]]:
+def _roles(season: int, before: str | None = None) -> dict[int, dict[int, dict]]:
     """Per team id, per skater: usual 5v5 seconds a game, ice-time rank at his position (F or D), how much he is worth
-    (expected goals a game) and his rank on the team by worth. This season's games when he has 3+, else last season's."""
+    (expected goals a game) and his rank on the team by worth. This season's games (before `before`, for a past
+    preview) when he has 3+, else last season's."""
     from pipeline.metrics import win_model
 
     have = [s for s in (season - 2, season - 1, season) if (TABLES / str(s) / "player_game.parquet").exists()]
@@ -69,6 +70,8 @@ def _roles(season: int) -> dict[int, dict[int, dict]]:
             frames.append(pl.read_parquet(f).filter(pl.col("pos") != "G").join(g, on="game_id").with_columns(season=pl.lit(s))
                           .select("season", "date", "team_id", "player_id", "pos", "sec", "sec5"))
     pg = pl.concat(frames)
+    if before:
+        pg = pg.filter((pl.col("season") < season) | (pl.col("date") < before))
     now = pg.filter(pl.col("season") == season).group_by("team_id", "player_id").agg(pl.len().alias("gp"), pl.col("sec").mean(), pl.col("sec5").mean(), pl.col("pos").last())
     old = (pg.filter(pl.col("season") == season - 1).sort("date").group_by("team_id", "player_id")
            .agg(pl.len().alias("gp"), pl.col("sec").tail(25).mean(), pl.col("sec5").tail(25).mean(), pl.col("pos").last()))
@@ -154,9 +157,11 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
     av = av.filter(pl.col("date") <= day)
     today_rows = av.filter(pl.col("date") == av["date"].max())
     ids = _team_ids(season)
-    roles = _roles(season)
+    past = day if day < Date.today().isoformat() else None
+    roles = _roles(season, past)
     from pipeline.metrics import relevancy
-    stars = relevancy.standouts(season)  # always worth an Out note, even when this season's games barely show him
+    # always worth an Out note, even when this season's games barely show him; as of `day` for a past preview
+    stars = relevancy.standouts(season, past)
     g_now, d_now, u_now = patterns._team_frame(season)
     g_old, _, u_old = patterns._team_frame(season - 1)
     names = {}
