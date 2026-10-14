@@ -56,3 +56,12 @@ def test_new_york_teams_read_as_they():
 
 def test_shared_surnames_get_initials():
     assert previews._lasts(["Aliaksei Protas", "Ilya Protas", "Jordan Kyrou"]) == ["A. Protas", "I. Protas", "Kyrou"]
+
+
+def test_goal_streaks_lead():
+    assert stories.run_of([1, 0, 2, 1, 1]) == 3
+    assert stories.streak_text(4, 4, 10) == "scored in four straight games"
+    assert stories.streak_text(5, 5, 5) == "scored in every game this season"
+    assert stories.streak_text(3, 7, 10) == "a point in seven straight games, with a goal in each of the last three"
+    assert stories.streak_text(2, 6, 10) == "a point in six straight games"
+    assert stories.streak_text(3, 3, 9, " against Dallas") == "scored in three straight games against Dallas"
