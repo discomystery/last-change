@@ -88,8 +88,8 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'Minor and major penalties called on opponents against him, per 60 minutes in all situations.' },
   discipline: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(2)} penalties taken /60`, label: 'Staying out of the box', lo: 'Often penalized', hi: 'Clean', say: (v) => `${v.toFixed(2)} penalties taken per 60`,
     tip: 'Minor and major penalties he takes per 60 minutes in all situations. Fewer is better. Misconducts and bench minors are left out.' },
-  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(1)}% won`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
-    tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
+  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(1)}% vs average`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `would win ${v.toFixed(1)}% of his faceoffs against an average centre`,
+    tip: 'Share of faceoffs he wins, in all situations, adjusted for who he took them against and in which end: beating the best centres counts for more than beating fourth-liners. Only rated for players who take faceoffs regularly.' },
 };
 export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Special teams', 'Physical and puck', 'Penalties and faceoffs'];
 

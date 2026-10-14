@@ -14,7 +14,8 @@ Z80 = 1.2816
 
 COLS = ["sec", "sec5", "sec_pp", "icf5", "ixg5", "ixg_pp", "ixg_net", "iff_net", "g_net", "a1_5", "a1_pp", "on_xgf_adj", "on_xga_adj",
         "t_xgf_adj", "t_xga_adj", "t_sec5", "hits", "hits_adj", "takes", "takes_adj", "blocks", "blocks_adj", "gives", "gives_adj", "fow", "fol",
-        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf"]
+        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf", "fo_exp"]
+ADDED = {"fo_exp"}  # not in player_game: added on load (faceoffs.py)
 C = {c: i for i, c in enumerate(COLS)}
 GROUP = {"C": "F", "L": "F", "R": "F", "D": "D"}
 SUB = {"C": "C", "L": "W", "R": "W", "D": "D"}
@@ -36,7 +37,9 @@ def _rate(num: str, den: str, mult: float = 3600.0):
 
 
 def _faceoffs(s):
-    return 100 * s[..., C["fow"]] / (s[..., C["fow"]] + s[..., C["fol"]])
+    """Faceoff rate against average opposition: an even 50% plus his wins above what an average centre would have won
+    against the same opponents in the same spots (faceoffs.py)."""
+    return 50 + 100 * (s[..., C["fow"]] - s[..., C["fo_exp"]]) / (s[..., C["fow"]] + s[..., C["fol"]])
 
 
 def _finishing(s):
@@ -74,10 +77,11 @@ def _weight(trait: str, s: np.ndarray) -> np.ndarray:
 def load(season: int, need: tuple[str, ...] = ()) -> pl.DataFrame:
     path = TABLES / str(season) / "player_game.parquet"
     # Rebuild when missing or built by an older version that lacks a column we now need (saved past seasons).
-    if not path.exists() or not set(COLS) | set(need) <= set(pl.read_parquet_schema(path)):
+    if not path.exists() or not (set(COLS) - ADDED) | set(need) <= set(pl.read_parquet_schema(path)):
         from pipeline.metrics import player_game
         player_game.build(season)
-    return pl.read_parquet(path).filter(pl.col("pos") != "G").sort("player_id", "game_id")
+    from pipeline.metrics import faceoffs
+    return faceoffs.attach(pl.read_parquet(path).filter(pl.col("pos") != "G"), season).sort("player_id", "game_id")
 
 
 def _matrices(pg: pl.DataFrame) -> dict[int, np.ndarray]:

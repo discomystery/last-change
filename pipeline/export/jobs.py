@@ -320,11 +320,12 @@ def shrink(n: float, v: float, k: float, prior: float) -> float:
 def _table(season: int) -> pl.DataFrame:
     """player_game for a season, rebuilt if it was saved before the power-play column existed."""
     path = TABLES / str(season) / "player_game.parquet"
-    need = set(P.COLS) | set(EXTRA)
+    need = (set(P.COLS) - P.ADDED) | set(EXTRA)
     if not path.exists() or not need <= set(pl.read_parquet_schema(path)):
         from pipeline.metrics import player_game
         player_game.build(season)
-    return pl.read_parquet(path).filter(pl.col("pos") != "G")
+    from pipeline.metrics import faceoffs
+    return faceoffs.attach(pl.read_parquet(path).filter(pl.col("pos") != "G"), season)
 
 
 def typical_ratios(last: pl.DataFrame) -> dict[str, float]:
@@ -513,14 +514,17 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
             if draws < MIN_DRAWS:
                 job |= {"verdict": "na", "text": (f"Took only {draws} {'draw' if draws == 1 else 'draws'}, too few to judge." if draws else "Took no draws.")}
             else:
+                # His usual rate is against average opposition; tonight's centres and spots move what is typical.
+                usual = float(np.clip(100 * T("fo_exp") / draws + usual - 50, 1, 99))
                 bench = max(avg, 50.0)
                 job |= {"verdict": grade(100 * won / draws, usual, bench), "tonight": f"{won} of {draws}", "usual": f"{usual:.0f}%", "bench": f"{bench:.0f}%", "bench_is": "Even",
-                        "text": f"Won {won} of {draws} draws ({100 * won / draws:.0f}%). Usual for him: {usual:.0f}%."}
+                        "text": f"Won {won} of {draws} draws ({100 * won / draws:.0f}%). Usual for him against these centres: {usual:.0f}%."}
             jobs.append(job)
         elif draws >= 12 and won / draws >= 0.65 and experienced and pct < 50:
+            usual = float(np.clip(100 * T("fo_exp") / draws + usual - 50, 1, 99))
             p = binom_tail(won, draws, usual / 100)
             if p < STAND_OUT_P:
-                outs.append({"key": "faceoffs", "label": LABEL["faceoffs"], "p": round(p, 4), "text": f"Won {won} of {draws} draws, when he usually wins {usual:.0f}%."})
+                outs.append({"key": "faceoffs", "label": LABEL["faceoffs"], "p": round(p, 4), "text": f"Won {won} of {draws} draws, when he would usually win {usual:.0f}% against these centres."})
 
     # Strengths among his own counts, and stand-out nights in the ones that aren't.
     for t, (col, tcol, many, one, where) in COUNTS.items():
