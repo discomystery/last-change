@@ -21,6 +21,10 @@ Narratives found (preview):
   milestone     a skater who dressed last game and is close to a round number: his 500th, 600th... NHL game next,
                 or within two of 100, 200... goals, 200+ assists or 300+ points (complete NHL careers only)
   bad blood     the last meeting this season had a line brawl, a big scrum, two or more fights, an ejection or a fight
+  storylines    Sora's notes on what makes a game interesting (2026-10-14, export/storylines.py): last spring's playoff
+                series, brothers on opposite sides, a club without both usual goalies, two of the worst records, a
+                star who fought last time. Post-game: natural hat tricks, a teammate (or brother) on every goal,
+                challenges that failed, league reviews with no goal, how rarely a star fights.
 History starts in 2023-24, so records against a team say "since 2023-24".
 
 Everything a preview story reads is from before the game's date, so a rebuilt preview tells it as a live one would.
@@ -34,7 +38,7 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
-from pipeline.export import penalties, wording
+from pipeline.export import penalties, storylines, wording
 from pipeline.export import surprises as surprise_rules
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
@@ -364,7 +368,21 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             items.append({"tag": "Out", "text": text, "score": 76 - k, "pid": n["pid"]})
             told.append(n["pid"])
         n_games = len(results(G, t, season))
-        for r in _starters_out(season, day, tids.get(t, -1), reported.get(t, {})):
+        keepers = _starters_out(season, day, tids.get(t, -1), reported.get(t, {}))
+        if len(keepers) >= 2:  # both of a club's usual goalies out: a little-used goalie gets the net (Sora's notes)
+            from pipeline.export import changes
+            out["heads"].append((80, f"Who’s in net for {W.the(t)}?"))
+            ids = [r["player_id"] for r in sorted(keepers, key=lambda r: -r["share"])][:3]
+            names_ = [N.get(i) or changes._name(next(r for r in keepers if r["player_id"] == i)) for i in ids]
+            items[:] = [x for x in items if x.get("pid") not in ids]
+            text = (f"{_cap(W.the(t))} are without both of their usual goalies, {names_[0]} and {names_[1]}." if len(ids) == 2
+                    else f"{_cap(W.the(t))} are without three of their goalies: {_and(names_)}.")
+            nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
+            if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
+                text += f" {N[nxt[0]]} is expected to start."
+            items.append({"tag": "In net", "text": text, "score": 86, "pid": ids[0], "pids": ids})
+            keepers = []
+        for r in keepers:
             if r["player_id"] in told:
                 continue
             from pipeline.export import changes
@@ -492,6 +510,31 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
     if item:
         items.append(item)
+    # Sora's notes on what makes a game worth watching (2026-10-14): last spring's series, brothers, the bottom of the
+    # table, and a club down to a little-used goalie.
+    if not out["meetings"]:
+        sr = storylines.playoff_series(away, home, season)
+        if sr:
+            close = sr["games"] >= 6 or sr["ot"] >= 2
+            tail = f", {num(sr['ot'])} of them in overtime" if sr["ot"] >= 2 else ""
+            items.append({"tag": "Rematch", "text": f"First meeting since {storylines.series_words(sr, W)}{tail}.", "score": 79 if close else 72})
+            out["heads"].append((78 if close else 68, f"A rematch of last spring’s {sr['round']}"))
+    last_dressed = P.filter((pl.col("season") == season) & pl.col("team").is_in([away, home]))
+    if not last_dressed.is_empty():
+        lastg = last_dressed.group_by("team").agg(pl.col("game_id").max())
+        dressed = last_dressed.join(lastg, on=["team", "game_id"])
+        dressed = dressed.filter(~pl.col("player_id").is_in(list(out["out"])))
+        for (p1, _), (p2, _) in _brothers(dressed, away, home):
+            if N.get(p1) and N.get(p2):
+                same = N[p1].split(" ", 1)[-1] == N[p2].split(" ", 1)[-1]
+                items.append({"tag": "Brothers", "text": f"Brothers {N[p1].split(' ', 1)[0]} and {N[p2]} on opposite sides." if same
+                              else f"{N[p1]} and his brother {N[p2]} on opposite sides.", "score": 80, "pids": [p1, p2], "pid": p1})
+                last1 = N[p1].split(" ", 1)[-1]
+                out["heads"].append((82, f"{last1} against {last1}" if same else "Brother against brother"))
+                break
+    if storylines.basement(G, away, home, season, before):
+        out["basement"] = "Both teams are near the bottom of the standings."
+        out["heads"].append((66, "Somebody has to win"))
     if gid is not None:
         items += _new_coach(gid, (away, home), before, W, season)
     from pipeline.ingest import standings_daily as sd
@@ -538,6 +581,11 @@ def _careers() -> dict[int, list[tuple[str, int, int]]]:
 
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _goals_of(gid: int, season: int, pid: int) -> list[int]:
+    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "type", "p1", "period_type"])
+    return ev.filter((pl.col("game_id") == gid) & (pl.col("type") == "goal") & (pl.col("p1") == pid) & (pl.col("period_type") != "SO"))["p1"].to_list()
 
 
 def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str, loser: str, most: int = 2) -> list[str]:
@@ -608,7 +656,10 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
                     f" and picked up {'an assist' if pts == 1 else num(pts) + ' assists'}" if pts else "")
             out.append(f"{_cap(who)} made his {club} debut{was}{',' if was and tail else ''}{tail}.")
         elif k == "club_goal":
-            out.append(f"{_cap(who)} scored his first goal for {W.place(x['team'])}.")
+            many = sum(1 for g in _goals_of(gid, season, pid)) >= 2
+            out.append(f"They were {_short(pid, P, N, season)}’s first goals for {W.place(x['team'])}." if known and many
+                       else f"It was {_short(pid, P, N, season)}’s first goal for {W.place(x['team'])}." if known
+                       else f"{_cap(who)} scored his first goal for {W.place(x['team'])}.")
     return out
 
 
@@ -755,6 +806,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             facts["heads"].append((60 + n, f"{_cap(W.the(t))} come in hot"))
         if k == "winless" and n >= 4:
             facts["heads"].append((58 + n, f"{_cap(W.the(t))} need a win"))
+    if facts.get("basement"):
+        sents.append(facts["basement"])
     # what to look for: the gist of the top calls
     look, kinds = [], set()
     tired_told = any("back-to-back" in v.get("body", "") for v in (outlook or {}).values())
@@ -765,6 +818,17 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             look.append(c["gist"])
             kinds.add(c["kind"])
     blood = penalties.bad_blood(m[-1]["game_id"], season, N) if m else None
+    if m:  # a star who fought last time is the bigger story (Sora's notes, 2026-10-14)
+        sf = [x for x in storylines.star_fights(m[-1]["game_id"], season, m[-1]["date"]) if N.get(x["pid"])]
+        if sf and blood:
+            words = storylines.rare_fight_words(sf[0]["record"])
+            if words:
+                full = N[sf[0]["pid"]]
+                who = full.split(" ", 1)[-1] if full in blood["text"] else full
+                blood = {**blood, "text": f"{blood['text']} For {who}, it was {words}.", "score": max(blood["score"], 78)}
+            facts["heads"].append((79, f"{N[sf[0]['pid']].split(' ', 1)[-1]} fought last time"))
+        if m[-1]["date"] == _day_before(start):
+            facts["heads"].append((75, "Same teams, second night running"))
     still = _still_out([n["text"] for n in lines.get(away, {}).get("notes", [])], away, N, season) \
         + _still_out([n["text"] for n in lines.get(home, {}).get("notes", [])], home, N, season)
     out_last = {N[p].split(" ", 1)[-1] for p in facts["out"] if N.get(p)}
@@ -990,6 +1054,39 @@ def _when(g: dict) -> str:
     return f"{part} the {PERIODS[p]}"
 
 
+def _day_before(d: str) -> str:
+    return Date.fromordinal(Date.fromisoformat(d[:10]).toordinal() - 1).isoformat()
+
+
+def _review_lines(gid: int, season: int, side, W, name, home: str, away: str) -> list[str]:
+    """A goal that stood after the other coach challenged it, and a league review that found no goal (Sora's notes,
+    2026-10-14: the two reviews in WSH at CAR went untold). Goals taken off are told by `wiped`."""
+    out = []
+    for x in storylines.reviews(gid, season):
+        when = _when({"period": x["period"], "sec": x["sec"]})
+        if x["kind"] == "stood":
+            t = home if x["home"] else away
+            other = away if t == home else home
+            who = f" by {name(x['scorer'])}" if x.get("scorer") else ""
+            out.append(f"{_cap(W.poss(t))} goal{who} {when} stood after {W.the(other)} challenged for {x['why']}.")
+        elif x["kind"] == "no_goal" and x.get("shooter_home") is not None:
+            t = home if x["shooter_home"] else away
+            out.append(f"The league looked at a {W.nick.get(t, t)} chance {when} on video and ruled no goal.")
+    return out[:2]
+
+
+def _brothers(dressed: pl.DataFrame, away: str, home: str) -> list[tuple[tuple[int, str], tuple[int, str]]]:
+    """Brothers on opposite sides of one game (Wikidata siblings), as ((id, team), (id, team)) pairs."""
+    sib = storylines.siblings()
+    team = dict(zip(dressed["player_id"].to_list(), dressed["team"].to_list()))
+    out = []
+    for pid, t in team.items():
+        for b in sib.get(pid, ()):
+            if pid < b and team.get(b) and team[b] != t and {t, team[b]} == {away, home}:
+                out.append(((pid, t), (b, team[b])))
+    return out
+
+
 def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | None:
     """The story for a finished game, from its post-game JSON (r), its Swing scores and the season's tables."""
     W = Words(places)
@@ -1042,6 +1139,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             heads.append((100, f"{last(pid)} scores {num(len(gs))}"))
         elif {"ev", "pp", "sh"} <= kinds:
             heads.append((100, f"{last(pid)}’s hat trick, one at every strength"))
+        elif storylines.natural_hat(goals) == pid:  # three in a row, nobody else scoring (Sora's notes, 2026-10-14)
+            heads.append((96, f"A natural hat trick for {last(pid)}"))
         else:
             heads.append((95, f"A hat trick for {last(pid)}"))
     wg = gl.get(winner)
@@ -1118,10 +1217,19 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             pid, gs = max(hat, key=lambda x: len(x[1]))
             kinds = [{"ev": "at even strength", "pp": "on the power play", "sh": "shorthanded", "en": "into an empty net",
                       "ps": "on a penalty shot"}[g["strength"]] for g in gs]
+            natural = storylines.natural_hat(goals) == pid
             if len(set(kinds)) == len(kinds):
                 s1.append(f"{name(pid)} scored {num(len(gs))}: {_and(['one ' + k for k in kinds])}.")
+            elif natural and len(gs) == 3 and len({g["period"] for g in gs}) == 1 and gs[0]["period"] <= 3:
+                s1.append(f"{name(pid)} scored three straight goals in the {PERIODS[gs[0]['period']]} period, a natural hat trick.")
+            elif natural:
+                s1.append(f"{name(pid)} scored {num(len(gs))}, three of them in a row with nobody else scoring in between.")
             else:
                 s1.append(f"{name(pid)} scored {num(len(gs))}.")
+            helper = storylines.set_up_all(goals, pid)
+            if helper and N.get(helper):  # one teammate on every goal; a brother is the story (the Tkachuks, 2026-10-13)
+                kin = "His brother " if helper in storylines.siblings().get(pid, set()) else ""
+                s1.append(f"{kin}{name(helper)} assisted on all {num(len(gs))}.")
         s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser)
         if comeback:
             s1.append(f"{_cap(W.the(winner))} came all the way back." if any(x.endswith("half over.") and "led" in x for x in s1)
@@ -1153,6 +1261,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             else:
                 s1.append(f"{name(x['p1'])} missed the net on a penalty shot {_when(x)}.")
         s1 += wiped
+        s1 += _review_lines(gid, season, side, W, name, home, away)
         if end == "OT":
             ot = next((g for g in goals if g["period"] > 3), None)
             if ot:  # "X added two goals ... X won it" read as three (eye test on 2025-26)
@@ -1316,6 +1425,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             break
     # paragraph three: the penalty sheet, only when something stood out (a fight, a brawl, an ejection, a strange count)
     s3 = penalties.recap_notes(gid, season, {home_id: home, row["away_id"][0]: away}, W, name)
+    if s3:  # a star who almost never fights is news on its own (Sora: MacKinnon and Hintz, 2026-10-13)
+        for x in storylines.star_fights(gid, season, r["date"])[:2]:
+            words = storylines.rare_fight_words(x["record"])
+            if words and N.get(x["pid"]):
+                s3.append(f"For {name(x['pid'])}, it was {words}.")
     # what it means
     items = []
     for t in (winner, loser):
@@ -1355,8 +1469,16 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 f"{_cap(W.the(winner))} lead the season series {w_}-{l_}." if w_ > l_ else
                 f"{_cap(W.the(loser))} still lead the season series {l_}-{w_}.")
         items.append({"tag": "Season series", "text": text, "score": 35})
+    if len(meet) == 1:  # the first meeting since last spring's series
+        sr = storylines.playoff_series(away, home, season)
+        if sr:
+            items.append({"tag": "Rematch", "text": f"{_cap(storylines.series_words(sr, W))}.", "score": 47})
     pg = P.filter((pl.col("season") == season) & (pl.col("date") <= r["date"]))
     tonight = pg.filter(pl.col("game_id") == gid)
+    for a_, b_ in _brothers(tonight, away, home):
+        if winner in (a_[1], b_[1]):
+            w_, l_ = (a_, b_) if a_[1] == winner else (b_, a_)
+            items.append({"tag": "Brothers", "text": f"{N[w_[0]]} got the better of his brother {N[l_[0]].split(' ', 1)[0]}.", "score": 58})
     for pr in tonight.filter(pl.col("pts") > 0).iter_rows(named=True):
         hist = pg.filter((pl.col("player_id") == pr["player_id"]) & (pl.col("team") == pr["team"]))["pts"].to_list()
         n = 0

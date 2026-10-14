@@ -20,7 +20,8 @@ accents away (`fold`), so it is unaffected.
 
 Saved: data/raw/names/fields.json (each player's name fields as the NHL sent them in the play-by-play, and which seasons
 were read), data/raw/names/countries.json (birth country, from the daily roster listing or the player's landing) and
-data/raw/names/wikidata.json (accented English labels by NHL id, refreshed weekly; one query, skipped offline).
+data/raw/names/wikidata.json (accented English labels by NHL id, refreshed weekly; one query, skipped offline) and
+data/raw/names/siblings.json (pairs of NHL ids Wikidata lists as siblings, refreshed weekly, for game storylines).
 """
 import gzip
 import json
@@ -155,6 +156,40 @@ def fetch_wikidata() -> dict:
     _cache["wikidata"] = {"fetched": time.time(), "labels": labels}
     _save("wikidata")
     return {"labels": len(labels)}
+
+
+def siblings() -> list[tuple[int, int]]:
+    """Pairs of NHL player ids Wikidata lists as siblings (P3373), for "brothers on the ice" storylines."""
+    return [tuple(p) for p in _load("siblings").get("pairs", [])]
+
+
+def fetch_siblings() -> dict:
+    """Refresh the saved sibling pairs once a week, the same way as the labels."""
+    saved = _load("siblings")
+    if OFFLINE or time.time() - saved.get("fetched", 0) < WIKIDATA_DAYS * 86400:
+        return {"skipped": True, "pairs": len(saved.get("pairs", []))}
+    import httpx
+
+    query = "SELECT ?a ?b WHERE { ?p wdt:P3522 ?a . ?p wdt:P3373 ?s . ?s wdt:P3522 ?b }"
+    try:
+        res = httpx.get(WIKIDATA, params={"query": query, "format": "json"}, timeout=120,
+                        headers={"User-Agent": "Spare Line Change (github.com/discomystery/last-change)"})
+        res.raise_for_status()
+        rows = res.json()["results"]["bindings"]
+    except Exception as e:
+        print(f"wikidata siblings unavailable: {e!r}")
+        return {"failed": True, "pairs": len(saved.get("pairs", []))}
+    pairs = set()
+    for r in rows:
+        try:
+            a, b = int(r["a"]["value"]), int(r["b"]["value"])
+        except (KeyError, ValueError):
+            continue
+        if a != b:
+            pairs.add((min(a, b), max(a, b)))
+    _cache["siblings"] = {"fetched": time.time(), "pairs": sorted(pairs)}
+    _save("siblings")
+    return {"pairs": len(pairs)}
 
 
 def countries() -> dict[str, str]:

@@ -54,6 +54,7 @@ def update(season: int) -> dict:
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
     if season == CURRENT_SEASON:
         out["wikidata"] = names.fetch_wikidata()  # accented spellings of players' names, refreshed weekly
+        out["siblings"] = names.fetch_siblings()  # brothers in the league, for game storylines
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
     if MONEYPUCK_CHECK:  # private cross-check only: nothing on the site reads MoneyPuck's shots
         moneypuck.download_shots(season)
@@ -180,6 +181,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["flow"] = flow.run(season)
     out["stories"] = stories.run_recaps(season)
     track.run(season)
+    from pipeline.export import home
+    out["home"] = home.run(season)  # last night's results and today's games change on game nights
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
 
