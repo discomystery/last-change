@@ -109,3 +109,13 @@ export function matchupTable(): { c: Record<string, string>; s: Record<string, s
   }
   return { c, s };
 }
+
+/** Plain colours for drawing outside CSS (share cards): each club's own colour and the matchup's colours, for light
+ * and dark cards. */
+export function cardColours(away: string, home: string) {
+  const own = (a: string) => ({ light: teamColour(a), dark: darkShade(teamColour(a), a) });
+  return {
+    own: { [away]: own(away), [home]: own(home) },
+    matchup: { [away]: { light: matchupColours(away, home).away, dark: darkAway(away, home) }, [home]: own(home) },
+  };
+}

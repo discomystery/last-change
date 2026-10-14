@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "astro": "^7.3.8",
-    "d3-geo": "^3.1.1"
+    "d3-geo": "^3.1.1",
+    "modern-screenshot": "4.7.0"
   },
   "devDependencies": {
     "topojson-client": "^3.1.0",

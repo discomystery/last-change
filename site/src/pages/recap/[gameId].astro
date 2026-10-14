@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
 import CallCard from '../../components/CallCard.astro';
+import ShareSheet from '../../components/ShareSheet.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
 import Explain from '../../components/Explain.astro';
 import Gloss from '../../components/Gloss.astro';
@@ -202,7 +203,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />
     <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p></GameTrail>
+    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p><p><button type="button" class="share-btn" data-share="game"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg><span>Share this game</span></button></p></GameTrail>
   </section>
 
   <SectionNav items={nav as [string, string][]} />
@@ -409,6 +410,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     }
   })();
 </script>
+  <ShareSheet r={r} replays={replays} replayHead={replayHead} />
 </Base>
 
 <style>

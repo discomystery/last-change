@@ -108,7 +108,7 @@ const units = (t: string) => (d?.units?.[t] ?? []).map((u) => ({ ...u, key: `${u
 const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
 ---
 {d && d.players.length > 0 && (
-  <Section id="swing" title="Swing" placeholder={false}
+  <Section id="swing" title="Swing" placeholder={false} share="swing"
     takeaway="How far each player swung tonight’s result, for his team or against it.">
     <Fragment slot="explain">
       <p class="note">The number is roughly in goals: what he added to his team tonight, or cost it. The label beside it is his report card from “Did they do their job?” below; L1 to L4 and P1 to P3 are tonight’s lines and pairs.</p>

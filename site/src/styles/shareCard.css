@@ -1,0 +1,97 @@
+/* Share cards (lib/shareCard.ts): drawn off screen at 1080 x 1350, then turned into an image. Everything is prefixed
+   sc- so the page's own styles never reach in. Colors follow the card's own light or dark choice, not the page's. */
+.shc-host { position: fixed; left: -20000px; top: 0; pointer-events: none; }
+.shc { --ice: #edf2f6; --sheet: #fff; --ink: #0f1c2b; --ink2: #48586a; --ink3: #6f7e8e; --rule: #d2dce5; --track: #e4ebf1; --swb: var(--sheet);
+  width: 1080px; height: 1350px; box-sizing: border-box; background: var(--ice); color: var(--ink); padding: 48px 48px 0; display: flex; flex-direction: column;
+  font-family: 'Hanken Grotesk', sans-serif; font-weight: 400; line-height: 1.2; text-align: left; letter-spacing: 0; color-scheme: light; }
+.shc.dark { --ice: #0a121a; --sheet: #111c27; --ink: #e6edf3; --ink2: #a9b6c3; --ink3: #7c8a98; --rule: #25333f; --track: #26384a; --swb: var(--ink); color-scheme: dark; }
+.shc * { box-sizing: border-box; margin: 0; padding: 0; }
+.sc-sheet { background: var(--sheet); border-radius: 40px; padding: 52px 64px 40px; flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.sc-foot { height: 104px; flex: none; display: flex; align-items: center; justify-content: space-between; color: var(--ink3); font-size: 24px; letter-spacing: 0.02em; }
+.sc-brand { display: flex; align-items: center; gap: 14px; }
+.sc-logo { display: inline-block; line-height: 0; }
+.sc-logo svg { height: 44px; width: auto; display: block; }
+.sc-logo .lg-ink { fill: var(--ink); }
+.sc-logo .lg-soft { fill: var(--ink3); }
+.sc-beta { font: 600 18px 'Hanken Grotesk'; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink2); background: var(--track); border-radius: 999px; padding: 4px 12px; }
+.sc-kick { font-size: 23px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); font-weight: 650; white-space: nowrap; overflow: hidden; }
+.sc-disp { font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 650; letter-spacing: -0.01em; line-height: 1.02; }
+.sc-fit { white-space: nowrap; overflow: hidden; }
+.sc-serif { font-family: 'Literata', serif; }
+.sc-sub { font-size: 30px; color: var(--ink2); margin-top: 14px; display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+.sc-dot { width: 20px; height: 20px; border-radius: 50%; display: inline-block; flex: none; background: var(--team); }
+.sc-sec { margin-top: 34px; }
+.sc-sec > .sc-kick { margin-bottom: 18px; }
+.sc-ends { display: flex; gap: 60px; white-space: nowrap; font-size: 19px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); margin-top: 10px; font-weight: 600; }
+
+/* Game card */
+.sc-score { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; }
+.sc-side { display: flex; align-items: center; gap: 26px; }
+.sc-bar { height: 10px; border-radius: 5px; margin-bottom: 18px; width: 120px; }
+.sc-ab { font-weight: 750; font-size: 72px; line-height: 1; }
+.sc-n { font-family: 'Fraunces', serif; font-weight: 600; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; font-size: 150px; line-height: 1; }
+.sc-midw { font-size: 24px; letter-spacing: 0.07em; color: var(--ink3); font-weight: 650; }
+.sc-run { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 44px; align-items: center; margin-top: 26px; padding: 28px 0; border-top: 2px solid var(--rule); border-bottom: 2px solid var(--rule); }
+.sc-dots { display: grid; grid-template-columns: repeat(10, 16px); gap: 6px; }
+.sc-dots i { width: 16px; height: 16px; border-radius: 50%; display: block; }
+.sc-rpc { display: flex; gap: 30px; align-items: baseline; margin-top: 22px; font: 600 25px 'Hanken Grotesk'; color: var(--ink2); white-space: nowrap; }
+.sc-rpc b { font: 600 66px/1 'Fraunces'; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; margin-right: 10px; }
+.sc-lede { font-size: 30px; line-height: 1.45; color: var(--ink2); margin-top: 26px; }
+.sc-call { padding: 18px 0; border-top: 2px solid var(--rule); }
+.sc-call:first-child { border-top: 0; }
+.sc-call:last-child { border-bottom: 2px solid var(--rule); }
+.sc-said { font: 500 20px 'Hanken Grotesk'; color: var(--ink3); margin-bottom: 10px; }
+.sc-h { font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 30px; line-height: 1.15; }
+.sc-h.sm { font-size: 27px; }
+.sc-vp { display: inline-block; font: 700 21px 'Hanken Grotesk'; padding: 4px 14px; border-radius: 999px; border: 3px solid var(--ink); white-space: nowrap; vertical-align: 5px; margin-right: 12px; }
+.sc-vp.held { background: var(--ink); color: var(--sheet); }
+.sc-vp.partly { border-color: var(--ink2); color: var(--ink); }
+.sc-vp.missed { border-color: var(--ink3); color: var(--ink2); }
+.sc-vp.big { font-size: 24px; padding: 10px 24px; vertical-align: 0; margin: 0; }
+.sc-vp.fill { background: var(--team); border-color: var(--team); color: #fff; }
+.shc.dark .sc-vp.fill { color: #0a121a; }
+.sc-vp.line { border-color: var(--ink2); color: var(--ink); }
+.sc-lane { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; margin-top: 8px; }
+.sc-end { font: 600 15px/1.25 'Hanken Grotesk'; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); width: 118px; }
+.sc-end.l { text-align: right; }
+.sc-tr { position: relative; height: 12px; border-radius: 6px; background: var(--track); margin: 0 10px; }
+.sc-tr i { position: absolute; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; display: block; }
+.sc-tr .avg { width: 3px; height: 26px; border-radius: 0; background: var(--ink3); opacity: 0.6; }
+.sc-tr .ref { width: 0; height: 26px; border-radius: 0; border-left: 3px dotted var(--ink2); }
+.sc-tr .us { width: 26px; height: 26px; border: 4px solid; background: var(--sheet); }
+.sc-tr .now { width: 26px; height: 26px; border: 3px solid var(--sheet); }
+.sc-lb { position: relative; height: 28px; margin: 6px 10px 0; font: 500 19px 'Hanken Grotesk'; color: var(--ink3); }
+.sc-lb.top { margin: 0 10px 6px; }
+.sc-lb span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.sc-lb .nw { color: var(--ink); font-weight: 700; }
+.sc-watch { font-family: 'Literata', serif; font-size: 28px; line-height: 1.4; margin-top: 24px; }
+.sc-tag { font-family: 'Hanken Grotesk'; white-space: nowrap; display: inline-block; font-size: 19px; letter-spacing: 0.07em; font-weight: 700; text-transform: uppercase; padding: 6px 14px; border-radius: 30px; background: var(--track); color: var(--ink2); margin-right: 14px; vertical-align: 4px; }
+
+/* Swing card: one split bar per player on the game's shared scale, in shades of the team's own color. */
+.sc-leg { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.sc-leg i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-left: 12px; }
+.s1 { background: var(--team); }
+.s2 { background: color-mix(in oklab, var(--team) 58%, var(--swb)); }
+.s3 { background: color-mix(in oklab, var(--team) 26%, var(--swb)); }
+.sc-swr { display: grid; grid-template-columns: 270px minmax(0, 1fr) 70px; align-items: center; gap: 22px; border-top: 2px solid var(--rule); font-size: 25px; }
+.sc-swr .nm { white-space: nowrap; overflow: hidden; }
+.sc-swr em { display: inline-block; width: 42px; font: 600 16px 'Hanken Grotesk'; letter-spacing: 0.06em; color: var(--ink3); font-style: normal; }
+.sc-swr .val { text-align: right; font-weight: 700; }
+.sc-sb { position: relative; height: 26px; }
+.sc-sb.big { height: 22px; margin-top: 14px; }
+.sc-sb i { position: absolute; top: 0; bottom: 0; display: block; background-clip: padding-box; border: 0 solid transparent; border-width: 0 2px; border-radius: 6px; }
+.sc-sb .z { position: absolute; top: -7px; bottom: -7px; width: 2px; margin-left: -1px; background: var(--ink3); }
+
+/* His night */
+.sc-num { position: absolute; right: 40px; top: -40px; font-family: 'Fraunces', serif; font-variation-settings: 'SOFT' 100; font-weight: 700; font-size: 420px; line-height: 1; opacity: 0.13; color: var(--team); }
+.sc-say { font-size: 28px; line-height: 1.35; color: var(--ink2); margin-top: 18px; }
+.sc-line { font-size: 27px; color: var(--ink3); margin-top: 10px; }
+.sc-job { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 16px 0; border-top: 2px solid var(--rule); }
+.sc-job:last-child { border-bottom: 2px solid var(--rule); }
+.sc-job .v { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--ink); font: 700 22px 'Hanken Grotesk'; }
+.sc-job.held .v { background: var(--ink); color: var(--sheet); }
+.sc-job.missed .v, .sc-job.na .v { border-style: dashed; border-color: var(--ink3); color: var(--ink3); }
+.sc-job .l { font: 600 30px/1.3 'Hanken Grotesk'; }
+.sc-job .u { display: block; font: 400 23px/1.35 'Hanken Grotesk'; color: var(--ink3); }
+.sc-job .n { display: grid; justify-items: end; font: 400 23px 'Hanken Grotesk'; color: var(--ink3); white-space: nowrap; }
+.sc-job .n b { font: 700 40px/1.1 'Hanken Grotesk'; color: var(--ink); }
