@@ -26,7 +26,8 @@ const games = (n: number) => `${n} game${n === 1 ? '' : 's'}`;
 /** The short tag and its tooltip for one player's status. */
 export function describe(p: RosterPlayer): { tag: string; tip: string; out: boolean } {
   const r = p.report;
-  const missed = (p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '') + (p.last ? ` Last played ${day(p.last)}.` : p.status !== 'no_club' ? ' Has not played this season.' : '');
+  // A goalie can dress as the backup without playing, so his date is the last game he dressed for.
+  const missed = (p.missed > 0 ? ` Has missed ${games(p.missed)} in a row.` : '') + (p.last ? ` Last ${p.pos === 'G' ? 'dressed' : 'played'} ${day(p.last)}.` : p.status !== 'no_club' ? ' Has not played this season.' : '');
   const said = r ? (!r.url ? ` Roster move, ${day(r.date)}.` : r.url.includes('espn.com') ? ` ESPN injury report, ${day(r.date)}.` : ` NHL.com Status Report, ${day(r.date)}.`) : '';
   // Sent to the minors (a roster move), for a player the club holds but does not list.
   const minors = r?.status === 'assigned' && r.timeline ? r.timeline.replace(/^to /, '') : null;

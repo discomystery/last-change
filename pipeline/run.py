@@ -82,6 +82,9 @@ def update(season: int) -> dict:
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
+    if season == CURRENT_SEASON:
+        from pipeline.export import roster_check
+        out["roster_check"] = roster_check.run(season)  # every listed player has a page; the workflow opens an issue if not
     from pipeline.metrics import drift, rapm
     rec = drift.check(season)  # has the league changed how it records plays? the workflow opens an issue if so
     drift.save(rec)

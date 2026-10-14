@@ -247,9 +247,10 @@ def run(season: int) -> int:
     photos = rosters.headshots(season)
     goalie_rec = {g["id"]: (abbr_, g) for abbr_, gs in goalies["teams"].items() for g in gs}
     unplayed = set(idle["player_id"])
+    listed = rosters.listed_today(season)  # the official listing wins over his last game's club (traded, claimed, recalled)
     for row in [*latest.iter_rows(named=True), *idle.iter_rows(named=True)]:
         pid, tid = row["player_id"], row["team_id"]
-        team = abbr.get(tid)
+        team = listed.get(pid) or abbr.get(tid)
         e_now = edge.read(season, pid) or edge.read(season - 1, pid) or {}
         bio = e_now.get("player") or {}
         if not bio.get("birthDate"):  # no tracking file yet (a player who has not dressed): his career landing has the birth date
@@ -263,18 +264,18 @@ def run(season: int) -> int:
             if c:
                 stats[key] = {"gp": c["gp"], "g": int(c["g"]), "a": int(c["a"]), "p": int(c["g"] + c["a"]), "sog": int(c["sog"]), "toi": round(c["sec"] / c["gp"]), "pim_pens": int(c["pen_taken"])}
         base["stats"] = stats
-        if pid in unplayed:
-            base["unplayed"] = True
         if row["pos"] == "G":
             team_g, g = goalie_rec.get(pid, (team, None))
-            if g is None and pid in unplayed and str(pid) in goalies.get("idle", {}):
-                g = {**goalies["idle"][str(pid)], "season": None}
-            if g is None:
-                continue
-            gp_team = team_games.get(tid, 0)
-            base |= {"group": "G", "goalie": g, "team_games": gp_team, "goalie_min": goalies["min_starts"]}
-            base["shots_against"] = _goalie_areas(ev, xg, pid, season)
-        else:
+            if g is None:  # no appearance this season: not dressed yet, or only dressed as the backup (Martin, Korpisalo)
+                unplayed.add(pid)
+                if str(pid) in goalies.get("idle", {}):
+                    g = {**goalies["idle"][str(pid)], "season": None}
+            base |= {"group": "G", "goalie": g, "team_games": team_games.get(tid, 0), "goalie_min": goalies["min_starts"]}
+            if g is not None:  # else no NHL games this season or last: the page is his name card and why he is out
+                base["shots_against"] = _goalie_areas(ev, xg, pid, season)
+        if pid in unplayed:
+            base["unplayed"] = True
+        if row["pos"] != "G":
             rec = r["players"].get(pid)
             if rec is None and pid in unplayed:
                 # No NHL games this season or last: the page is his name card and why he is out.
