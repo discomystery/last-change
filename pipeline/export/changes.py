@@ -37,6 +37,7 @@ UNREPORTED_MIN_MISSED = 2  # a scratch or roster move with nothing reported need
 TOP = {"F": 9, "D": 4}  # regulars worth a note: top nine forwards, top four defensemen by ice time
 NEW_DAYS = 14
 MAX_OUT = 4
+LONG_OUT = 20  # games missed after which only a star is still listed as out
 
 
 def _name(r: dict) -> str:
@@ -193,9 +194,14 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 continue
             if not reported and (r["games_missed"] or 0) < UNREPORTED_MIN_MISSED:
                 continue
+            # out a long time or sent down: no longer part of what the team is now (eye test on 2025-26: Engvall after 79
+            # games and Rinzel in the AHL were "one of their most valuable skaters"), so only stars are still told
+            long_out = (r["games_missed"] or 0) >= LONG_OUT or r["report_status"] == "assigned" or r["status"] == "off_roster"
+            if long_out and not star:
+                continue
             who = names.get(pid) or _name(r)
             text = f"{who} {_status_text(r, len(game_ids))}."
-            matters = _matters(ro, len(role)) or ("one of their best players" if star else None)
+            matters = "one of their best players" if long_out else _matters(ro, len(role)) or ("one of their best players" if star else None)
             if matters:
                 text += f" He is {matters}."
             kind = "D" if (ro["grp"] if ro else ("D" if r["pos"] == "D" else "F")) == "D" else "F"

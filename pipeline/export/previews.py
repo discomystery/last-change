@@ -25,7 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 13  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 14  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -36,6 +36,8 @@ RULES_VERSION = 13  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 11: second round of notes: edges carry stakes, fewer semicolons and "league"s, no rest venue, plainer changed calls
 # 12: third round of notes: hotter goalie-history calls, "chance would suggest", why shots in close matter, "even though" leans, shared Missing items
 # 13: softer leans at the ends ("should be favored", "work cut out"; no "miracle" or "surprise")
+# 14: tonight's coach (no matchup call for a new coach without a home habit of his own), "New coach" and "Playoff race"
+#     items, season series counted right, no 33rd of 32 (outside-coverage comparison, 2026-10-14)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -279,6 +281,7 @@ def _pick(pool: list[str], *key) -> str:
 
 
 MIN_HOME_GAMES, MIN_MINUTES = 3, 30  # before a home matching habit becomes a call
+COACH_HOME_GAMES = 10  # a habit is tonight's coach's own once he has coached this many of its home games, or half
 ORD = ["first", "second", "third", "fourth"]
 NICKS: dict[str, str] = {}  # team -> nickname, from teams.json (filled by `names`)
 
@@ -554,14 +557,20 @@ def _star(unit: dict, pts: dict) -> str:
 
 
 def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts: dict | None = None,
-                  coach: str | None = None) -> dict | None:
-    """`coach` is the home team's head coach before this game; without one the call says \"their coach\"."""
+                  coach: str | dict | None = None) -> dict | None:
+    """`coach` is the home team's head coach tonight (a name, or coaches.for_game's dict); without one the call says
+    \"their coach\". A habit mostly built under an earlier coach is not his plan, so no call then (eye test on 2025-26,
+    2026-10-13: "John Tortorella keeps choosing..." rested on home games coached by Bruce Cassidy)."""
     h, a = lines.get(home), lines.get(away)
     if not h or not a or not h.get("matchups"):
         return None
     mu = h["matchups"]["home"]
     if mu["games"] < MIN_HOME_GAMES:
         return None
+    if isinstance(coach, dict):
+        if coach["home"] < min(mu["games"], COACH_HOME_GAMES) and coach["home"] * 2 < mu["games"]:
+            return None
+        coach = coach["coach"]
     rows = [(r, j, v, v - r["expected"][j]) for r in mu["rows"] if r["minutes"] >= MIN_MINUTES for j, v in enumerate(r["share"]) if v is not None]
     rows = [x for x in rows if x[3] >= 10]
     if not rows:
@@ -961,7 +970,7 @@ def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, e
     extra = extra or {}
     cands = duel_claims(gid, away, home, fp, places)
     cands += changed_claims(gid, away, home, fp, places, extra.get("stab") or {})
-    mc = matchup_claim(gid, away, home, lines, places, extra.get("pts"), (extra.get("coaches") or {}).get(home))
+    mc = matchup_claim(gid, away, home, lines, places, extra.get("pts"), extra.get("bench") or (extra.get("coaches") or {}).get(home))
     if mc:
         cands.append(mc)
     cands += history_claims(gid, away, home, extra.get("goalies") or {}, extra.get("hist"), places, extra.get("likely"))
@@ -1070,8 +1079,11 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     # let a rebuilt preview see the game itself
     day = g.get("date") or g["start"][:10]
     rest_usual = usual_share(rested[0], day) if rested else None
+    from pipeline.config import CURRENT_SEASON
+    from pipeline.ingest import coaches
+    bench = coaches.for_game(CURRENT_SEASON, g["id"], home, day)
     claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
-                   {**call_extras(site, day), "likely": likely, "rest": rest, "rest_usual": rest_usual})
+                   {**call_extras(site, day), "likely": likely, "rest": rest, "rest_usual": rest_usual, "bench": bench})
     from pipeline.export import surprises, wording
     for c in claims:
         rep = special_teams_record(c, wording.places(places), surprises)

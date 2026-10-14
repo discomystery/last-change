@@ -13,7 +13,13 @@ Kinds, most important first (`WEIGHT`):
   return          a regular (14:00 a game for forwards, 18:00 for defensemen, over his last ten) back after missing 10+
                   of his team's games ("his first NHL game since ..." after a long time away); never why he was out
   first_point     his first NHL point, when it wasn't a goal
+  club_debut      his first game for a club he had never played for, after NHL games elsewhere: told when he moved
+                  during the season, or had a point ("made his Wild debut after four seasons with the Canucks"); never
+                  "traded" or "signed", since no feed says how he moved
   club_goal       his first goal for a new club, for a player with NHL goals elsewhere
+
+A return's "since" date counts playoff games too (eye test on 2025-26: Tkachuk's "first NHL game since Feb 8, 2025"
+skipped his whole playoff run); a player back after the summer is told as his first game of the season.
 """
 import gzip
 import json
@@ -21,9 +27,9 @@ from functools import lru_cache
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, PLAYOFFS, RAW, REGULAR, SITE_DATA, TABLES
 
-WEIGHT = {"first_goal": 90, "milestone": 85, "debut": 80, "return": 70, "first_point": 65, "club_goal": 60}
+WEIGHT = {"first_goal": 90, "milestone": 85, "debut": 80, "return": 70, "first_point": 65, "club_debut": 62, "club_goal": 60}
 RETURN_GAMES = 10  # team games missed before a return is told
 LONG_AWAY_DAYS = 300  # past this, "his first NHL game since <date>" instead of a count
 GOALIE_RETURN_GAMES = 30  # a goalie back in net: told by the date of his last game, after this many team games
@@ -48,10 +54,39 @@ def prior_totals(season: int = CURRENT_SEASON) -> dict[int, dict]:
             continue
         rows = [s for s in land["seasonTotals"] if s.get("gameTypeId") == REGULAR and s.get("leagueAbbrev") == "NHL" and s["season"] < cut]
         clubs = {(s.get("teamName") or {}).get("default") if isinstance(s.get("teamName"), dict) else s.get("teamName") for s in rows}
+        seasons = {}
+        for s in rows:
+            c = (s.get("teamName") or {}).get("default") if isinstance(s.get("teamName"), dict) else s.get("teamName")
+            if c:
+                seasons.setdefault(c, set()).add(s["season"])
         out[int(f.name.split(".")[0])] = {"gp": sum(s.get("gamesPlayed") or 0 for s in rows), "g": sum(s.get("goals") or 0 for s in rows),
                                           "a": sum(s.get("assists") or 0 for s in rows), "clubs": {c for c in clubs if c},
+                                          "seasons": {c: len(v) for c, v in seasons.items()},
+                                          "last_club": max(rows, key=lambda s: s["season"]).get("teamName", {}).get("default") if rows else None,
                                           "pos": land.get("position")}
     return out
+
+
+@lru_cache(maxsize=1)
+def _playoff_dates() -> dict[int, list[str]]:
+    """Every skater's and goalie's playoff game dates since 2023-24, oldest first."""
+    out = {}
+    for d in sorted(TABLES.glob("20*")):
+        if not (d / "games.parquet").exists() or not (d / "players.parquet").exists():
+            continue
+        g = pl.read_parquet(d / "games.parquet", columns=["game_id", "game_type", "date"]).filter(pl.col("game_type") == PLAYOFFS)
+        if g.is_empty():
+            continue
+        p = pl.read_parquet(d / "players.parquet", columns=["game_id", "player_id"]).join(g, on="game_id")
+        for pid, day in p.select("player_id", "date").iter_rows():
+            out.setdefault(pid, []).append(day)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def _last_any(pid: int, last_regular: str | None, day: str) -> str | None:
+    """His last NHL game before `day`, playoffs included."""
+    po = [d for d in _playoff_dates().get(pid, []) if d < day]
+    return max([x for x in (last_regular, po[-1] if po else None) if x], default=None)
 
 
 @lru_cache(maxsize=1)
@@ -131,17 +166,33 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
             past_here = P.filter((pl.col("player_id") == pid) & (pl.col("team") == t) & (pl.col("date") < day))
             if name and name not in base["clubs"] and not past_here["g"].sum() and not for_club["g"].sum():
                 out.append({**item, "kind": "club_goal"})
+        if gp:  # his first game for a club he had never played for
+            name = club.get(t)
+            here = P.filter((pl.col("player_id") == pid) & (pl.col("team") == t) & (pl.col("date") < day))
+            elsewhere = P.filter((pl.col("player_id") == pid) & (pl.col("team") != t) & (pl.col("date") < day))
+            if name and name not in base["clubs"] and here.is_empty():
+                moved = mine.filter(pl.col("team") != t).height > 0  # played for someone else earlier this season
+                if moved or pts_now:
+                    old = elsewhere["team"][-1] if elsewhere.height else None
+                    old_name = club.get(old) if old else base.get("last_club")
+                    n = base["seasons"].get(old_name, 0) + (1 if old and elsewhere.filter((pl.col("team") == old) & (pl.col("season") == season)).height else 0)
+                    out[:] = [x for x in out if not (x["pid"] == pid and x["kind"] == "club_goal")]  # told in the debut
+                    out.append({**item, "kind": "club_debut", "from": old, "from_name": old_name, "seasons": n, "moved": moved, "points": pts_now})
         if gp:  # a return: his last game, and how many of his team's games went by since
             hist = P.filter((pl.col("player_id") == pid) & (pl.col("date") < day)).tail(10)
             prev = hist.tail(1)
             regular = hist.height and hist["sec"].mean() >= (REGULAR_D if r["pos"] == "D" else REGULAR_F)
             if prev.height and regular:
-                last_day = prev["date"][0]
-                missed = G.filter((pl.col("date") > last_day) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
+                last_day = _last_any(pid, prev["date"][0], day)
+                opened = G.filter(pl.col("season") == season)["date"].min()
+                fresh = opened is not None and last_day < opened  # back after the summer: count this season's games only
+                span = G.filter((pl.col("season") == season) if fresh else (pl.col("date") > last_day))
+                missed = span.filter((pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
                 if missed >= RETURN_GAMES:
                     from datetime import date as Date
                     days = (Date.fromisoformat(day) - Date.fromisoformat(last_day)).days
-                    out.append({**item, "kind": "return", "missed": missed, "since": last_day if days >= LONG_AWAY_DAYS else None})
+                    out.append({**item, "kind": "return", "missed": missed, "since": last_day if days >= LONG_AWAY_DAYS else None,
+                                "season_debut": fresh})
     starts = _goalie_starts(season).get(gid, [])
     team_of = {game["home_id"][0]: game["home"][0], game["away_id"][0]: game["away"][0]}
     for pid, tid in starts:

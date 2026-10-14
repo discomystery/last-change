@@ -205,7 +205,7 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
     # how many penalties were called, and who took them
     per = c.filter(pl.col("p1").is_not_null()).group_by("p1").agg(n=pl.len()).sort("n", descending=True)
     busy = per.row(0, named=True) if per.height else None
-    if total <= N["few"]:
+    if total <= N["few"] and not must:  # "only two penalties" reads wrong beside a fight (eye test on 2025-26, 2026-10-13)
         if total == 0:
             notes.append((75, "Not a single penalty was called all night."))
         elif busy and busy["n"] >= 2 and busy["n"] == total:
@@ -219,7 +219,7 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
         tail = f", a total the league sees {_every(rare)}" if rare > 0 else ", more than any game since 2023-24"
         notes.append((65, f"The officials called {num(total)} penalties{tail}."))
     if busy and busy["p1"] not in told:
-        if busy["n"] >= 2 and total <= QUIET_GAME:
+        if busy["n"] >= 2 and total <= QUIET_GAME and not must:
             notes.append((78, f"Only {num(total)} penalties were called, and {num(busy['n'])} of them were {name(busy['p1'])}’s."))
         elif busy["n"] >= BUSY_PLAYER:
             share = f" of the game’s {num(total)}" if busy["n"] * 2 > total else ""
