@@ -24,20 +24,20 @@ BANDS = [
     # The two outer bands say "favored" and "work cut out", never "miracle" or "surprise" (eye test, 2026-10-13: of 19
     # games told that way, the favorite lost about one in five, and Washington had won in Raleigh days earlier).
     # Teams go by nickname with plural verbs here, as in the preview calls ("the Hurricanes have"; Sora, 2026-10-14).
-    (0.30, ["A steep climb for {T}", "{T} have their work cut out", "{O} should be favored"],
-     ["{T} can still win it {how}, but a lot has to go their way.", "{Tp} best hope is {how_bare}, plus a big night in goal."]),
-    (0.42, ["A tough matchup for {T}", "{T} face a real test", "Not an easy night for {T}"],
+    (0.30, ["A steep climb for {T}", "{T} have their work cut out", "{O} should be favored", "{T} are up against it"],
+     ["{T} can still win it {how}, but a lot has to go their way.", "{Tp} best hope is {how_bare}, plus a big night in goal.", "To pull this off, {T} need {how_bare} and a goalie who steals the show."]),
+    (0.42, ["A tough matchup for {T}", "{T} face a real test", "Not an easy night for {T}", "{T} have a hill to climb"],
      ["{T} can pull it off {how}.", "{Tp} best way through is {how_bare}."]),
     (0.48, ["A slightly uphill night for {T}", "{T} start a half-step behind", "Close, but {O} have the slight edge"],
      ["{T} can tip it {how}.", "{Tp} best way to tip it is {how_bare}."]),
-    (0.52, ["Too close to call", "A genuine toss-up", "Nothing to separate these two"],
+    (0.52, ["Too close to call", "A genuine toss-up", "Nothing to separate these two", "Anybody’s game"],
      ["{T} can tip it {how}.", "For {T}, the difference could be {how_bare}."]),
     (0.58, ["{T} have a slight edge", "Leaning {Tp} way", "{T} start a half-step ahead"],
      ["It’s still close, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
-    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} have a lot going for them"],
+    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} have a lot going for them", "Advantage, {T}"],
      ["{O} can make it interesting {how_o}.", "{Op} way back in is {how_o_bare}."]),
-    (1.01, ["{T} should be favored", "A big edge for {T}", "This one sets up well for {T}"],
-     ["It’s on {O} to make it a game, and they can {how_o}.", "{Op} best way in is {how_o_bare}."]),
+    (1.01, ["{T} should be favored", "A big edge for {T}", "This one sets up well for {T}", "{T} should be in control"],
+     ["It’s on {O} to make it a game, and they can {how_o}.", "{Op} best way in is {how_o_bare}.", "If {O} want to spoil it, start with {how_o_bare}."]),
 ]
 # A team's way to win, from its strongest trait against the matching trait of the other team.
 ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare phrase)
