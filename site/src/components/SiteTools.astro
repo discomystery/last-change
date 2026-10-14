@@ -1,0 +1,12 @@
+---
+// The team pill (opens the settings menu: your team, Seasons, Adjusted stats) and, with `menu`, a quiet three-line icon
+// that opens a list of every page (Sora, 2026-10-14). The pill sits in the top menu; pill and icon together ride at the
+// right of the pinned section menu, or float at the top right on pages without one, once the top menu scrolls away.
+// Base.astro's settings script fills in every pill (team, its colour, and any setting off its usual value).
+interface Props { menu?: boolean }
+const { menu = false } = Astro.props;
+---
+<span class="tools">
+  <button type="button" class="tpill" data-prefs-open aria-haspopup="dialog" aria-expanded="false" aria-controls="prefs" aria-label="Your team and settings"><span class="tp-dot" aria-hidden="true"></span><span class="tp-ab">Your team</span><span class="tp-chg"></span><svg class="tp-chev" viewBox="0 0 11 7" aria-hidden="true"><path d="M1 1l4.5 4.5L10 1" /></svg></button>
+  {menu && <button type="button" class="tmenu" data-nav-open aria-haspopup="true" aria-expanded="false" aria-controls="navmenu" aria-label="Every page"><svg viewBox="0 0 15 11" aria-hidden="true"><path d="M1 1h13M1 5.5h13M1 10h13" /></svg></button>}
+</span>
