@@ -4,6 +4,7 @@ Lines are chosen by 5-on-5 ice time together over a team's last ten games (fewer
 by what each line is: its players' average 5-on-5 and power-play ice time a game (see `_by_role`).
 """
 from collections import defaultdict
+from functools import lru_cache
 
 import polars as pl
 
@@ -77,6 +78,12 @@ def _pick(units: pl.DataFrame, count: int, by: str = "sec") -> list[dict]:
     return chosen
 
 
+@lru_cache(maxsize=2)
+def _player_games(season: int) -> pl.DataFrame | None:
+    p = TABLES / str(season) / "player_game.parquet"
+    return pl.read_parquet(p, columns=["game_id", "team_id", "player_id", "sec5", "sec_pp", "g", "a1", "a2"]) if p.exists() else None
+
+
 def _player_weight(season: int, tid: int, age: dict[int, int]) -> dict[str, tuple[float, float]]:
     """Each player's average 5-on-5 plus power-play ice time a game over the window (older games counting less, as for
     the lines) and points a game this season, for numbering lines. Penalty-kill time is left out: it lifted checking
@@ -84,15 +91,33 @@ def _player_weight(season: int, tid: int, age: dict[int, int]) -> dict[str, tupl
     all-strength ice time 66, 5-on-5 alone 69, points 69, minutes together (the old rule) 57. Our four lines held
     NHL.com's first line 99 times, so the misses are the order of two close top lines. Empty when the player table is
     not built."""
-    p = TABLES / str(season) / "player_game.parquet"
-    if not p.exists():
+    pg = _player_games(season)
+    if pg is None:
         return {}
-    pg = pl.read_parquet(p, columns=["game_id", "team_id", "player_id", "sec5", "sec_pp", "g", "a1", "a2"]).filter(pl.col("team_id") == tid)
+    pg = pg.filter(pl.col("team_id") == tid)
     pts = pg.group_by("player_id").agg(((pl.col("g") + pl.col("a1") + pl.col("a2")).sum() / pl.len()).alias("ppg"))
     w = pg.filter(pl.col("game_id").is_in(list(age))).with_columns(w=DECAY ** pl.col("game_id").replace_strict(age))
     toi = w.group_by("player_id").agg((((pl.col("sec5") + pl.col("sec_pp")) * pl.col("w")).sum() / pl.col("w").sum()).alias("toi"))
     pts = dict(pts.iter_rows())
     return {str(pid): (t, pts.get(pid, 0.0)) for pid, t in toi.iter_rows()}
+
+
+@lru_cache(maxsize=2)
+def _team_games(season: int) -> pl.DataFrame:
+    """Each team's games in order (game_id, team_id, date), from the per-game units table."""
+    return pl.read_parquet(TABLES / str(season) / "game_units.parquet", columns=["game_id", "team_id", "date"]).unique().sort("date", "game_id")
+
+
+def game_lines(season: int, gu: pl.DataFrame, gid: int, team_id: int) -> list[tuple[str, str, dict]]:
+    """One game's lines and pairs as (kind, label, unit row): picked by 5-on-5 time together in that game, then
+    numbered the way team and preview pages number them (`_by_role`, players' recent ice time over the window ending
+    with this game), so a post-game page's L1 is the same line the preview called L1."""
+    games = _team_games(season).filter((pl.col("team_id") == team_id) & (pl.col("date") <= gu.filter(pl.col("game_id") == gid)["date"].max()))
+    window = games.tail(WINDOW_GAMES)["game_id"].to_list()
+    weight = _player_weight(season, team_id, {g: len(window) - 1 - k for k, g in enumerate(window)})
+    mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
+    return [(kind, f"{tag}{i}", u) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
+            for i, u in enumerate(_by_role(_pick(mine.filter(pl.col("kind") == kind), count), weight), 1)]
 
 
 def _by_role(chosen: list[dict], weight: dict[str, tuple[float, float]]) -> list[dict]:

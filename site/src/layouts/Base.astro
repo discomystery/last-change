@@ -350,49 +350,6 @@ const teamList = teams as { abbr: string; name: string }[];
       })();
     </script>
     <script is:inline>
-      // Rink headers (Rink.astro on preview and post-game pages): the boards and goal creases are drawn in an SVG fitted to each rink, so the creases stay round
-      // whatever the rink's shape. With the site's motion on, the puck drops once when a rink is half on screen: the
-      // boards trace round, the lines and centre circle draw themselves, the teams skate in and a final score counts up.
-      (() => {
-        const root = document.documentElement, NS = 'http://www.w3.org/2000/svg';
-        const add = (parent, tag, attrs) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, String(attrs[k])); parent.append(el); return el; };
-        const fit = (rink) => {
-          let svg = rink.querySelector(':scope > .rk-boards');
-          if (!svg) { svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'rk-boards'); svg.setAttribute('aria-hidden', 'true'); add(svg, 'rect', { pathLength: 100 }); rink.prepend(svg); }
-          const r = svg.querySelector('rect'), w = rink.clientWidth, h = rink.clientHeight;
-          if (!w || (rink.dataset.fw === String(w) && rink.dataset.fh === String(h))) return;
-          rink.dataset.fw = String(w); rink.dataset.fh = String(h);
-          const rad = parseFloat(getComputedStyle(rink).borderTopLeftRadius) - 3;
-          Object.entries({ x: 1, y: 1, width: w - 2, height: h - 2, rx: Math.max(0, Math.min(rad, h / 2 - 1)) }).forEach(([k, v]) => r.setAttribute(k, String(v)));
-          svg.querySelector('.rk-marks')?.remove();
-          // A goal crease, a half circle 6 ft deep in front of each goal line (the rink is 85 ft wide).
-          const g = add(svg, 'g', { class: 'rk-marks' }), ft = h / 85;
-          for (const side of [0, 1]) {
-            const gx = side ? w * 0.945 : w * 0.055;
-            add(g, 'path', { class: 'rk-crease', d: `M${gx} ${h / 2 - 6 * ft} a${6 * ft} ${6 * ft} 0 0 ${side ? 0 : 1} 0 ${12 * ft}Z` });
-          }
-          rink.classList.add('boards');
-        };
-        const motion = root.classList.contains('motion') && 'IntersectionObserver' in window;
-        const io = motion && new IntersectionObserver((entries) => entries.forEach((e) => {
-          if (!e.isIntersecting) return;
-          io.unobserve(e.target);
-          e.target.querySelectorAll('.score[data-to]').forEach((s) => {
-            const to = +s.dataset.to;
-            s.textContent = '0';
-            for (let i = 1; i <= to; i++) setTimeout(() => { s.textContent = String(i); }, 700 + i * Math.min(140, 700 / to));
-          });
-          e.target.classList.add('run');
-        }), { threshold: 0.5 });
-        const ro = 'ResizeObserver' in window && new ResizeObserver((es) => es.forEach((e) => fit(e.target)));
-        const taken = new WeakSet();
-        const take = (rink) => { if (taken.has(rink)) return; taken.add(rink); fit(rink); ro && ro.observe(rink); io && io.observe(rink); };
-        const scan = (n) => { if (n.matches?.('[data-drop]')) take(n); n.querySelectorAll?.('[data-drop]').forEach(take); };
-        scan(document);
-        new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && scan(n)))).observe(document.body, { childList: true, subtree: true });
-      })();
-    </script>
-    <script is:inline>
       // Season switch: on screen, the scales' dots glide to their new spots a card at a time, each leaving an open ring
       // where it was and a bar over the distance it moved (the chart guide's gap), which stay a few seconds and fade
       // (styles/motion.css). The whisker steps aside while the gap shows. Off screen they simply change.

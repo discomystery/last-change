@@ -7,6 +7,8 @@ import Gloss from './Gloss.astro';
 import Section from './Section.astro';
 import PLink from './PLink.astro';
 import { peerOf } from '../lib/players';
+import { jobsFor } from '../lib/gameFiles';
+import { signed } from '../lib/format';
 
 type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
@@ -17,8 +19,7 @@ type Jobs = { game_id: number; away: string; home: string; players: Card[]; stoo
 interface Props { gameId: number; place: (a: string) => string; side: (a: string) => string; goalies?: boolean }
 const { gameId, place, side, goalies = false } = Astro.props;
 
-const files = import.meta.glob<{ default: Jobs }>('../../public/data/jobs/2*.json', { eager: true });
-const d = Object.values(files).find((f) => f.default.game_id === gameId)?.default;
+const d = jobsFor<Jobs>(gameId);
 const order = d ? [d.away, d.home] : [];
 const SHOWN = 6; // cards visible before the fold, per team (most ice time first)
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
@@ -37,15 +38,14 @@ const whyTip = (j: Job) => {
 // When the whole game and his usual jobs disagree, say so in plain words rather than letting either read as the verdict.
 const nightNote = (c: Card) => {
   const quiet = c.summary === 'mixed' || c.summary === 'didnt';
-  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but his usual jobs went quiet.';
-  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even though his usual jobs were quieter.';
-  if (c.night === 'good') return c.pill === 'big' ? ', on top of doing his usual jobs.' : ', so it counts for more.';
-  if (c.night === 'rough' && c.summary === 'did') return ', though he still did his usual jobs.';
+  if (c.night === 'huge' && c.pill === 'big') return '. Huge on the scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && c.pill === 'mixed') return '. A good scoresheet, but he came up short on his usual responsibilities.';
+  if ((c.night === 'huge' || c.night === 'big') && quiet) return '. A strong game, even if he didn’t handle all of his usual responsibilities.';
+  if (c.night === 'good') return c.pill === 'big' ? ', on top of handling his usual responsibilities.' : ', so it counts for more.';
+  if (c.night === 'rough' && c.summary === 'did') return ', though he still handled his usual responsibilities.';
   return '.';
 };
-const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
-const signed = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${(-v).toFixed(1)}` : '0.0');
+const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
 const skaters = d ? d.players.filter((c) => c.pos !== 'G') : [];
 const gcards = d ? d.players.filter((c) => c.pos === 'G') : [];
 const graded = d ? skaters.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];

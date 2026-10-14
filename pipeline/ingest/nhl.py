@@ -12,7 +12,6 @@ from pathlib import Path
 from pipeline.config import FINAL_STATES, NHL_STATS, NHL_WEB, RAW, REGULAR, PLAYOFFS, season_id
 from pipeline.ingest.client import get
 
-TEAMS_FALLBACK_SEASON_PROBE = "CAR"
 KINDS = {
     "pbp": lambda gid: f"{NHL_WEB}/v1/gamecenter/{gid}/play-by-play",
     "box": lambda gid: f"{NHL_WEB}/v1/gamecenter/{gid}/boxscore",

@@ -10,6 +10,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import FULL_SEASONS, REGULAR, TABLES
+from pipeline.metrics.team_game import BREAKDOWN_XG
 
 UNBLOCKED = ["shot-on-goal", "missed-shot", "goal"]
 TIERS = (("low", 0.0, 0.05), ("medium", 0.05, 0.15), ("high", 0.15, 9.9))
@@ -61,8 +62,15 @@ def shots(season: int) -> pl.DataFrame:
     sv = _saves(season).with_columns(_rebound_cell()).join(rebound_rates(), on=["shot_type", "db", "ab"], how="left").select(
         "game_id", "event_id", "rebound", pl.col("rb_exp").fill_null(0.0))
     s = s.join(sv, on=["game_id", "event_id"], how="left").with_columns(pl.col("rebound").fill_null(False), pl.col("rb_exp").fill_null(0.0))
-    turnover = (pl.col("prev_gap") <= 5) & (((pl.col("prev_type") == "giveaway") & ~pl.col("prev_same_team")) | ((pl.col("prev_type") == "takeaway") & pl.col("prev_same_team")))
-    return s.with_columns(goal=pl.col("type") == "goal", on_goal=pl.col("type") != "missed-shot", breakdown=turnover & (pl.col("xg") >= 0.15), season=pl.lit(season))
+    # Breakdowns in front of him: the team trait's rule exactly (team_game: a dangerous shot within a few seconds of
+    # a turnover), read from the shots team_game flagged.
+    if not (d / "turnover_shots.parquet").exists():
+        from pipeline.metrics import team_game
+        team_game.build(season)
+    to = pl.read_parquet(d / "turnover_shots.parquet").with_columns(turnover=pl.lit(True))
+    s = s.join(to, on=["game_id", "event_id"], how="left").with_columns(pl.col("turnover").fill_null(False))
+    return s.with_columns(goal=pl.col("type") == "goal", on_goal=pl.col("type") != "missed-shot",
+                          breakdown=pl.col("turnover") & (pl.col("xg") >= BREAKDOWN_XG), season=pl.lit(season))
 
 
 def per_game(season: int) -> pl.DataFrame:
@@ -149,14 +157,14 @@ def run(season: int) -> dict:
             goalies[gid][mode] = summarise(games, league_sv)
         # Where each goalie sits among those with enough starts to judge.
         ok = [gid for gid, m in goalies.items() if mode in m and m[mode]["starts"] >= MIN_STARTS[mode]]
-        for trait, (field, _) in TRAITS.items():
+        for trait, (field, higher) in TRAITS.items():
             vals = np.array([goalies[gid][mode][field] for gid in ok if goalies[gid][mode][field] is not None], dtype=float)
             for gid in goalies:
                 if mode not in goalies[gid]:
                     continue
                 v = goalies[gid][mode][field]
                 enough = gid in ok and v is not None and len(vals) > 1
-                goalies[gid][mode].setdefault("pct", {})[trait] = round(100 * (float((vals < v).sum()) + 0.5) / len(vals)) if enough else None
+                goalies[gid][mode].setdefault("pct", {})[trait] = round(100 * (float((vals < v).sum() if higher else (vals > v).sum()) + 0.5) / len(vals)) if enough else None
     league = [{"id": gid, "x": m["blend"]["xga60"], "y": m["blend"]["gsax60"]} for gid, m in sorted(goalies.items()) if "blend" in m and m["blend"]["starts"] >= MIN_STARTS["blend"]]
     # This season's goalies per team, most-used first.
     by_team = defaultdict(list)

@@ -1,6 +1,7 @@
 ---
 // League page: all 32 teams on every style scale, every team's lines against the same-numbered lines elsewhere,
 // every goalie on one chart, and where every team's goals come from. Everything follows the season switch.
+import { srcPhrase } from '../lib/goalSources';
 import Base from '../layouts/Base.astro';
 import Section from '../components/Section.astro';
 import SectionNav from '../components/SectionNav.astro';
@@ -14,7 +15,7 @@ import fpData from '../../public/data/fingerprints.json';
 import linesData from '../../public/data/lines.json';
 import goalieData from '../../public/data/goalies.json';
 import howData from '../../public/data/goal_sources.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../data/mock';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../lib/traits';
 import { clock, compared } from '../lib/format';
 import '../styles/blocks.css';
 
@@ -46,7 +47,7 @@ const numFmt: Record<string, [(v: number) => string, string]> = {
   volume: [(v) => String(Math.round(v)), 'score, 100 is average'], quality: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], rebounds: [(v) => `${f1(v)}%`, 'of chances'],
   turnover: [(v) => `${f1(v)}%`, 'of chances'], dShots: [(v) => `${f1(v)}%`, 'of attempts'], inClose: [(v) => `${f1(v)}%`, 'of shots'], shotsThrough: [(v) => `${f1(v)}%`, 'of attempts through'], pointAllowed: [(v) => `${f1(v)}%`, 'of attempts against from D'], icing: [f1, 'icings per 60'], blocking: [(v) => `${f1(v)}%`, 'of attempts blocked'], suppression: [(v) => String(Math.round(v)), 'score, 100 is average'],
   qualityAllowed: [(v) => `${f1(100 * v)}%`, 'chance a shot goes in'], breakdowns: [f2, 'per 60'], longShifts: [(v) => `${f1(v)}%`, 'of shots against'], goalie: [(v) => signed(v, 2), 'saved above expected per 60'],
-  pace: [(v) => String(Math.round(v)), 'score, 100 is average'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'], rough: [f2, 'calls per 60'],
+  pace: [(v) => String(Math.round(v)), 'score, 100 is average'], forecheck: [(v) => String(Math.round(v)), 'score, 100 is average'], physical: [(v) => String(Math.round(v)), 'score, 100 is average'], rough: [f2, 'body-contact penalties per 60'],
   depth: [(v) => `${f1(v)}%`, 'of forward ice time'], pp: [f1, 'expected goals per 60'], pk: [f1, 'allowed per 60'], powerKill: [f1, 'created per 60'],
   discipline: [(v) => signed(v, 2), 'drawn minus taken per 60'],
 };
@@ -128,10 +129,7 @@ type Src = { n: number; share: number | null; band: (number | null)[] };
 type SrcSide = { goals: number; sources: Record<string, Src> };
 const how = howData.teams as unknown as Record<string, { sources: Record<Mode, Record<'for' | 'against', SrcSide>> | null }>;
 const lgSrc = howData.league_sources as Record<string, number>;
-const srcInfo: [string, string][] = [
-  ['other', 'everyday even-strength play'], ['pp', 'the power play'], ['rebound', 'rebounds'], ['turnover', 'turnovers'],
-  ['faceoff', 'faceoff wins'], ['en', 'empty nets'], ['sh', 'shorthanded play'], ['ea', 'play with the goalie pulled'],
-];
+const srcInfo: [string, string][] = ['other', 'pp', 'rebound', 'turnover', 'faceoff', 'en', 'sh', 'ea'].map((k) => [k, srcPhrase[k]]);
 const sides: [string, string][] = [['for', 'goals scored'], ['against', 'goals allowed']];
 const srcRows = (side: 'for' | 'against', key: string) => {
   const rows = teams.map((t) => ({ t, x: Object.fromEntries(modes.map((m) => [m, how[t.abbr]?.sources?.[m]?.[side]])) as Record<Mode, SrcSide | undefined> }));

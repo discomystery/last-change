@@ -14,13 +14,16 @@ export function goalieCard(a: Args): GoalieCardData | null {
   type G = { name: string; blend: any };
   const gd = goalieData as unknown as { min_starts: { blend: number }; league: { x: number; y: number; name: string; team: string }[]; teams: Record<string, G[]> };
   const mates = (gd.teams[a.team] ?? []).filter((x) => x.name !== a.goalie!.name && x.blend.xga60 != null && x.blend.gsax60 != null);
-  // The league chart, scaled as on team pages: the median goalie's team in the middle across, zero up and down.
+  // The league chart, scaled exactly as on team pages (Quadrant.astro): ranges from the league's goalies, the median
+  // goalie's team in the middle across, zero up and down, the vertical range padded by 22% of its span. A goalie
+  // outside the league's range (too few starts to be in it) is kept on the chart's edge.
   const lg = gd.league;
-  const gx = [...lg.map((q) => q.x), g.xga60 ?? 0], gy = [...lg.map((q) => Math.abs(q.y)), Math.abs(g.gsax60 ?? 0)];
+  const gx = lg.map((q) => q.x), gy = lg.map((q) => Math.abs(q.y));
   const x0 = Math.min(...gx) - 0.1, x1 = Math.max(...gx) + 0.1, yMax = Math.max(...gy) + 0.1;
-  const xMid = [...lg.map((q) => q.x)].sort((a, b) => a - b)[Math.floor(lg.length / 2)];
-  const yHi = yMax * 1.22, yLo = -yHi;
-  const X = (v: number) => Math.round((1000 * (v - x0)) / (x1 - x0)) / 10, Y = (v: number) => Math.round((1000 * (yHi - v)) / (yHi - yLo)) / 10;
+  const xMid = [...gx].sort((a, b) => a - b)[Math.floor(lg.length / 2)];
+  const yHi = yMax + 0.22 * 2 * yMax, yLo = -yHi;
+  const edge = (v: number) => Math.min(100, Math.max(0, v));
+  const X = (v: number) => edge(Math.round((1000 * (v - x0)) / (x1 - x0)) / 10), Y = (v: number) => edge(Math.round((1000 * (yHi - v)) / (yHi - yLo)) / 10);
   const lastName = (n: string) => n.split('. ').slice(-1)[0];
   const quad = g.xga60 != null && g.gsax60 != null ? {
     mid: [X(xMid), Y(0)] as [number, number],

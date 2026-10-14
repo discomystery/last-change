@@ -23,20 +23,21 @@ from pipeline.metrics import win_model
 BANDS = [
     # The two outer bands say "favored" and "work cut out", never "miracle" or "surprise" (eye test, 2026-10-13: of 19
     # games told that way, the favorite lost about one in five, and Washington had won in Raleigh days earlier).
-    (0.30, ["A steep climb for {T}", "{T} has their work cut out", "{O} should be favored"],
-     ["{T} can still win it {how}, but a lot has to go their way.", "{T}’s best hope is {how_bare}, plus a big night in goal."]),
-    (0.42, ["A tough matchup for {T}", "{T} faces a real test", "Not an easy night for {T}"],
-     ["{T} can pull it off {how}.", "{T}’s best way through is {how_bare}."]),
-    (0.48, ["A slightly uphill night for {T}", "{T} starts a half-step behind", "Close, but {O} has the slight edge"],
-     ["{T} can tip it {how}.", "{T}’s best way to tip it is {how_bare}."]),
+    # Teams go by nickname with plural verbs here, as in the preview calls ("the Hurricanes have"; Sora, 2026-10-14).
+    (0.30, ["A steep climb for {T}", "{T} have their work cut out", "{O} should be favored"],
+     ["{T} can still win it {how}, but a lot has to go their way.", "{Tp} best hope is {how_bare}, plus a big night in goal."]),
+    (0.42, ["A tough matchup for {T}", "{T} face a real test", "Not an easy night for {T}"],
+     ["{T} can pull it off {how}.", "{Tp} best way through is {how_bare}."]),
+    (0.48, ["A slightly uphill night for {T}", "{T} start a half-step behind", "Close, but {O} have the slight edge"],
+     ["{T} can tip it {how}.", "{Tp} best way to tip it is {how_bare}."]),
     (0.52, ["Too close to call", "A genuine toss-up", "Nothing to separate these two"],
      ["{T} can tip it {how}.", "For {T}, the difference could be {how_bare}."]),
-    (0.58, ["{T} has a slight edge", "Leaning {T}’s way", "{T} starts a half-step ahead"],
+    (0.58, ["{T} have a slight edge", "Leaning {Tp} way", "{T} start a half-step ahead"],
      ["It’s still close, though: {O} can make it interesting {how_o}.", "{O} can still swing it {how_o}."]),
-    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} has a lot going for them"],
-     ["{O} can make it interesting {how_o}.", "{O}’s way back in is {how_o_bare}."]),
+    (0.70, ["{T} should have the upper hand", "The matchup suits {T}", "{T} have a lot going for them"],
+     ["{O} can make it interesting {how_o}.", "{Op} way back in is {how_o_bare}."]),
     (1.01, ["{T} should be favored", "A big edge for {T}", "This one sets up well for {T}"],
-     ["It’s on {O} to make it a game, and they can {how_o}.", "{O}’s best way in is {how_o_bare}."]),
+     ["It’s on {O} to make it a game, and they can {how_o}.", "{Op} best way in is {how_o_bare}."]),
 ]
 # A team's way to win, from its strongest trait against the matching trait of the other team.
 ROUTE = {  # trait: (the trait it meets on the other side, "if ..." phrase, bare phrase)
@@ -253,7 +254,8 @@ def _agree(text: str) -> str:
 
 def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) -> dict[str, dict]:
     """The pre-game note for each team. Holds words only, never the chance itself."""
-    places = {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
+    from pipeline.export.previews import team_words
+    raw_places, places = places, {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
     out = {}
     lineups = chance.get("lineups") or {}
     for team, opp in ((home, away), (away, home)):
@@ -261,7 +263,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         _, heads, caveats = next(b for b in BANDS if p < b[0])
         how, how_bare = _route(fp, team, opp)
         how_o, how_o_bare = _route(fp, opp, team)
-        w = {"T": places[team], "O": places[opp], "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
+        w = {**team_words(team, raw_places, "T"), **team_words(opp, raw_places, "O"), "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
                      "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
     return out
@@ -344,7 +346,6 @@ def _named_changes(season: int):
         held = set(av.select("date", "team", "player_id").iter_rows())
     ids = team_ids(season)
     from pipeline.metrics import relevancy
-    stars = relevancy.standouts(season)
     f = TABLES / str(season) / "player_game.parquet"
     dressed = set(pl.read_parquet(f).select("game_id", "team_id", "player_id").iter_rows()) if f.exists() else set()
 
@@ -360,6 +361,7 @@ def _named_changes(season: int):
         # a long time, or never seen with this club) or his usual night is worth little by the ratings ("small").
         # Readers still want to hear he was out.
         shown = {x["id"] for k in res for x in res[k]}
+        stars = relevancy.standouts(season, day)  # the stars as of that morning, not as we know them now
         res["stars"] = [{"id": int(q), "name": names[q], "why": "small" if w["worth"].get(q, NAMED) < NAMED else "priced"} for q in stars
                         if q not in shown and q in names and (day, team, q) in held and (gid, ids.get(team), q) not in dressed][:2]
         return res

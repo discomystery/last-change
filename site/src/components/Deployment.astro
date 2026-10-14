@@ -37,7 +37,7 @@ const tip = `The percentages are how often each group starts in the offensive zo
     Most coaches give their top line the faceoffs in the offensive zone. {verdict}: <Fragment set:html={nums(d.top, d.bottom)} />.
   </p>
   <div class="deploy-scale">
-    <span class="lo">Spread around</span>
+    <span class="lo">Shared evenly</span>
     <Marker pct={d.pct} tip={`${d.pct > 55 ? `Saves the offensive-zone draws for the top forwards more than ${d.pct}% of teams` : d.pct < 45 ? `Spreads the offensive-zone draws around more than ${100 - d.pct}% of teams` : 'About as much as most teams'}. Not good or bad: a coaching choice.`} />
     <span class="hi">Saved for the top line</span>
     <span class="term" tabindex="0" data-tip={tip}>How this is measured</span>

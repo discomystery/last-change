@@ -135,17 +135,6 @@ def season_table(season: int, game_type: int | None = 2, collapse_flurries: bool
     return pl.DataFrame(rows)
 
 
-def team_season(table: pl.DataFrame) -> pl.DataFrame:
-    """Per team: games, real wins and replay wins (the sum of its replay shares)."""
-    side = lambda home: table.select(
-        pl.col("home" if home else "away").alias("team"),
-        pl.col("home_share" if home else "away_share").alias("share"),
-        (pl.col("home_won") == home).alias("won"))
-    return (pl.concat([side(True), side(False)]).group_by("team")
-            .agg(pl.len().alias("gp"), pl.col("won").sum().alias("wins"), pl.col("share").sum().alias("replay_wins"))
-            .with_columns((pl.col("wins") - pl.col("replay_wins")).alias("luck")).sort("luck", descending=True))
-
-
 def build(season: int) -> dict:
     """Write replays.parquet for a season's finished regular-season games."""
     t = season_table(season)

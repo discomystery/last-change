@@ -94,7 +94,7 @@ def shootout(pbp: dict) -> list[list]:
 
 
 def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame, gu: pl.DataFrame | None, roster: pl.DataFrame,
-         so: list[list] | None = None) -> dict:
+         so: list[list] | None = None, season: int = CURRENT_SEASON) -> dict:
     ev = ev.filter(pl.col("period_type") != "SO").sort("sort")
     length = int(ev["sec"].max() or 0)
     shots = []
@@ -117,15 +117,14 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
             for r in ev.filter((pl.col("type") == "penalty") & pl.col("is_home").is_not_null()).iter_rows(named=True)]
     pp = power_plays([(int(s), c) for s, c in ev.select("sec", "situation_code").iter_rows()], length)
 
-    # Tonight's lines and pairs by 5-on-5 time together; anyone else is listed under "other".
+    # Tonight's lines and pairs by 5-on-5 time together, numbered as team and preview pages number them; anyone
+    # else is listed under "other".
     group: dict[int, str] = {}
     if gu is not None:
         for team_id in (g["away_id"], g["home_id"]):
-            mine = gu.filter(pl.col("team_id") == team_id)
-            for kind, prefix, count in (("F", "L", 4), ("D", "P", 3)):
-                for i, u in enumerate(U._pick(mine.filter(pl.col("kind") == kind), count), 1):
-                    for pid in u["unit"].split("-"):
-                        group[int(pid)] = f"{prefix}{i}"
+            for _, label, u in U.game_lines(season, gu, gid, team_id):
+                for pid in u["unit"].split("-"):
+                    group[int(pid)] = label
 
     skaters: dict[int, list] = {}
     goalies: dict[int, list] = {}
@@ -175,7 +174,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
             continue
         so = shootout(nhl.read_raw(season, "pbp", gid)) if g.get("last_period") == "SO" else None
         out = game(gid, g, ev.filter(pl.col("game_id") == gid), xg.filter(pl.col("game_id") == gid).drop("game_id"), sub,
-                   gu.filter(pl.col("game_id") == gid) if gu is not None else None, roster.filter(pl.col("game_id") == gid), so)
+                   gu.filter(pl.col("game_id") == gid) if gu is not None else None, roster.filter(pl.col("game_id") == gid), so, season)
         (OUT / f"{gid}.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
         n += 1
     return {"games": n}

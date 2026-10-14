@@ -23,6 +23,7 @@ import '../../styles/blocks.css';
 import { matchupPaint } from '../../lib/teams';
 import teamsData from '../../../public/data/teams.json';
 import recapIndex from '../../../public/data/recaps/index.json';
+import { jobsFor, scoresFor } from '../../lib/gameFiles';
 
 type Call = { id: string; kind: string; head: string; body: string; call?: string | null; nums?: string | null; cite: string; verdict: 'held' | 'partly' | 'missed' | 'na' | 'pending' | null; happened?: string; beyond?: string; usual?: string; tonight?: string; league?: string };
 type Nums = { shots: number; xg: number; cf5: number | null; pp_goals: number; pp_opps: number };
@@ -151,7 +152,7 @@ const takeaway = r.pending && r.calls.length
   : r.preview ? 'None of the preview’s calls could be judged from this game.' : 'No preview was saved for this game.';
 const season = recapIndex.tally as Record<string, number>;
 const seasonTotal = season.held + season.partly + season.missed;
-const sgn = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
 // Each row also says how far its bar leans: the share of the row's total each team had.
 const rows: [string, string, (n: Nums) => string, (n: Nums) => number][] = [
   ['Shots on goal', 'Every shot that reached the net, including goals. The bar splits them between the teams.', (n) => String(n.shots), (n) => n.shots],
@@ -185,17 +186,15 @@ const replayBody = !dw ? '' : pct(loser) >= 60
   : `With chances like these, ${place(away)} would win about ${pct(away)} games in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
-const jobFiles = import.meta.glob<{ default: { game_id: number; players: { pos: string }[] } }>('../../../public/data/jobs/2*.json', { eager: true });
-const jobs = Object.values(jobFiles).find((f) => f.default.game_id === r.game_id)?.default;
+const jobs = jobsFor<{ game_id: number; players: { pos: string }[] }>(r.game_id);
 const hasJobs = !!jobs?.players.some((c) => c.pos !== 'G');
 const hasGoalieCards = !!jobs?.players.some((c) => c.pos === 'G');
-const scoreFiles = import.meta.glob<{ default: { game_id: number; players: unknown[] } }>('../../../public/data/scores/2*.json', { eager: true });
-const hasImpact = !!Object.values(scoreFiles).find((f) => f.default.game_id === r.game_id)?.default.players.length;
+const hasImpact = !!scoresFor<{ players: unknown[] }>(r.game_id)?.players.length;
 const story = r.story;
 // How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
 const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it went']] : []), ['preview', 'The preview'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it unfolded']] : []), ['preview', 'Preview vs result'],
   ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
@@ -305,9 +304,10 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     ) : (
       <p class="note">No preview was saved for this game, so there were no calls to check.</p>
     )}
-    {(r.preview_page || seasonTotal > 0) && (
+    {(r.preview_page || r.rebuilt || seasonTotal > 0) && (
       <p class="note small">
-        {r.preview_page && <><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a> as it stood at puck drop.</>}
+        {r.preview_page && <><a href={`${import.meta.env.BASE_URL}preview/${r.game_id}/`}>Read the full preview</a>{r.rebuilt ? '.' : ' as it stood at puck drop.'}</>}
+        {r.rebuilt && <> Rebuilt with our current methods, from the games before it.</>}
         {seasonTotal > 0 && <> This season: {season.held} held up, {season.partly} partly, {season.missed} didn’t happen, out of {seasonTotal}. <a href={`${import.meta.env.BASE_URL}record/`}>Track record</a>.</>}
       </p>
     )}

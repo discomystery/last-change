@@ -3,6 +3,8 @@
 Teams that are trailing shoot more; home teams shoot more. Each 5v5 event is weighted so that, within
 every score state, the league's home and away totals come out equal.
 """
+from functools import lru_cache
+
 import polars as pl
 
 from pipeline.config import FULL_SEASONS, TABLES
@@ -18,8 +20,14 @@ def _five_on_five(seasons: list[int]) -> pl.DataFrame:
 
 
 def weights(seasons: list[int] = FULL_SEASONS) -> pl.DataFrame:
-    """One row per (metric, home score state) with the weight for home events and for away events."""
-    t = _five_on_five(seasons)
+    """One row per (metric, home score state) with the weight for home events and for away events. Kept for the run
+    (a dozen exports ask); team_game.build clears it when it rewrites a table."""
+    return _weights(tuple(seasons))
+
+
+@lru_cache(maxsize=4)
+def _weights(seasons: tuple[int, ...]) -> pl.DataFrame:
+    t = _five_on_five(list(seasons))
     rows = []
     for m in METRICS:
         by = t.group_by("home_state", "is_home").agg(pl.col(m).sum().alias("n"))

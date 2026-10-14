@@ -4,6 +4,9 @@ Each arena's off-ice scorers count these a little differently. For every home ri
 event is recorded in that team's home games with how often it is recorded in the same team's road games
 (both teams' events combined, per hour). A factor of 1.20 means that building records 20% more.
 """
+import copy
+from functools import lru_cache
+
 import polars as pl
 
 from pipeline.config import FULL_SEASONS, REGULAR, TABLES
@@ -13,6 +16,11 @@ SHRINK_GAMES = 20  # pull each factor part of the way back toward 1.00
 
 
 def factors(seasons: list[int] = FULL_SEASONS) -> pl.DataFrame:
+    return _factors(tuple(seasons))
+
+
+@lru_cache(maxsize=4)
+def _factors(seasons: tuple[int, ...]) -> pl.DataFrame:
     frames, venues = [], []
     for s in seasons:
         d = TABLES / str(s)
@@ -43,6 +51,11 @@ def home_road(seasons: list[int] = FULL_SEASONS) -> dict[str, dict[str, float]]:
     and it does not need to be: the weights simply put home and road games on the same footing.
     (A building-by-building version was tested and rejected: it does not repeat from year to year.)
     """
+    return copy.deepcopy(_home_road(tuple(seasons)))
+
+
+@lru_cache(maxsize=4)
+def _home_road(seasons: tuple[int, ...]) -> dict[str, dict[str, float]]:
     home = {e: 0.0 for e in EVENTS} | {"sec": 0.0}
     away = dict(home)
     for s in seasons:

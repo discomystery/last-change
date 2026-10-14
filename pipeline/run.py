@@ -40,6 +40,9 @@ def main() -> None:
         print(mode(a.requested))
 
 
+MONEYPUCK_CHECK = os.environ.get("LC_MONEYPUCK") == "1"  # set to download MoneyPuck's shots for a private comparison
+
+
 def update(season: int) -> dict:
     """Everything a new game needs, in order: fetch, build tables, rate shots, team and unit tables, site JSON."""
 
@@ -52,7 +55,8 @@ def update(season: int) -> dict:
     if season == CURRENT_SEASON:
         out["wikidata"] = names.fetch_wikidata()  # accented spellings of players' names, refreshed weekly
         out["rosters"] = rosters.snapshot(season)  # who each club lists today, kept as a dated history
-    moneypuck.download_shots(season)  # cross-check only; the export's match-rate check reads it
+    if MONEYPUCK_CHECK:  # private cross-check only: nothing on the site reads MoneyPuck's shots
+        moneypuck.download_shots(season)
     out["shift_checks"] = check_saved_shifts(season)
     out["build"] = games.build_season(season)
     out["names"] = respell(season)
@@ -62,7 +66,8 @@ def update(season: int) -> dict:
         out["standings_days"] = standings_daily.update(season)  # the table after each game day, for the playoff race
         out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
         out["availability"] = availability_update(season)
-    out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # cross-check table; export reads it
+    if MONEYPUCK_CHECK:
+        out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # shots_xg.parquet, for xg_model.evaluate
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     refresh_saved(season)
@@ -134,7 +139,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     the next full update."""
     from pipeline.build import games, shot_features
     from pipeline.export import flow, game_scores, jobs, pending, previews, recaps, roster, site_json, stories, track
-    from pipeline.ingest import game_rosters, game_stats, nhl, nhl_previews, rosters, status_report, transactions
+    from pipeline.ingest import game_rosters, game_stats, injuries, nhl, nhl_previews, rosters, standings_daily, status_report, transactions
     from pipeline.metrics import availability, player_game, team_game, units, xg_model
     import polars as pl
 
@@ -142,10 +147,12 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["build"] = games.build_season(season)
     out["names"] = respell(season)
     out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
+    out["standings_days"] = standings_daily.update(season)  # the table after tonight's games, for the playoff race
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     team_game.build(season)
     units.game_units(season)
+    units.depth_table(season)  # team numbers join it: without it tonight's finals have no team rows to grade
     player_game.build(season)
     out["rosters"] = rosters.snapshot(season)
     out["game_rosters"] = game_rosters.update(season)  # tonight's scratches, posted before puck drop
@@ -155,6 +162,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
         print(f"status report unavailable: {e!r}")
     status_report.build(season)
     out["transactions"] = transactions.update(season)  # today's roster moves (keeps the saved copy if unreachable)
+    out["injuries"] = injuries.update(season)  # ESPN's injury list as it stands now
     out["availability"] = availability.build(season)
     out["nhl_previews"] = nhl_previews.update(season)
     out["teams_and_schedule"] = site_json.export_teams_and_schedule(season)  # standings, and which games are final
@@ -201,10 +209,11 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 4  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 5  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
 # 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
 # 4 (2026-10-11): expected-goals model v2; earlier seasons' shots are rebuilt and re-rated
+# 5 (2026-10-14): a turnover ends the other side's off-turnover window; goalie breakdowns use the team rule; depth tables
 
 
 def check_saved_shifts(season: int) -> dict:
@@ -246,6 +255,7 @@ def refresh_saved(season: int) -> list[int]:
     for s in done:
         team_game.build(s)
         units.game_units(s)
+        units.depth_table(s)
     for s in done:
         player_game.build(s)
         (TABLES / str(s) / "rules.json").write_text(json.dumps({"rules": TABLE_RULES}))
@@ -270,10 +280,11 @@ def publish(season: int) -> dict:
     units.depth_table(season)
     player_game.build(season)
     if season == CURRENT_SEASON:
-        from pipeline.ingest import status_report, transactions
+        from pipeline.ingest import injuries, status_report, transactions
         from pipeline.metrics import availability
         status_report.build(season)  # re-read the saved reports with the current rules
         transactions.build(season)  # and the saved roster moves
+        injuries.build(season)  # and ESPN's saved injury lists
         out["availability"] = availability.build(season)
     out["export"] = site_json.run(season)
     return out

@@ -32,6 +32,15 @@ def _state(diff: int) -> int:
     return max(-3, min(3, diff))
 
 
+def _forget() -> None:
+    """Drop what other modules keep for the run that was read from team_game tables (this one was just rewritten)."""
+    from pipeline.metrics import adjust, rink_bias, team_style
+    adjust._weights.cache_clear()
+    rink_bias._factors.cache_clear()
+    rink_bias._home_road.cache_clear()
+    team_style._STABLE.clear()
+
+
 def build(season: int) -> dict:
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet")
@@ -64,6 +73,7 @@ def build(season: int) -> dict:
             rows[key]["sec"] += s["duration"]
 
     goal_rows = []  # one row per goal, tagged with how it came about (goal sources)
+    turnover_shots = []  # unblocked shots off a turnover, for goalie cards (one rule for team and goalie breakdowns)
     last_turnover: dict[bool, int] = {}
     last_faceoff = None  # (second, won by home team) of the last offensive-zone faceoff win since play stopped
     current = None
@@ -79,10 +89,13 @@ def build(season: int) -> dict:
             continue
         if home is None or gid not in ids:
             continue
+        # A turnover gives the puck to one side and ends the other side's chance of a shot off its own earlier turnover.
         if typ == "giveaway":
             last_turnover[not home] = e["sec"]  # the other team now has the puck
+            last_turnover.pop(home, None)
         elif typ == "takeaway":
             last_turnover[home] = e["sec"]
+            last_turnover.pop(not home, None)
         hg, ag = e["home_goalie"] is not None, e["away_goalie"] is not None
         nh, na = len(e["home_on"]), len(e["away_on"])
         diff = e["home_score"] - e["away_score"]
@@ -125,6 +138,8 @@ def build(season: int) -> dict:
                         bump(side, "reb_xg" + sfx, xg)
                     if off_turnover:
                         bump(side, "to_xg" + sfx, xg)
+                        if sfx == "f":
+                            turnover_shots.append((gid, e["event_id"]))
                     if off_turnover and xg >= BREAKDOWN_XG:
                         bump(side, "bd_" + sfx)
                 if typ in ("shot-on-goal", "goal"):
@@ -163,6 +178,8 @@ def build(season: int) -> dict:
     )
     table.write_parquet(d / "team_game.parquet")
     pl.DataFrame(goal_rows).write_parquet(d / "goals.parquet")
+    _forget()
+    pl.DataFrame(turnover_shots, schema={"game_id": pl.Int64, "event_id": pl.Int64}, orient="row").write_parquet(d / "turnover_shots.parquet")
 
     # Discipline: count each stretch a team spends shorthanded (from who is actually on the ice), not penalty calls,
     # so offsetting minors and misconducts that change nothing are ignored.

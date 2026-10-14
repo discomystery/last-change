@@ -103,7 +103,7 @@ def usage(season: int, ratings: dict[int, tuple[float, float]]) -> pl.DataFrame:
 
 def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Per player-game: goal credit and the expected goals of his own unblocked shots at a goalie (shootouts out);
-    per goalie-game: expected goals and goals on the unblocked shots he faced."""
+    per goalie-game: expected goals and goals on the unblocked shots he faced (goalies.per_game)."""
     d = TABLES / str(season)
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
     ev = pl.read_parquet(d / "events.parquet").join(games, on="game_id")
@@ -124,8 +124,10 @@ def shot_credit(season: int) -> tuple[pl.DataFrame, pl.DataFrame]:
         parts.append(goals.filter(pl.col(col).is_not_null()).select("game_id", pl.col(col).alias("player_id"), w.alias("credit")))
     credit = pl.concat(parts).group_by("game_id", "player_id").agg(pl.col("credit").sum())
     skaters = own.join(credit, on=["game_id", "player_id"], how="full", coalesce=True).with_columns(pl.col("ixg", "credit").fill_null(0.0), pl.col("miss").fill_null(0))
-    goalies = at_goalie.group_by("game_id", pl.col("goalie").alias("player_id")).agg(
-        pl.col("xg").sum().alias("xga"), (pl.col("type") == "goal").sum().alias("ga"), pl.len().alias("shots"))
+    # Goalies: the same per-game figures as the goalie's report card and the recap's goalie lines (the goalie named on
+    # each shot in the play-by-play, empty-net shots out), so his Swing and his card agree on his saves above expected.
+    from pipeline.metrics import goalies as G
+    goalies = G.per_game(season).select("game_id", pl.col("goalie_id").alias("player_id"), "xga", "ga", pl.col("fa").alias("shots"))
     return skaters, goalies
 
 
@@ -200,18 +202,14 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     pools = {g: np.sort(ref.filter(pl.col("grp") == g)["score"].to_numpy()) for g in ("F", "D", "G")}
     pct = lambda g, v: int(max(1, min(99, round(100 * np.searchsorted(pools[g], v, side="right") / len(pools[g]))))) if len(pools[g]) else None
 
-    # Tonight's lines and pairs: the trios and pairs that played most together at 5-on-5 in this game.
+    # Tonight's lines and pairs: the trios and pairs that played most together at 5-on-5 in this game, numbered as
+    # the team and preview pages number them.
     gu = pl.read_parquet(d / "game_units.parquet") if (d / "game_units.parquet").exists() else None
     def lines(gid: int, team_id: int) -> list[dict]:
         if gu is None:
             return []
-        mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
-        out = []
-        for kind, count in (("F", 4), ("D", 3)):
-            for i, u in enumerate(U._pick(mine.filter(pl.col("kind") == kind), count), 1):
-                out.append({"kind": kind, "n": i, "ids": [int(x) for x in u["unit"].split("-")], "sec": int(u["sec"]),
-                            "xgf": round(u["xgf"], 2), "xga": round(u["xga"], 2)})
-        return out
+        return [{"kind": kind, "n": int(label[1:]), "ids": [int(x) for x in u["unit"].split("-")], "sec": int(u["sec"]),
+                 "xgf": round(u["xgf"], 2), "xga": round(u["xga"], 2)} for kind, label, u in U.game_lines(season, gu, gid, team_id)]
 
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json") if only is None else ():
