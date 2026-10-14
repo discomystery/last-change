@@ -53,6 +53,31 @@ def num(n: int) -> str:
     return WORDS[n] if 0 <= n < len(WORDS) else str(n)
 
 
+GOAL_RUN = 3  # straight games with a goal that make a streak worth telling (intros use the same bar)
+
+
+def run_of(xs) -> int:
+    """Games in a row, most recent last, with more than zero of something."""
+    n = 0
+    for x in reversed(list(xs)):
+        if x <= 0:
+            break
+        n += 1
+    return n
+
+
+def streak_text(gn: int, pn: int, games: int, vs: str = "") -> str:
+    """The verb phrase for a scoring run, goals first (Sora, 2026-10-14: a goal streak is the more impressive one, so it
+    leads whenever there is one). `gn` straight games with a goal, `pn` with a point, `games` played in all; `vs` is
+    " against Dallas" or empty. "has" / "have" is left to the caller."""
+    if gn >= GOAL_RUN and gn >= pn:
+        return "scored in every game this season" if gn == games and not vs else f"scored in {num(gn)} straight games{vs}"
+    run = "every game this season" if pn == games and not vs else f"{num(pn)} straight games{vs}"
+    if gn >= GOAL_RUN:
+        return f"a point in {run}, with a goal in each of the last {num(gn)}"
+    return f"a point in {run}"
+
+
 def _pick(pool: list[str], *key) -> str:
     return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
 
@@ -429,18 +454,15 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         # hot streaks; teammates on the same run share one item (Sora, 2026-10-12: "Granlund and LaCombe have ...")
         hot = {}
         for pid, g in this.sort("player_id").group_by("player_id", maintain_order=True):
-            pts = g.sort("date")["pts"].to_list()
-            n = 0
-            for x in reversed(pts):
-                if x <= 0:
-                    break
-                n += 1
-            if n >= 4:
-                hot.setdefault("every game this season" if n == len(pts) else f"{num(n)} straight games", []).append((60 + n + sum(pts) / 100, pid[0]))
+            g = g.sort("date")
+            pts = g["pts"].to_list()
+            n, gn = run_of(pts), run_of(g["g"].to_list())
+            if n >= 4 or gn >= GOAL_RUN:
+                hot.setdefault(streak_text(gn, n, len(pts)), []).append((60 + n + gn / 2 + sum(pts) / 100, pid[0]))
         for run, who in hot.items():
             who.sort(key=lambda x: -x[0])
             names = [N[p] for _, p in who]
-            text = f"{_and(names)} {'has' if len(names) == 1 else 'have'} a point in {run}."
+            text = f"{_and(names)} {'has' if len(names) == 1 else 'have'} {run}."
             items.append({"tag": "Hot streak", "text": text, "score": who[0][0], "pid": who[0][1], "pids": [p for _, p in who]})
         # slow start: scored often last season, nothing yet
         last = mine.filter(pl.col("season") == season - 1).group_by("player_id").agg(gp=pl.len(), g=pl.col("g").sum())
@@ -458,18 +480,14 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             if pid in skip:
                 continue
             pts, goals, gp = g["pts"].to_list(), int(g["g"].sum()), g.height
-            n = 0
-            for x in reversed(pts):
-                if x <= 0:
-                    break
-                n += 1
+            n, gn = run_of(pts), run_of(g["g"].to_list())
             elsewhere = g.filter(pl.col("team") != t)
             mostly = elsewhere["team"].mode()[0] if elsewhere.height * 2 > gp else None
             tail = f", most of them with {W.place(mostly)}" if mostly else ""
-            if n >= 5:
-                extra = f", and {int(sum(pts))} points in his last {num(gp) if gp <= 12 else gp} against them" if sum(pts) >= 1.5 * gp else ""
-                cands.append({"tag": "Owns them", "score": 70 + n, "pid": pid, "streak": n,
-                              "text": f"{N[pid]} has a point in {num(n)} straight games against {W.place(o)}{extra}."})
+            if n >= 5 or gn >= GOAL_RUN:
+                extra = f", and {int(sum(pts))} points in his last {num(gp) if gp <= 12 else gp} against them" if sum(pts) >= 1.5 * gp and gn < n else ""
+                cands.append({"tag": "Owns them", "score": 70 + n + gn / 2, "pid": pid, "streak": n,
+                              "text": f"{N[pid]} has {streak_text(gn, n, gp, f' against {W.place(o)}')}{extra}."})
             elif gp >= 6 and goals / gp >= 0.6:
                 cands.append({"tag": "Haunts them", "score": 68 + goals / gp * 10, "pid": pid,
                               "text": f"{N[pid]} has {num(goals)} goals in {num(gp) if gp <= 12 else gp} games against {W.place(o)} since 2023-24{tail}."})
@@ -1509,15 +1527,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             w_, l_ = (a_, b_) if a_[1] == winner else (b_, a_)
             items.append({"tag": "Brothers", "text": f"{N[w_[0]]} got the better of his brother {N[l_[0]].split(' ', 1)[0]}.", "score": 58})
     for pr in tonight.filter(pl.col("pts") > 0).iter_rows(named=True):
-        hist = pg.filter((pl.col("player_id") == pr["player_id"]) & (pl.col("team") == pr["team"]))["pts"].to_list()
-        n = 0
-        for x in reversed(hist):
-            if x <= 0:
-                break
-            n += 1
-        if n >= 5:
-            items.append({"tag": "Streak", "text": f"{N[pr['player_id']]} has a point in {num(n)} straight games." if n < len(hist)
-                          else f"{N[pr['player_id']]} has a point in every game this season.", "score": 50 + n})
+        mine_ = pg.filter((pl.col("player_id") == pr["player_id"]) & (pl.col("team") == pr["team"])).sort("date")
+        hist = mine_["pts"].to_list()
+        n, gn = run_of(hist), run_of(mine_["g"].to_list())
+        if n >= 5 or gn >= GOAL_RUN:
+            items.append({"tag": "Streak", "text": f"{N[pr['player_id']]} has {streak_text(gn, n, len(hist))}.", "score": 50 + n + gn / 2})
         if pr["g"] > 0 and len(hist) >= 5 and pg.filter((pl.col("player_id") == pr["player_id"]) & (pl.col("game_id") != gid))["g"].sum() == 0:
             items.append({"tag": "Finally", "text": f"{N[pr['player_id']]} scored his first goal of the season.", "score": 48})
     nxt = _next_games(r["date"], (away, home))
