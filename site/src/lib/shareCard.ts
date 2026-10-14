@@ -3,6 +3,7 @@
 // share sheet, then handed to the phone's share sheet or downloaded. Nothing is made on the server.
 import { domToBlob } from 'modern-screenshot';
 import LOGO from '../assets/logo/full.svg?raw';
+import { signed } from './format';
 
 type Two = { light: string; dark: string };
 type Lane = { team: string | null; ends: [string, string] | null; avg: [number, ...unknown[]] | null; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
@@ -25,7 +26,6 @@ import type { Theme } from './shareSheet';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
-const signed = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);  // as on the pages
 const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
 const pillWord: Record<string, string> = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' };
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;

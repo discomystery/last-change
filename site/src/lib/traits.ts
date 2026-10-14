@@ -10,7 +10,7 @@ const TRAITS: Trait[] = [
   { key: 'volume', label: 'Shot volume', tip: 'How many shot attempts a team takes at 5-on-5, as a score where 100 is league average: 120 means 20% more than an average team. Teams that are behind shoot more, so each attempt is weighted for the score and for home ice first. That’s why it’s a score and not a count.' },
   { key: 'quality', label: 'Shot quality', tip: 'How dangerous the average shot is: its chance of going in, by expected goals.' },
   { key: 'suppression', label: 'Shot suppression', tip: 'How many shot attempts a team allows at 5-on-5, as a shots-against score where 100 is league average. Lower is better: 75 means a quarter fewer than an average team. Each attempt is weighted for the score and for home ice, so a team that sat on a lead isn’t punished for it. Further right means fewer allowed.' },
-  { key: 'qualityAllowed', label: 'Quality allowed', tip: 'How dangerous the average shot against is. Further right means safer shots against.' },
+  { key: 'qualityAllowed', label: 'Dangerous shots allowed', tip: 'How dangerous the average shot against is. Further right means safer shots against.' },
   { key: 'pace', label: 'Pace', tip: 'How many shots both teams get at 5-on-5 combined (blocked shots left out), as a score where 100 is league average. Each shot is weighted for the score and for home ice, so a game that turned into a chase doesn’t look faster than it was.', neutral: true },
   { key: 'rebounds', label: 'Second chances', tip: 'Share of scoring chances that come from rebounds.', neutral: true },
   { key: 'turnover', label: 'Off-turnover offense', tip: 'Share of scoring chances within five seconds of forcing a turnover.', neutral: true },
@@ -27,7 +27,7 @@ const TRAITS: Trait[] = [
   { key: 'icing', label: 'Icing the puck', tip: 'Icings per 60 minutes of 5-on-5 play, compared with what the league does in the same score (teams protecting a lead ice it more). Usually a sign of being stuck in their own end. Further right means fewer icings. Teams that ice it a lot tend to give up more chances.' },
   { key: 'pp', label: 'Power play', tip: 'Expected goals per 60 with the man advantage.' },
   { key: 'pk', label: 'Penalty kill', tip: 'Expected goals allowed per 60 shorthanded. Further right means stingier.' },
-  { key: 'powerKill', label: 'Power kill', tip: 'How dangerous the team is while shorthanded.' },
+  { key: 'powerKill', label: 'Shorthanded threat', tip: 'How dangerous the team is while shorthanded.' },
   { key: 'discipline', label: 'Discipline', tip: 'Penalties drawn minus penalties taken, per 60.' },
   { key: 'goalie', label: 'Goaltending', tip: 'Goals saved above expected per 60, all goalies combined.' },
   { key: 'depth', label: 'Depth', tip: 'How much of the forwards’ 5-on-5 ice time goes to the six least-used forwards each night. Higher means the coach spreads minutes more evenly.' },
@@ -79,7 +79,7 @@ export const fpInfo = Object.fromEntries(TRAITS.map((d) => [d.key, { label: d.la
 
 /** Labels, tooltips and scale ends for goalie traits. */
 export const goalieTraitInfo = [
-  { key: 'gsax', label: 'Stopping more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall' },
+  { key: 'gsax', label: 'Saving more than expected', tip: 'Goals saved above expected: goals prevented compared with an average goalie facing the same shots.', lo: 'Sieve', hi: 'Wall' },
   { key: 'rebounds', label: 'Rebound control', tip: 'How often his saves lead to another shot within three seconds, compared with what saves on the same kind of shot from the same spot usually give up.', lo: 'Loose', hi: 'Smothers it' },
   { key: 'busy', label: 'How busy he is', tip: 'Shots on goal he faces per 60.', lo: 'Quiet', hi: 'Under siege' },
   { key: 'danger', label: 'How dangerous the shots are', tip: 'How dangerous the shots against him are, on average.', lo: 'Sheltered', hi: 'Exposed' },

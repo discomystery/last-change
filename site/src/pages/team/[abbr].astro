@@ -68,7 +68,7 @@ const fpStandouts = (mode: 'blend' | 'season') => {
 };
 type Unit = { label: string; players: string[]; gp?: number; new?: boolean; minutes: number; seconds: number; toi_sec: number | null; toi: number; xgf60: number; xga60: number; share: number; oz: number | null; pct: Record<string, number | null>; in_last_game: boolean };
 const ln = (linesData.teams as Record<string, { games: number; units: Unit[]; last: { date: string; opponent: string; at_home: boolean; units: { label: string; players: string[]; minutes: number; seconds: number; usual: boolean }[] }; notes: { text: string }[] }>)[abbr!];
-const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top pairs', P2: 'second pairs', P3: 'third pairs' };
+const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top defense pairs', P2: 'second defense pairs', P3: 'third defense pairs' };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; seconds: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string; player: string } | null; shots: { x: number; y: number; xg: number }[] } | undefined;
 type MRow = { label: string; minutes: number; seconds: number; share: (number | null)[]; expected: number[] };
@@ -393,7 +393,7 @@ const coachSince = coach && (team as any).coach_since
                       <div class="ghead">
                         <div class="ghead-text">
                           <p class="gname"><PLink id={g.id} name={g.name} /><span class="n">{x.starts} {x.starts === 1 ? 'start' : 'starts'} · {x.shots} shots faced, {words}</span></p>
-                          <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Stopping more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
+                          <p class="gbig"><strong>{sgn(x.gsax)}</strong> <span class="term" tabindex="0" data-tip="Goals saved above expected: how many goals he has prevented compared with an average goalie facing the same shots. Positive is good.">goals saved above expected</span> {few ? <span class="n">too few starts to rate</span> : <Pips pct={x.pct.gsax!} tip={`Saving more than expected, per 60, pulled toward average until he has faced enough shots: ${compared(x.pct.gsax!, 'better than', 'worse than', 'goalies', true)}.`} />}</p>
                         </div>
                         <Portrait id={g.id} size={96} class="g-photo" />
                       </div>

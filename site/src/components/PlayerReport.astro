@@ -4,7 +4,7 @@
 // the same bars. "Recent games": one row per game with the report-card result, each mark, and his Swing.
 import Section from './Section.astro';
 import Pips from './Pips.astro';
-import { clock } from '../lib/format';
+import { clock, signed } from '../lib/format';
 import { cardsFor } from '../lib/reportCards';
 import { peerOf } from '../lib/players';
 
@@ -30,13 +30,13 @@ const others = ([
   ['pp', 'Power play', `${clock(toi.toi_pp ?? 0)} a game`, null],
   ['pk', 'Killing penalties', (toi.toi_pk ?? 0) >= 15 ? `${clock(toi.toi_pk)} a game` : 'Rarely kills penalties', null],
   ['faceoffs', 'Faceoffs', p.group === 'D' ? null : p.sub === 'W' ? 'A winger: rarely takes the draw' : null, p.sub === 'C' ? 'faceoffs' : null],
-  ['shooting', 'Shooting', null, 'shooting'],
+  ['shooting', 'Shooting volume', null, 'shooting'],
   ['chances', 'Creating his own chances', null, 'chances'],
-  ['offImpact', 'Creating chances at 5-on-5', null, 'offImpact'],
-  ['defImpact', 'Preventing chances at 5-on-5', null, 'defImpact'],
+  ['offImpact', 'Creating chances', null, 'offImpact'],
+  ['defImpact', 'Preventing chances', null, 'defImpact'],
   ['takeaways', 'Takeaways', null, 'takeaways'],
   ['hits', 'Hitting', null, 'hits'],
-  ['blocks', 'Blocking shots', null, 'blocks'],
+  ['blocks', 'Shot blocking', null, 'blocks'],
 ] as [string, string, string | null, string | null][]).filter(([k, , text, trait]) => !duties.some((j) => j.key === k) && (text || (trait && traits[trait]?.blend)));
 const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 const SW = 1.2; // Swing bar half-width, in Swing points
@@ -92,9 +92,9 @@ const SW = 1.2; // Swing bar half-width, in Swing points
             <span class="rp-marks">{r.card.jobs.map((j: any) => <span class:list={['rp-m', j.verdict]} tabindex="0" data-tip={`${j.label}: ${word[j.verdict as keyof typeof word]}. ${j.text}`}>{mark[j.verdict as keyof typeof mark]}</span>)}</span>
             <span class="rp-box">{r.card.box.g} G · {r.card.box.a} A · {r.card.toi}</span>
           </span>
-          {s ? <span class="rp-sw" tabindex="0" data-tip={`Swing ${s.score.toFixed(2)}: better than ${s.pct}% of nights by ${peer[p.group]} last season.`}>
+          {s ? <span class="rp-sw" tabindex="0" data-tip={`Swing ${signed(s.score)}: better than ${s.pct}% of nights by ${peer[p.group]} last season.`}>
             <span class="rp-track"><i class:list={{ neg: s.score < 0 }} style={s.score >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}></i></span>
-            <strong>{s.score >= 0 ? '+' : '−'}{Math.abs(s.score).toFixed(1)}</strong>
+            <strong>{signed(s.score)}</strong>
           </span> : <span class="rp-sw n">–</span>}
         </li>
       ); })}

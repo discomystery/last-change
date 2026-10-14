@@ -20,3 +20,6 @@ export const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
+
+/** A Swing-style number: one decimal, a true minus sign, and "0.0" for anything that rounds to zero. */
+export const signed = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);

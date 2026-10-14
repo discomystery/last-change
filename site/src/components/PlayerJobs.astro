@@ -8,6 +8,7 @@ import Section from './Section.astro';
 import PLink from './PLink.astro';
 import { peerOf } from '../lib/players';
 import { jobsFor } from '../lib/gameFiles';
+import { signed } from '../lib/format';
 
 type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
 type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
@@ -44,8 +45,7 @@ const nightNote = (c: Card) => {
   if (c.night === 'rough' && c.summary === 'did') return ', though he still handled his usual responsibilities.';
   return '.';
 };
-const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
-const signed = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${(-v).toFixed(1)}` : '0.0');
+const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
 const skaters = d ? d.players.filter((c) => c.pos !== 'G') : [];
 const gcards = d ? d.players.filter((c) => c.pos === 'G') : [];
 const graded = d ? skaters.flatMap((c) => c.jobs).filter((j) => j.verdict !== 'na') : [];
