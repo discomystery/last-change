@@ -38,8 +38,8 @@
 .sc-dots i { width: 16px; height: 16px; border-radius: 50%; display: block; }
 .sc-rpc { display: flex; gap: 30px; align-items: baseline; margin-top: 16px; font: 600 25px 'Hanken Grotesk'; color: var(--ink2); white-space: nowrap; }
 .sc-rpc b { font: 600 60px/1 'Fraunces'; font-variation-settings: 'SOFT' 100, 'opsz' 144; letter-spacing: -0.02em; margin-right: 10px; }
-.sc-say { margin-top: 16px; font: 400 21px/1.4 'Literata', serif; color: var(--ink2); }
-.sc-say b { font-weight: 700; }
+.sc-rps { margin-top: 14px; font: 400 19px/1.45 'Literata', serif; color: var(--ink2); }
+.sc-rps b { font-weight: 700; }
 .sc-lede { font-size: 30px; line-height: 1.45; color: var(--ink2); margin-top: 26px; }
 .sc-call { padding: 18px 0; border-top: 2px solid var(--rule); }
 .sc-call:first-child { border-top: 0; }

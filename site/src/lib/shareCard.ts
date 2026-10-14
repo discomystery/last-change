@@ -82,7 +82,7 @@ export function gameCard(g: GameData, theme: Theme) {
   const run = rp ? `<div class="sc-run" data-opt="3"><div class="sc-dots">${dots.map((c) => `<i style="background:${c}"></i>`).join('')}</div>
 <div><div class="sc-kick" style="margin-bottom:12px">Run it back</div><div class="sc-disp sc-fit" style="font-size:34px;line-height:1.15">${esc(rp.head)}</div>
 <div class="sc-rpc"><span><b style="color:${col(g.away)}">${rp.away}</b>${esc(g.teams[g.away].place)}</span><span><b style="color:var(--ink3)">${rp.tie}</b>even</span><span><b style="color:${col(g.home)}">${rp.home}</b>${esc(g.teams[g.home].place)}</span></div>
-<div class="sc-say">${replaySay(g, col)}</div></div></div>` : '';
+<div class="sc-rps">${replaySay(g, col)}</div></div></div>` : '';
   // Two calls keep their lanes; three or four are told in a line each.
   const roomy = g.calls.length <= 2;
   const calls = g.calls.length ? `<div class="sc-calls">${g.calls.map((c) => `<div class="sc-call"><div class="sc-said">We said: ${esc(c.said)}</div>
