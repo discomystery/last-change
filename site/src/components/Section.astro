@@ -2,8 +2,8 @@
 // A page section. The explainer (`takeaway`, plus anything in the `explain` slot) sits behind a "?" beside the
 // title and opens on demand. `lead` keeps the takeaway on show instead, for lines that carry this page's own facts
 // (a game's tally of calls) or pages that are explanation through and through (Methods).
-interface Props { id: string; title: string; takeaway?: string; placeholder?: boolean; lead?: boolean }
-const { id, title, takeaway, placeholder = true, lead = false } = Astro.props;
+interface Props { id: string; title: string; takeaway?: string; placeholder?: boolean; lead?: boolean; share?: string }
+const { id, title, takeaway, placeholder = true, lead = false, share } = Astro.props;
 const tucked = (takeaway && !lead) || Astro.slots.has('explain');
 ---
 <section class="sec" id={id} aria-labelledby={`${id}-h`}>
@@ -11,6 +11,7 @@ const tucked = (takeaway && !lead) || Astro.slots.has('explain');
     <h2 id={`${id}-h`}>{title}</h2>
     {tucked && <button type="button" class="xp-q" aria-expanded="false" aria-controls={`${id}-xp`} aria-label={`What this shows: ${title}`}>?</button>}
     {placeholder && <span class="ph">Placeholder numbers</span>}
+    {share && <button type="button" class="share-btn sec-share" data-share={share}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg><span>Share</span></button>}
   </header>
   {takeaway && lead && <p class="takeaway">{takeaway}</p>}
   {tucked && (
