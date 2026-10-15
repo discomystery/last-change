@@ -81,3 +81,23 @@ def test_a_clubs_absences_share_one_out_item():
     assert one["text"] == "The Jets have been without Seth Jarvis all season. Stuart Skinner is expected to start."
     mid = stories._merge_out([{**outs[2], "missed": 6}], "The Hurricanes", 8)
     assert mid["text"] == "The Hurricanes have been without Jordan Staal since Oct 10."
+
+
+def test_a_fill_in_who_scored_in_the_missing_players_spot(tmp_path, monkeypatch):
+    """Sora, 2026-10-15: "Jankowski made up for Staal's absence with a goal ..." Facts about tonight only."""
+    import polars as pl
+    d = tmp_path / "2026"
+    d.mkdir()
+    pl.DataFrame({"game_id": [9, 9, 9], "team_id": [12, 12, 12], "kind": ["F", "F", "F"], "unit": ["2-3-4", "2-3-5", "6-7-8"],
+                  "sec": [400.0, 30.0, 500.0]}).write_parquet(d / "game_units.parquet")
+    pl.DataFrame({"game_id": [1, 2, 9, 9], "player_id": [1, 1, 4, 5], "team_id": [12] * 4, "g": [0.0, 0.0, 1.0, 0.0],
+                  "a1": [0.0] * 4, "a2": [0.0] * 4, "fow": [6.0, 6.0, 3.0, 0.0], "fol": [4.0, 4.0, 7.0, 0.0]}).write_parquet(d / "player_game.parquet")
+    monkeypatch.setattr(stories, "TABLES", tmp_path)
+    monkeypatch.setattr(stories, "_out_notes", lambda s, day: {"CAR": [
+        {"pid": 1, "games": 2, "last_played": "2026-10-10", "partners": [2, 3], "grp": "F"}]})
+    monkeypatch.setattr(stories, "_roles_on", lambda s, day: {12: {1: {"toi_rank": 7}, 4: {"toi_rank": 9}}})
+    N = {1: "Jordan Staal", 4: "Mark Jankowski"}
+    item = stories._filled_in(9, "2026-10-13", "CAR", 12, 2026, N, lambda pid: N[pid])
+    assert item["text"] == "With Jordan Staal out, Mark Jankowski took his spot and scored, though he won only 3 of 10 faceoffs."
+    monkeypatch.setattr(stories, "_roles_on", lambda s, day: {12: {1: {"toi_rank": 7}, 4: {"toi_rank": 2}}})
+    assert stories._filled_in(9, "2026-10-13", "CAR", 12, 2026, N, lambda pid: N[pid]) is None  # a bigger player moved over

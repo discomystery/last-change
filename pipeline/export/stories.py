@@ -302,6 +302,80 @@ def _merge_out(outs: list[dict], team: str, n_games: int) -> dict:
     return {"tag": "Out", "text": text, "score": outs[0]["score"], "pid": outs[0]["pid"], "pids": [o["pid"] for o in outs]}
 
 
+def _season_start(season: int) -> str:
+    return f"{season}-09-01"  # 2026 is 2026-27
+
+
+@lru_cache(maxsize=16)
+def _roles_on(season: int, day: str) -> dict:
+    from pipeline.export import changes
+    return changes._roles(season, day)
+
+
+def _count(n: int, word: str) -> str:
+    return f"an {word}" if n == 1 and word[0] in "aeiou" else f"a {word}" if n == 1 else f"{num(n)} {word}s"
+
+
+FILL_SEC = 240  # 5-on-5 seconds beside the missing player's usual linemates to count as taking his spot
+FILL_DRAWS = 6  # faceoffs the fill-in took before his faceoffs are told against the missing center's
+CENTER_DRAWS = 8  # draws a game that make the missing player the club's faceoff man
+DRAW_GAP = 0.10
+
+
+def _filled_in(gid: int, day: str, team: str, tid: int, season: int, N: dict, name) -> dict | None:
+    """Post-game (Sora, 2026-10-15: "Jankowski made up for Staal's absence with a goal, even though he wasn't as impressive
+    on the faceoff dot"): a regular who is newly out, whoever played beside his usual linemates tonight, and what that
+    player did in the missing player's spot. Only told when he had a point or his faceoffs stood apart from the missing
+    center's. Facts about tonight, never a judgment of the absence."""
+    from pipeline.metrics import patterns
+    # newly out: he has played for the club this season and missed only the last few games
+    notes = [n for n in _out_notes(season, day).get(team, []) if n.get("partners") and (n.get("games") or 0) <= NEWLY_OUT + 1
+             and n.get("last_played") and n["last_played"] >= _season_start(season)]
+    if not notes:
+        return None
+    roles = _roles_on(season, day).get(tid, {})
+    units = pl.read_parquet(TABLES / str(season) / "game_units.parquet").filter(pl.col("game_id") == gid)
+    pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet", columns=["game_id", "player_id", "team_id", "g", "a1", "a2", "fow", "fol"])
+    tonight = pg.filter(pl.col("game_id") == gid)
+    for n in notes:
+        cover = [c for c in patterns._with(units, tid, [gid], tuple(n["partners"]), n["grp"]) if c[0] != n["pid"]]
+        if not cover or cover[0][1] < FILL_SEC or not N.get(cover[0][0]) or not N.get(n["pid"]):
+            continue
+        fid = cover[0][0]
+        if (roles.get(fid) or {}).get("toi_rank", 99) <= (roles.get(n["pid"]) or {}).get("toi_rank", 0):
+            continue  # a bigger player moved over (Draisaitl, Werenski): not someone stepping up into his spot
+        me = tonight.filter(pl.col("player_id") == fid)
+        if me.is_empty():
+            continue
+        f = me.row(0, named=True)
+        g, a = int(f["g"]), int(f["a1"] + f["a2"])
+        did = ("had a goal and an assist" if g == 1 and a == 1 else
+               ("scored twice" if g == 2 else f"scored {num(g)} times" if g > 2 else "scored") + (f" and added {_count(a, 'assist')}" if a else "") if g
+               else f"had {num(a)} assists" if a >= 2 else "")  # a lone assist is not the story
+        draws = ""
+        his = pg.filter((pl.col("player_id") == n["pid"]) & (pl.col("team_id") == tid))
+        if his.height and f["fow"] + f["fol"] >= FILL_DRAWS:
+            hw, hn = his["fow"].sum(), his["fow"].sum() + his["fol"].sum()
+            if hn >= CENTER_DRAWS * his.height:
+                w, k = int(f["fow"]), int(f["fow"] + f["fol"])
+                if w / k <= hw / hn - DRAW_GAP:
+                    draws = f"won only {w} of {k} faceoffs"
+                elif w / k >= max(hw / hn + DRAW_GAP, 0.5):
+                    draws = f"won {w} of {k} faceoffs"
+        if not did and not draws:
+            continue
+        missing, filler = name(n["pid"]), name(fid)
+        text = f"With {missing} out, {filler} took his spot"
+        if did and draws.startswith("won only"):
+            text += f" and {did}, though he {draws}"
+        elif did:
+            text += f" and {did}" + (f" and {draws}" if draws else "")
+        else:
+            text += f" and {draws}" if not draws.startswith("won only") else f", though he {draws}"
+        return {"tag": "Filling in", "text": text + ".", "score": 52 if g else 46}
+    return None
+
+
 @lru_cache(maxsize=8)
 def _out_notes(season: int, day: str) -> dict[str, list[dict]]:
     """The team page's "Out" notes (export/changes.py) as of `day`: regulars and stars, most important first."""
@@ -1954,6 +2028,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 and pg.filter((pl.col("player_id") == pr["player_id"]) & (pl.col("game_id") != gid))["g"].sum() == 0):
             first = "first goal" if pr["g"] == 1 else f"first {num(int(pr['g']))} goals"  # Crosby scored two (2026-10-13)
             items.append({"tag": "Finally", "text": f"{N[pr['player_id']]} scored his {first} of the season.", "score": 48})
+    for t in (winner, loser):
+        fill = _filled_in(gid, r["date"], t, home_id if t == home else row["away_id"][0], season, N, name)
+        if fill:
+            items.append(fill)
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
     league = []
     try:

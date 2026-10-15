@@ -131,11 +131,16 @@ def _status_text(r: dict, now_games: int) -> str:
     return "has not played this season" if never else f"has not dressed for the last {n} {games}"
 
 
+def _usual(tid: int, pid: int, kind: str, units_now, units_old, games_with: list[int], old_games: list[int]):
+    """His usual linemates (or partner): this season's when he has played 2+ games, else last season's."""
+    usual = patterns._mates(units_now, tid, games_with, pid, kind) if len(games_with) >= 2 else None
+    return usual or patterns._mates(units_old, tid, old_games, pid, kind)
+
+
 def _cover(tid: int, pid: int, kind: str, units_now, units_old, games_with: list[int], games_without: list[int], old_games: list[int], names: dict,
            away: set[int]) -> str | None:
     """Who has played beside his usual linemates since he last played."""
-    usual = patterns._mates(units_now, tid, games_with, pid, kind) if len(games_with) >= 2 else None
-    usual = usual or patterns._mates(units_old, tid, old_games, pid, kind)
+    usual = _usual(tid, pid, kind, units_now, units_old, games_with, old_games)
     if usual is None or not games_without:
         return None
     partners = usual[0]
@@ -215,9 +220,11 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             with_ids = [g for g in game_ids if g in played.get(pid, set())]
             without = [g for g, d in zip(game_ids, game_dates) if g not in played.get(pid, set()) and (r["last_played"] is None or d > r["last_played"])]
             cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
+            usual = _usual(tid, pid, kind, u_now, u_old, with_ids, old_games)
             if cover:
                 text += " " + cover
             found.append({"pid": pid, "last_played": r["last_played"], "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
+                          "grp": kind, "partners": list(usual[0]) if usual else [],
                           "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"] if ro else 0})
         found = sorted(found, key=lambda n: n["order"])[:MAX_OUT]
 
