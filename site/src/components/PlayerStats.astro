@@ -79,7 +79,7 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
                 const now = v.gt === 2 && r.yr === cur;
                 return <>
                   <tr class={now ? 'now' : undefined}>
-                    <th class="yr" scope="row">{seasonName(r.yr)}{now && <span class="chip">Now</span>}</th>
+                    <th class="yr" scope="row">{seasonName(r.yr)}</th>
                     <td class="tm-c"><Fragment set:html={[...new Set(r.teams)].map(tag).join('<span class="sep">·</span>')} />{(cup || other.length > 0) && <span class="mk" tabindex="0" data-tip={`${tip}, ${seasonName(r.yr)}. Listed at the end of the row.`}>{other.length > 0 && <><Fragment set:html={DIAMOND} />{other.length}</>}{cup && <span class="mk-cup"><Fragment set:html={CUP(9)} /></span>}</span>}</td>
                     {keys.map((k) => isBest(v, k, r)
                       ? <td data-in={inGroups(k)} class="hi" style={`color:${teamPaint(r.main)}`}><span tabindex="0" data-tip="Career high">{fmt(k, r[k])}</span></td>
@@ -94,7 +94,7 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
               })}
             </tbody>
             <tfoot>
-              <tr><th class="yr" scope="row">Career</th><td class="tm-c">{n(v.rows.length, v.gt === 3 ? 'playoff year' : 'season')}</td>{keys.map((k) => <td data-in={inGroups(k)}>{fmt(k, v.career[k])}</td>)}{v.anyAw && <td class="aw">{awardTotal(v) ? `${awardTotal(v)} in all` : ''}</td>}</tr>
+              <tr><th class="yr" scope="row"><span tabindex="0" data-tip={`${n(v.rows.length, v.gt === 3 ? 'playoff year' : 'season')} in the NHL`}>Career</span></th><td class="tm-c"></td>{keys.map((k) => <td data-in={inGroups(k)}>{fmt(k, v.career[k])}</td>)}{v.anyAw && <td class="aw">{awardTotal(v) ? `${awardTotal(v)} in all` : ''}</td>}</tr>
               {v.per82 && <tr class="p82"><th class="yr" scope="row">Per 82 games</th><td class="tm-c"></td>{keys.map((k) => <td data-in={inGroups(k)}>{per82(v.career, k)}</td>)}{v.anyAw && <td class="aw"></td>}</tr>}
             </tfoot>
           </table>
@@ -133,7 +133,6 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
   .ldg thead th { position: sticky; top: 0; z-index: 2; background: var(--sheet); }
   .ldg .yr { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; }
   .ldg thead .yr { z-index: 3; }
-  .ldg tbody .yr .chip { margin-left: 8px; }
   .ldg .tm-c, .ldg .tm-h { text-align: left; }
   .ldg .tm-c :global(.sep) { margin: 0 4px; color: var(--ink-3); }
   .ldg tr.now > * { background: color-mix(in oklab, var(--track) 55%, var(--sheet)); }
