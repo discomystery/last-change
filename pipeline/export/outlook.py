@@ -163,13 +163,23 @@ def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
 WEAK_COUNTER = 0.5  # reasons for the other side that add up to under half of the main ones are told as "even though"
 
 
-def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None) -> str:
-    """Plain reasons, from the model's own breakdown, as one sentence: the reasons that help one side first (biggest
-    first, Sora 2026-10-12: chance control matters more than home ice), then "but" and the ones that help the other.
-    Clauses about the same team share its name once. When the two are even at out-chancing opponents, that is said
-    first on its own. `lineups` (by team abbreviation) names a key skater a side will be without or gets back."""
+def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineups: dict | None = None,
+         nicks: dict | None = None) -> str:
+    """Plain reasons, from the model's own breakdown: the reasons that help one side first (biggest first, Sora
+    2026-10-12: chance control matters more than home ice), then the ones that help the other. Clauses about the same
+    team share its name once. When the two are even at out-chancing opponents, that is said first on its own.
+    `lineups` (by team abbreviation) names a key skater a side will be without or gets back; `nicks` gives "the Jets"
+    for a team already named by its place earlier in the same sentence.
+
+    Sentence rules (Sora, 2026-10-15, after "Even though Winnipeg has home-ice advantage, Carolina has been
+    out-chancing ..., while Winnipeg may be without Morrissey"): one contrast word per sentence ("even though", "but",
+    "while" or "though", never two), so two reasons pointing the same way are joined with "and" whenever the sentence
+    already has a contrast; "while" only joins two teams' reasons in a sentence of their own (Sora, 2026-10-12: a bare
+    "and" there read as if the two were connected). A team is named by its place once a sentence; after that it is
+    "they" right after its own clause, else its nickname."""
     s = {x["input"]: x["shift"] * (1 if team == home else -1) for x in steps}  # > 0 helps `team`
     other = {team: opp, opp: team}
+    nicks = nicks or {}
     facts = []  # (weight, side it helps, subject, singular predicate, plural predicate)
     chances = s.get("xgd", 0.0)
     if abs(chances) >= 0.025:
@@ -204,36 +214,47 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
             lead.setdefault(f[2], len(lead))
         g.sort(key=lambda f: lead[f[2]])
 
-    def clauses(group: list, after: str | None, joiner: str = ", while ") -> str:
-        many = lambda t: places[t].lower().startswith("the ")  # "the Rangers have", not "has"
-        parts = []  # one phrase per team: "Edmonton has been ... lately and has home-ice advantage"
+    def clauses(group: list, named: list, joiner: str) -> str:
+        """`named` holds the teams already named in this sentence, last subject last (updated in place)."""
+        plural = lambda t: places[t].lower().startswith("the ")  # "the Rangers have", not "has"
+        parts = []  # one phrase per team: [team, subject, plural, predicates]
         for f in group:
-            if parts and parts[-1][0] == f[2]:
-                parts[-1][1] += " and " + (f[4] if parts[-1][1].startswith("they ") or many(f[2]) else f[3])
-            elif not parts and f[2] == after:
-                parts.append([f[2], "they " + f[4]])  # "..., but they are on the second night"
+            t = f[2]
+            if parts and parts[-1][0] == t:
+                parts[-1][3].append(f[4] if parts[-1][2] else f[3])
+                continue
+            if named and named[-1] == t:
+                parts.append([t, "they", True, [f[4]]])  # "..., but they are on the second night"
+            elif t in named and nicks.get(t):
+                parts.append([t, nicks[t], True, [f[4]]])  # "..., and the Jets may be without Morrissey"
             else:
-                parts.append([f[2], f"{places[f[2]]} {f[4] if many(f[2]) else f[3]}"])
-        out = [p[1] for p in parts]
-        if len(out) == 1:
-            return out[0]
-        # two teams' facts that help the same side: "while" (Sora, 2026-10-12: "and" implied they were connected)
-        return ", ".join(out[:-1]) + joiner + out[-1]
+                parts.append([t, places[t], plural(t), [f[4] if plural(t) else f[3]]])
+            named.append(t)
+        # a team's own reasons as a list ("has home-ice advantage, gets Ace back and is ..."), never an "and" chain
+        say = lambda ps: ps[0] if len(ps) == 1 else ", ".join(ps[:-1]) + " and " + ps[-1]
+        out = [f"{p[1]} {say(p[3])}" for p in parts]
+        if joiner == " and " and any(len(p[3]) > 1 for p in parts):
+            joiner = ", and "  # "Carolina gets Ace back, and Winnipeg may be without Star and is ..."
+        return joiner.join(out)
 
+    named = []
     if groups[1] and sum(f[0] for f in groups[1]) < WEAK_COUNTER * sum(f[0] for f in groups[0]):
         # a counterpoint too small to stand as an equal (Sora, 2026-10-12): "Even though Chicago has home-ice advantage, ..."
-        text = "even though " + clauses(groups[1], None) + ", " + clauses(groups[0], None) + "."
-    else:
-        text = clauses(groups[0], None)
-        if groups[1] and ", while " in text:  # no "while ... but" pile-up: the other side gets its own sentence
-            more = clauses(groups[1], None)
-            text += ". " + more[0].upper() + more[1:] + ", though"
-        elif groups[1]:
-            text += ", but " + clauses(groups[1], groups[0][-1][2], " and ")  # a list of counterpoints
-        text += "."
+        counter = clauses(groups[1], named, " and ")
+        named.append(None)  # a new clause: "they" would point back across the comma
+        text = "even though " + counter + ", " + clauses(groups[0], named, ", and ") + "."
+    elif not groups[1]:
+        text = clauses(groups[0], named, ", while ") + "."
+    elif len({f[2] for f in groups[0]}) == 1:
+        text = clauses(groups[0], named, ", while ") + ", but " + clauses(groups[1], named, ", and ") + "."
+    else:  # both teams already in the first sentence: the other side gets a sentence of its own
+        text = clauses(groups[0], named, ", while ") + ". "
+        named = []
+        more = clauses(groups[1], named, ", and ")
+        text += (more[0].upper() + more[1:] + ", though.") if len({f[2] for f in groups[1]}) == 1 else f"Then again, {more}."
     text = text[0].upper() + text[1:]
     if abs(chances) < 0.025:
-        text = "The two have been about even at out-chancing opponents lately. " + text[0].upper() + text[1:]
+        text = "The two have been about even at out-chancing opponents lately. " + text
     return text
 
 
@@ -258,6 +279,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
     raw_places, places = places, {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
     out = {}
     lineups = chance.get("lineups") or {}
+    nicks = {t: team_words(t, raw_places, "X")["X"] for t in (away, home)}
     for team, opp in ((home, away), (away, home)):
         p = chance["p_home"] if team == home else 1 - chance["p_home"]
         _, heads, caveats = next(b for b in BANDS if p < b[0])
@@ -265,7 +287,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {**team_words(team, raw_places, "T"), **team_words(opp, raw_places, "O"), "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
-                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
+                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, nicks), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
     return out
 
 
@@ -298,12 +320,12 @@ def reveal(season: int, final: list[dict], places: dict) -> dict[int, dict]:
             pct, T, O = round(100 * p), say[team], say[opp]
             # bands on the shown figure, so "60%" is never also "close to even"; 45-55% is a coin flip, 40-44% and 56-59%
             # a lean, under 40% or 60%+ a clear call
-            if won:
-                head = (f"We gave {T} only {_a(pct)} chance, and {T} proved us wrong." if pct < 40 else
-                        f"We had {T} as slight underdogs ({pct}%), and {T} pulled it off." if pct < CLOSE[0] else
-                        f"We had this close to even ({pct}% for {T}), and {T} came through." if pct <= CLOSE[1] else
-                        f"We leaned {T}’s way ({pct}%), and {T} came through." if pct < 60 else
-                        f"We gave {T} {_a(pct)} chance, and {T} delivered.")
+            if won:  # the team is named once a sentence (Sora, 2026-10-15)
+                head = (f"We gave {T} only {_a(pct)} chance, and they proved us wrong." if pct < 40 else
+                        f"We had {T} as slight underdogs ({pct}%), and they pulled it off." if pct < CLOSE[0] else
+                        f"We had this close to even ({pct}% for {T}), and they came through." if pct <= CLOSE[1] else
+                        f"We leaned {T}’s way ({pct}%), and they came through." if pct < 60 else
+                        f"We gave {T} {_a(pct)} chance, and they delivered.")
             else:
                 head = (f"We gave {T} only {_a(pct)} chance, and it went the way we feared." if pct < 40 else
                         f"We had {T} as slight underdogs ({pct}%), and it went {O}’s way." if pct < CLOSE[0] else

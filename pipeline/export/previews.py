@@ -18,6 +18,7 @@ puck drop in raw/previews_live/.
 Reads the site JSON the other exports have just written (fingerprints, lines), so it must run after them.
 """
 import json
+import re
 import zlib
 from functools import lru_cache
 from datetime import date, datetime, timedelta, timezone
@@ -25,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 16  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 17  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -40,6 +41,8 @@ RULES_VERSION = 16  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 #     items, season series counted right, no 33rd of 32 (outside-coverage comparison, 2026-10-14)
 # 15: matchup, rest and goalie-history calls end in team pills like every other call (figures and source in the tooltips)
 # 16: a chattier, hotter voice (Sora, 2026-10-14): more wording per call, hot words only where the numbers are extreme
+# 17: sentence rules (Sora, 2026-10-15): one contrast word per sentence, a team named by place once a sentence, and
+# an edge body never opens by repeating its headline
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -738,7 +741,7 @@ EDGE_SEE = {"volume": "{top} out-attempting {bot} at 5-on-5, usually by about {d
             "suppression": "{top} allowing fewer shot attempts at 5-on-5 than {bot}, usually about {d} fewer."}
 EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, {bot} the other
     "volume": ["{top} will outshoot {bot}", "Volume against patience", "{top} will pepper {bot}"],
-    "quality": ["{top} hunt better looks than {bot}", "Good looks against hopeful ones"],
+    "quality": ["{top} hunt better looks than {bot}", "Picky against trigger-happy"],
     "suppression": ["{top} lock it down, {bot} don’t", "One stingy defense, one leaky one", "A brick wall against a revolving door"],
     "qualityAllowed": ["{top} shut down the dangerous stuff, {bot} don’t", "Sheltered against exposed"],
     "point": ["{top} fire from the point, {bot} work down low", "Two different ideas of a good shot"],
@@ -783,6 +786,18 @@ EDGE_STAKES = {
     "pp": "Every penalty {bot} take could cost them.",
     "pk": "Penalties should hurt {bot} more than {top}.",
 }
+_FILLER = {"the", "a", "an", "and", "but", "of", "to", "in", "on", "is", "are", "for", "their", "they", "it", "mostly", "a lot"}
+
+
+def echoes(head: str, sentence: str) -> bool:
+    """A body sentence that only says the headline again (Sora, 2026-10-15: "The Hurricanes hound the puck, the Jets
+    sit back" over "The Hurricanes hound the puck, but the Jets sit back."): nearly every headline word is in it and
+    it adds hardly anything."""
+    words = lambda t: set(re.findall(r"[a-z’']+", t.lower())) - _FILLER
+    h, b = words(head), words(sentence)
+    return bool(h) and len(h & b) >= 0.6 * len(h) and len(b - h) <= 3
+
+
 EDGE_FAR = 26  # "about as far apart as two teams get" only for ranks this far apart, say 3rd and 29th (Sora, 2026-10-12)
 EDGE_GAP, EDGE_END = 50, 25  # a "hot enough" edge: percentiles 50+ apart, with one team in the top or bottom quarter
 # A filler edge (the widest gap, but not a hot one) is told plainly: the two teams are not at opposite ends of anything.
@@ -835,11 +850,16 @@ def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set
         chk["scale"] = "score"
     w = {"name": ("the " + name) if k in ("pp", "pk") else name, **tw, **bw, "rt": _ordinal(rt["rank"]), "rb": _ordinal(rb["rank"]), "hi": hi, "lo": lo,
          "wt": standing(rt["rank"]), "wb": standing(rb["rank"]), "wbs": short(standing(rb["rank"]))}
+    head = _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w)
+    plain = _fmt(EDGE_PLAIN.get(k, ""), **w)
+    body = _pick(EDGE_BODIES, gid, k, "body")
+    if "{plain}" in body and echoes(head, plain):  # the plain contrast would only repeat the headline
+        body = next(b for b in EDGE_BODIES if "{plain}" not in b)
     return {
         "kind": "edge", "gap": gap(k), "metric": k, "team": top, "opp": bot,
-        "head": _fmt(_pick(EDGE_HEADS[k] if hot else EDGE_MILD_HEADS, gid, k), **w),
-        "body": _fmt((_pick(EDGE_BODIES, gid, k, "body") + (" They’re about as far apart as two teams get." if abs(rt["rank"] - rb["rank"]) >= EDGE_FAR else "") + " " + EDGE_STAKES.get(k, "Expect that gap to show."))
-                     if hot else (EDGE_SMALL_BODY if gap(k) < EDGE_SMALL else EDGE_MILD_BODY) + EDGE_WHY.get(k, ""), plain=_fmt(EDGE_PLAIN.get(k, ""), **w), **w),
+        "head": head,
+        "body": _fmt((body + (" They’re about as far apart as two teams get." if abs(rt["rank"] - rb["rank"]) >= EDGE_FAR else "") + " " + EDGE_STAKES.get(k, "Expect that gap to show."))
+                     if hot else (EDGE_SMALL_BODY if gap(k) < EDGE_SMALL else EDGE_MILD_BODY) + EDGE_WHY.get(k, ""), plain=plain, **w),
         "nums": f"{_cap(name)}: {places[top]} {w['rt']}, {places[bot]} {w['rb']}",
         "chips": [chip(top, k, rt, places, cite), chip(bot, k, rb, places, cite)] if k in CHIP else [],
         "gist": _fmt(EDGE_PLAIN[k] if hot and k in EDGE_PLAIN else "{top} have the edge over {bot} on {name}.", **w),
