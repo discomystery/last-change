@@ -44,7 +44,7 @@ RULES_VERSION = 19  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 17: sentence rules (Sora, 2026-10-15): one contrast word per sentence, a team named by place once a sentence, and
 # an edge body never opens by repeating its headline
 # 18: a projected starting goalie is named where a call or note would say "their goalie" (Sora, 2026-10-15)
-# 19: more fun headlines in every call pool, in the style of "Unstoppable force, meet immovable object" (Sora, 2026-10-15)
+# 19: more fun headlines in every call pool (Sora, 2026-10-15), trimmed by her notes, with "vs." for contrasts ("Strength vs. strength")
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -176,7 +176,7 @@ CLASH_WORDS = {
     ),
     "pp": (
         ["{Xp} power play has a target", "Penalties could cost {Y}", "Special teams lean toward {X}", "{Y} can’t afford to take penalties",
-         "Stay out of the box, {Yn}", "For {Y}, the penalty box is lava"],
+         "Stay out of the box, {Yn}"],
         ["{Xp} power play is {xw}, and {Yp} kill is {yw}. Every trip to the box hurts {Y} more than most.",
          "{Yp} penalty kill is {yw}, and {Xp} power play is {xw}. Discipline matters more than usual for {Y} tonight.",
          "*{Xp} power play is one of the league’s best, and {Yp} kill is {yw}. {Y} need to stay out of the box."],
@@ -184,10 +184,9 @@ CLASH_WORDS = {
 }
 PACE_WORDS = {
     "fast": (["Expect a track meet", "Shots should fly both ways", "Nobody’s sitting back in this one", "Buckle up", "Bring popcorn", "Run and gun",
-                      "Pond hockey, NHL edition"],
+                      "Pond hockey"],
              "{Ac} plays some of the league’s fastest games, and so does {Hc}. We think this one runs hotter than either team’s usual."),
-    "slow": (["Expect a grind", "Bring a pillow", "Don’t blink and you still might miss the shots", "Trench warfare", "Every inch will be earned",
-              "Chess, not checkers", "Low and slow", "A grinder’s delight"],
+    "slow": (["Expect a grind", "Bring a pillow", "Shots will be scarce", "Trench warfare", "A grinder’s delight"],
              "{Ac} plays some of the league’s slowest games, and so does {Hc}. We think this one is even quieter than either team’s usual."),
 }
 # The gist of each call, one short sentence with no numbers, for the story at the top of the page.
@@ -212,8 +211,8 @@ def standing(rank: int) -> str:
             else "around the middle of the league" if rank <= 22 else "near the bottom of the league" if rank <= 27
             else "one of the league’s worst" if rank <= 31 else "the league’s worst")
 PHYSICAL_HEADS = ["Bodies will fly", "This one’s going to leave marks", "Two of the league’s heaviest-hitting teams",
-                  "Keep your head up", "Ice packs on standby", "Old-time hockey", "Not for the faint of heart",
-                  "Bring your mouthguard", "Heavy hockey on the menu"]
+                  "Keep your head up", "Ice packs on standby", "Old-time hockey",
+                  "Bring your mouthguard", "Heavyweight bout"]
 TOP = 5  # "among the best" wording needs a top-five rank
 BOTH = 70  # both teams at or above this percentile (or both at or below 100 - BOTH) for a pace or physical call
 
@@ -229,10 +228,8 @@ DUELS = {  # offense trait: (defense trait, weights, what the offense does, what
     "pp": ("pk", (0.897, 0.589), "the power play", "the penalty kill"),
 }
 DUEL_BAR = 75  # both teams at or above this percentile
-DUEL_HEADS = ["Something has to give", "Strength against strength", "The matchup inside the matchup", "Best against best",
-              "Unstoppable force, meet immovable object", "Heavyweight bout",
-              "Clash of the titans", "Fire meets ice", "Sword against shield", "Iron sharpens iron", "Two titans, one sheet of ice",
-              "Who blinks first?"]
+DUEL_HEADS = ["Something has to give", "Strength vs. strength", "The matchup inside the matchup", "Best vs. best",
+              "Unstoppable force vs. immovable object", "Clash of the titans", "Iron sharpens iron", "Who blinks first?"]
 DUEL_LEAN = {  # who we side with
     "offense": ["We think {X} still get theirs.", "Our lean: {Xp} {oname} wins out.", "We’ll side with {X}.",
                 "Hot take: {X} break through anyway."],
@@ -271,9 +268,9 @@ MATCHUP_WORDS = {
              "{Coach} has been chasing an easier matchup for the team’s scorers."),
     "shadow": (["A shadow job for {mine}", "{H} will send their checkers at {Ostar}", "{Ostar} gets company tonight", "Nowhere to hide for {Ostar}"],
                "{Coach} has been using this group as a checking line on {theirline}."),
-    "best": (["Best on best: {Hstar} against {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power against power", "Stars collide: {Hstar} against {Ostar}"],
+    "best": (["Best on best: {Hstar} vs. {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power vs. power", "Stars collide: {Hstar} vs. {Ostar}"],
              "{Coach} has been choosing strength on strength."),
-    "even": (["{H} like {Hstar}’s line against {Ostar}’s", "Like for like: {Hstar} against {Ostar}"],
+    "even": (["{H} like {Hstar}’s line against {Ostar}’s", "Like for like: {Hstar} vs. {Ostar}"],
              "{Coach} keeps choosing line for line."),
     "pair": (["{mine} get the {Ostar} assignment", "{H} will send {mine} at {Ostar}", "A tough night ahead for {Ostar}"],
              "{Coach} has been picking a defense pair for {theirline}."),
@@ -286,7 +283,7 @@ HISTORY_MIN_STARTS, HISTORY_MIN_SHOTS, HISTORY_GAP = 5, 120, 0.03  # save-percen
 HISTORY_HEADS = {"good": ["Don’t buy {Gp} record against {O}", "{Gp} hold on {O} won’t last", "{G} doesn’t own {O}",
                           "{Gp} spell over {O} is a myth"],
                  "bad": ["{G} is due against {O}", "Don’t buy {Gp} slump against {O}", "{O} don’t own {G}",
-                         "There’s no curse: {G} against {O}", "{G} gets another crack at {O}"]}
+                         "There’s no curse: {G} vs. {O}", "{G} gets another crack at {O}"]}
 # A hotter take than "it's a coincidence" (Sora, 2026-10-12): say what to expect instead.
 HISTORY_BODIES = {
     "good": ["{G} has been a wall against {O} since 2023-24, well above his usual. But three seasons of data say a goalie’s record "
@@ -749,18 +746,18 @@ EDGE_SCORE_CALL = {"volume": "{topp} shot volume score is higher than {botp}.", 
 EDGE_SEE = {"volume": "{top} out-attempting {bot} at 5-on-5, usually by about {d}.",
             "suppression": "{top} allowing fewer shot attempts at 5-on-5 than {bot}, usually about {d} fewer."}
 EDGE_HEADS = {  # {top} is the team at the better (or higher) end of the scale, {bot} the other
-    "volume": ["{top} will outshoot {bot}", "Volume against patience", "{top} will pepper {bot}", "{top} shoot first and ask questions later"],
-    "quality": ["{top} hunt better looks than {bot}", "Picky against trigger-happy", "Patience against spray-and-pray"],
-    "suppression": ["{top} lock it down, {bot} don’t", "One stingy defense, one leaky one", "A brick wall against a revolving door", "Stingy against generous"],
-    "qualityAllowed": ["{top} shut down the dangerous stuff, {bot} don’t", "Sheltered against exposed", "Fort Knox against an open door"],
+    "volume": ["{top} will outshoot {bot}", "Volume vs. patience", "{top} will pepper {bot}", "{top} shoot first and ask questions later"],
+    "quality": ["{top} hunt better looks than {bot}", "Picky vs. trigger-happy", "Patience vs. spray-and-pray"],
+    "suppression": ["{top} lock it down, {bot} don’t", "One stingy defense, one leaky one", "A brick wall vs. a revolving door", "Stingy vs. generous"],
+    "qualityAllowed": ["{top} shut down the dangerous stuff, {bot} don’t", "Sheltered vs. exposed"],
     "point": ["{top} fire from the point, {bot} work down low", "Two different ideas of a good shot"],
-    "dShots": ["{topp} defense joins the attack, {botp} stays home", "Active D against forward-led", "Rovers on the blue line against stay-at-homes"],
-    "inClose": ["{top} get in close, {bot} shoot from distance", "In close against from distance", "Crash the net against bombs away"],
-    "forecheck": ["{top} hound the puck, {bot} sit back", "Forecheck against patience", "{top} hunt in packs"],
-    "physical": ["Bruisers against finesse", "{top} hit, {bot} mostly don’t", "{bot} better keep their heads up", "Sandpaper against silk"],
-    "depth": ["{top} roll four lines, {bot} lean on their top six", "Depth against star power", "Strength in numbers for {top}"],
-    "pp": ["One power play bites, one doesn’t", "{topp} power play outclasses {botp}", "{topp} power play is a weapon", "One power play has teeth"],
-    "pk": ["{top} kill penalties far better than {bot}", "Airtight against leaky on the kill", "One kill is a fortress"],
+    "dShots": ["{topp} defense joins the attack, {botp} stays home", "Active D vs. forward-led", "Rovers on the blue line vs. stay-at-homes"],
+    "inClose": ["{top} get in close, {bot} shoot from distance", "In close vs. from distance", "Crash the net vs. bombs away"],
+    "forecheck": ["{top} hound the puck, {bot} sit back", "Forecheck vs. patience", "{top} hunt in packs"],
+    "physical": ["Bruisers vs. finesse", "{top} hit, {bot} mostly don’t", "{bot} better keep their heads up"],
+    "depth": ["{top} roll four lines, {bot} lean on their top six", "Depth vs. star power", "Strength in numbers for {top}"],
+    "pp": ["One power play bites, one doesn’t", "{topp} power play outclasses {botp}", "{topp} power play is a weapon"],
+    "pk": ["{top} kill penalties far better than {bot}", "Airtight vs. leaky on the kill"],
 }
 # Each edge told as a plain contrast first (Sora, 2026-10-12: "Vegas' defensemen shoot a lot, LA's not so much"), with
 # "but" so the two halves read as against each other.
@@ -933,8 +930,8 @@ def tempo_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list
 # per 60. The call: the rested team gets a bigger share of the 5-on-5 chances than it usually does (held 59% of the
 # time, against 50% for any team). Both teams on a back-to-back made no difference, and neither did time zones crossed
 # or the first home game after a long road trip.
-REST_HEADS = ["{T} played last night", "Fresh legs against tired ones", "Second night of a back-to-back for {T}", "{R} come in rested",
-              "Tired legs for {T}", "{T} are running on fumes", "The schedule did {T} no favors"]
+REST_HEADS = ["{T} played last night", "Fresh legs vs. tired ones", "Second night of a back-to-back for {T}", "{R} come in rested",
+              "Tired legs for {T}", "The schedule did {T} no favors"]
 REST_BODIES = [
     "{T} played last night and get no rest before this one. Teams in that spot usually get the worse of the chances, so we expect {R} to control more of the play than they usually do.",
     "It’s {Tp} second game in two nights. Teams on the back end of those usually spend more time defending, so we think {R} get more of the play than usual.",
