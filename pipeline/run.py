@@ -48,7 +48,7 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, rosters
+    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, records, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
@@ -81,6 +81,8 @@ def update(season: int) -> dict:
     if season == CURRENT_SEASON:
         out["careers"] = careers.update(season)  # NHL career history for the page intros, a capped batch per run
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
+        out["records"] = records.update()  # franchise all-time scoring lists from records.nhl.com, weekly
+        out["league_lists"] = records.league_update(season)  # NHL all-time lists, a snapshot each update, for post-game stories
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
     if season == CURRENT_SEASON:

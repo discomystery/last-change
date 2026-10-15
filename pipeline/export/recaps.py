@@ -254,6 +254,13 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
                     "usual": f"{base}%", "tonight": "–"}
         sec = matchup_seconds(S, gid, chk)
         total = sum(sec.values())
+        whole, part = unit_together(S, gid, chk)
+        if part and whole < BROKEN_SHARE * part and whole < BROKEN_SEC:
+            # The coach broke the group up (eye test, 2026-10-14: Washington's "L1 (Wilson, Tuch, Strome)" was graded
+            # missed while the same page said Tuch and Strome had moved to a new line with Kyrou)
+            return {"verdict": "na", "happened": f"{team} broke up that {'pair' if len(chk['unit_ids']) == 2 else 'line'} tonight: {names} were together for only "
+                                                 f"{clock(whole)} at 5-on-5, so the matchup this call described never really happened.",
+                    "usual": f"{base}%", "tonight": "–"}
         if total < MIN_MATCHUP_SEC:
             return {"verdict": "na", "happened": f"{team}’s {chk['unit']} ({names}) spent only {clock(total)} against {opp_place}’s usual lines, too little to judge.",
                     "usual": f"{base}%", "tonight": "–"}
@@ -337,6 +344,27 @@ def measure_history(claim: dict, glines: list) -> dict:
     return {"verdict": verdict,
             "happened": f"{g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
             "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None, "_v": sv, "_name": g["name"]}
+
+
+BROKEN_SHARE = 0.4  # a group whose players were all out together for under this share of the time it was counted ...
+BROKEN_SEC = 300  # ... and under five minutes in all was broken up for the night
+
+
+def unit_together(S: Season, gid: int, chk: dict) -> tuple[float, float]:
+    """5v5 seconds (all of the home group together, at least the matchup's share of it together) in this game."""
+    g = S.games[gid]
+    unit = set(chk["unit_ids"])
+    need = 2 if len(unit) == 3 else 1
+    st = S.stints.filter((pl.col("game_id") == gid) & (pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null())
+    side = "home_skaters" if chk["team"] == g["home"] else "away_skaters"
+    whole = part = 0.0
+    for mine, d in st.select(side, "duration").iter_rows():
+        n = len(unit & set(mine))
+        if n >= need:
+            part += d
+        if n == len(unit):
+            whole += d
+    return whole, part
 
 
 def matchup_seconds(S: Season, gid: int, chk: dict) -> dict[str, float]:

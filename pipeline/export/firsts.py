@@ -30,7 +30,9 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, RAW, REGULAR, SITE_DATA, TABLES
 
 WEIGHT = {"first_goal": 90, "milestone": 85, "debut": 80, "return": 70, "first_point": 65, "club_debut": 62, "club_goal": 60}
-RETURN_GAMES = 10  # team games missed before a return is told
+RETURN_GAMES = 5  # team games a regular missed before a mid-season return is told (10 until 2026-10-15; a regular rarely sits)
+SEASON_DEBUT_GAMES = 2  # ... and before a regular's first game of the season is told
+DEPTH_DEBUT_GAMES = 3  # a depth player's season debut: only when he scored, after this many team games
 LONG_AWAY_DAYS = 300  # past this, "his first NHL game since <date>" instead of a count
 GOALIE_RETURN_GAMES = 30  # a goalie back in net: told by the date of his last game, after this many team games
 REGULAR_F, REGULAR_D = 14 * 60, 18 * 60  # a return is told for a regular: this much ice time a game in his last ten
@@ -188,11 +190,18 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                 fresh = opened is not None and last_day < opened  # back after the summer: count this season's games only
                 span = G.filter((pl.col("season") == season) if fresh else (pl.col("date") > last_day))
                 missed = span.filter((pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
-                if missed >= RETURN_GAMES:
+                # a regular's first game of the season is news after any wait (eye test, 2026-10-14: Bedard's and
+                # McAvoy's returns after six games led NHL.com and went untold); mid-season, after RETURN_GAMES
+                if missed >= (SEASON_DEBUT_GAMES if fresh else RETURN_GAMES):
                     from datetime import date as Date
                     days = (Date.fromisoformat(day) - Date.fromisoformat(last_day)).days
                     out.append({**item, "kind": "return", "missed": missed, "since": last_day if days >= LONG_AWAY_DAYS else None,
-                                "season_debut": fresh})
+                                "season_debut": fresh, "points": pts_now})
+            elif prev.height and g_now and mine.is_empty():  # a depth player's season debut, told when he scored
+                opened = G.filter(pl.col("season") == season)["date"].min()  # (Miroshnichenko, 2026-10-14)
+                missed = G.filter((pl.col("season") == season) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
+                if opened is not None and missed >= DEPTH_DEBUT_GAMES:
+                    out.append({**item, "kind": "return", "missed": missed, "since": None, "season_debut": True, "points": pts_now})
     starts = _goalie_starts(season).get(gid, [])
     team_of = {game["home_id"][0]: game["home"][0], game["away_id"][0]: game["away"][0]}
     for pid, tid in starts:
@@ -210,6 +219,15 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         earlier = [x for k, v in _goalie_starts(season).items() if k < gid for x in v if x[0] == pid]
         if not earlier:
             out.append({"pid": pid, "team": team_of.get(tid), "kind": "debut", "goalie": True})
+    debuts = {x["pid"] for x in out if x["kind"] in ("club_debut", "debut")}  # a new club's debut says it already
+    out = [x for x in out if not (x["kind"] == "return" and x["pid"] in debuts)]
+    stars = {}
+    if any(x["kind"] == "return" for x in out):
+        from pipeline.metrics import relevancy
+        stars = relevancy.standouts(season, day)
     for x in out:
         x["weight"] = WEIGHT[x["kind"]]
+        if x["kind"] == "return" and not x.get("goalie"):  # a star back leads (Bedard, McAvoy); a depth player's season
+            x["weight"] = 88 if x["pid"] in stars else 70 if not x.get("season_debut") else 68 if x.get("goals") else 55
+            # (a depth player's season debut comes after club firsts)
     return sorted(out, key=lambda x: -x["weight"])

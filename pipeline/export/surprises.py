@@ -93,6 +93,35 @@ def spreads() -> dict[str, np.ndarray]:
     return out
 
 
+@lru_cache(maxsize=1)
+def pp_levels() -> tuple[np.ndarray, np.ndarray]:
+    """(team's season power-play level, that night's rate) for every past team-game with enough power-play time."""
+    w = adjust.weights()
+    lv, val = [], []
+    for season in FULL_SEASONS:
+        for (_,), g in team_style.per_game(season, w).group_by("team_id"):
+            v = np.array([x for x in map(_pp, g.to_dicts()) if x is not None])
+            if len(v) > 5:
+                lv += [float(v.mean())] * len(v)
+                val += list(v)
+    return np.array(lv), np.array(val)
+
+
+def pp_tail(usual: float, x: float) -> float:
+    """How often a power play at this level has a night this far out, from teams at about the same level. A night at
+    or near zero is far rarer for an elite power play than for a poor one, but not "less than once in a thousand":
+    measured against every team, Vegas's chanceless two power plays at Nashville read that way, when about one in 400
+    nights for power plays as good as theirs does it (eye test, 2026-10-14)."""
+    lv, val = pp_levels()
+    near = np.abs(lv - usual) <= PP_NEAR
+    v = val[near] if near.sum() >= 200 else val
+    n = (v <= x).sum() if x < usual else (v >= x).sum()
+    return max(float(n), 0.5) / len(v)
+
+
+PP_NEAR = 1.5  # expected goals per 60: teams this close to a power play's level are its comparison
+
+
 def sd(k: str) -> float:
     return float(np.std(spreads()[k]))
 
@@ -111,15 +140,18 @@ def z_of(k: str, dev: float) -> float:
 
 def every(k: str, dev: float) -> int:
     """About how many team-games go by between departures this big in this direction, rounded to a friendly number."""
-    n = 1 / tail(k, dev)
+    return _friendly(1 / tail(k, dev))
+
+
+def _friendly(n: float) -> int:
     for step in (1, 5, 10, 25, 50, 100):
         if n < step * 10:
             return max(2, int(round(n / step) * step))
     return int(round(n, -2))
 
 
-def rarity(k: str, dev: float) -> str:
-    n = every(k, dev)
+def rarity(k: str, dev: float, share: float | None = None) -> str:
+    n = every(k, dev) if share is None else _friendly(1 / share)
     # A team plays 82 games, so "once every 100+" is rarer than once a season for any one club (Sora, 2026-10-14: say
     # how rare it really is, the way a fan would).
     tail_ = " That’s rarer than once a season for any one team." if n >= 100 else ""
@@ -406,6 +438,8 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
         return None
     e = usual if expected is None else expected
     z = z_of(kind, x - e)
+    if kind == "pp":  # the same rarity the sentence quotes
+        z = float(np.sign(x - e) * NormalDist().inv_cdf(1 - min(0.5, pp_tail(usual, x))))
     s, own, opp, why = standing(kind, t, o, fp, places, season) if fp else (None, 0.0, 0.0, [])
     cls = classify(e, x, league, sd(kind), s, own, opp)
     if kind in NEUTRAL and cls in ("worse", "better"):
@@ -438,7 +472,7 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
         fig = f"{T}’s bottom-six forwards played {x:.0f}% of the forwards’ 5-on-5 time, {rest}"
         short = f"the bottom six played {x:.0f}% of the forwards’ 5-on-5 time, {rest}"
         cat = "lineup"
-    body = compose(cls, why, fig, short, rarity(kind, x - e), BRIDGE[kind][0 if up else 1], who=T)
+    body = compose(cls, why, fig, short, rarity(kind, x - e, pp_tail(usual, x) if kind == "pp" else None), BRIDGE[kind][0 if up else 1], who=T)
     return _item(cat, abs(z) * (DEPTH_WEIGHT if kind == "depth" else 1.0), cls, head, body, (kind, t, up))
 
 

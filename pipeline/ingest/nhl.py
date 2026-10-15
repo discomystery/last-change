@@ -3,8 +3,12 @@
 Final games are fetched once and never again, except a shift chart that stops before the end of the game: the NHL
 fills shift charts in during and after play, so one saved soon after the final horn can be missing the last minutes
 (2026-10-10: CAR at CHI stopped at 13:05 of the third, PHI at BOS at 16:58). Those are fetched again on later runs
-until they cover the whole game. Raw responses are stored gzipped, untouched.
+until they cover the whole game. The play-by-play and boxscore are fetched once more after the game has settled
+(`SETTLE_HOURS` after puck drop): the NHL edits them after the horn (2026-10-14: DAL at COL's coach's challenge was
+saved as a plain offside and only later marked as a challenge that took a goal off; 9 of 18 games that week changed).
+Raw responses are stored gzipped, untouched.
 """
+from datetime import datetime, timedelta, timezone
 import gzip
 import json
 from pathlib import Path
@@ -77,17 +81,44 @@ def season_games(season: int, *, refresh: bool = False) -> list[dict]:
     return rows
 
 
-def fetch_game(season: int, game_id: int) -> int:
+SETTLE_HOURS = 6  # after puck drop, when a game's play-by-play and boxscore are fetched one last time
+SETTLE_DAYS = 14  # only games this recent are settled (older ones were saved long after the edits)
+
+
+def _settled_path(season: int) -> Path:
+    return RAW / str(season) / "settled.json"
+
+
+def _settled(season: int) -> set[int]:
+    p = _settled_path(season)
+    return set(json.loads(p.read_text())) if p.exists() else set()
+
+
+def settle_due(season: int, game_id: int, start_utc: str | None, now: datetime | None = None) -> bool:
+    """True when a saved final game's play-by-play should be fetched once more: it started SETTLE_HOURS ago or more,
+    within the last SETTLE_DAYS, and has not been settled yet."""
+    if not start_utc or not raw_path(season, "pbp", game_id).exists() or game_id in _settled(season):
+        return False
+    now = now or datetime.now(timezone.utc)
+    start = datetime.fromisoformat(start_utc.replace("Z", "+00:00"))
+    return timedelta(hours=SETTLE_HOURS) <= now - start <= timedelta(days=SETTLE_DAYS)
+
+
+def fetch_game(season: int, game_id: int, start_utc: str | None = None) -> int:
     """Download whatever is missing for one final game. Returns the number of requests made."""
     made = 0
     fresh = False  # the shift chart was fetched in this call
+    settle = settle_due(season, game_id, start_utc)
     for kind, url in KINDS.items():
         path = raw_path(season, kind, game_id)
-        if path.exists() and not (kind == "shifts" and _unfinished(season, game_id)):
+        if path.exists() and not (kind == "shifts" and _unfinished(season, game_id)) and not (settle and kind in ("pbp", "box")):
             continue
         _write(path, get(url(game_id)).json())
         made += 1
         fresh = fresh or kind == "shifts"
+    if settle:
+        done = _settled(season) | {game_id}
+        _settled_path(season).write_text(json.dumps(sorted(done)))
     # The shift-chart API sometimes returns nothing, an unfinished chart, or a chart that disagrees with the rest of the
     # game file; fall back to the official HTML reports, fetched again while they too stop short.
     backup = raw_path(season, "shifts_html", game_id)
@@ -243,5 +274,5 @@ def ingest_season(season: int, *, refresh_schedule: bool = False, limit: int | N
     games = [g for g in season_games(season, refresh=refresh_schedule) if g["state"] in FINAL_STATES]
     if limit:
         games = games[:limit]
-    requests = sum(fetch_game(season, g["game_id"]) for g in games)
+    requests = sum(fetch_game(season, g["game_id"], g.get("start_utc")) for g in games)
     return {"season": season, "final_games": len(games), "requests": requests}
