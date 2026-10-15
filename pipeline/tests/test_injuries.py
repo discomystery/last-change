@@ -19,7 +19,8 @@ def test_classify():
     assert classify(e("Suspension", "OUT", "Suspension"), 2026) == ("suspended", None)
     assert classify(e("Injured Reserve", "IR-NR", "Suspension"), 2026) == ("suspended", None)
     assert classify(e("Injured Reserve", "IR-NR", "Personal"), 2026) == ("personal", None)
-    assert classify(e("Out", "OUT", "Contract Dispute"), 2026) is None
+    assert classify(e("Out", "OUT", "Contract Dispute"), 2026) == ("unsigned", None)
+    assert classify(e("Injured Reserve", "IR-NR", "Contract Dispute"), 2026) == ("unsigned", None)
 
 
 def test_injury_words():
