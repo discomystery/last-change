@@ -271,6 +271,43 @@ def _elsewhere(season: int, day: str, teams: tuple[str, str]) -> set[int]:
     return set(av["player_id"].to_list()) - here
 
 
+OUT_SHORT = {"season": "out for the season", "long": "out long term", "ir": "on injured reserve", "week": "week to week",
+             "day": "day to day", "suspended": "suspended", "personal": "personal reasons"}
+
+
+def _out_why(r: dict | None) -> str:
+    """A few words on what the league has said about a player who is out, for "(calf tear, out 1-2 months)"; empty when
+    nothing has been reported. Never a reason the league has not given."""
+    if not r or r.get("status") not in REPORTED_OUT:
+        return ""
+    if r["status"] in ("suspended", "personal"):
+        return OUT_SHORT[r["status"]]
+    from pipeline.export import changes
+    bits = [changes._injury(r.get("report_injury")).strip(" ()")]
+    tl = r.get("report_timeline")
+    bits.append(tl if tl and r.get("report_status") == "long" and not tl.lower().startswith(("week", "day"))
+                else OUT_SHORT.get(r.get("report_status") or "", ""))
+    return ", ".join(b for b in bits if b)
+
+
+def _merge_out(outs: list[dict], reported: dict[int, dict], N: dict) -> dict:
+    """One "Out" item per team: the most important absence told in full, everyone else named after it ("Jordan Staal
+    (calf tear, out 1-2 months) and Taylor Hall (upper-body injury) are also out."). Two items a game used to be the cap
+    for the tag, so a club's third or fourth absence never showed (Sora, 2026-10-15: Staal and Hall in WPG-CAR)."""
+    outs = sorted(outs, key=lambda o: -o["score"])
+    lead = outs[0]
+    if len(outs) == 1:
+        return lead
+    rest = []
+    for o in outs[1:]:
+        r = reported.get(o["pid"])
+        who = N.get(o["pid"]) or o["text"].split(" is ")[0].split(" has")[0]
+        why = _out_why(r)
+        rest.append(f"{who} ({why})" if why else who)
+    text = f"{lead['text']} {_and(rest)} {'is' if len(rest) == 1 else 'are'} also out."
+    return {**lead, "text": text, "pids": [o["pid"] for o in outs]}
+
+
 @lru_cache(maxsize=8)
 def _out_notes(season: int, day: str) -> dict[str, list[dict]]:
     """The team page's "Out" notes (export/changes.py) as of `day`: regulars and stars, most important first."""
@@ -400,8 +437,8 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
     for t, o in ((away, home), (home, away)):
         skip = set(reported.get(t, {}))
         out["out"] |= skip
-        told = []
-        for k, n in enumerate(notes.get(t, [])[:2]):
+        told, team_out = [], []
+        for k, n in enumerate(notes.get(t, [])):
             text = n["text"].split(" He is ")[0] + (" He is " + n["text"].split(" He is ")[1].split(".")[0] + "." if " He is " in n["text"] else "")
             if N.get(n["pid"]) and text.startswith(n["player"]):  # the team page's short names, written out in full
                 text = N[n["pid"]] + text[len(n["player"]):]
@@ -415,7 +452,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                         f"{who} has missed the last {num(gone)} games." if gone > 1 else f"{who} missed their last game.") \
                     + (" He is" + text.split(" He is", 1)[1] if " He is" in text else "")
             out["out"].add(n["pid"])
-            items.append({"tag": "Out", "text": text, "score": 76 - k, "pid": n["pid"]})
+            team_out.append({"tag": "Out", "text": text, "score": 76 - k, "pid": n["pid"]})
             told.append(n["pid"])
         n_games = len(results(G, t, season))
         keepers = _starters_out(season, day, tids.get(t, -1), reported.get(t, {}))
@@ -447,7 +484,9 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
             if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
                 text += f" {N[nxt[0]]} is expected to start."
-            items.append({"tag": "Out", "text": text, "score": 70 + 20 * r["share"], "pid": r["player_id"]})
+            team_out.append({"tag": "Out", "text": text, "score": 70 + 20 * r["share"], "pid": r["player_id"]})
+        if team_out:
+            items.append(_merge_out(team_out, reported.get(t, {}), N))
         roster = [p for p, team in cur.items() if team == t and p not in skip]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))

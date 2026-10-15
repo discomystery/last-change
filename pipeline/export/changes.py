@@ -68,20 +68,22 @@ def _roles(season: int, before: str | None = None) -> dict[int, dict[int, dict]]
         if f.exists():
             g = pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date")
             frames.append(pl.read_parquet(f).filter(pl.col("pos") != "G").join(g, on="game_id").with_columns(season=pl.lit(s))
-                          .select("season", "date", "team_id", "player_id", "pos", "sec", "sec5"))
+                          .select("season", "date", "team_id", "player_id", "pos", "sec", "sec5", "sec_pp"))
     pg = pl.concat(frames)
     if before:
         pg = pg.filter((pl.col("season") < season) | (pl.col("date") < before))
-    now = pg.filter(pl.col("season") == season).group_by("team_id", "player_id").agg(pl.len().alias("gp"), pl.col("sec").mean(), pl.col("sec5").mean(), pl.col("pos").last())
+    now = pg.filter(pl.col("season") == season).group_by("team_id", "player_id").agg(pl.len().alias("gp"), pl.col("sec").mean(), pl.col("sec5").mean(), pl.col("sec_pp").mean(), pl.col("pos").last())
     old = (pg.filter(pl.col("season") == season - 1).sort("date").group_by("team_id", "player_id")
-           .agg(pl.len().alias("gp"), pl.col("sec").tail(25).mean(), pl.col("sec5").tail(25).mean(), pl.col("pos").last()))
+           .agg(pl.len().alias("gp"), pl.col("sec").tail(25).mean(), pl.col("sec5").tail(25).mean(), pl.col("sec_pp").tail(25).mean(), pl.col("pos").last()))
     old = old.filter(pl.col("gp") >= 20)
     both = pl.concat([now.filter(pl.col("gp") >= 3), old.join(now.filter(pl.col("gp") >= 3), on=["team_id", "player_id"], how="anti")])
     out: dict[int, dict[int, dict]] = {}
     for (tid,), t in both.group_by(["team_id"]):
         rows = t.with_columns(grp=pl.when(pl.col("pos") == "D").then(pl.lit("D")).otherwise(pl.lit("F")),
                               worth=pl.col("player_id").replace_strict(rate, default=0.0, return_dtype=pl.Float64) * pl.col("sec5") / 3600)
-        rows = rows.with_columns(toi_rank=pl.col("sec").rank("ordinal", descending=True).over("grp"),
+        # Ranked by 5-on-5 plus power-play time, as lines are numbered (metrics/units._player_weight): all-situations time
+        # lifted penalty killers and dropped Taylor Hall, on Carolina's second line, to 10th (Sora, 2026-10-15).
+        rows = rows.with_columns(toi_rank=(pl.col("sec5") + pl.col("sec_pp")).rank("ordinal", descending=True).over("grp"),
                                  worth_rank=pl.col("worth").rank("ordinal", descending=True))
         out[tid] = {r["player_id"]: r for r in rows.iter_rows(named=True)}
     return out
@@ -105,7 +107,7 @@ def _matters(role: dict | None, team_size: int) -> str | None:
 def _injury(text: str | None) -> str:
     if not text or "undisclosed" in text:
         return ""
-    return f" ({text})" if text.endswith(("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue")) else f" ({text} injury)"
+    return f" ({text})" if text.endswith(("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear")) else f" ({text} injury)"
 
 
 def _status_text(r: dict, now_games: int) -> str:

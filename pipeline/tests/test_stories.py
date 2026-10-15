@@ -65,3 +65,18 @@ def test_goal_streaks_lead():
     assert stories.streak_text(3, 7, 10) == "a point in seven straight games, with a goal in each of the last three"
     assert stories.streak_text(2, 6, 10) == "a point in six straight games"
     assert stories.streak_text(3, 3, 9, " against Dallas") == "scored in three straight games against Dallas"
+
+
+def test_a_clubs_absences_share_one_out_item():
+    """Sora, 2026-10-15: Staal and Hall were left out of WPG-CAR because two "Out" items a game was the cap."""
+    rep = {2: {"status": "injured", "report_status": "out", "report_injury": "upper-body", "report_timeline": None},
+           3: {"status": "injured", "report_status": "long", "report_injury": "calf tear", "report_timeline": "out 1-2 months"}}
+    N = {1: "Seth Jarvis", 2: "Taylor Hall", 3: "Jordan Staal"}
+    outs = [{"tag": "Out", "text": "Seth Jarvis has not played this season.", "score": 76, "pid": 1},
+            {"tag": "Out", "text": "Taylor Hall is out.", "score": 75, "pid": 2},
+            {"tag": "Out", "text": "Jordan Staal is out long term.", "score": 74, "pid": 3}]
+    item = stories._merge_out(outs, rep, N)
+    assert item["text"] == ("Seth Jarvis has not played this season. Taylor Hall (upper-body injury) and "
+                            "Jordan Staal (calf tear, out 1-2 months) are also out.")
+    assert item["pids"] == [1, 2, 3] and item["pid"] == 1
+    assert stories._merge_out(outs[:1], rep, N) == outs[0]
