@@ -37,7 +37,7 @@ def _x(a, ahead=(), level=(), below=()):
 
 
 def _board(t):
-    return [("..." if r.get("gap") else f"{'T-' if r['tied'] else ''}{r['rank']} {r['who']}") for r in t["rows"]]
+    return [f"{'T-' if r['tied'] else ''}{r['rank']} {r['who']}" for r in t["rows"]] + [f"+{r['who']}" for r in t["tied"]]
 
 
 def test_board_leader_shows_two_below():
@@ -53,12 +53,12 @@ def test_board_third_shows_one_two_three():
 def test_board_far_down_next_up_and_below():
     ahead = [(f"P{i}", 900 - i) for i in range(31)]
     t = record_book.tile(_x(824, ahead=ahead, below=[("Q", 820), ("R", 810)]), "McDavid")
-    assert _board(t) == ["...", "31 P30", "32 McDavid", "33 Q"]
+    assert _board(t) == ["31 P30", "32 McDavid", "33 Q"]
 
 
 def test_board_ties_one_name_and_more():
     ahead = [(f"P{i}", 30 - i) for i in range(8)]
     t = record_book.tile(_x(17, ahead=ahead, level=["A", "B", "C"], below=[("D", 16)]), "McDavid")
-    assert _board(t) == ["...", "8 P7", "T-9 McDavid", "T-9 A", "T-9 2 more"]
+    assert _board(t) == ["8 P7", "T-9 McDavid", "T-9 A", "+B", "+C"]
     t = record_book.tile(_x(18, ahead=[("Draisaitl", 20)], level=["Crosby", "Marchand"], below=[("Scheifele", 17)]), "Aho")
-    assert _board(t) == ["1 Draisaitl", "T-2 Aho", "T-2 Crosby", "T-2 Marchand"]
+    assert _board(t) == ["1 Draisaitl", "T-2 Aho", "T-2 Crosby", "+Marchand"]

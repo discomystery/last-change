@@ -4,8 +4,8 @@
 // Drawn as the name card's last strip, under the intro. Read through a glob so a build without the file still works.
 interface Props { id: number }
 const { id } = Astro.props;
-type Row = { gap?: boolean; rank: number; tied: boolean; who: string; n: number; me?: boolean; more?: boolean };
-type Tile = { tag: string; stat: string; scope: string; record: boolean; rows: Row[]; active: boolean; say: string };
+type Row = { rank: number; tied: boolean; who: string; n: number; me?: boolean };
+type Tile = { tag: string; stat: string; scope: string; record: boolean; rows: Row[]; tied: Row[]; active: boolean; say: string };
 const files = import.meta.glob('../../public/data/records.json', { eager: true, import: 'default' }) as Record<string, any>;
 const book = Object.values(files)[0] as { asof: string | null; players: Record<string, Tile[]> } | undefined;
 const tiles = book?.players?.[id] ?? [];
@@ -26,10 +26,16 @@ const fmt = (n: number) => n.toLocaleString('en-US');
           </div>
           <p class="rb-scope">{t.scope}</p>
           <ol class="rb-board" aria-hidden="true">
-            {t.rows.map((r) => r.gap
-              ? <li class="gap"><span>⋮</span></li>
-              : <li class:list={[r.me && 'me', r.more && 'more']}><span class="rk">{r.tied ? 'T-' : ''}{ord(r.rank)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n)}</span></li>)}
+            {t.rows.map((r) => <li class:list={[r.me && 'me']}><span class="rk">{r.tied ? 'T-' : ''}{ord(r.rank)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n)}</span></li>)}
           </ol>
+          {(t.tied ?? []).length > 0 && (
+            <details class="rb-more">
+              <summary>{t.tied.length === 1 ? 'One more' : `${t.tied.length} more`} tied for {ord(t.tied[0].rank)}</summary>
+              <ol class="rb-board">
+                {t.tied.map((r) => <li><span class="rk">T-{ord(r.rank)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n)}</span></li>)}
+              </ol>
+            </details>
+          )}
           {t.active && <p class="rb-act">Most of any active player</p>}
         </div>
       ))}
@@ -54,9 +60,12 @@ const fmt = (n: number) => n.toLocaleString('en-US');
   .rb-board li.me { color: var(--ink); font-weight: 700; }
   .rb-board li.me .rk { color: var(--team); }
   .rb-board li.me .who { color: var(--team); }
-  .rb-board li.more .who { color: var(--ink-3); }
-  .rb-board li.gap { display: block; padding: 0 0 2px; color: var(--ink-3); line-height: 1; border-top: 0; }
-  .rb-board li.gap + li { border-top: 0; }
+  .rb-more { margin-top: 8px; }
+  .rb-more > summary { list-style: none; cursor: pointer; padding: 5px 10px; border-radius: 999px; background: color-mix(in oklab, var(--track) 70%, transparent); font: 400 13px var(--ui); color: var(--ink-2); display: flex; justify-content: space-between; }
+  .rb-more > summary::-webkit-details-marker { display: none; }
+  .rb-more > summary::after { content: '+'; }
+  .rb-more[open] > summary::after { content: '−'; }
+  .rb-more .rb-board { margin-top: 4px; }
   .rb-act { margin: auto 0 0; padding-top: 8px; font: 400 13px var(--ui); color: var(--ink-3); }
   :global(.phead:has(+ .precs)), :global(.pstory:has(+ .precs)), .precs:has(+ :global(.phfold)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
   @media (max-width: 719px) { .precs { padding: 0 16px 18px; } }

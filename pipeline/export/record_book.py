@@ -89,35 +89,29 @@ LABEL = {"goals": "Goals", "assists": "Assists", "points": "Points", "gwg": "Gam
          "otg3": "3-on-3 overtime goals"}
 
 
-ROWS = 3  # a tile's leaderboard shows at least three players (Sora: "1, 2 and 3" for a third-place player)
+ROWS = 3  # a tile's leaderboard always shows three players (Sora: "1, 2 and 3" for a third-place player)
 
 
 def tile(x: dict, who: str, full: str | None = None) -> dict:
-    """One record-book tile: the stat and list, an outright-record flag, and a small leaderboard (`rows`): the one or two
-    ahead of him, or a gap and the next one up; him; anyone level with him (all of them up to two, else one and "N
-    more"); then the players below him until the board has ROWS players. `say` is the same as a sentence, for screen
-    readers."""
+    """One record-book tile: the stat and list, an outright-record flag, and a small leaderboard. `rows` are the three
+    shown: the one or two ahead of him (or just the next one up), him, then anyone level with him and the players below
+    until there are three. `tied` holds the rest of a three-way-or-bigger tie, for a fold under the board (Sora: only
+    ever three lines on the table). `say` is the same as a sentence, for screen readers."""
     a = x["args"]
     ahead, level, below = a["ahead"], a["level"], x["below"]
     rank = len(ahead) + 1
-    rows: list[dict] = []
     near = ahead if len(ahead) <= 2 else ahead[-1:]  # the leaders when he is near the top, else the next one up
-    if len(ahead) > 2:
-        rows.append({"gap": True})
-    for n, v in near:
-        rows.append({"rank": 1 + sum(1 for _, w in ahead if w > v), "tied": sum(1 for _, w in ahead if w == v) > 1, "who": n, "n": v})
+    rows = [{"rank": 1 + sum(1 for _, w in ahead if w > v), "tied": sum(1 for _, w in ahead if w == v) > 1, "who": n, "n": v}
+            for n, v in near]
     rows.append({"rank": rank, "tied": bool(level), "who": full or who, "n": a["a"], "me": True})
-    shown = level if len(level) <= 2 else level[:1]
-    rows += [{"rank": rank, "tied": True, "who": n, "n": a["a"]} for n in shown]
-    if len(level) > len(shown):
-        rows.append({"rank": rank, "tied": True, "who": f"{len(level) - len(shown)} more", "n": a["a"], "more": True})
+    rows += [{"rank": rank, "tied": True, "who": n, "n": a["a"]} for n in level]
     after = rank + len(level) + 1  # the first rank below him and anyone level
     for k, (n, v) in enumerate(below):
-        if sum(1 for r in rows if not r.get("gap")) >= ROWS:
+        if len(rows) >= ROWS:
             break
         rows.append({"rank": after + sum(1 for _, w in below[:k] if w > v), "tied": sum(1 for _, w in below if w == v) > 1, "who": n, "n": v})
-    return {"tag": x["tag"], "stat": x["stat"], "scope": x["scope"], "record": rank == 1 and not level, "rows": rows,
-            "active": bool(a.get("active_first")) and bool(ahead), "say": sentence(who, **a)}
+    return {"tag": x["tag"], "stat": x["stat"], "scope": x["scope"], "record": rank == 1 and not level, "rows": rows[:ROWS],
+            "tied": rows[ROWS:], "active": bool(a.get("active_first")) and bool(ahead), "say": sentence(who, **a)}
 
 
 def league_notes(season: int, names: dict[int, str], last: dict[int, str], active: set[int], logs) -> dict[int, list[dict]]:
