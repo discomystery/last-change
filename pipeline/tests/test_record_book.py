@@ -59,6 +59,6 @@ def test_board_far_down_next_up_and_below():
 def test_board_ties_one_name_and_more():
     ahead = [(f"P{i}", 30 - i) for i in range(8)]
     t = record_book.tile(_x(17, ahead=ahead, level=["A", "B", "C"], below=[("D", 16)]), "McDavid")
-    assert _board(t) == ["8 P7", "T-9 McDavid", "T-9 A", "+B", "+C"]
+    assert _board(t) == ["8 P7", "T-9 McDavid", "+A", "+B", "+C"]
     t = record_book.tile(_x(18, ahead=[("Draisaitl", 20)], level=["Crosby", "Marchand"], below=[("Scheifele", 17)]), "Aho")
-    assert _board(t) == ["1 Draisaitl", "T-2 Aho", "T-2 Crosby", "+Marchand"]
+    assert _board(t) == ["1 Draisaitl", "T-2 Aho", "+Crosby", "+Marchand"]

@@ -95,7 +95,7 @@ ROWS = 3  # a tile's leaderboard always shows three players (Sora: "1, 2 and 3" 
 def tile(x: dict, who: str, full: str | None = None) -> dict:
     """One record-book tile: the stat and list, an outright-record flag, and a small leaderboard. `rows` are the three
     shown: the one or two ahead of him (or just the next one up), him, then anyone level with him and the players below
-    until there are three. `tied` holds the rest of a three-way-or-bigger tie, for a fold under the board (Sora: only
+    until there are three. When the tie does not fit, every tied player goes in `tied`, a fold that takes the third line (Sora: only
     ever three lines on the table). `say` is the same as a sentence, for screen readers."""
     a = x["args"]
     ahead, level, below = a["ahead"], a["level"], x["below"]
@@ -104,7 +104,11 @@ def tile(x: dict, who: str, full: str | None = None) -> dict:
     rows = [{"rank": 1 + sum(1 for _, w in ahead if w > v), "tied": sum(1 for _, w in ahead if w == v) > 1, "who": n, "n": v}
             for n, v in near]
     rows.append({"rank": rank, "tied": bool(level), "who": full or who, "n": a["a"], "me": True})
-    rows += [{"rank": rank, "tied": True, "who": n, "n": a["a"]} for n in level]
+    level_rows = [{"rank": rank, "tied": True, "who": n, "n": a["a"]} for n in level]
+    if len(rows) + len(level_rows) > ROWS:  # the tie doesn't fit: the fold is the last line (Sora: in place of a third name)
+        return {"tag": x["tag"], "stat": x["stat"], "scope": x["scope"], "record": False, "rows": rows, "tied": level_rows,
+                "active": bool(a.get("active_first")) and bool(ahead), "say": sentence(who, **a)}
+    rows += level_rows
     after = rank + len(level) + 1  # the first rank below him and anyone level
     for k, (n, v) in enumerate(below):
         if len(rows) >= ROWS:
