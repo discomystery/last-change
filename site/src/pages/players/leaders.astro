@@ -24,7 +24,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
 <Base section="players" title="Leaders" description="Every NHL skater, goalie and team with goals, assists, points, power-play and shorthanded goals, save percentage and more, sortable by any stat.">
   <header class="page-top"><h1>Leaders</h1></header>
   <p class="lede">Every player’s and every team’s season totals, as the NHL records them. Tap a column to sort by it.</p>
-  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`} aria-current="page">Leaders</a></nav>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`} aria-current="page">Leaders</a><a class="ptab pill" href={`${base}players/compare/`}>Compare</a></nav>
 
   {yrs.length === 0 ? <p class="note">The season totals arrive with the next update.</p> : (
     <>

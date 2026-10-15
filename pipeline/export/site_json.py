@@ -29,6 +29,8 @@ def run(season: int) -> dict:
     roster.run(season)  # every club's full roster and who is out, from availability.parquet
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
+    from pipeline.export import similar
+    similar.run()  # Compare page: three skaters with a similar style for each skater (reads the player JSON)
     from pipeline.export import stats
     stats.run(season)  # the league's own counting stats: player and team pages, the Leaders page
     from pipeline.export import ledger
