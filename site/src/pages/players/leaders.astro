@@ -5,6 +5,7 @@
 import Base from '../../layouts/Base.astro';
 import teams from '../../../public/data/teams.json';
 import { seasons, seasonName, asOf, SKATER, GOALIE, TEAM } from '../../lib/stats';
+import { teamPaint } from '../../lib/teams';
 import '../../styles/blocks.css';
 
 const base = import.meta.env.BASE_URL;
@@ -16,6 +17,7 @@ const cur = yrs[0];
 const yearWord = (s: number) => `${s === cur ? 'this season' : s === cur - 1 ? 'last season' : seasonName(s)} (${seasonName(s)})`;
 const strip = (d: Record<string, any>) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, { short: v.short, name: v.name, tip: v.tip, f: v.f, low: !!v.low, q: v.q ?? null }]));
 const defs = { s: strip(SKATER), g: strip(GOALIE), t: strip(TEAM) };
+const paints = Object.fromEntries(teams.map((t) => [t.abbr, teamPaint(t.abbr)]));
 const when = asOf();
 const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(when)) : null;
 ---
@@ -60,6 +62,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   )}
   <script type="application/json" id="lead-defs" set:html={JSON.stringify(defs)}></script>
   <script type="application/json" id="lead-pages" set:html={JSON.stringify(pages)}></script>
+  <script type="application/json" id="lead-paints" set:html={JSON.stringify(paints)}></script>
 </Base>
 
 <script>
@@ -71,6 +74,11 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   if (kindSel) {
     const defs = JSON.parse($('lead-defs').textContent);
     const pages = new Set<number>(JSON.parse($('lead-pages').textContent));
+    const paints: Record<string, string> = JSON.parse($('lead-paints').textContent);
+    // Team pills, the same as the career ledger's.
+    const pill = (t: string) => `<a class="chip tm" style="--team:${paints[t] ?? 'var(--ink-3)'}" href="${base}team/${t}/">${esc(t)}</a>`;
+    // On phones the sorted column comes first after the name, so it is on screen without scrolling.
+    const narrow = matchMedia('(max-width: 719px)');
     // Columns shown for each list, in order; the first sort is the usual leaderboard's.
     const COLS: Record<string, string[]> = {
       s: ['gp', 'g', 'a', 'p', 'pm', 'pim', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'gwg', 'otg', 's', 'spct', 'toi', 'pptoi', 'shtoi', 'fopct', 'hit', 'blk', 'tk', 'gv'],
@@ -130,17 +138,18 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
       const xs = pool.filter((r: any) => (!team || String(r.team ?? '').split(', ').includes(team)) && (k === 't' || words.every((w) => fold(r.name).includes(w))));
       const at = focus ? xs.findIndex((r: any) => String(r.id ?? r.team) === focus) : -1;
       const limit = words.length || team ? xs.length : Math.max(shown, at + 6);
-      const head = `<thead><tr><th class="rk">#</th><th class="who">${k === 't' ? 'Team' : 'Player'}</th>${k === 't' ? '' : '<th class="tm">Team</th>'}${k === 's' ? '<th class="ps">Pos</th>' : ''}${COLS[k].map((c) => `<th class="${c === sortKey ? 'on' : ''}"><button type="button" data-sort="${c}" data-tip="${esc(d[c].name)}: ${esc(d[c].tip)}" aria-label="Sort by ${esc(d[c].name)}">${esc(d[c].short)}${c === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`).join('')}</tr></thead>`;
+      const cols = narrow.matches ? [sortKey, ...COLS[k].filter((c) => c !== sortKey)] : COLS[k];
+      const head = `<thead><tr><th class="rk">#</th><th class="who">${k === 't' ? 'Team' : 'Player'}</th>${k === 't' ? '' : '<th class="tm">Team</th>'}${k === 's' ? '<th class="ps">Pos</th>' : ''}${cols.map((c) => `<th class="${c === sortKey ? 'on' : ''}"><button type="button" data-sort="${c}" data-tip="${esc(d[c].name)}: ${esc(d[c].tip)}" aria-label="Sort by ${esc(d[c].name)}">${esc(d[c].short)}${c === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`).join('')}</tr></thead>`;
       const mine = (window as any).lcPrefs?.get('team');
       const body = xs.slice(0, limit).map((r: any) => {
         const id = String(r.id ?? r.team);
         const teams = String(r.team ?? '').split(', ');
         const who = k === 't'
-          ? `<a class="tlink" href="${base}team/${r.team}/">${esc(r.team)}</a>`
+          ? pill(r.team)
           : pages.has(r.id) ? `<a class="plink" href="${base}player/${r.id}/">${esc(r.name)}</a>` : esc(r.name);
-        const tm = teams.map((t) => `<a class="tlink" href="${base}team/${t}/">${esc(t)}</a>`).join(', ');
+        const tm = teams.map(pill).join('');
         const cls = [id === focus ? 'focus' : '', mine && teams.includes(mine) ? 'mine' : '', qual(r) ? '' : 'unq'].join(' ');
-        return `<tr class="${cls}"><td class="rk">${r._rk ?? ''}</td><th class="who" scope="row">${who}</th>${k === 't' ? '' : `<td class="tm">${tm}</td>`}${k === 's' ? `<td class="ps">${posWord[r.pos] ?? r.pos}</td>` : ''}${COLS[k].map((c) => `<td class="${c === sortKey ? 'on' : ''}">${(FMT as any)[d[c].f](r[c])}</td>`).join('')}</tr>`;
+        return `<tr class="${cls}"><td class="rk">${r._rk ?? ''}</td><th class="who" scope="row">${who}</th>${k === 't' ? '' : `<td class="tm">${tm}</td>`}${k === 's' ? `<td class="ps">${posWord[r.pos] ?? r.pos}</td>` : ''}${cols.map((c) => `<td class="${c === sortKey ? 'on' : ''}">${(FMT as any)[d[c].f](r[c])}</td>`).join('')}</tr>`;
       }).join('');
       $('table').innerHTML = head + `<tbody>${body}</tbody>`;
       $('empty').hidden = xs.length > 0;
@@ -182,6 +191,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
       shown = 50;
       paint();
     });
+    narrow.addEventListener('change', () => paint());
     $('more').addEventListener('click', () => { shown += 50; paint(); });
     paint().then(() => { const f = document.querySelector('#table tr.focus'); if (f) f.scrollIntoView({ block: 'center' }); });
   }
@@ -189,7 +199,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
 
 <style is:global>
   .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
-  .for-s[hidden], .for-p[hidden] { display: none; }
+  .for-s[hidden], .for-p[hidden], .lead-tools .search[hidden] { display: none; }
   .lead-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
   .lead-tools .sortpick { margin: 0; }
   .lead-tools .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 2px 14px; flex: 0 1 300px; min-width: 0; }
@@ -211,12 +221,14 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   /* Rank and name stay put while the numbers scroll sideways. */
   .stbl.lead .rk { position: sticky; left: 0; z-index: 1; background: var(--sheet); padding-left: 16px; width: 53px; min-width: 53px; max-width: 53px; color: var(--ink-3); font-weight: 600; font-size: 12px; }
   .stbl.lead .who { position: sticky; left: 53px; z-index: 1; background: var(--sheet); text-align: left; font-weight: 600; max-width: 190px; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--rule); }
-  .stbl.lead .tm, .stbl.lead .ps { text-align: left; color: var(--ink-2); font-size: 13px; }
-  .stbl.lead .tm .tlink { color: inherit; }
+  .stbl.lead .tm, .stbl.lead .ps { text-align: left; }
+  .stbl.lead td.ps { color: var(--ink-2); font-size: 13px; }
+  .stbl.lead td.tm .chip + .chip { margin-left: 4px; }
+  .stbl.lead .chip.tm { text-decoration: none; }
   .stbl.lead td:last-child, .stbl.lead thead th:last-child { padding-right: 16px; }
   .stbl.lead tr.mine .rk, .stbl.lead tr.mine .who, .stbl.lead tr.mine td { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); }
   .stbl.lead tr.focus .rk, .stbl.lead tr.focus .who, .stbl.lead tr.focus td { background: var(--track); }
-  .stbl.lead tr.focus .rk { color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+  .stbl.lead tr.focus .rk { color: var(--ink); }
   .stbl.lead tr.unq td, .stbl.lead tr.unq .who { color: var(--ink-3); }
   .fold-btn { display: block; margin-top: 14px; padding: 12px 16px; border: 0; border-radius: 14px; background: var(--track); font: 500 15px var(--ui); color: var(--ink); cursor: pointer; }
   .fold-btn:hover { background: var(--rule); }
