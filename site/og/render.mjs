@@ -54,26 +54,27 @@ function frame(body, note, extra = null) {
       h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note ?? 'sparelinechange.com')));
 }
 
-// Preview and post-game: the teams set as on the game page's rink header (Rink.astro), without the rink itself (Sora,
-// 2026-10-15): the abbreviation in team colour with the score beside it at the same size and on the same baseline, the
-// full name underneath, visitors on the left, "at" or "final" between. As big as the longer side allows. The date and
-// arena go in the line under the card. Nothing that changes with the story, so a link looks the same however late it is shared.
-const ems = (t) => t.ab.length * 0.7 + (t.score == null ? 0 : String(t.score).length * 0.62 + 0.22);
-function gameSide(t, right, size) {
-  const ab = h('div', { color: t.color }, t.ab);
-  const n = t.score == null ? null : h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, letterSpacing: '-0.02em', color: C.ink }, String(t.score));
-  return h('div', { flex: 1, flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', justifyContent: 'center' },
-    h('div', { alignItems: 'baseline', gap: size * 0.22, fontFamily: 'Hanken', fontWeight: 700, fontSize: size, lineHeight: 0.9, letterSpacing: '-0.035em' }, right ? [n, ab] : [ab, n]),
-    h('div', { fontFamily: 'Literata', fontWeight: 600, fontSize: 30, color: C.ink, marginTop: 26 }, t.name));
-}
+// Preview and post-game: a scoreboard (Sora picked it, 2026-10-15): one row per team, visitors on top, the abbreviation
+// big in team colour on the left and the score in Fraunces on the right, the loser's score faded. No team names. A preview
+// has no scores, so the date sits on the right instead. The date and arena go in the line under the card. Nothing that
+// changes with the story, so a link looks the same however late it is shared.
 function game(d, final) {
-  const size = Math.min(220, Math.floor(430 / Math.max(ems(d.away), ems(d.home))));
   const end = d.end === 'OT' ? 'Final in overtime' : d.end === 'SO' ? 'Final in a shootout' : 'Final';
   const note = [final ? end : 'Preview', d.date, d.venue].filter(Boolean).join(' · ');
-  return frame(h('div', { flex: 1, alignItems: 'center' },
-    gameSide(d.away, false, size),
-    h('div', { width: 96, flexShrink: 0, justifyContent: 'center', fontFamily: 'Fraunces', fontSize: 40, color: C.ink3, paddingBottom: 50 }, final ? 'final' : 'at'),
-    gameSide(d.home, true, size)), note);
+  const awayWon = (d.away.score ?? 0) > (d.home.score ?? 0);
+  const row = (t, won) => h('div', { alignItems: 'center', height: 190 },
+    h('div', { flex: 1, fontFamily: 'Hanken', fontWeight: 700, fontSize: 180, lineHeight: 0.9, letterSpacing: '-0.035em', color: t.color }, t.ab),
+    final ? h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 190, lineHeight: 0.9, letterSpacing: '-0.02em', color: C.ink, opacity: won ? 1 : 0.45 }, String(t.score)) : null);
+  const date = final ? null : h('div', { position: 'absolute', right: 80, top: 0, bottom: 0, flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' },
+    kicker('Preview'), h('div', { fontFamily: 'Fraunces', fontWeight: 650, fontSize: 64, marginTop: 14, color: C.ink }, d.date));
+  const sheet = h('div', { width: W - 72, height: H - 32 - 86, marginTop: 32, flexShrink: 0, boxSizing: 'border-box', background: C.sheet, borderRadius: 32, position: 'relative', overflow: 'hidden', flexDirection: 'column', justifyContent: 'center', padding: '0 80px' },
+    date, row(d.away, awayWon),
+    h('div', { height: 2, background: C.track, margin: final ? '10px 0' : '10px 460px 10px 0' }),
+    row(d.home, !awayWon));
+  return h('div', { width: W, height: H, background: C.ice, flexDirection: 'column', alignItems: 'center', fontFamily: 'Hanken', color: C.ink }, sheet,
+    h('div', { width: W - 84, height: 86, alignItems: 'center', justifyContent: 'space-between' },
+      img(LOGO, { width: Math.round(36 * LOGO_RATIO), height: 36 }),
+      h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note)));
 }
 
 // The big faint letters behind a name (a team's abbreviation, a player's sweater number), as on the page headers.
