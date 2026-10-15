@@ -812,6 +812,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .chip { display: inline-block; font: 600 11px/1 var(--ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 8px; border-radius: 999px; background: var(--track); color: var(--ink-2); white-space: nowrap; vertical-align: 1px; }
   .chip.phrase { text-transform: none; letter-spacing: 0.01em; font-size: 12px; }
   .chip.solid { background: var(--ink); color: var(--sheet); }
+  .chip.tm { background: color-mix(in oklab, var(--team) 14%, transparent); color: var(--team); } /* a club as a tag, chip-sized (career ledger) */
   /* 4. Rank badge: a player's standing (Elite, Top 10...). */
   .rank { display: inline-block; font: 700 11px/1 var(--ui); letter-spacing: 0.03em; padding: 3px 7px; border-radius: 999px; background: var(--ink); color: var(--sheet); white-space: nowrap; vertical-align: 2px; text-decoration: none; }
   /* 5. Button pill: anything tapped to go somewhere or switch a view. Dark when it is the one selected. (The menu's

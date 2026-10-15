@@ -15,6 +15,8 @@ import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import PlayerStats from '../../components/PlayerStats.astro';
+import { ledgerOf } from '../../lib/ledger';
 import SharePlayer from '../../components/SharePlayer.astro';
 import ShareButton from '../../components/ShareButton.astro';
 import { cardsFor } from '../../lib/reportCards';
@@ -109,6 +111,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
+const hasLine = !!ledgerOf(p.id)?.rows.length;
 const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
@@ -141,6 +144,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamPaint(p.team)} class="pstory" />
+    {hasLine && <PlayerStats id={p.id} pos={p.pos} goalie={isG} />}
     <SectionNav items={nav as [string, string][]} />
 
     {((!isG && !s.traits) || (isG && !g)) && (
@@ -601,7 +605,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   :global(html[data-mode='season']) .lane.noseason .dot { opacity: 0.35; }
   :global(html[data-mode='season']) .lane.noseason .whisk { display: none; }
   /* The intro is the name card's second half: joined below the stats, the story on the left and the next game on the right. */
-  .phead:has(+ :global(.pstory)) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .phead:has(+ :global(.pstory)), .phead:has(+ :global(.phfold)), :global(.pstory:has(+ .phfold)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
   :global(.pstory) { max-width: none !important; margin: -1px 0 0 !important; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 18px 28px 22px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 28px; }
   :global(.pstory:not(.with-next)) { grid-template-columns: minmax(0, 1fr); }
   :global(.pstory .intro-next) { margin-top: 0 !important; background: var(--ice) !important; }

@@ -1,4 +1,4 @@
-"""NHL career history per player, for the plain-English intros on player pages.
+"""NHL career history per player, for the plain-English intros and the career ledger on player pages.
 
 From the NHL: the player landing page (season totals by club, draft club) and the regular-season game log of every
 NHL season he played before 2023-24. Finished seasons never change, so each player costs one landing request plus one per
@@ -45,12 +45,31 @@ def _write(pid: int, body: dict) -> None:
     tmp.replace(_path(pid))
 
 
+# Every NHL season line the landing page carries, for the career ledger on player pages (2026-10-15).
+SEASON_KEYS = ("season", "gameTypeId", "sequence", "leagueAbbrev", "teamName", "gamesPlayed", "goals", "assists", "points",
+               "plusMinus", "pim", "powerPlayGoals", "powerPlayPoints", "shorthandedGoals", "shorthandedPoints",
+               "gameWinningGoals", "otGoals", "shots", "avgToi", "faceoffWinningPctg",
+               "gamesStarted", "wins", "losses", "otLosses", "shotsAgainst", "goalsAgainst", "shutouts", "timeOnIce")
+
+
 def _trim_landing(land: dict) -> dict:
     keep = ("playerId", "firstName", "lastName", "position", "headshot", "birthDate", "draftDetails")
     out = {k: land.get(k) for k in keep}
-    out["seasonTotals"] = [{k: s.get(k) for k in ("season", "gameTypeId", "leagueAbbrev", "teamName", "gamesPlayed", "goals", "assists", "points")}
+    out["seasonTotals"] = [{k: s[k] for k in SEASON_KEYS if s.get(k) is not None}
                            for s in land.get("seasonTotals", []) if s.get("leagueAbbrev") == "NHL"]
+    out["awards"] = [{"trophy": (a.get("trophy") or {}).get("default"), "seasons": sorted({x["seasonId"] for x in a.get("seasons", []) if x.get("seasonId")})}
+                     for a in land.get("awards", [])]
+    out["full"] = True
     return out
+
+
+def stale(have: dict) -> bool:
+    """Whether the saved landing needs fetching again: saved before it kept every stat, or before the last finished
+    season's playoffs were over (July 1 of the year it ended), so its season lines are not final."""
+    land = have.get("landing")
+    if not land:
+        return True
+    return not land.get("full") or have.get("fetched", "") < f"{CURRENT_SEASON}-07-01"
 
 
 def _past_seasons(landing: dict) -> list[int]:
@@ -81,13 +100,14 @@ def update(season: int = CURRENT_SEASON, budget: int = BUDGET) -> dict:
         have = read(pid) or {}
         if have.get("version", 1) < VERSION:
             have = {k: v for k, v in have.items() if k != "logs"} | {"logs": {}, "complete": False, "version": VERSION}
-        if have.get("complete"):
+        if have.get("complete") and not stale(have):
             continue
         if used >= budget:
             break
         try:
-            if "landing" not in have:
-                have = {"fetched": date.today().isoformat(), "complete": False, "logs": {}, "version": VERSION,
+            if stale(have):
+                # game logs of finished seasons never change, so a fresh landing keeps the ones already saved
+                have = {"fetched": date.today().isoformat(), "complete": False, "logs": have.get("logs", {}), "version": VERSION,
                         "landing": _trim_landing(get(f"{NHL_WEB}/v1/player/{pid}/landing").json())}
                 used += 1
             for s in _past_seasons(have["landing"]):
