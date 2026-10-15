@@ -1,29 +1,73 @@
 ---
-// "In the record books": where a player stands on the NHL's and his club's all-time lists (pipeline/export/record_book.py).
+// "In the record books": where a player stands on the NHL's and his club's all-time lists (pipeline/export/record_book.py),
+// as tiles with a small leaderboard each: the names just ahead (or just behind, for a leader), him, and anyone level.
 // Drawn as the name card's last strip, under the intro. Read through a glob so a build without the file still works.
-interface Props { id: number }
-const { id } = Astro.props;
+interface Props { id: number; name: string }
+const { id, name } = Astro.props;
+type Tile = { tag: string; rank: number; tied: boolean; stat: string; scope: string; total: number; ahead: [string, number, number][];
+  next: boolean; level: string[]; more: number; below: [string, number][]; active: boolean; say: string };
 const files = import.meta.glob('../../public/data/records.json', { eager: true, import: 'default' }) as Record<string, any>;
-const book = Object.values(files)[0] as { asof: string | null; players: Record<string, { tag: string; text: string }[]> } | undefined;
-const notes = book?.players?.[id] ?? [];
+const book = Object.values(files)[0] as { asof: string | null; players: Record<string, Tile[]> } | undefined;
+const tiles = book?.players?.[id] ?? [];
 const asof = book?.asof ? new Date(`${book.asof}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
 const tip = `Regular-season totals${asof ? ` through the games of ${asof}` : ''}. The NHL’s all-time lists come from the league’s records site, with every game since its last update added from the play-by-play; club lists count the seasons a player spent with that franchise, including its earlier homes.`;
+const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
+const fmt = (n: number) => n.toLocaleString('en-US');
+const rows = (t: Tile) => {
+  const me = { rank: t.rank, who: name, n: t.total, me: true, tied: t.tied };
+  const out: { rank: number | null; who: string; n: number | null; me?: boolean; tied?: boolean; gap?: boolean }[] = [];
+  if (t.next) out.push({ rank: null, who: '', n: null, gap: true });
+  for (const [who, n, rank] of t.ahead) out.push({ rank, who, n, tied: t.ahead.filter((x) => x[1] === n).length > 1 });
+  out.push(me);
+  for (const who of t.level) out.push({ rank: t.rank, who, n: t.total, tied: true });
+  if (t.more) out.push({ rank: t.rank, who: `${t.more} more`, n: t.total, tied: true });
+  for (const [who, n] of t.below) out.push({ rank: t.rank + 1, who, n });
+  return out;
+};
 ---
-{notes.length > 0 && (
+{tiles.length > 0 && (
   <section class="precs" aria-label="In the record books">
     <p class="box-h"><span class="term" tabindex="0" data-tip={tip}>In the record books</span></p>
-    <ul>
-      {notes.map((n) => <li><span class="chip">{n.tag}</span><span class="rb-t">{n.text}</span></li>)}
-    </ul>
+    <div class="rb-grid">
+      {tiles.map((t) => (
+        <div class="rb-tile" aria-label={t.say}>
+          <div class="rb-head">
+            <p class="rb-stat">{t.stat}</p>
+            {t.rank === 1 && !t.tied && <span class="chip">{t.tag === 'Club history' ? 'Club record' : 'NHL record'}</span>}
+          </div>
+          <p class="rb-scope">{t.scope}</p>
+          <ol class="rb-board" aria-hidden="true">
+            {rows(t).map((r) => r.gap
+              ? <li class="gap"><span>⋮</span></li>
+              : <li class:list={[r.me && 'me']}><span class="rk">{r.tied ? 'T-' : ''}{ord(r.rank!)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n!)}</span></li>)}
+          </ol>
+          {t.active && <p class="rb-act">Most of any active player</p>}
+        </div>
+      ))}
+    </div>
   </section>
 )}
 <style>
   .precs { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 0 28px 22px; }
   .precs .box-h { margin: 0; padding-top: 16px; border-top: 1px solid var(--rule); }
-  .precs ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px 32px; }
-  @media (min-width: 900px) { .precs ul:has(> li:nth-child(2)) { grid-template-columns: 1fr 1fr; } }
-  .precs li { display: grid; gap: 5px; justify-items: start; font: 400 16px/1.55 var(--body); color: var(--ink-2); }
-  .precs .chip { font-size: 10px; }
+  .rb-grid { margin-top: 12px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+  .rb-tile { background: var(--ice); border-radius: 14px; padding: 12px 14px 12px; display: flex; flex-direction: column; }
+  .rb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rb-stat { margin: 0; font: 600 18px/1.25 var(--display); font-variation-settings: 'SOFT' 100; }
+  .rb-head .chip { flex: none; font-size: 10px; }
+  .rb-scope { margin: 2px 0 0; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .rb-board { list-style: none; margin: 10px 0 0; padding: 0; font: 400 14px/1.3 var(--ui); color: var(--ink-2); }
+  .rb-board li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) auto; gap: 6px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--rule); }
+  .rb-board li:first-child { border-top: 0; }
+  .rb-board .rk { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .rb-board .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rb-board .n { font-variant-numeric: tabular-nums; text-align: right; }
+  .rb-board li.me { color: var(--ink); font-weight: 700; }
+  .rb-board li.me .rk { color: var(--team); }
+  .rb-board li.me .who { color: var(--team); }
+  .rb-board li.gap { display: block; padding: 0 0 2px; color: var(--ink-3); line-height: 1; border-top: 0; }
+  .rb-board li.gap + li { border-top: 0; }
+  .rb-act { margin: auto 0 0; padding-top: 8px; font: 400 13px var(--ui); color: var(--ink-3); }
   :global(.phead:has(+ .precs)), :global(.pstory:has(+ .precs)), .precs:has(+ :global(.phfold)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
-  @media (max-width: 719px) { .precs { padding: 0 16px 18px; } .precs li { font-size: 15.5px; } }
+  @media (max-width: 719px) { .precs { padding: 0 16px 18px; } }
 </style>

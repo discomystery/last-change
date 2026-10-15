@@ -151,7 +151,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
       <Portrait id={p.id} size={230} class="phead-photo" />
     </div>
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} colour={teamPaint(p.team)} class="pstory" />
-    <RecordBook id={p.id} />
+    <RecordBook id={p.id} name={p.name} />
     {hasLine && <PlayerStats id={p.id} pos={p.pos} goalie={isG} />}
     <SectionNav items={nav as [string, string][]} />
 

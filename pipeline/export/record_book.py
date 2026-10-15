@@ -25,7 +25,7 @@ from pipeline.config import SITE_DATA
 
 LEAGUE_TOP = {"goals": 50, "assists": 50, "points": 50, "gwg": 25, "otg": 25, "otg3": 10}
 CLUB_TOP = 10
-MOST = 4  # notes on one page
+MOST = 4  # tiles on one page
 WHAT = {"goals": "goals", "assists": "assists", "points": "points", "gwg": "game-winning goals", "otg": "overtime goals",
         "otg3": "overtime goals since the NHL went to 3-on-3 overtime in 2015-16"}
 WHERE = {k: ("" if k == "otg3" else " in NHL history") for k in WHAT}
@@ -81,8 +81,24 @@ def sentence(who: str, a: int, ahead: list[tuple[str, int]], level: list[str], w
     else:
         text = f"{who} {'is tied for' if level else 'ranks'} {_ord(rank)} in {what}{where}, {with_}{tied}{behind}."
     if active_first and rank > 1:
-        text += " That’s the most of any active player."
+        text += f" That’s {'also ' if active_first == 'also' else ''}the most of any active player."
     return text
+
+
+LABEL = {"goals": "Goals", "assists": "Assists", "points": "Points", "gwg": "Game-winning goals", "otg": "Overtime goals",
+         "otg3": "3-on-3 overtime goals"}
+
+
+def tile(x: dict, who: str) -> dict:
+    """One record-book tile: rank (with a tie), the stat and list, his total, and the names around him; `say` is the
+    same as a sentence, for screen readers and the tooltip."""
+    a = x["args"]
+    ahead, level = a["ahead"], a["level"]
+    near = ahead if len(ahead) <= 2 else ahead[-1:]  # the leaders when he is near the top, else the next one up
+    return {"tag": x["tag"], "rank": len(ahead) + 1, "tied": bool(level), "stat": x["stat"], "scope": x["scope"], "total": a["a"],
+            "ahead": [[n, v, 1 + sum(1 for _, w in ahead if w > v)] for n, v in near], "next": len(ahead) > 2, "level": level[:2], "more": max(0, len(level) - 2),
+            "below": [list(n) for n in x["below"]] if not ahead and not level else [],
+            "active": bool(a.get("active_first")) and bool(ahead), "say": sentence(who, **a)}
 
 
 def league_notes(season: int, names: dict[int, str], last: dict[int, str], active: set[int], logs) -> dict[int, list[dict]]:
@@ -114,10 +130,11 @@ def league_notes(season: int, names: dict[int, str], last: dict[int, str], activ
                 continue
             level = [_name(x, names) for x, v in tot if v == a and x["playerId"] != pid]
             first_active = not any(x["playerId"] in active for x, v in tot if v >= a and x["playerId"] != pid)
+            below = [(_name(x, names), v) for x, v in tot if v < a][:1]
             out.setdefault(pid, []).append({
                 "tag": "NHL history", "list": name, "rank": len(ahead) + 1, "score": (len(ahead) + 1) / top,
-                "text": sentence(last[pid], a, ahead, level, WHAT[name], WHERE[name],
-                                 active_first=first_active)})
+                "args": dict(a=a, ahead=ahead, level=level, what=WHAT[name], where=WHERE[name], active_first=first_active),
+                "stat": LABEL[name], "scope": "NHL since 2015-16" if name == "otg3" else "NHL all-time", "below": below})
     return out
 
 
@@ -150,8 +167,10 @@ def club_notes(season: int, names: dict[int, str], last: dict[int, str], active:
                 if len(ahead) + 1 > CLUB_TOP or (best and len(ahead) + 1 >= best["rank"]):
                     continue
                 level = [_name(x, names) for x in lead if val(x) == a and x["playerId"] != pid]
+                below = sorted(((_name(x, names), val(x)) for x in lead if val(x) < a), key=lambda y: -y[1])[:1]
                 best = {"tag": "Club history", "rank": len(ahead) + 1, "score": 0.5 * (len(ahead) + 1) / CLUB_TOP,
-                        "text": sentence(last[pid], a, ahead, level, stat, club=W.poss(t))}
+                        "args": dict(a=a, ahead=ahead, level=level, what=stat, club=W.poss(t)),
+                        "stat": stat.capitalize(), "scope": f"{W.nick.get(t, t)} all-time", "below": below}
             if best:
                 out.setdefault(pid, []).append(best)
     return out
@@ -181,7 +200,7 @@ def run(season: int) -> dict:
         xs.sort(key=lambda x: x["score"])
         ot = [x for x in xs if x.get("list") in ("otg", "otg3")]
         xs = [x for x in xs if x not in ot[1:]]  # career and 3-on-3 overtime goals are mostly the same goals: the better rank
-        out[str(pid)] = [{"tag": x["tag"], "text": x["text"]} for x in xs[:MOST]]
+        out[str(pid)] = [tile(x, last[pid]) for x in xs[:MOST]]
     (SITE_DATA / "records.json").write_text(json.dumps({"asof": dates.max() if len(dates) else None, "players": out},
                                                        separators=(",", ":"), ensure_ascii=False))
     records.leaders.cache_clear()

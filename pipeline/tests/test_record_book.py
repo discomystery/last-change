@@ -28,3 +28,4 @@ def test_club_lists():
         "Sebastian Aho ranks third on the Hurricanes’ all-time scoring list, with 724 points, behind Ron Francis (1,175) and Eric Staal (775)."
     assert record_book.sentence("Kyle Connor", 330, [("A", 400), ("B", 380), ("C", 331)], [], "goals", club="the Jets’") == \
         "Kyle Connor ranks fourth on the Jets’ all-time goals list, with 330 goals, one behind C."
+
