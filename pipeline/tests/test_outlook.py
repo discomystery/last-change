@@ -40,3 +40,25 @@ def test_a_key_absence_and_return_are_named_in_the_note():
     assert "Alpha may be without Star" in body and "gets Ace back" in body
     assert body.startswith("The two have been about even")
     assert "injur" not in body
+
+
+def test_reasons_keep_one_contrast_word_and_name_each_team_once_a_sentence():
+    import itertools
+    places, nicks = {"AAA": "Alpha", "BBB": "Beta"}, {"AAA": "the Ants", "BBB": "the Bees"}
+    contrast = re.compile(r"\b(even though|though|while|but)\b")
+    for xgd, b2b, home, wo, back in itertools.product([0.0, 0.03, -0.1], [0, 0.02, -0.02], [0.02, 0.06], [None, "AAA", "BBB"], [None, "AAA", "BBB"]):
+        steps = [{"input": "xgd", "shift": xgd}, {"input": "b2b", "shift": b2b}, {"input": "home", "shift": home}, {"input": "roster", "shift": 0.03}]
+        lu = {}
+        if wo:
+            lu.setdefault(wo, {})["without"] = "Star"
+        if back:
+            lu.setdefault(back, {})["back"] = "Ace"
+        for s in re.split(r"(?<=\.) ", outlook._why(steps, "AAA", "BBB", "BBB", places, lu, nicks)):
+            assert len(contrast.findall(s.lower())) <= 1, s
+            assert s.count("Alpha") <= 1 and s.count("Beta") <= 1, s
+
+
+def test_an_edge_body_that_only_repeats_its_headline_is_caught():
+    from pipeline.export import previews
+    assert previews.echoes("The Ants hound the puck, the Bees sit back", "The Ants hound the puck, but the Bees sit back.")
+    assert not previews.echoes("Bruisers against finesse", "The Ants hit a lot, but the Bees mostly don’t.")
