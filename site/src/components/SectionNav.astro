@@ -13,12 +13,15 @@
 import SiteTools from './SiteTools.astro';
 interface Props { items: [string, string][] }
 const { items } = Astro.props;
+// Mid-sentence in "Jump to [section]", a section name starts lower case ("Jump to next game"), unless it starts with
+// a capitalized word such as an abbreviation ("NHL ...").
+const inSentence = (label: string) => (/^[A-Z][a-z]/.test(label) ? label[0].toLowerCase() + label.slice(1) : label);
 ---
 <div class="secnav-pin"><nav class="jump secnav-pills pinned" aria-label="Sections">{items.map(([id, label]) => <a class="secnav-a" href={`#${id}`}>{label}</a>)}<span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></nav><div class="secnav-prefs"><SiteTools menu /></div></div>
 <div class="secnav-bar">
   <div class="secnav-jumprow">
     <label for="secnav-pick">Jump to</label>
-    <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{label}</option>)}</select>
+    <select id="secnav-pick" aria-label="Jump to a section">{items.map(([id, label]) => <option value={id}>{inSentence(label)}</option>)}</select>
   </div>
   <div class="secnav-foot"><p class="secnav-next" aria-hidden="true"></p></div>
   <div class="secnav-dots"><span class="secnav-line" aria-hidden="true"></span><span class="secnav-fill" aria-hidden="true"></span>{items.map(() => <span class="secnav-tick" aria-hidden="true"></span>)}<span class="secnav-puck" aria-hidden="true"></span></div>
@@ -32,7 +35,7 @@ const { items } = Astro.props;
     const bar = document.querySelector('.secnav-bar');
     const row = document.querySelector('.secnav-pills');
     const names = [...row.querySelectorAll('a')];
-    const labels = [...pick.options].map((o) => o.textContent);
+    const labels = names.map((a) => a.textContent);
     const ids = [...pick.options].map((o) => o.value);
     const secs = ids.map((id) => document.getElementById(id));
     const next = bar.querySelector('.secnav-next');
@@ -140,12 +143,9 @@ const { items } = Astro.props;
       display: block; position: sticky; top: 0; z-index: 15;
       margin: 14px -16px 0; padding: 9px 16px 0;
     }
-    .secnav-jumprow { display: flex; align-items: center; gap: 10px; font: 600 17px var(--display); font-variation-settings: 'SOFT' 100; }
+    .secnav-jumprow { display: flex; align-items: baseline; gap: 10px; font: 500 17px/1.3 var(--ui); color: var(--ink-2); }
     .secnav-jumprow label { white-space: nowrap; }
-    .secnav-jumprow select {
-      flex: 1; min-width: 0; font: 600 16px var(--ui); color: var(--ink); background: var(--sheet);
-      border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; cursor: pointer;
-    }
+    .secnav-jumprow select { min-width: 0; }
     .secnav-dots { position: relative; height: 12px; margin: 2px 4px 0; }
     /* "Next" at the right, just above the dotted line. */
     .secnav-foot { display: flex; align-items: center; padding: 6px 0 0; }

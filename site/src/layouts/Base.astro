@@ -571,9 +571,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
      !important because pages style their selects with scoped `padding` and `background` shorthands. */
   select {
     -webkit-appearance: none !important; appearance: none !important;
-    padding-right: 36px !important;
+    padding-right: var(--chev-room, 36px) !important;
     background-image: var(--chev) !important; background-repeat: no-repeat !important;
-    background-position: right 14px center !important; background-size: 11px 7px !important;
+    background-position: right var(--chev-x, 14px) center !important; background-size: 11px 7px !important;
   }
   select::-ms-expand { display: none; }
   :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%230f1c2b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
@@ -735,9 +735,18 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .lede { color: var(--ink-2); margin-top: 10px; font-size: 18px; }
   /* Card titles default to the display serif; pages only set spacing. */
   h3 { font: 600 22px/1.15 var(--display); }
-  /* Fill-in-the-sentence pickers: "Show [every game]". */
-  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 6px; font: 600 20px var(--display); }
-  .pick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  /* Fill-in-the-sentence menus: "Show [every game]". One look on every page (Sora, 2026-10-15): all in the sans, the
+     sentence in grey and the choice in bold with a thin underline and the chevron, both on one baseline, each menu as
+     wide as the choice picked. Components add spacing only, never their own font, fill or border. */
+  :is(.pick, .jpick, .stpick, .try-pick, .cmp-pick) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 20px 0 6px; font: 500 20px/1.3 var(--ui); color: var(--ink-2); }
+  :is(.pick, .jpick, .stpick, .try-pick, .cmp-pick) :is(select, input), .secnav-jumprow select {
+    font: 700 1em/1.25 var(--ui); color: var(--ink); background-color: transparent; border: 0; border-bottom: 2px solid var(--ink-3);
+    border-radius: 0; padding: 0 0 3px; margin: 0; max-width: 100%; cursor: pointer; field-sizing: content; transition: border-color 0.15s;
+    --chev-room: 22px; --chev-x: 2px;
+  }
+  :is(.pick, .jpick, .stpick, .try-pick, .cmp-pick) :is(select, input):hover, .secnav-jumprow select:hover { border-bottom-color: var(--ink); }
+  :is(.pick, .jpick, .stpick, .try-pick, .cmp-pick) input { cursor: text; }
+  :is(.pick, .jpick, .stpick, .try-pick, .cmp-pick) input::placeholder { color: var(--ink-3); font-weight: 500; }
   /* Small all-caps labels above a value or a card. */
   .eyebrow, .mini-h { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   /* The one stronger label: the title of a side box ("Who to watch", "What it means", the intro's next game). */
