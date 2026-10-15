@@ -137,7 +137,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
         <h1>{p.name}</h1>
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
-      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
+      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{!isG && s.traits && <a class="pcmp" href={`${base}players/compare/#${p.id}`}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></svg><span>Compare with another player</span></a>}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
       {!isG && hasStats && (
         <div class="pstats-in">
           <table class="pstats">
@@ -613,7 +613,10 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
   .pmeta :global(.pshare) { margin-left: 14px; vertical-align: baseline; }
-  @media (max-width: 719px) { .pmeta :global(.pshare) { display: flex; width: fit-content; margin: 4px 0 0; } }
+  /* Compare: a quiet link beside Share, in the same style. */
+  .pcmp { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); text-decoration: underline 1px var(--rule); text-underline-offset: 5px; }
+  .pcmp:hover, .pcmp:focus-visible { color: var(--ink); text-decoration-color: var(--ink-3); background: none; box-shadow: none; }
+  @media (max-width: 719px) { .pmeta :global(.pshare), .pmeta .pcmp { display: flex; width: fit-content; margin: 4px 0 0; } }
   .pout { display: inline-block; margin-top: 10px; color: var(--ink); }
   /* The status pill gets room of its own: a little air beside the words and around its label. */
   .pout-tag { margin-left: 8px; padding: 4px 11px; }
