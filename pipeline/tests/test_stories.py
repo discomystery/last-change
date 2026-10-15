@@ -94,3 +94,15 @@ def test_league_reviewed_goals_taken_off(tmp_path, monkeypatch):
     _pbp(tmp_path, plays)
     out = stories._overturned(2026020107, 2026)
     assert [(x["home"], x["why"], x["sec"]) for x in out] == [(True, "for offside", 115), (True, "after a video review", 569)]
+
+
+def test_goals_taken_off_get_a_follow_up():
+    pk = lambda pool: pool[0]
+    off = [{"period": 1, "sec": 100}]
+    g = lambda per, sec, home, st="ev": {"period": per, "sec": sec, "home": home, "strength": st}
+    assert stories._wipe_after(off, [g(2, 50, False)], True, False, 1, "REG", pk) == " That one stung in a one-goal loss."
+    assert stories._wipe_after(off + [{"period": 1, "sec": 500}], [], True, False, 1, "SO", pk) == " Those stung in a game that went to a shootout."
+    assert stories._wipe_after(off, [g(1, 145, True)], True, True, 2, "REG", pk) == " They got it back just 45 seconds later."
+    assert stories._wipe_after(off, [g(2, 10, True, "pp")], True, True, 2, "REG", pk) == " The power play gave it back."
+    assert stories._wipe_after(off, [g(2, 10, True)], True, True, 2, "REG", pk) == " It didn’t cost them in the end."
+    assert stories._wipe_after(off, [g(2, 10, False)], True, False, 4, "REG", pk) == ""  # a rout: the goal didn't decide it

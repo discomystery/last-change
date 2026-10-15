@@ -1109,6 +1109,37 @@ def _overturned(gid: int, season: int) -> list[dict]:
     return out
 
 
+def _wipe_after(mine: list[dict], goals: list[dict], home: bool, won: bool, margin: int, end: str, pk) -> str:
+    """How the goals a team had taken off played out (Sora, 2026-10-15: talk about it like a fan would). In order: it
+    cost them in a close loss (lost by no more than the goals taken off), they scored the game's next goal within five
+    minutes ("got it back"), their power play matched it in a win, or they won anyway. A lopsided loss gets nothing:
+    the goals taken off didn't decide it, and saying what would have happened is a guess."""
+    n = len(mine)
+    at = lambda x: (x["period"] - 1) * 1200 + x["sec"]
+    first = min(at(x) for x in mine)
+    if not won and (margin == 1 or end in ("OT", "SO")):
+        one = "That one" if n == 1 else "Those"
+        if end in ("OT", "SO"):
+            went = "a shootout" if end == "SO" else "overtime"
+            return " " + pk([f"{one} stung in a game that went to {went}.", f"It stung: the game went all the way to {went}."])
+        return " " + pk([f"{one} stung in a one-goal loss.", "It mattered: they lost by one."])
+    if not won and margin <= n:
+        return f" They lost by {num(margin)}, as many goals as came off."
+    nxt = next((g for g in goals if at(g) >= max(at(x) for x in mine)), None)
+    if n == 1 and nxt and nxt["home"] == home and at(nxt) - at(mine[0]) <= 300:
+        gap = at(nxt) - at(mine[0])
+        later = f"just {gap} seconds later" if gap < 60 else f"{gap // 60}:{gap % 60:02d} later"
+        return " " + pk([f"They got it back {later}.", f"They didn’t wait long to get it back: {later}."])
+    if won:
+        pp = [g for g in goals if g["home"] == home and g["strength"] == "pp" and at(g) > first]
+        if len(pp) >= n:
+            return " " + pk(["The power play gave it back.", "They got it back on the power play."] if n == 1 else
+                            ["The power play gave them back.", "They got them back on the power play."])
+        return " " + pk(["It didn’t cost them in the end.", "They won anyway.", "No harm done: they won anyway.",
+                         "It didn’t matter in the end." if n == 1 else "They didn’t matter in the end."])
+    return ""
+
+
 def _blown(goals: list[dict], winner_home: bool) -> str | None:
     """"5-2" when the winner led by two or more and the other team then drew level or went ahead (eye test, 2026-10-13:
     Vancouver's 5-2 lead at Edmonton read "The game was tied twice")."""
@@ -1546,13 +1577,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             continue
         whys = list(dict.fromkeys(x["why"] for x in mine))
         why = whys[0] if len(whys) == 1 else ", ".join(f"one {w}" for w in whys[:-1]) + f" and one {whys[-1]}"
+        after = _wipe_after(mine, goals, t == home, t == winner, ws - ls, end, lambda pool: _pick(pool, gid, "wipe", t))
         if len(mine) == 1:
             what = "what would have been the winner" if mine[0]["period"] > 3 else "a goal"  # overtime ends on a goal
-            wiped.append(f"{_cap(W.place(t))} had {what} taken off {why} {_when(mine[0])}.")
+            wiped.append(f"{_cap(W.place(t))} had {what} taken off {why} {_when(mine[0])}.{after}")
         else:
             pers = {x["period"] for x in mine}
             per = f" in the {PERIODS[min(pers)]}" if len(pers) == 1 and min(pers) in PERIODS else ""
-            wiped.append(f"{_cap(W.place(t))} had {num(len(mine))} goals taken off{per}{',' if len(whys) > 1 else ''} {why}.")
+            wiped.append(f"{_cap(W.place(t))} had {num(len(mine))} goals taken off{per}{',' if len(whys) > 1 else ''} {why}.{after}")
         latest = max((x["period"], x["sec"]) for x in mine)
         if len(goals) >= 2 and latest < (goals[1]["period"], goals[1]["sec"]):
             early_wipe = 0 if latest < (goals[0]["period"], goals[0]["sec"]) else 1
