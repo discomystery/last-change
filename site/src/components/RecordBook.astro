@@ -1,0 +1,29 @@
+---
+// "In the record books": where a player stands on the NHL's and his club's all-time lists (pipeline/export/record_book.py).
+// Drawn as the name card's last strip, under the intro. Read through a glob so a build without the file still works.
+interface Props { id: number }
+const { id } = Astro.props;
+const files = import.meta.glob('../../public/data/records.json', { eager: true, import: 'default' }) as Record<string, any>;
+const book = Object.values(files)[0] as { asof: string | null; players: Record<string, { tag: string; text: string }[]> } | undefined;
+const notes = book?.players?.[id] ?? [];
+const asof = book?.asof ? new Date(`${book.asof}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+const tip = `Regular-season totals${asof ? ` through the games of ${asof}` : ''}. The NHL’s all-time lists come from the league’s records site, with every game since its last update added from the play-by-play; club lists count the seasons a player spent with that franchise, including its earlier homes.`;
+---
+{notes.length > 0 && (
+  <section class="precs" aria-label="In the record books">
+    <p class="box-h"><span class="term" tabindex="0" data-tip={tip}>In the record books</span></p>
+    <ul>
+      {notes.map((n) => <li><span class="chip">{n.tag}</span><span class="rb-t">{n.text}</span></li>)}
+    </ul>
+  </section>
+)}
+<style>
+  .precs { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; padding: 0 28px 22px; }
+  .precs .box-h { margin: 0; padding-top: 16px; border-top: 1px solid var(--rule); }
+  .precs ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px 32px; }
+  @media (min-width: 900px) { .precs ul:has(> li:nth-child(2)) { grid-template-columns: 1fr 1fr; } }
+  .precs li { display: grid; gap: 5px; justify-items: start; font: 400 16px/1.55 var(--body); color: var(--ink-2); }
+  .precs .chip { font-size: 10px; }
+  :global(.phead:has(+ .precs)), :global(.pstory:has(+ .precs)), .precs:has(+ :global(.phfold)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+  @media (max-width: 719px) { .precs { padding: 0 16px 18px; } .precs li { font-size: 15.5px; } }
+</style>
