@@ -552,6 +552,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                               "text": f"{_and(names)} {'has' if len(names) == 1 else 'have'} missed {W.poss(t)} {when}."})
         if res:
             items += [x for x in _milestones(t, res[-1], P, N, before) if x.get("pid") not in skip]
+            items += [x for x in _club_chases(t, res[-1], P, N, W, before, season) if x.get("pid") not in skip]
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
     if item:
         items.append(item)
@@ -731,6 +732,52 @@ def milestone(games: list[tuple[str, int, int]], before: str) -> tuple[float, st
             unit = what if away == 1 else what + "s"
             found.append((base + nxt / 200 - away, f"is {num(away)} {unit} from {nxt:,}"))
     return max(found) if found else None
+
+
+CHASE_NEAR = 2  # goals, assists or points from passing someone in a franchise's all-time top ten
+
+
+def _club_chases(t: str, last: dict, P: pl.DataFrame, N: dict[int, str], W, before: str, season: int) -> list[dict]:
+    """A skater who dressed in the team's last game and is close to passing someone inside his franchise's all-time top
+    ten ("Kyle Connor is one goal from passing Ilya Kovalchuk for third on the Jets' all-time goals list"). Only for the
+    team's next game, as with milestones. The same lists as the post-game "Club history" item."""
+    from pipeline.ingest import names as names_, records
+    if _games_between(t, last["date"], before):
+        return []
+    fid = records.franchise_of(f"{season}{season + 1}", t)
+    lead = records.leaders(fid) if fid and records.seasons_of(fid) >= CLUB_SEASONS else []
+    if not lead:
+        return []
+    logs, day = _club_logs(), before[:10]
+    out = []
+    for pid in P.filter((pl.col("game_id") == last["game_id"]) & (pl.col("team") == t))["player_id"].to_list():
+        mine = _club_totals(pid, fid, day, logs) if N.get(pid) else None
+        if not mine:
+            continue
+        for stat in ("points", "goals", "assists"):
+            have = mine[stat][0]
+            ahead = []
+            for r in lead:
+                if r["playerId"] == pid:
+                    continue
+                own = _club_totals(r["playerId"], fid, day, logs) if r.get("activePlayer") else None
+                ahead.append((own[stat][0] if own else r[stat], r))
+            above = sorted((x for x in ahead if x[0] >= have), key=lambda x: x[0])
+            if not above:
+                continue
+            total, r = above[0]
+            rank = sum(1 for x in ahead if x[0] > total) + 1  # his place once he passes
+            away = total - have + 1
+            if rank > CLUB_TOP or away > CHASE_NEAR:
+                continue
+            first, last_ = names_.spell(r["playerId"], r["firstName"], r["lastName"])
+            rival = N.get(r["playerId"]) or f"{first} {last_}"
+            unit = {"points": "point", "goals": "goal", "assists": "assist"}[stat] + ("" if away == 1 else "s")
+            lst = f"{W.poss(t)} all-time scoring list" if stat == "points" else f"{W.poss(t)} all-time {stat} list"
+            out.append({"tag": "Club history", "score": 70 - rank, "pid": pid,
+                        "text": f"{N[pid]} is {num(away)} {unit} from passing {rival} for {ORDINAL_N(rank)} on {lst}."})
+            break
+    return sorted(out, key=lambda x: -x["score"])[:2]
 
 
 def _games_between(t: str, after: str, before: str) -> int:

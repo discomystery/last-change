@@ -38,3 +38,13 @@ def test_nothing_outside_the_top_ten(monkeypatch):
     _setup(monkeypatch, lead, logs)
     tonight = pl.DataFrame({"player_id": [99], "team": ["CAR"], "pts": [1]})
     assert stories._club_lists("2026-10-14", tonight, {99: "Someone"}, W(), 2026) == []
+
+
+def test_preview_chase_names_the_list(monkeypatch):
+    lead = [_row(1, 900, 400), _row(2, 330, 329), _row(9, 900, 328, active=True)]
+    logs = {9: [("20252026", "2026-03-01", "WPG", 328, 600)]}
+    _setup(monkeypatch, lead, logs)
+    monkeypatch.setattr(stories, "_games_between", lambda t, a, b: 0)
+    P = pl.DataFrame({"game_id": [5], "team": ["WPG"], "player_id": [9]})
+    out = stories._club_chases("WPG", {"game_id": 5, "date": "2026-10-13"}, P, {9: "Kyle Connor"}, W(), "2026-10-15T23:00:00Z", 2026)
+    assert out[0]["text"] == "Kyle Connor is two goals from passing P 2 for second on the Hurricanes’ all-time goals list."
