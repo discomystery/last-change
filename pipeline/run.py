@@ -186,6 +186,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["jobs"] = jobs.run(season, only=todo)
     out["scores"] = game_scores.run(season, only=todo)
     out["flow"] = flow.run(season)
+    from pipeline.export import matchups
+    out["matchups"] = matchups.run(season)  # post-game line-against-line time, after the recaps (it reads their exits)
     out["stories"] = stories.run_recaps(season)
     track.run(season)
     from pipeline.export import home

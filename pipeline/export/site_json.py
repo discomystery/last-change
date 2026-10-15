@@ -49,6 +49,8 @@ def run(season: int) -> dict:
     game_scores.run(season)  # post-game Swing: one number per player, with its parts
     from pipeline.export import flow
     flow.run(season)  # post-game flow chart: every shot, power play and shift, read in the browser
+    from pipeline.export import matchups
+    matchups.run(season)  # post-game "who played against whom": line-against-line time (reads the recaps' exits)
     from pipeline.export import stories
     stories.run_recaps(season)  # last: the plain-English story reads the recap, report cards and Swing
     from pipeline.export import track
