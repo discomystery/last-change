@@ -20,7 +20,7 @@ const font = (name, file, weight) => ['latin', 'latin-ext'].map((s) => ({ name, 
 const FONTS = [
   ...font('Fraunces', 'fraunces-650', 650), ...font('Fraunces Big', 'fraunces-big-600', 600),
   ...font('Hanken', 'hanken-500', 500), ...font('Hanken', 'hanken-600', 600), ...font('Hanken', 'hanken-700', 700),
-  ...font('Literata', 'literata-400', 400),
+  ...font('Literata', 'literata-400', 400), ...font('Literata', 'literata-600', 600),
 ];
 const svgUri = (file, ink, soft) => `data:image/svg+xml;base64,${Buffer.from(
   asset(file).toString().replace(/class="lg-ink"/g, `fill="${ink}"`).replace(/class="lg-soft"/g, `fill="${soft}"`)).toString('base64')}`;
@@ -54,27 +54,32 @@ function frame(body, note, extra = null) {
       h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note ?? 'sparelinechange.com')));
 }
 
-// One side of the scoreboard: colour bar, big abbreviation and nickname, with the score (post-game) beside it.
-function side(t, right, score) {
-  const ab = h('div', { flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start' },
-    h('div', { width: 132, height: 12, borderRadius: 6, background: t.color }),
-    h('div', { fontFamily: 'Hanken', fontWeight: 700, fontSize: 150, lineHeight: 1, letterSpacing: '-0.02em', marginTop: 18 }, t.ab),
-    h('div', { fontSize: 30, color: C.ink2, marginTop: 10 }, t.nick));
-  if (score == null) return ab;
-  const n = h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 190, lineHeight: 1, letterSpacing: '-0.02em', margin: right ? '0 40px 0 0' : '0 0 0 40px' }, String(score));
-  return h('div', { alignItems: 'center' }, right ? [n, ab] : [ab, n]);
+// Preview and post-game: the game page's rink header (Rink.astro) on the card: faint boards, goal, blue and red lines,
+// the centre circle with "at" or "final", each team set in from its own goal line, the abbreviation in team colour with
+// the score beside it at the same size and on the same baseline, the full name underneath. The date and arena go in the
+// line under the card. Nothing that changes with the story, so a link looks the same however late it is shared.
+const RINK = { boards: '#b0b8c1', red: 'rgba(200,16,46,0.32)', blue: 'rgba(31,78,158,0.32)' };
+function rinkSide(t, right, size) {
+  const ab = h('div', { color: t.color }, t.ab);
+  const n = t.score == null ? null : h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, letterSpacing: '-0.02em', color: C.ink }, String(t.score));
+  return h('div', { flex: 1, flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', justifyContent: 'center', padding: right ? '0 128px 0 0' : '0 0 0 128px' },
+    h('div', { alignItems: 'baseline', gap: size * 0.24, fontFamily: 'Hanken', fontWeight: 700, fontSize: size, lineHeight: 0.9, letterSpacing: '-0.035em' }, right ? [n, ab] : [ab, n]),
+    h('div', { fontFamily: 'Literata', fontWeight: 600, fontSize: 28, color: C.ink, marginTop: 22 }, t.name));
 }
-
-// Preview and post-game: the matchup (and final score) as a scoreboard, the date above. Nothing that changes with the
-// story, so the image a link shows is the same however late someone shares it.
 function game(d, final) {
-  const mid = final
-    ? kicker(d.end === 'OT' ? 'Final · OT' : d.end === 'SO' ? 'Final · SO' : 'Final', { fontSize: 26 })
-    : h('div', { fontFamily: 'Fraunces', fontSize: 64, color: C.ink3, paddingBottom: 30 }, 'at');
-  return frame(h('div', { flexDirection: 'column', flex: 1 },
-    kicker([final ? 'Post-game' : 'Game preview', d.date].join(' · ')),
-    h('div', { flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }, side(d.away, false, final ? d.away.score : null), mid, side(d.home, true, final ? d.home.score : null)),
-  ), d.venue);
+  const longest = Math.max(...[d.away, d.home].map((t) => t.ab.length + (t.score == null ? 0 : String(t.score).length + 0.6)));
+  const size = longest <= 3 ? 150 : longest <= 4.6 ? 128 : longest <= 5 ? 112 : 96;
+  const line = (left, width, colour, right = false) => h('div', { position: 'absolute', top: 0, bottom: 0, [right ? 'right' : 'left']: left, width, background: colour });
+  const rink = h('div', { width: W - 72, height: H - 32 - 86, marginTop: 32, flexShrink: 0, background: C.sheet, border: `2px solid ${RINK.boards}`, borderRadius: 120, position: 'relative', overflow: 'hidden' },
+    line('5.5%', 1.5, RINK.red), line('5.5%', 1.5, RINK.red, true), line('37.5%', 6, RINK.blue), line('37.5%', 6, RINK.blue, true), line(W / 2 - 36 - 3, 6, RINK.red),
+    h('div', { position: 'absolute', left: (W - 72) / 2 - 2 - 64, top: (H - 32 - 86) / 2 - 2 - 64, width: 128, height: 128, borderRadius: 64, border: `3px solid ${RINK.blue}`, background: C.sheet, alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces', fontSize: 38, color: C.ink2 }, final ? 'final' : 'at'),
+    rinkSide(d.away, false, size), rinkSide(d.home, true, size));
+  const end = d.end === 'OT' ? 'Final in overtime' : d.end === 'SO' ? 'Final in a shootout' : 'Final';
+  const note = [final ? end : 'Preview', d.date, d.venue].filter(Boolean).join(' · ');
+  return h('div', { width: W, height: H, background: C.ice, flexDirection: 'column', alignItems: 'center', fontFamily: 'Hanken', color: C.ink }, rink,
+    h('div', { width: W - 84, height: 86, alignItems: 'center', justifyContent: 'space-between' },
+      img(LOGO, { width: Math.round(36 * LOGO_RATIO), height: 36 }),
+      h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note)));
 }
 
 // The big faint letters behind a name (a team's abbreviation, a player's sweater number), as on the page headers.
@@ -88,19 +93,18 @@ function team(d) {
   ), d.note, ghost(d.abbr, d.color, 300, true));
 }
 
-// Player: name, position and club, his sweater number big in the club's colour; with a portrait he stands on the
-// sheet's bottom edge in front of the number, as on his page.
+// Player: name, position and club, his sweater number huge in the club's colour, running off the card's right and
+// bottom edges; with a portrait he stands on the sheet's bottom edge in front of a faint number, as on his page.
 function player(d) {
-  const photo = d.photo
-    ? [ghost(d.number != null ? String(d.number) : '', d.color, 420, false, 0.16),
-       img(d.photo, { position: 'absolute', right: 70, bottom: -2, width: 400, height: 400 })]
-    : d.number != null ? ghost(String(d.number), d.color, 420, false, 0.9) : null;
-  return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end', maxWidth: 640 },
+  const num = d.number != null ? String(d.number) : '';
+  const big = h('div', { position: 'absolute', right: num.length > 1 ? -70 : -20, bottom: -250, fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 720, lineHeight: 1, letterSpacing: '-0.05em', color: d.photo ? tint(d.color, 0.16) : d.color }, num);
+  const photo = d.photo ? img(d.photo, { position: 'absolute', right: 70, bottom: -2, width: 400, height: 400 }) : null;
+  return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end', maxWidth: num.length > 1 ? 560 : 680 },
     kicker(d.kick),
-    disp(d.name, fit(d.name, [[14, 92], [20, 78], [99, 64]]), { marginTop: 16 }),
+    disp(d.name, fit(d.name, [[12, 92], [17, 80], [22, 66], [99, 56]]), { marginTop: 16 }),
     h('div', { fontSize: 30, color: C.ink2, marginTop: 16, alignItems: 'center' },
       h('div', { width: 16, height: 16, borderRadius: 8, background: d.color, marginRight: 14 }), d.sub),
-  ), d.note, photo);
+  ), d.note, [num ? big : null, photo]);
 }
 
 // Pages with no card of their own (Games, League, Methods...): the logo, the page's name and what it is for.

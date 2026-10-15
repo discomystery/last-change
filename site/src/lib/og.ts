@@ -15,7 +15,7 @@ export const OG_REV = (() => {
   try { return createHash('sha1').update(readFileSync(`${process.cwd()}/og/render.mjs`)).digest('hex').slice(0, 8); } catch { return ''; }
 })();
 
-type Side = { ab: string; nick: string; color: string; score?: number };
+type Side = { ab: string; name: string; color: string; score?: number };
 // Plain facts that don't change once the page exists (Sora, 2026-10-14: no headlines, records or ratings), so a link
 // shows the same picture whenever it is shared.
 export type OgCard =
@@ -30,7 +30,7 @@ const day = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short'
 
 function sides(away: string, home: string, score?: Record<string, number>) {
   const cc = cardColours(away, home);
-  const s = (a: string): Side => ({ ab: a, nick: T[a]?.nick ?? a, color: cc.matchup[a].light, ...(score ? { score: score[a] } : {}) });
+  const s = (a: string): Side => ({ ab: a, name: T[a]?.name ?? a, color: cc.matchup[a].light, ...(score ? { score: score[a] } : {}) });
   return { away: s(away), home: s(home) };
 }
 
