@@ -851,7 +851,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         k, n = f["streak"]
         if k == "won" and n >= 4:
             facts["heads"].append((60 + n, _pick([f"{_cap(W.the(t))} come in hot", f"{_cap(W.the(t))} are rolling", f"Can anyone stop {W.the(t)}?"]
-                                                 if n >= 6 else [f"{_cap(W.the(t))} come in hot", f"{_cap(W.the(t))} are rolling"], gid, t, "hot")))
+                                                 if n >= 6 else [f"{_cap(W.the(t))} come in hot", f"{_cap(W.the(t))} are rolling", f"{_cap(W.the(t))} are on a heater"], gid, t, "hot")))
         if k == "winless" and n >= 4:
             facts["heads"].append((58 + n, _pick([f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are desperate for a win", f"Something has to change for {W.the(t)}"]
                                                  if n >= 6 else [f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are searching for answers"], gid, t, "cold")))
@@ -1215,13 +1215,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if ls == 0 and wg:
         G_ = last(wg["id"]) or wg["name"].split(" ", 1)[-1]
         heads.append((92, f"{G_} stops all {wg['saves']} to blank {L_}" if (wg.get("saves") or 0) >= 35 else
-                      pk([f"{G_} shuts out {L_}", f"{G_} slams the door on {L_}", f"{G_} blanks {L_}"], "so")))
+                      pk([f"{G_} shuts out {L_}", f"{G_} slams the door on {L_}", f"{G_} blanks {L_}", f"Nothing gets past {G_}"], "so")))
     elif wg and (wg.get("gsax") or 0) >= 2.5:  # a goalie who carried the win: 2.5+ goals saved above expected
         G_ = last(wg["id"]) or wg["name"].split(" ", 1)[-1]
         heads.append((89, pk([f"{G_} stands on his head", f"{G_} stands on his head against {L_}"], "soh")))
     if rally:
         Ln_ = W.nick.get(loser, loser)
-        heads.append((86, pk([f"{W_} hold off a {Ln_} charge", f"{W_} survive a {Ln_} rally", f"{W_} hang on against {L_}"], "rally")))
+        heads.append((86, pk([f"{W_} hold off a {Ln_} charge", f"{W_} survive a {Ln_} rally", f"{W_} hang on against {L_}", f"{W_} survive a scare"], "rally")))
     if share is not None and share <= 0.35 and ws - ls <= 2:
         thief = wg["name"].split(" ", 1)[-1] if wg and (wg.get("gsax") or 0) >= 1 else None
         where = f" {W.at(home)}" if winner == away else ""
@@ -1241,9 +1241,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             heads.append((80, pk([f"{last(so_pid)} wins it in a shootout", f"{last(so_pid)} seals it in the shootout"], "so2")
                           if so_pid else f"{W_} win it in a shootout"))
     if ws - ls >= 6:
-        heads.append((76, pk([f"{W_} blow out {L_}", f"{W_} bury {L_}", f"{W_} hang {ws} on {L_}"], "rout")))
+        heads.append((76, pk([f"{W_} blow out {L_}", f"{W_} bury {L_}", f"{W_} hang {ws} on {L_}", f"{W_} turn it into a laugher"], "rout")))
     elif ws - ls >= 4:
-        heads.append((75, pk([f"{W_} roll past {L_}", f"{W_} pile it on {L_}", f"{W_} run away from {L_}"], "rout")))
+        heads.append((75, pk([f"{W_} roll past {L_}", f"{W_} pile it on {L_}", f"{W_} run away from {L_}", f"{W_} cruise past {L_}"], "rout")))
     heads.append((10, pk([f"{W_} beat {L_}", f"{W_} get past {L_}", f"{W_} take down {L_}"] +
                          ([f"{W_} edge {L_}", f"{W_} squeak past {L_}"] if ws - ls == 1 else [f"{W_} handle {L_}"]), "base")))
     head = max(heads, key=lambda h: h[0])[1]
