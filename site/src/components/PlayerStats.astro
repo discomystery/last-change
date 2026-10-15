@@ -80,11 +80,11 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
                 return <>
                   <tr class={now ? 'now' : undefined}>
                     <th class="yr" scope="row">{seasonName(r.yr)}</th>
-                    <td class="tm-c"><Fragment set:html={[...new Set(r.teams)].map(tag).join('<span class="sep">·</span>')} />{(cup || other.length > 0) && <span class="mk" tabindex="0" data-tip={`${tip}, ${seasonName(r.yr)}. Listed at the end of the row.`}>{other.length > 0 && <><Fragment set:html={DIAMOND} />{other.length}</>}{cup && <span class="mk-cup"><Fragment set:html={CUP(9)} /></span>}</span>}</td>
+                    <td class="tm-c"><Fragment set:html={[...new Set(r.teams)].map(tag).join('<span class="sep">·</span>')} />{(cup || other.length > 0) && <span class="mk" tabindex="0" data-tip={`${tip}, ${seasonName(r.yr)}. Listed at the end of the row.`}>{other.length > 0 && <><Fragment set:html={DIAMOND} />{other.length}</>}{cup && <span class="mk-cup"><Fragment set:html={CUP(7)} /></span>}</span>}</td>
                     {keys.map((k) => isBest(v, k, r)
                       ? <td data-in={inGroups(k)} class="hi" style={`color:${teamPaint(r.main)}`}><span tabindex="0" data-tip="Career high">{fmt(k, r[k])}</span></td>
                       : <td data-in={inGroups(k)}>{fmt(k, r[k])}</td>)}
-                    {v.anyAw && <td class="aw">{other.map((a) => <span class="chip" tabindex="0" data-tip={`${a.name}, ${seasonName(r.yr)}`}>{a.short}</span>)}{cup && <span class="chip cup" tabindex="0" data-tip={`Stanley Cup, ${seasonName(r.yr)}`}><Fragment set:html={CUP(6)} />Cup</span>}</td>}
+                    {v.anyAw && <td class="aw">{other.map((a) => <span class="chip" tabindex="0" data-tip={`${a.name}, ${seasonName(r.yr)}`}>{a.short}</span>)}{cup && <span class="chip" tabindex="0" data-tip={`Stanley Cup, ${seasonName(r.yr)}`}>Cup</span>}</td>}
                   </tr>
                   {r.parts.map((p) => {
                     const c = combine([p], goalie);
@@ -144,7 +144,6 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
   .ldg .mk-cup:first-child { margin-left: 0; }
   .ldg .aw { text-align: left; }
   .ldg .aw .chip { margin-right: 4px; }
-  .ldg .chip.cup { display: inline-flex; align-items: center; gap: 3px; }
   .ldg tfoot > tr > * { font-weight: 700; }
   .ldg tfoot .p82 > * { font-weight: 400; color: var(--ink-2); }
   .ldg[data-g='sc'] [data-in]:not([data-in~='sc']),
