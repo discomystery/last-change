@@ -136,19 +136,30 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         const STAT = /(^|[^\w.\-–#])([+−-]?\d(?:[\d,]*\d)?(?:[.:]\d+)?(?:[-–]\d+)*(?:%|st|nd|rd|th)?(?:\s?(?:mph|ft|feet|miles?|km\/h|km|metres?))?)(?![\w\-–]|[.:]\d)/g;
         const DATE = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s$/;
         const serif = new WeakMap();
+        // Only body-size serif text (13-24 px; "per 60" is a unit, not a stat): decorative numbers (the sweater number behind a portrait, big display figures) are
+        // left alone, and so is anything hidden from screen readers. The font is read once the page's stylesheets have
+        // loaded (`styled`); before that every element still shows the body font, so text met earlier waits in `later`.
         const inSerif = (el) => {
-          if (!el || el.closest('.sn,select,option,svg,title,head,[data-serif-num]')) return false;
-          if (!serif.has(el)) serif.set(el, /Literata/.test(getComputedStyle(el).fontFamily.split(',')[0]));
+          if (!el || el.closest('.sn,select,option,svg,title,head,[aria-hidden="true"],[data-serif-num]')) return false;
+          if (!serif.has(el)) {
+            const cs = getComputedStyle(el);
+            serif.set(el, /Literata/.test(cs.fontFamily.split(',')[0]) && parseFloat(cs.fontSize) >= 13 && parseFloat(cs.fontSize) <= 24);
+          }
           return serif.get(el);
         };
+        let styled = false;
+        const later = [];
         const sansNumbers = (t) => {
-          const s = t.data;
-          if (!/\d/.test(s) || !inSerif(t.parentElement)) return null;
+          const o = was.get(t);
+          const s = o && t.data === o.out ? o.src : t.data;  // split the original, so each piece keeps its own
+          if (!/\d/.test(s) || !t.parentElement) return null;
+          if (!styled) { later.push(t); return null; }
+          if (!inSerif(t.parentElement)) return null;
           const bits = [];
           let last = 0;
           s.replace(STAT, (m, pre, n, i) => {
             const at = i + pre.length;
-            if (/^(19|20)\d\d(?:[-–]\d\d)?$/.test(n) || DATE.test(s.slice(0, at))) return m;
+            if (/^(19|20)\d\d(?:[-–]\d\d)?$/.test(n) || DATE.test(s.slice(0, at)) || /\bper\s$/.test(s.slice(0, at))) return m;
             bits.push([last, at, false], [at, at + n.length, true]);
             last = at + n.length;
             return m;
@@ -193,6 +204,13 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           seen.forEach((n) => (n.nodeType === 3 ? fixText(n) : fixAttrs(n)));  // collected first: fixText may split a text node
         };
         const root = document.documentElement;
+        const sheetsReady = () => Promise.all([...document.querySelectorAll('link[rel="stylesheet"]')].map((l) =>
+          l.sheet ? null : new Promise((ok) => { l.addEventListener('load', ok, { once: true }); l.addEventListener('error', ok, { once: true }); })));
+        const whenStyled = () => sheetsReady().then(() => {
+          styled = true;
+          later.splice(0).forEach((t) => t.isConnected && !skip(t.parentElement) && sansNumbers(t)?.forEach((x) => redo(x, x.data, (v) => { x.data = v; })));
+        });
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', whenStyled, { once: true }); else whenStyled();
         new MutationObserver((list) => list.forEach((m) => {
           if (m.type === 'childList') m.addedNodes.forEach(fix);
           else if (m.type === 'characterData') fixText(m.target);
