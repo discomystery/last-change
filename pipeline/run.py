@@ -199,10 +199,12 @@ def quick(season: int = CURRENT_SEASON) -> dict:
 
 
 def official_stats_update(season: int) -> dict:
-    """The league's own season totals (goals, power-play goals, wins, PP%...): this season every run, last season once."""
+    """The league's own season totals (goals, power-play goals, wins, PP%...): this season every run, last season once,
+    and every finished season's shifts and ice time by strength once (career ledger)."""
     from pipeline.ingest import official_stats
 
-    return {season: official_stats.update(season), season - 1: official_stats.update(season - 1, current=False)}
+    return {season: official_stats.update(season), season - 1: official_stats.update(season - 1, current=False),
+            "ice_history": official_stats.ice_history()}
 
 
 def respell(season: int) -> dict:

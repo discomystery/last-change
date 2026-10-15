@@ -71,6 +71,12 @@ const areaName = AREA_NAME;
 
 // ---- Skater role sentences ----
 const role = isG ? null : s.role;
+// "the longest", "3rd-longest", "the shortest", "2nd-shortest": whichever end he is nearer.
+const shiftRank = (rank: number, of: number) => {
+  if (rank === 1) return 'the longest';
+  if (rank === of) return 'the shortest';
+  return rank <= (of + 1) / 2 ? `${ordinal(rank)}-longest` : `${ordinal(of - rank + 1)}-shortest`;
+};
 const nameLink = (m: { id: number; name: string }) => ({ ...m, href: href(m.id) });
 const unitWord = (label: string) => (label.endsWith('1') ? 'first' : 'second');
 const games = (n: number) => `${n} ${n === 1 ? 'game' : 'games'}`;
@@ -206,6 +212,14 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   <dt>Ice time</dt>
                   <dd>
                     <p><strong>{clock(role.toi.toi)}</strong> a game{role.toi_rank !== undefined && role.toi_of !== undefined && role.toi_of > 1 && <>, <span class="term" tabindex="0" data-tip={`Among the ${role.toi_of} ${team?.place ?? p.team} ${groupWord[s.group]} who have played at least half the games.`}>{most(role.toi_rank)} among {team?.place ?? p.team} {groupWord[s.group]}</span></>}<span class="n"> · {[`${clock(role.toi.toi5)} 5-on-5`, role.toi.toi_pp >= 15 && `${clock(role.toi.toi_pp)} PP`, role.toi.toi_pk >= 15 && `${clock(role.toi.toi_pk)} PK`].filter(Boolean).join(' · ')}</span></p>
+                  </dd>
+                </div>
+              )}
+              {role.shifts && (
+                <div>
+                  <dt>Shifts</dt>
+                  <dd>
+                    <p><strong>{clock(role.shifts.tps)}</strong> a shift{role.shifts.rank !== undefined && role.shifts.of !== undefined && <>, <span class="term" tabindex="0" data-tip={`Among the ${role.shifts.of} ${team?.place ?? p.team} ${groupWord[s.group]} who have played at least half the games. How long a player stays out follows his role and his coach: longer isn’t better or worse.`}>{shiftRank(role.shifts.rank, role.shifts.of)} among {team?.place ?? p.team} {groupWord[s.group]}</span></>}<span class="n"> · {role.shifts.per_game.toFixed(1)} shifts a game{role.shifts.avg != null && <> · <span class="term" tabindex="0" data-tip={`Every NHL ${s.group === 'D' ? 'defenseman' : 'forward'}’s ice time this season divided by their shifts. Shift counts: NHL.`}>{s.group === 'D' ? 'defensemen' : 'forwards'} average {clock(role.shifts.avg)}</span></>}</span></p>
                   </dd>
                 </div>
               )}

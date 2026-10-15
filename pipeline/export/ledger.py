@@ -8,17 +8,22 @@ for. A player whose landing page is not saved yet gets last season's line from t
 false so the page can say the older seasons are on their way.
 
 Written to site/public/data/careers/{id}.json for every player with a page (players/index.json):
-{"cols": [...], "rows": [[...], ...], "awards": [{"name", "short", "yrs"}], "complete": bool}
+{"cols": [...], "rows": [[...], ...], "awards": [{"name", "short", "yrs"}], "complete": bool, "ice": {...}}
 Skater rows: season, game type (2 regular, 3 playoffs), club(s), GP, G, A, P, +/-, PIM, PPG, PPP, SHG, SHP, GWG, OTG,
 S, ice time a game (seconds), faceoff win share. Goalie rows: season, game type, club(s), GP, GS, W, L, OTL, shots
 against, goals against, shutouts, ice time (total seconds).
+
+Skaters also get `ice`: for each season and game type ("2026-2"), even-strength, power-play and shorthanded ice time
+a game, shifts a game and the average shift in seconds (ICE), from the league's skater/timeonice reports, which
+start in 1997-98 (Sora, 2026-10-15: shift length). Those reports give one line per season, so a season split by a
+trade has them on its total line only.
 """
 import json
 import re
 
-from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA
+from pipeline.config import CURRENT_SEASON, PLAYOFFS, RAW, REGULAR, SITE_DATA
 from pipeline.export import stats
-from pipeline.ingest import careers
+from pipeline.ingest import careers, official_stats
 
 OUT = SITE_DATA / "careers"
 SKATER = ["yr", "gt", "team", "gp", "g", "a", "p", "pm", "pim", "ppg", "ppp", "shg", "shp", "gwg", "otg", "s", "toi", "fo"]
@@ -28,6 +33,7 @@ LANDING = {"gp": "gamesPlayed", "g": "goals", "a": "assists", "p": "points", "pm
            "s": "shots", "fo": "faceoffWinningPctg", "gs": "gamesStarted", "w": "wins", "l": "losses", "otl": "otLosses",
            "sa": "shotsAgainst", "ga": "goalsAgainst", "so": "shutouts"}
 SKIP_AWARDS = ("McGuire",)  # the draft combine's prospect award, not an NHL trophy
+ICE = ["evtoi", "pptoi", "shtoi", "shifts", "tps"]
 KEEP_WHOLE = ("Art Ross", "Conn Smythe", "Lady Byng", "Stanley Cup", "King Clancy", "Jack Adams")
 
 
@@ -80,6 +86,17 @@ def _official(season: int, goalie: bool) -> dict[int, list]:
     return out
 
 
+def _ice(season: int) -> dict[int, dict[str, list]]:
+    """player -> {"yr-gt": [evtoi, pptoi, shtoi, shifts, tps]} over every season with a saved report."""
+    out: dict[int, dict[str, list]] = {}
+    for yr in range(official_stats.ICE_FROM, season + 1):
+        for gt in (REGULAR, PLAYOFFS):
+            for r in official_stats.read(yr, "skater/timeonice", gt):
+                ice = stats.ice(r)
+                out.setdefault(r["playerId"], {})[f"{yr}-{gt}"] = [ice[k] for k in ICE]
+    return out
+
+
 def run(season: int = CURRENT_SEASON) -> dict:
     index = SITE_DATA / "players" / "index.json"
     if not index.exists():
@@ -88,6 +105,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
     abbr = _abbrs()
     now = {g: _official(season, g) for g in (False, True)}
     last = {g: _official(season - 1, g) for g in (False, True)}
+    ice = _ice(season)
     OUT.mkdir(parents=True, exist_ok=True)
     keep, complete = set(), 0
     for pl_ in players:
@@ -104,6 +122,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
         awards = [{"name": a["trophy"], "short": short(a["trophy"]), "yrs": [s // 10000 for s in a["seasons"]]}
                   for a in land.get("awards", []) if a.get("trophy") and not any(x in a["trophy"] for x in SKIP_AWARDS)]
         body = {"cols": GOALIE if goalie else SKATER, "rows": rows, "awards": awards, "complete": full}
+        if not goalie and pid in ice:
+            body |= {"ice_cols": ICE, "ice": ice[pid]}
         (OUT / f"{pid}.json").write_text(json.dumps(body, separators=(",", ":"), ensure_ascii=False))
         keep.add(f"{pid}.json")
         complete += full
