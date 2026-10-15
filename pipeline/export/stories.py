@@ -1092,6 +1092,86 @@ def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser
     return out
 
 
+CLUB_TOP = 10  # a move up a franchise's all-time scoring list is told inside its top ten (wire recaps tell these)
+CLUB_TIE_TOP = 5  # drawing level is told only near the top: most passes come a game or two after a tie
+CLUB_SEASONS = 10  # a younger franchise's top ten is a few seasons' work (Utah's tenth had 30 assists), so it is left out
+
+
+@lru_cache(maxsize=1)
+def _club_logs() -> dict[int, list[tuple[str, str, str, int, int]]]:
+    """Every skater with a complete career on file: his regular-season games as (season, date, team, goals, points)."""
+    from pipeline.ingest import careers
+    out = {}
+    for pid, c in careers.load_all().items():
+        if (c.get("landing") or {}).get("position") == "G":
+            continue
+        out[pid] = [(s, x["gameDate"], x["teamAbbrev"], int(x.get("goals") or 0), int(x.get("points") or 0))
+                    for s, log in c["logs"].items() for x in log]
+    return out
+
+
+def _club_totals(pid: int, fid: int, day: str, logs) -> dict[str, tuple[int, int]] | None:
+    """(before tonight, after tonight) franchise totals of points, goals and assists, from our own game logs."""
+    from pipeline.ingest import records
+    games = logs.get(pid)
+    if games is None:
+        return None
+    mine = [x for x in games if records.franchise_of(x[0], x[2]) == fid]
+    out = {}
+    for stat in ("points", "goals", "assists"):
+        val = (lambda x: x[4]) if stat == "points" else (lambda x: x[3]) if stat == "goals" else (lambda x: x[4] - x[3])
+        out[stat] = (sum(val(x) for x in mine if x[1] < day), sum(val(x) for x in mine if x[1] <= day))
+    return out
+
+
+def _club_lists(day: str, tonight, N, W, season: int) -> list[dict]:
+    """A player who moved up his franchise's all-time list of points, goals or assists tonight, inside its top ten
+    ("Aho passed Eric Staal for second on the Hurricanes' all-time points list"). Other names on the list come from the
+    NHL's records site; anyone with a complete career on file is counted from our own logs as of tonight too."""
+    from pipeline.ingest import names as names_, records
+    logs = _club_logs()
+    out = []
+    for pr in tonight.filter(pl.col("pts") > 0).iter_rows(named=True):
+        pid, t = pr["player_id"], pr["team"]
+        fid = records.franchise_of(f"{season}{season + 1}", t)
+        lead = records.leaders(fid) if fid and records.seasons_of(fid) >= CLUB_SEASONS else []
+        mine = _club_totals(pid, fid, day, logs) if lead and N.get(pid) else None
+        if not mine:
+            continue
+        for stat in ("points", "goals", "assists"):
+            b, a = mine[stat]
+            if a == b:
+                continue
+            others = []
+            for r in lead:
+                if r["playerId"] == pid:
+                    continue
+                own = _club_totals(r["playerId"], fid, day, logs) if r.get("activePlayer") else None
+                others.append((r, own[stat] if own else (r[stat], r[stat])))
+            rank = 1 + sum(1 for _, (_, ra) in others if ra > a)
+            passed = [r for r, (rb, ra) in others if b <= rb and a > ra]
+            tied = [r for r, (rb, ra) in others if b < rb and a == ra]
+            if rank > CLUB_TOP or not (passed or tied and rank <= CLUB_TIE_TOP):
+                continue
+
+            def who(r):
+                first, last = names_.spell(r["playerId"], r["firstName"], r["lastName"])
+                return N.get(r["playerId"]) or f"{first} {last}"
+            passed.sort(key=lambda r: -r[stat])
+            lst = f"{W.poss(t)} all-time {stat} list" if stat != "points" else f"{W.poss(t)} all-time scoring list"
+            if rank == 1 and passed and not tied:
+                text = f"{N[pid]} passed {who(passed[0])} to become {W.poss(t)} all-time leader in {stat}, with {a:,}."
+            elif passed:
+                over = who(passed[0]) if len(passed) == 1 else f"{who(passed[-1])} and {who(passed[0])}" if len(passed) == 2 else f"{num(len(passed))} players"
+                place = ORDINAL_N(rank) if not tied else f"a tie for {ORDINAL_N(rank)}"
+                text = f"{N[pid]} passed {over} for {place} on {lst}, with {a:,}{' points' if stat == 'points' else ''}."
+            else:
+                text = f"{N[pid]} tied {who(tied[0])} for {ORDINAL_N(rank)} on {lst}, with {a:,}{' points' if stat == 'points' else ''}."
+            out.append({"tag": "Club history", "text": text, "score": 76 - rank, "pid": pid})
+            break  # one list per player: points first, then goals, then assists
+    return sorted(out, key=lambda x: -x["score"])[:2]
+
+
 BIG_SAVES, ROUGH_GOALS = 35, 5  # a goalie's night told in the story (eye test, 2026-10-14: Dobeš's five on 24 led
 # Montréal's coverage, Luukkonen's 35 saves Buffalo's; neither was on our page)
 
@@ -1812,6 +1892,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             first = "first goal" if pr["g"] == 1 else f"first {num(int(pr['g']))} goals"  # Crosby scored two (2026-10-13)
             items.append({"tag": "Finally", "text": f"{N[pr['player_id']]} scored his {first} of the season.", "score": 48})
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
+    items += _club_lists(r["date"], tonight, N, W, season)
     if any(x["tag"] == "Rematch" and "split the two-game set" in x["text"] for x in items):  # same news, said once
         items = [x for x in items if "bounced back after" not in x["text"]]
     nxt = _next_games(r["date"], (away, home))
