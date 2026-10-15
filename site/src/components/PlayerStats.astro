@@ -101,7 +101,6 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
         </div>
       ))}
       {!l!.complete && <p class="note">Seasons before last are still being collected and will appear here within a few nights.</p>}
-      <p class="note">Every NHL season he has played, as the league records it; point at a heading to see what it counts. A season split by a trade has a total line with each club’s line underneath. His career high in each column is in bold, in the color of the club he set it with; for percentages and ice time only seasons of 20 games or more count (5 in the playoffs). The diamond beside a club counts that season’s trophies and the Cup marks a Stanley Cup; both are written out in the Awards column at the end of the row.</p>
       <p class="note"><a href={`${base}players/leaders/?k=${goalie ? 'g' : 's'}&g=${group}&p=${id}`}>See where he ranks among every {goalie ? 'goalie' : 'skater'} this season →</a></p>
     </div>
   </details>
