@@ -91,7 +91,7 @@ function team(d) {
 // bottom edges; with a portrait he stands on the sheet's bottom edge in front of a faint number, as on his page.
 function player(d) {
   const num = d.number != null ? String(d.number) : '';
-  const big = h('div', { position: 'absolute', right: num.length > 1 ? -140 : -20, bottom: -150, fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 720, lineHeight: 1, letterSpacing: '-0.05em', color: d.photo ? tint(d.color, 0.16) : d.color }, num);
+  const big = h('div', { position: 'absolute', right: num.length > 1 ? -90 : 20, bottom: -150, fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 720, lineHeight: 1, letterSpacing: '-0.05em', color: tint(d.color, 0.2) }, num);
   const photo = d.photo ? img(d.photo, { position: 'absolute', right: 70, bottom: -2, width: 400, height: 400 }) : null;
   return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end', maxWidth: num.length > 1 ? 560 : 680 },
     kicker(d.kick),
