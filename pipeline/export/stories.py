@@ -1043,6 +1043,9 @@ def _ps_stopped(gid: int, season: int) -> list[dict]:
 
 
 WIPED_WHY = {"off-side": "for offside", "goal-interference": "for goalie interference", "missed-stoppage": "because play should have been stopped earlier"}
+REVIEW_WHY = {"high-stick": "for a high stick", "hand-pass": "for a hand pass"}  # league reviews; most give no reason
+SHOT_TYPES = ("shot-on-goal", "missed-shot")  # a blocked shot is owned by the blocking team
+REVIEW_GAP = 10
 
 
 def _overturned(gid: int, season: int) -> list[dict]:
@@ -1050,15 +1053,23 @@ def _overturned(gid: int, season: int) -> list[dict]:
     winner at home to Detroit went untold). The NHL deletes the goal from the play-by-play and leaves a stoppage whose
     reason is "chlg-{hm|vis|league}-{why}". A failed challenge keeps the goal and restarts at center ice; a successful
     one restarts at a neutral-zone dot outside the blue line where the goal was scored, which says whose goal it was
-    (checked on all 13 challenges of 2026-27 so far, and it names Montréal for the league's overtime review)."""
+    (checked on all 13 challenges of 2026-27 so far, and it names Montréal for the league's overtime review).
+    Goals the league itself reviews (a kicked puck, a high stick, a hand pass; Sora's eye test, 2026-10-15: Colorado's
+    kicked goal against Dallas went untold) leave a stoppage whose reason or secondary reason is "video-review" and no
+    reason why. One counts as a goal that didn't count when play restarts at a neutral-zone dot with no penalty at that
+    second and the side the dot names took the last shot attempt, within REVIEW_GAP seconds (about 30 a season; the
+    rest restart in the end zone after a review that found no goal, or come with a penalty review)."""
     f = RAW / str(season) / "pbp" / f"{gid}.json.gz"
     if not f.exists():
         return []
-    plays = json.loads(gzip.open(f).read()).get("plays", [])
+    d = json.loads(gzip.open(f).read())
+    plays, home_id = d.get("plays", []), (d.get("homeTeam") or {}).get("id")
     out = []
     for i, p in enumerate(plays):
-        why = (p.get("details") or {}).get("reason") or ""
-        if not why.startswith("chlg-") or p.get("typeDescKey") != "stoppage":
+        det = p.get("details") or {}
+        why = det.get("reason") or ""
+        review = "video-review" in (why, det.get("secondaryReason"))
+        if p.get("typeDescKey") != "stoppage" or not (why.startswith("chlg-") or review):
             continue
         when = p.get("timeInPeriod") or "0:00"
         same = [x for x in plays if x.get("timeInPeriod") == when and (x.get("periodDescriptor") or {}).get("number") == p["periodDescriptor"]["number"]]
@@ -1069,6 +1080,21 @@ def _overturned(gid: int, season: int) -> list[dict]:
         if not fx:
             continue  # center ice: the goal stood
         defends = p.get("homeTeamDefendingSide")
+        if not why.startswith("chlg-"):
+            if abs(fx) > 30 or defends not in ("left", "right") or any(x.get("typeDescKey") == "penalty" for x in same):
+                continue  # an end-zone restart (no goal found) or a penalty review
+            home_goal = (fx > 0) == (defends == "left")
+            m, sec = when.split(":")
+            shot = next((x for x in reversed(plays[max(0, i - 8):i]) if x.get("typeDescKey") in SHOT_TYPES), None)
+            if not shot or (shot.get("periodDescriptor") or {}).get("number") != p["periodDescriptor"]["number"]:
+                continue
+            sm, ss = (shot.get("timeInPeriod") or "0:00").split(":")
+            owner_home = (shot.get("details") or {}).get("eventOwnerTeamId") == home_id
+            if owner_home != home_goal or int(m) * 60 + int(sec) - (int(sm) * 60 + int(ss)) > REVIEW_GAP:
+                continue
+            out.append({"home": home_goal, "why": REVIEW_WHY.get(why, "after a video review"), "period": p["periodDescriptor"]["number"],
+                        "sec": int(m) * 60 + int(sec), "league": True})
+            continue
         if "-hm-" in why or "-vis-" in why:  # a coach only challenges the other team's goal (eye test on 2025-26:
             home_goal = "-vis-" in why        # the restart dot named Carolina for Montréal's goal)
         elif defends in ("left", "right"):
@@ -1081,6 +1107,37 @@ def _overturned(gid: int, season: int) -> list[dict]:
         out.append({"home": home_goal, "why": WIPED_WHY.get(kind, "on a challenge"), "period": p["periodDescriptor"]["number"],
                     "sec": int(m) * 60 + int(sec), "league": "-league-" in why})
     return out
+
+
+def _wipe_after(mine: list[dict], goals: list[dict], home: bool, won: bool, margin: int, end: str, pk) -> str:
+    """How the goals a team had taken off played out (Sora, 2026-10-15: talk about it like a fan would). In order: it
+    cost them in a close loss (lost by no more than the goals taken off), they scored the game's next goal within five
+    minutes ("got it back"), their power play matched it in a win, or they won anyway. A lopsided loss gets nothing:
+    the goals taken off didn't decide it, and saying what would have happened is a guess."""
+    n = len(mine)
+    at = lambda x: (x["period"] - 1) * 1200 + x["sec"]
+    first = min(at(x) for x in mine)
+    if not won and (margin == 1 or end in ("OT", "SO")):
+        one = "That one" if n == 1 else "Those"
+        if end in ("OT", "SO"):
+            went = "a shootout" if end == "SO" else "overtime"
+            return " " + pk([f"{one} stung in a game that went to {went}.", f"It stung: the game went all the way to {went}."])
+        return " " + pk([f"{one} stung in a one-goal loss.", "It mattered: they lost by one."])
+    if not won and margin <= n:
+        return f" They lost by {num(margin)}, as many goals as came off."
+    nxt = next((g for g in goals if at(g) >= max(at(x) for x in mine)), None)
+    if n == 1 and nxt and nxt["home"] == home and at(nxt) - at(mine[0]) <= 300:
+        gap = at(nxt) - at(mine[0])
+        later = f"just {gap} seconds later" if gap < 60 else f"{gap // 60}:{gap % 60:02d} later"
+        return " " + pk([f"They got it back {later}.", f"They didn’t wait long to get it back: {later}."])
+    if won:
+        pp = [g for g in goals if g["home"] == home and g["strength"] == "pp" and at(g) > first]
+        if len(pp) >= n:
+            return " " + pk(["The power play gave it back.", "They got it back on the power play."] if n == 1 else
+                            ["The power play gave them back.", "They got them back on the power play."])
+        return " " + pk(["It didn’t cost them in the end.", "They won anyway.", "No harm done: they won anyway.",
+                         "It didn’t matter in the end." if n == 1 else "They didn’t matter in the end."])
+    return ""
 
 
 def _blown(goals: list[dict], winner_home: bool) -> str | None:
@@ -1369,7 +1426,10 @@ def _review_lines(gid: int, season: int, side, W, name, home: str, away: str) ->
     """A goal that stood after the other coach challenged it, and a league review that found no goal (Sora's notes,
     2026-10-14: the two reviews in WSH at CAR went untold). Goals taken off are told by `wiped`."""
     out = []
+    gone = {(x["period"], x["sec"]) for x in _overturned(gid, season)}
     for x in storylines.reviews(gid, season):
+        if (x["period"], x["sec"]) in gone:
+            continue  # told as a goal taken off
         when = _when({"period": x["period"], "sec": x["sec"]})
         if x["kind"] == "stood":
             t = home if x["home"] else away
@@ -1515,15 +1575,19 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         mine = [x for x in gone if (home if x["home"] else away) == t]
         if not mine:
             continue
-        whys = {x["why"] for x in mine}
-        why = whys.pop() if len(whys) == 1 else "on challenges"
+        whys = list(dict.fromkeys(x["why"] for x in mine))
+        why = whys[0] if len(whys) == 1 else ", ".join(f"one {w}" for w in whys[:-1]) + f" and one {whys[-1]}"
+        after = _wipe_after(mine, goals, t == home, t == winner, ws - ls, end, lambda pool: _pick(pool, gid, "wipe", t))
         if len(mine) == 1:
             what = "what would have been the winner" if mine[0]["period"] > 3 else "a goal"  # overtime ends on a goal
-            wiped.append(f"{_cap(W.place(t))} had {what} taken off {why} {_when(mine[0])}.")
-            if len(goals) >= 2 and (mine[0]["period"], mine[0]["sec"]) < (goals[1]["period"], goals[1]["sec"]):
-                early_wipe = 0 if (mine[0]["period"], mine[0]["sec"]) < (goals[0]["period"], goals[0]["sec"]) else 1
+            wiped.append(f"{_cap(W.place(t))} had {what} taken off {why} {_when(mine[0])}.{after}")
         else:
-            wiped.append(f"{_cap(W.place(t))} had {num(len(mine))} goals taken off {why}.")
+            pers = {x["period"] for x in mine}
+            per = f" in the {PERIODS[min(pers)]}" if len(pers) == 1 and min(pers) in PERIODS else ""
+            wiped.append(f"{_cap(W.place(t))} had {num(len(mine))} goals taken off{per}{',' if len(whys) > 1 else ''} {why}.{after}")
+        latest = max((x["period"], x["sec"]) for x in mine)
+        if len(goals) >= 2 and latest < (goals[1]["period"], goals[1]["sec"]):
+            early_wipe = 0 if latest < (goals[0]["period"], goals[0]["sec"]) else 1
     told = set()  # penalty-shot goals already told in another sentence
     push = None  # a late goal by the loser that made it close, told after the winner
     told_first = set()  # players whose first goal (NHL, for a club, of the season) the story already told
