@@ -148,5 +148,21 @@ const { items } = Astro.props;
     .secnav-next { flex: 1; min-width: 0; margin: 0; font: 500 12px var(--ui); color: var(--ink-3); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     main [id] { scroll-margin-top: 104px; }
   }
+  /* MOCK-UP (flush): the frosted strip ends on the reading line, so the line is the strip's bottom edge and the dots and
+     puck hang half below it. The background moves to a ::before that stops 3 px up, at the line's lower edge. */
+  .secnav-pin, .secnav-bar { background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .secnav-pin::before, .secnav-bar::before {
+    content: ''; position: absolute; inset: 0 0 3px 0; z-index: -1; pointer-events: none;
+    background: color-mix(in oklab, var(--ice) 96%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .secnav-pin .jump.secnav-pills { padding-block: 8px 14px; }
+  .secnav-line, .secnav-fill { bottom: 3px; }
+  .secnav-tick { bottom: 1px; }
+  .secnav-puck { bottom: 0; }
+  @media (max-width: 719px) {
+    .secnav-bar { display: flex; flex-direction: column; border-bottom: 0; }
+    .secnav-foot { order: 1; padding: 6px 0 0; }
+    .secnav-dots { order: 2; height: 12px; margin-top: 2px; }
+  }
   @media (prefers-reduced-motion: reduce) { .secnav-bar, .jump.secnav-pills a { transition: none; } }
 </style>
