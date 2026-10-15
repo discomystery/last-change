@@ -3,7 +3,7 @@
 // regular season or playoffs. A season split by a trade gets a total line with each club underneath. His career
 // high in each column is bold in the color of the club he set it with. Trophies are written as pills at the far end
 // of the row, with a small marker by the club (a diamond and a count, and the Cup) so the stats columns keep their place.
-import Section from './Section.astro';
+// It opens from a fold at the bottom of the player's name card (Sora, 2026-10-15).
 import { SKATER, GOALIE, seasons as statSeasons, seasonName, type Stat } from '../lib/stats';
 import { ledgerOf, seasons, combine, awardsIn, type Season } from '../lib/ledger';
 import { teamPaint } from '../lib/teams';
@@ -55,9 +55,9 @@ const awardTotal = (v: View) => v.rows.reduce((t, r) => { const a = awardsIn(l!,
 const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
 ---
 {views.length > 0 && (
-  <Section id="stats" title="Stats" placeholder={false} takeaway="Every NHL season he has played, as the league records it. Point at a heading to see what it counts.">
-    <Fragment slot="explain"><p class="note">A season split by a trade has a total line with each club’s line underneath. His career high in each column is in bold, in the color of the club he set it with; for percentages and ice time only seasons of 20 games or more count (5 in the playoffs). The diamond beside a club counts that season’s trophies and the Cup marks a Stanley Cup; both are written out in the Awards column at the end of the row.</p></Fragment>
-    <div class="card ldg-card">
+  <details class="fold phfold" id="stats">
+    <summary><span class="closed">Show his career stats</span><span class="opened">Hide his career stats</span></summary>
+    <div class="ldg-card">
       <p class="pick ldg-pick">
         {!goalie && <><span>Show</span>
         <select class="ldg-g" aria-label="Which stats"><option value="all">every stat</option><option value="sc">scoring</option><option value="sp">power play and shorthanded</option><option value="sh">shooting and ice time</option></select></>}
@@ -101,12 +101,16 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
         </div>
       ))}
       {!l!.complete && <p class="note">Seasons before last are still being collected and will appear here within a few nights.</p>}
+      <p class="note">Every NHL season he has played, as the league records it; point at a heading to see what it counts. A season split by a trade has a total line with each club’s line underneath. His career high in each column is in bold, in the color of the club he set it with; for percentages and ice time only seasons of 20 games or more count (5 in the playoffs). The diamond beside a club counts that season’s trophies and the Cup marks a Stanley Cup; both are written out in the Awards column at the end of the row.</p>
+      <p class="note"><a href={`${base}players/leaders/?k=${goalie ? 'g' : 's'}&g=${group}&p=${id}`}>See where he ranks among every {goalie ? 'goalie' : 'skater'} this season →</a></p>
     </div>
-    <p class="note"><a href={`${base}players/leaders/?k=${goalie ? 'g' : 's'}&g=${group}&p=${id}`}>See where he ranks among every {goalie ? 'goalie' : 'skater'} this season →</a></p>
-  </Section>
+  </details>
 )}
 
 <script is:inline>
+  // A link to #stats opens the fold.
+  const openStats = () => { const f = document.getElementById('stats'); if (location.hash === '#stats' && f?.tagName === 'DETAILS') f.open = true; };
+  openStats(); addEventListener('hashchange', openStats);
   document.querySelectorAll('.ldg-card').forEach((card) => {
     const g = card.querySelector('.ldg-g'), t = card.querySelector('.ldg-t');
     g?.addEventListener('change', () => card.querySelectorAll('.ldg').forEach((tb) => { tb.dataset.g = g.value; }));
@@ -115,7 +119,13 @@ const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
 </script>
 
 <style>
-  .ldg-card { padding-top: 14px; }
+  /* The fold is the name card's last strip: a soft bar across its bottom that opens the table below it. */
+  .phfold { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; }
+  .phfold > summary { border-radius: 0 0 17px 17px; background: color-mix(in oklab, var(--track) 70%, var(--sheet)); border-top: 1px solid var(--rule); cursor: pointer; }
+  .phfold[open] > summary { border-radius: 0; margin-bottom: 0; }
+  .ldg-card { padding: 16px 28px 20px; }
+  .ldg-card .note { margin: 12px 0 0; }
+  @media (max-width: 719px) { .ldg-card { padding: 14px 16px 16px; } }
   .ldg-pick { margin: 0 0 12px; }
   .ldg-wrap { overflow: auto; max-height: 620px; }
   .ldg { min-width: 100%; }
