@@ -68,15 +68,16 @@ def test_goal_streaks_lead():
 
 
 def test_a_clubs_absences_share_one_out_item():
-    """Sora, 2026-10-15: Staal and Hall were left out of WPG-CAR because two "Out" items a game was the cap."""
-    rep = {2: {"status": "injured", "report_status": "out", "report_injury": "upper-body", "report_timeline": None},
-           3: {"status": "injured", "report_status": "long", "report_injury": "calf tear", "report_timeline": "out 1-2 months"}}
-    N = {1: "Seth Jarvis", 2: "Taylor Hall", 3: "Jordan Staal"}
-    outs = [{"tag": "Out", "text": "Seth Jarvis has not played this season.", "score": 76, "pid": 1},
-            {"tag": "Out", "text": "Taylor Hall is out.", "score": 75, "pid": 2},
-            {"tag": "Out", "text": "Jordan Staal is out long term.", "score": 74, "pid": 3}]
-    item = stories._merge_out(outs, rep, N)
-    assert item["text"] == ("Seth Jarvis has not played this season. Taylor Hall (upper-body injury) and "
-                            "Jordan Staal (calf tear, out 1-2 months) are also out.")
-    assert item["pids"] == [1, 2, 3] and item["pid"] == 1
-    assert stories._merge_out(outs[:1], rep, N) == outs[0]
+    """Sora, 2026-10-15: Staal and Hall were left out of WPG-CAR; names only, newly out first."""
+    outs = [{"score": 76, "pid": 1, "who": "Seth Jarvis", "missed": 8, "last_played": None},
+            {"score": 75, "pid": 2, "who": "Taylor Hall", "missed": 0, "last_played": "2026-10-13"},
+            {"score": 74, "pid": 3, "who": "Jordan Staal", "missed": 2, "last_played": "2026-10-10"},
+            {"score": 73, "pid": 4, "who": "Alexander Nikishin", "missed": 8, "last_played": None}]
+    item = stories._merge_out(outs, "The Hurricanes", 8)
+    assert item["text"] == ("The Hurricanes are newly without Taylor Hall and Jordan Staal, and have had to make do without "
+                            "Seth Jarvis and Alexander Nikishin all season.")
+    assert item["pids"] == [1, 2, 3, 4] and item["tag"] == "Out"
+    one = stories._merge_out([{**outs[0], "start": "Stuart Skinner"}], "The Jets", 8)
+    assert one["text"] == "The Jets have been without Seth Jarvis all season. Stuart Skinner is expected to start."
+    mid = stories._merge_out([{**outs[2], "missed": 6}], "The Hurricanes", 8)
+    assert mid["text"] == "The Hurricanes have been without Jordan Staal since Oct 10."

@@ -271,41 +271,35 @@ def _elsewhere(season: int, day: str, teams: tuple[str, str]) -> set[int]:
     return set(av["player_id"].to_list()) - here
 
 
-OUT_SHORT = {"season": "out for the season", "long": "out long term", "ir": "on injured reserve", "week": "week to week",
-             "day": "day to day", "suspended": "suspended", "personal": "personal reasons"}
+NEWLY_OUT = 3  # games missed up to which a player who has played this season is "newly" out
 
 
-def _out_why(r: dict | None) -> str:
-    """A few words on what the league has said about a player who is out, for "(calf tear, out 1-2 months)"; empty when
-    nothing has been reported. Never a reason the league has not given."""
-    if not r or r.get("status") not in REPORTED_OUT:
-        return ""
-    if r["status"] in ("suspended", "personal"):
-        return OUT_SHORT[r["status"]]
-    from pipeline.export import changes
-    bits = [changes._injury(r.get("report_injury")).strip(" ()")]
-    tl = r.get("report_timeline")
-    bits.append(tl if tl and r.get("report_status") == "long" and not tl.lower().startswith(("week", "day"))
-                else OUT_SHORT.get(r.get("report_status") or "", ""))
-    return ", ".join(b for b in bits if b)
-
-
-def _merge_out(outs: list[dict], reported: dict[int, dict], N: dict) -> dict:
-    """One "Out" item per team: the most important absence told in full, everyone else named after it ("Jordan Staal
-    (calf tear, out 1-2 months) and Taylor Hall (upper-body injury) are also out."). Two items a game used to be the cap
-    for the tag, so a club's third or fourth absence never showed (Sora, 2026-10-15: Staal and Hall in WPG-CAR)."""
+def _merge_out(outs: list[dict], team: str, n_games: int) -> dict:
+    """One "Out" item per club, names only, recent absences first (Sora, 2026-10-15: "The Hurricanes are newly without
+    Taylor Hall and Jordan Staal, and have had to make do without Seth Jarvis and Alexander Nikishin all season."). Two
+    items a game was the cap for the tag, so a club's third absence never showed; the league's reasons stay on the team
+    page."""
     outs = sorted(outs, key=lambda o: -o["score"])
-    lead = outs[0]
-    if len(outs) == 1:
-        return lead
-    rest = []
-    for o in outs[1:]:
-        r = reported.get(o["pid"])
-        who = N.get(o["pid"]) or o["text"].split(" is ")[0].split(" has")[0]
-        why = _out_why(r)
-        rest.append(f"{who} ({why})" if why else who)
-    text = f"{lead['text']} {_and(rest)} {'is' if len(rest) == 1 else 'are'} also out."
-    return {**lead, "text": text, "pids": [o["pid"] for o in outs]}
+    if not n_games:
+        clauses = [f"are without {_and([o['who'] for o in outs])}"]
+    else:
+        never = [o for o in outs if o["missed"] >= n_games]
+        new = [o for o in outs if o not in never and o["missed"] <= NEWLY_OUT]
+        mid = [o for o in outs if o not in never and o not in new]
+        clauses = []
+        if new:
+            clauses.append(f"are newly without {_and([o['who'] for o in new])}")
+        if mid:
+            since = (f" since {Date.fromisoformat(mid[0]['last_played']).strftime('%b %-d')}"
+                     if len(mid) == 1 and mid[0]["last_played"] else " for several games")
+            clauses.append(f"have been without {_and([o['who'] for o in mid])}{since}")
+        if never:
+            clauses.append(f"{'have had to make do' if clauses else 'have been'} without {_and([o['who'] for o in never])} all season")
+    text = team + " " + (clauses[0] if len(clauses) == 1 else ", ".join(clauses[:-1]) + ", and " + clauses[-1]) + "."
+    start = next((o["start"] for o in outs if o.get("start")), None)
+    if start:
+        text += f" {start} is expected to start."
+    return {"tag": "Out", "text": text, "score": outs[0]["score"], "pid": outs[0]["pid"], "pids": [o["pid"] for o in outs]}
 
 
 @lru_cache(maxsize=8)
@@ -439,20 +433,9 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         out["out"] |= skip
         told, team_out = [], []
         for k, n in enumerate(notes.get(t, [])):
-            text = n["text"].split(" He is ")[0] + (" He is " + n["text"].split(" He is ")[1].split(".")[0] + "." if " He is " in n["text"] else "")
-            if N.get(n["pid"]) and text.startswith(n["player"]):  # the team page's short names, written out in full
-                text = N[n["pid"]] + text[len(n["player"]):]
-            if not n.get("status"):  # nothing reported: only what the game sheets show, never "a scratch"
-                who = N.get(n["pid"]) or n["player"]
-                gone = n.get("games") or 0
-                since = n.get("last_played")
-                when = Date.fromisoformat(since).strftime("%b %-d") if since else None
-                text = (f"{who} hasn’t played since {when}." if when and gone >= LONG_AWAY else
-                        f"{who} hasn’t played this season." if " this season" in text.split(".")[0] else
-                        f"{who} has missed the last {num(gone)} games." if gone > 1 else f"{who} missed their last game.") \
-                    + (" He is" + text.split(" He is", 1)[1] if " He is" in text else "")
             out["out"].add(n["pid"])
-            team_out.append({"tag": "Out", "text": text, "score": 76 - k, "pid": n["pid"]})
+            team_out.append({"score": 76 - k, "pid": n["pid"], "who": N.get(n["pid"]) or n["player"], "missed": n.get("games") or 0,
+                             "last_played": n.get("last_played")})
             told.append(n["pid"])
         n_games = len(results(G, t, season))
         keepers = _starters_out(season, day, tids.get(t, -1), reported.get(t, {}))
@@ -475,18 +458,12 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             if r["player_id"] in told:
                 continue
             from pipeline.export import changes
-            if r["status"] in REPORTED_OUT:
-                text = f"{N.get(r['player_id']) or changes._name(r)} {changes._status_text(r, n_games)}."
-            elif r["last_played"]:
-                text = f"{N.get(r['player_id']) or changes._name(r)} hasn’t played since {Date.fromisoformat(r['last_played']).strftime('%b %-d')}."
-            else:
-                text = f"{N.get(r['player_id']) or changes._name(r)} hasn’t played this season."
             nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
-            if nxt and nxt[1] >= LIKELY and N.get(nxt[0]):
-                text += f" {N[nxt[0]]} is expected to start."
-            team_out.append({"tag": "Out", "text": text, "score": 70 + 20 * r["share"], "pid": r["player_id"]})
+            team_out.append({"score": 70 + 20 * r["share"], "pid": r["player_id"], "who": N.get(r["player_id"]) or changes._name(r),
+                             "missed": r["games_missed"] or 0, "last_played": r["last_played"],
+                             "start": N[nxt[0]] if nxt and nxt[1] >= LIKELY and N.get(nxt[0]) else None})
         if team_out:
-            items.append(_merge_out(team_out, reported.get(t, {}), N))
+            items.append(_merge_out(team_out, _cap(W.the(t)), n_games))
         roster = [p for p, team in cur.items() if team == t and p not in skip]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))
