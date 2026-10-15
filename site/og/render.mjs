@@ -54,32 +54,26 @@ function frame(body, note, extra = null) {
       h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note ?? 'sparelinechange.com')));
 }
 
-// Preview and post-game: the game page's rink header (Rink.astro) on the card: faint boards, goal, blue and red lines,
-// the centre circle with "at" or "final", each team set in from its own goal line, the abbreviation in team colour with
-// the score beside it at the same size and on the same baseline, the full name underneath. The date and arena go in the
-// line under the card. Nothing that changes with the story, so a link looks the same however late it is shared.
-const RINK = { boards: '#b0b8c1', red: 'rgba(200,16,46,0.32)', blue: 'rgba(31,78,158,0.32)' };
-function rinkSide(t, right, size) {
+// Preview and post-game: the teams set as on the game page's rink header (Rink.astro), without the rink itself (Sora,
+// 2026-10-15): the abbreviation in team colour with the score beside it at the same size and on the same baseline, the
+// full name underneath, visitors on the left, "at" or "final" between. As big as the longer side allows. The date and
+// arena go in the line under the card. Nothing that changes with the story, so a link looks the same however late it is shared.
+const ems = (t) => t.ab.length * 0.7 + (t.score == null ? 0 : String(t.score).length * 0.62 + 0.22);
+function gameSide(t, right, size) {
   const ab = h('div', { color: t.color }, t.ab);
   const n = t.score == null ? null : h('div', { fontFamily: 'Fraunces Big', fontWeight: 600, letterSpacing: '-0.02em', color: C.ink }, String(t.score));
-  return h('div', { flex: 1, flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', justifyContent: 'center', padding: right ? '0 128px 0 0' : '0 0 0 128px' },
-    h('div', { alignItems: 'baseline', gap: size * 0.24, fontFamily: 'Hanken', fontWeight: 700, fontSize: size, lineHeight: 0.9, letterSpacing: '-0.035em' }, right ? [n, ab] : [ab, n]),
-    h('div', { fontFamily: 'Literata', fontWeight: 600, fontSize: 28, color: C.ink, marginTop: 22 }, t.name));
+  return h('div', { flex: 1, flexDirection: 'column', alignItems: right ? 'flex-end' : 'flex-start', justifyContent: 'center' },
+    h('div', { alignItems: 'baseline', gap: size * 0.22, fontFamily: 'Hanken', fontWeight: 700, fontSize: size, lineHeight: 0.9, letterSpacing: '-0.035em' }, right ? [n, ab] : [ab, n]),
+    h('div', { fontFamily: 'Literata', fontWeight: 600, fontSize: 30, color: C.ink, marginTop: 26 }, t.name));
 }
 function game(d, final) {
-  const longest = Math.max(...[d.away, d.home].map((t) => t.ab.length + (t.score == null ? 0 : String(t.score).length + 0.6)));
-  const size = longest <= 3 ? 150 : longest <= 4.6 ? 128 : longest <= 5 ? 112 : 96;
-  const line = (left, width, colour, right = false) => h('div', { position: 'absolute', top: 0, bottom: 0, [right ? 'right' : 'left']: left, width, background: colour });
-  const rink = h('div', { width: W - 72, height: H - 32 - 86, marginTop: 32, flexShrink: 0, background: C.sheet, border: `2px solid ${RINK.boards}`, borderRadius: 120, position: 'relative', overflow: 'hidden' },
-    line('5.5%', 1.5, RINK.red), line('5.5%', 1.5, RINK.red, true), line('37.5%', 6, RINK.blue), line('37.5%', 6, RINK.blue, true), line(W / 2 - 36 - 3, 6, RINK.red),
-    h('div', { position: 'absolute', left: (W - 72) / 2 - 2 - 64, top: (H - 32 - 86) / 2 - 2 - 64, width: 128, height: 128, borderRadius: 64, border: `3px solid ${RINK.blue}`, background: C.sheet, alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces', fontSize: 38, color: C.ink2 }, final ? 'final' : 'at'),
-    rinkSide(d.away, false, size), rinkSide(d.home, true, size));
+  const size = Math.min(220, Math.floor(430 / Math.max(ems(d.away), ems(d.home))));
   const end = d.end === 'OT' ? 'Final in overtime' : d.end === 'SO' ? 'Final in a shootout' : 'Final';
   const note = [final ? end : 'Preview', d.date, d.venue].filter(Boolean).join(' · ');
-  return h('div', { width: W, height: H, background: C.ice, flexDirection: 'column', alignItems: 'center', fontFamily: 'Hanken', color: C.ink }, rink,
-    h('div', { width: W - 84, height: 86, alignItems: 'center', justifyContent: 'space-between' },
-      img(LOGO, { width: Math.round(36 * LOGO_RATIO), height: 36 }),
-      h('div', { fontSize: 24, color: C.ink3, letterSpacing: '0.02em' }, note)));
+  return frame(h('div', { flex: 1, alignItems: 'center' },
+    gameSide(d.away, false, size),
+    h('div', { width: 96, flexShrink: 0, justifyContent: 'center', fontFamily: 'Fraunces', fontSize: 40, color: C.ink3, paddingBottom: 50 }, final ? 'final' : 'at'),
+    gameSide(d.home, true, size)), note);
 }
 
 // The big faint letters behind a name (a team's abbreviation, a player's sweater number), as on the page headers.
@@ -97,7 +91,7 @@ function team(d) {
 // bottom edges; with a portrait he stands on the sheet's bottom edge in front of a faint number, as on his page.
 function player(d) {
   const num = d.number != null ? String(d.number) : '';
-  const big = h('div', { position: 'absolute', right: num.length > 1 ? -70 : -20, bottom: -250, fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 720, lineHeight: 1, letterSpacing: '-0.05em', color: d.photo ? tint(d.color, 0.16) : d.color }, num);
+  const big = h('div', { position: 'absolute', right: num.length > 1 ? -140 : -20, bottom: -150, fontFamily: 'Fraunces Big', fontWeight: 600, fontSize: 720, lineHeight: 1, letterSpacing: '-0.05em', color: d.photo ? tint(d.color, 0.16) : d.color }, num);
   const photo = d.photo ? img(d.photo, { position: 'absolute', right: 70, bottom: -2, width: 400, height: 400 }) : null;
   return frame(h('div', { flexDirection: 'column', flex: 1, justifyContent: 'flex-end', maxWidth: num.length > 1 ? 560 : 680 },
     kicker(d.kick),
