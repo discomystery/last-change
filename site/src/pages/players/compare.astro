@@ -212,9 +212,8 @@ const boot = { base, players: skaters.map((p) => [p.id, p.name, p.team, p.pos]),
 <style is:global>
   .cmp-page .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
   .cmp-page .lede { margin-top: 18px; }
-  .cmp-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 18px; font: 600 20px var(--display); font-variation-settings: 'SOFT' 100; }
-  .cmp-pick input { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--team, var(--ink)); border-radius: 8px 8px 0 0; padding: 8px 10px; width: min(100%, 16em); }
-  .cmp-pick input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .cmp-pick { margin-top: 18px; }
+  .cmp-pick input { field-sizing: fixed; width: min(100%, 12em); border-bottom-color: var(--team, var(--ink-3)); }
   .cmp-sugg { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font: 400 14px var(--ui); color: var(--ink-2); }
   .cmp-sugg[hidden] { display: none; }
   #cmp-empty { margin-top: 18px; }
