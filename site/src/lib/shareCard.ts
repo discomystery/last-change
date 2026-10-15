@@ -3,7 +3,7 @@
 // share sheet, then handed to the phone's share sheet or downloaded. Nothing is made on the server.
 import { domToBlob } from 'modern-screenshot';
 import LOGO from '../assets/logo/full.svg?raw';
-import { signed } from './format';
+import { signed, styleWords } from './format';
 
 type Two = { light: string; dark: string };
 type Lane = { team: string | null; ends: [string, string] | null; avg: [number, ...unknown[]] | null; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
@@ -191,9 +191,7 @@ export function teamCard(d: TeamCardData, mode: Mode, theme: Theme) {
   const lanes = d.modes[mode] ?? d.modes.blend;
   const far = (l: ScaleLane) => Math.abs(l.pct - 50);
   const high = lanes.filter((l) => l.pct >= 50), low = lanes.filter((l) => l.pct < 50);
-  // The headline is their three strongest leanings toward the right-hand word, the left-hand ones only to make up three.
-  const byFar = (a: ScaleLane, b: ScaleLane) => far(b) - far(a);
-  const words = [...[...high].sort(byFar), ...[...low].sort(byFar)].slice(0, 3).map((l) => (l.pct >= 50 ? l.ends[1] : l.ends[0]));
+  const words = styleWords(lanes);
   // The least distinctive traits go first if the sheet runs out of room.
   const order = [...lanes].sort((a, b) => far(a) - far(b));
   const opt = (l: ScaleLane) => (lanes.length > 4 && order.indexOf(l) < lanes.length - 4 ? order.indexOf(l) + 1 : undefined);

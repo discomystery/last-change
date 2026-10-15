@@ -3,6 +3,7 @@
 // back), what the preview expected (the win chance kept hidden before the game, the preview's calls exactly as saved
 // at puck drop, each graded by the rule stored with it, and what it didn't see coming), then the players.
 import Base from '../../layouts/Base.astro';
+import { finalOg } from '../../lib/og';
 import Section from '../../components/Section.astro';
 import Rink from '../../components/Rink.astro';
 import GameTrail from '../../components/GameTrail.astro';
@@ -204,7 +205,7 @@ const nav = [
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 ---
-<Base section="games" title={`${away} at ${home}, final`}>
+<Base section="games" title={`${away} at ${home}, final`} description={r.story?.head ? `${r.story.head}. How the preview’s calls held up, the Swing and every report card.` : 'How the preview’s calls held up, the Swing and every report card.'} og={finalOg(r as any)}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />

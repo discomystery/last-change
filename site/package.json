@@ -8,9 +8,12 @@
     "preview": "astro preview"
   },
   "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "astro": "^7.3.8",
     "d3-geo": "^3.1.1",
-    "modern-screenshot": "4.7.0"
+    "modern-screenshot": "4.7.0",
+    "satori": "0.57.2",
+    "upng-js": "2.1.0"
   },
   "devDependencies": {
     "topojson-client": "^3.1.0",

@@ -3,6 +3,7 @@ import { srcInfo, srcPhrase } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
 // Team page: next game, results and schedule, season trend, fingerprint, lines, special teams, goalies, goal sources.
 import Base from '../../layouts/Base.astro';
+import { teamOg } from '../../lib/og';
 import Section from '../../components/Section.astro';
 import teams from '../../../public/data/teams.json';
 import schedule from '../../../public/data/schedule.json';
@@ -135,7 +136,7 @@ const coachSince = coach && (team as any).coach_since
   ? new Date(`${(team as any).coach_since}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
   : null;
 ---
-<Base section="teams" title={team.name}>
+<Base section="teams" title={team.name} description={`How the ${team.name} play: style, lines, special teams, goalies and where their goals come from.`} og={teamOg(abbr!)}>
   <AreaShapes />
   <nav class="crumbs" aria-label="Where this team sits"><a href={`${base}teams/`}>Teams</a><span aria-hidden="true">›</span><span>{team.division} Division</span><span aria-hidden="true">›</span><span aria-current="page">{team.name}</span></nav>
   <div class="tcard-wrap" style={`--team:${teamPaint(abbr)}`}>

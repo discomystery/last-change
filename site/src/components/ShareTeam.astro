@@ -3,25 +3,16 @@
 // here, for both season readings; the card follows the visitor's Seasons setting.
 import ShareDialog from './ShareDialog.astro';
 import { cardColours } from '../lib/teams';
-import { fpInfo, ordinal } from '../lib/traits';
+import { ordinal } from '../lib/traits';
 import teamsData from '../../public/data/teams.json';
 import fpData from '../../public/data/fingerprints.json';
+import { teamLanes } from '../lib/og';
 import type { ScaleLane, TeamCardData } from '../lib/shareCard';
 
 interface Props { abbr: string }
 const { abbr } = Astro.props;
 const t = teamsData.find((x) => x.abbr === abbr)!;
-type Est = { pct: number | null; lo: number; hi: number; rank: number };
-const dims = (fpData.teams as unknown as Record<string, { dims: Record<string, Record<'blend' | 'season', Est | null>> }>)[abbr].dims;
-// Six traits: those whose likely range sits clear of the middle first (as "What sets them apart" picks), then the
-// next furthest from average, each list most extreme first.
-const pick = (mode: 'blend' | 'season'): ScaleLane[] => {
-  const ok = fpData.ready.filter((k) => dims[k]?.[mode]?.pct != null && fpInfo[k]).map((k) => ({ k, e: dims[k][mode]! }));
-  const far = (x: { e: Est }) => Math.abs(x.e.pct! - 50);
-  const clear = ok.filter((x) => x.e.lo >= 65 || x.e.hi <= 35).sort((a, b) => far(b) - far(a));
-  const rest = ok.filter((x) => !clear.includes(x)).sort((a, b) => far(b) - far(a));
-  return [...clear, ...rest].slice(0, 6).map(({ k, e }) => ({ label: fpInfo[k].label, rank: ordinal(e.rank), pct: e.pct!, lo: e.lo, hi: e.hi, ends: [fpInfo[k].lo, fpInfo[k].hi] }));
-};
+const pick = (mode: 'blend' | 'season'): ScaleLane[] => teamLanes(abbr, mode);
 const day = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }).format(new Date(iso));
 const data: TeamCardData = {
   abbr, name: t.name, place: t.place, own: cardColours(abbr, abbr).own[abbr], asOf: day(fpData.generated_at),

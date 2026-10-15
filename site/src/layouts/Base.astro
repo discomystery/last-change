@@ -4,8 +4,11 @@ import teams from '../../public/data/teams.json';
 import '../styles/motion.css';
 import SiteTools from '../components/SiteTools.astro';
 import { teamPaint } from '../lib/teams';
+import type { OgCard } from '../lib/og';
+import { createHash } from 'node:crypto';
+import { OG_REV } from '../lib/og';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
-interface Props { title: string; description?: string; section?: Section }
+interface Props { title: string; description?: string; section?: Section; og?: OgCard }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
 // Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
@@ -20,6 +23,16 @@ const cur = (id: Section) => (section === id ? 'page' : undefined);
 const base = import.meta.env.BASE_URL;
 const teamList = teams as { abbr: string; name: string; nick: string }[];
 // For the settings script: each club's colour (light-dark() pair) and nickname, for the team pill and its page link.
+// Link preview (lib/og.ts, drawn after the build by og/integration.mjs): this page's own card, or a plain one with its
+// name. The image sits at og/{page path}.png; ?v= changes with the card, so apps that keep old previews fetch the new one.
+const route = Astro.url.pathname.slice(base.length).replace(/\/$/, '');
+const ogCard: OgCard = Astro.props.og ?? (route === '' ? { kind: 'home' } : { kind: 'page', kick: SITE_NAME, title, text: Astro.props.description });
+const ogJson = JSON.stringify(ogCard);
+const ogImage = new URL(`${base}og/${route || 'home'}.png?v=${createHash('sha1').update(OG_REV + ogJson).digest('hex').slice(0, 10)}`, Astro.site).href;
+const ogAlt = ogCard.kind === 'home' ? SITE_NAME
+  : ogCard.kind === 'final' ? `${ogCard.away.ab} ${ogCard.away.score}, ${ogCard.home.ab} ${ogCard.home.score}, final`
+  : ogCard.kind === 'preview' ? `${ogCard.away.ab} at ${ogCard.home.ab}, ${ogCard.date}`
+  : `${'name' in ogCard ? ogCard.name : ogCard.title} on ${SITE_NAME}`;
 const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(t.abbr), n: t.nick }]));
 ---
 <!doctype html>
@@ -32,10 +45,18 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     <meta property="og:site_name" content={SITE_NAME} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={new URL(`${base}share-card.png`, Astro.site).href} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site).href} />
+    <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogAlt} />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogAlt} />
+    <script type="application/json" data-og set:html={ogJson.replace(/</g, '\\u003c')} />
     <title>{title === SITE_NAME ? title : `${title} · ${SITE_NAME}`}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />

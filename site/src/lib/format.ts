@@ -23,3 +23,11 @@ export const ordinal = (n: number) => {
 
 /** A Swing-style number: one decimal, a true minus sign, and "0.0" for anything that rounds to zero. */
 export const signed = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
+
+/** "Stingy. Predatory. Relentless.": the three strongest leanings toward a right-hand word, left-hand ones to make up three. */
+export function styleWords(lanes: { pct: number; ends: [string, string] }[]) {
+  const far = (l: { pct: number }) => Math.abs(l.pct - 50);
+  const byFar = (a: { pct: number }, b: { pct: number }) => far(b) - far(a);
+  const high = lanes.filter((l) => l.pct >= 50).sort(byFar), low = lanes.filter((l) => l.pct < 50).sort(byFar);
+  return [...high, ...low].slice(0, 3).map((l) => (l.pct >= 50 ? l.ends[1] : l.ends[0]));
+}
