@@ -89,15 +89,34 @@ LABEL = {"goals": "Goals", "assists": "Assists", "points": "Points", "gwg": "Gam
          "otg3": "3-on-3 overtime goals"}
 
 
-def tile(x: dict, who: str) -> dict:
-    """One record-book tile: rank (with a tie), the stat and list, his total, and the names around him; `say` is the
-    same as a sentence, for screen readers and the tooltip."""
+ROWS = 3  # a tile's leaderboard shows at least three players (Sora: "1, 2 and 3" for a third-place player)
+
+
+def tile(x: dict, who: str, full: str | None = None) -> dict:
+    """One record-book tile: the stat and list, an outright-record flag, and a small leaderboard (`rows`): the one or two
+    ahead of him, or a gap and the next one up; him; anyone level with him (all of them up to two, else one and "N
+    more"); then the players below him until the board has ROWS players. `say` is the same as a sentence, for screen
+    readers."""
     a = x["args"]
-    ahead, level = a["ahead"], a["level"]
+    ahead, level, below = a["ahead"], a["level"], x["below"]
+    rank = len(ahead) + 1
+    rows: list[dict] = []
     near = ahead if len(ahead) <= 2 else ahead[-1:]  # the leaders when he is near the top, else the next one up
-    return {"tag": x["tag"], "rank": len(ahead) + 1, "tied": bool(level), "stat": x["stat"], "scope": x["scope"], "total": a["a"],
-            "ahead": [[n, v, 1 + sum(1 for _, w in ahead if w > v)] for n, v in near], "next": len(ahead) > 2, "level": level[:2], "more": max(0, len(level) - 2),
-            "below": [list(n) for n in x["below"]] if not ahead and not level else [],
+    if len(ahead) > 2:
+        rows.append({"gap": True})
+    for n, v in near:
+        rows.append({"rank": 1 + sum(1 for _, w in ahead if w > v), "tied": sum(1 for _, w in ahead if w == v) > 1, "who": n, "n": v})
+    rows.append({"rank": rank, "tied": bool(level), "who": full or who, "n": a["a"], "me": True})
+    shown = level if len(level) <= 2 else level[:1]
+    rows += [{"rank": rank, "tied": True, "who": n, "n": a["a"]} for n in shown]
+    if len(level) > len(shown):
+        rows.append({"rank": rank, "tied": True, "who": f"{len(level) - len(shown)} more", "n": a["a"], "more": True})
+    after = rank + len(level) + 1  # the first rank below him and anyone level
+    for k, (n, v) in enumerate(below):
+        if sum(1 for r in rows if not r.get("gap")) >= ROWS:
+            break
+        rows.append({"rank": after + sum(1 for _, w in below[:k] if w > v), "tied": sum(1 for _, w in below if w == v) > 1, "who": n, "n": v})
+    return {"tag": x["tag"], "stat": x["stat"], "scope": x["scope"], "record": rank == 1 and not level, "rows": rows,
             "active": bool(a.get("active_first")) and bool(ahead), "say": sentence(who, **a)}
 
 
@@ -130,7 +149,7 @@ def league_notes(season: int, names: dict[int, str], last: dict[int, str], activ
                 continue
             level = [_name(x, names) for x, v in tot if v == a and x["playerId"] != pid]
             first_active = not any(x["playerId"] in active for x, v in tot if v >= a and x["playerId"] != pid)
-            below = [(_name(x, names), v) for x, v in tot if v < a][:1]
+            below = [(_name(x, names), v) for x, v in tot if v < a][:4]
             out.setdefault(pid, []).append({
                 "tag": "NHL history", "list": name, "rank": len(ahead) + 1, "score": (len(ahead) + 1) / top,
                 "args": dict(a=a, ahead=ahead, level=level, what=WHAT[name], where=WHERE[name], active_first=first_active),
@@ -167,7 +186,7 @@ def club_notes(season: int, names: dict[int, str], last: dict[int, str], active:
                 if len(ahead) + 1 > CLUB_TOP or (best and len(ahead) + 1 >= best["rank"]):
                     continue
                 level = [_name(x, names) for x in lead if val(x) == a and x["playerId"] != pid]
-                below = sorted(((_name(x, names), val(x)) for x in lead if val(x) < a), key=lambda y: -y[1])[:1]
+                below = sorted(((_name(x, names), val(x)) for x in lead if val(x) < a), key=lambda y: -y[1])[:4]
                 best = {"tag": "Club history", "rank": len(ahead) + 1, "score": 0.5 * (len(ahead) + 1) / CLUB_TOP,
                         "args": dict(a=a, ahead=ahead, level=level, what=stat, club=W.poss(t)),
                         "stat": stat.capitalize(), "scope": f"{W.nick.get(t, t)} all-time", "below": below}
@@ -200,7 +219,7 @@ def run(season: int) -> dict:
         xs.sort(key=lambda x: x["score"])
         ot = [x for x in xs if x.get("list") in ("otg", "otg3")]
         xs = [x for x in xs if x not in ot[1:]]  # career and 3-on-3 overtime goals are mostly the same goals: the better rank
-        out[str(pid)] = [tile(x, last[pid]) for x in xs[:MOST]]
+        out[str(pid)] = [tile(x, last[pid], names[pid]) for x in xs[:MOST]]
     (SITE_DATA / "records.json").write_text(json.dumps({"asof": dates.max() if len(dates) else None, "players": out},
                                                        separators=(",", ":"), ensure_ascii=False))
     records.leaders.cache_clear()

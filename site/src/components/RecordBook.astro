@@ -1,11 +1,11 @@
 ---
 // "In the record books": where a player stands on the NHL's and his club's all-time lists (pipeline/export/record_book.py),
-// as tiles with a small leaderboard each: the names just ahead (or just behind, for a leader), him, and anyone level.
+// as tiles with a small leaderboard each (rows built in the pipeline: who is ahead, him, anyone level, who is below).
 // Drawn as the name card's last strip, under the intro. Read through a glob so a build without the file still works.
-interface Props { id: number; name: string }
-const { id, name } = Astro.props;
-type Tile = { tag: string; rank: number; tied: boolean; stat: string; scope: string; total: number; ahead: [string, number, number][];
-  next: boolean; level: string[]; more: number; below: [string, number][]; active: boolean; say: string };
+interface Props { id: number }
+const { id } = Astro.props;
+type Row = { gap?: boolean; rank: number; tied: boolean; who: string; n: number; me?: boolean; more?: boolean };
+type Tile = { tag: string; stat: string; scope: string; record: boolean; rows: Row[]; active: boolean; say: string };
 const files = import.meta.glob('../../public/data/records.json', { eager: true, import: 'default' }) as Record<string, any>;
 const book = Object.values(files)[0] as { asof: string | null; players: Record<string, Tile[]> } | undefined;
 const tiles = book?.players?.[id] ?? [];
@@ -13,17 +13,6 @@ const asof = book?.asof ? new Date(`${book.asof}T12:00:00Z`).toLocaleDateString(
 const tip = `Regular-season totals${asof ? ` through the games of ${asof}` : ''}. The NHL’s all-time lists come from the league’s records site, with every game since its last update added from the play-by-play; club lists count the seasons a player spent with that franchise, including its earlier homes.`;
 const ord = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
 const fmt = (n: number) => n.toLocaleString('en-US');
-const rows = (t: Tile) => {
-  const me = { rank: t.rank, who: name, n: t.total, me: true, tied: t.tied };
-  const out: { rank: number | null; who: string; n: number | null; me?: boolean; tied?: boolean; gap?: boolean }[] = [];
-  if (t.next) out.push({ rank: null, who: '', n: null, gap: true });
-  for (const [who, n, rank] of t.ahead) out.push({ rank, who, n, tied: t.ahead.filter((x) => x[1] === n).length > 1 });
-  out.push(me);
-  for (const who of t.level) out.push({ rank: t.rank, who, n: t.total, tied: true });
-  if (t.more) out.push({ rank: t.rank, who: `${t.more} more`, n: t.total, tied: true });
-  for (const [who, n] of t.below) out.push({ rank: t.rank + 1, who, n });
-  return out;
-};
 ---
 {tiles.length > 0 && (
   <section class="precs" aria-label="In the record books">
@@ -33,13 +22,13 @@ const rows = (t: Tile) => {
         <div class="rb-tile" aria-label={t.say}>
           <div class="rb-head">
             <p class="rb-stat">{t.stat}</p>
-            {t.rank === 1 && !t.tied && <span class="chip">{t.tag === 'Club history' ? 'Club record' : 'NHL record'}</span>}
+            {t.record && <span class="chip">{t.tag === 'Club history' ? 'Club record' : 'NHL record'}</span>}
           </div>
           <p class="rb-scope">{t.scope}</p>
           <ol class="rb-board" aria-hidden="true">
-            {rows(t).map((r) => r.gap
+            {t.rows.map((r) => r.gap
               ? <li class="gap"><span>⋮</span></li>
-              : <li class:list={[r.me && 'me']}><span class="rk">{r.tied ? 'T-' : ''}{ord(r.rank!)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n!)}</span></li>)}
+              : <li class:list={[r.me && 'me', r.more && 'more']}><span class="rk">{r.tied ? 'T-' : ''}{ord(r.rank)}</span><span class="who">{r.who}</span><span class="n">{fmt(r.n)}</span></li>)}
           </ol>
           {t.active && <p class="rb-act">Most of any active player</p>}
         </div>
@@ -65,6 +54,7 @@ const rows = (t: Tile) => {
   .rb-board li.me { color: var(--ink); font-weight: 700; }
   .rb-board li.me .rk { color: var(--team); }
   .rb-board li.me .who { color: var(--team); }
+  .rb-board li.more .who { color: var(--ink-3); }
   .rb-board li.gap { display: block; padding: 0 0 2px; color: var(--ink-3); line-height: 1; border-top: 0; }
   .rb-board li.gap + li { border-top: 0; }
   .rb-act { margin: auto 0 0; padding-top: 8px; font: 400 13px var(--ui); color: var(--ink-3); }
