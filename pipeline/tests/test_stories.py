@@ -65,3 +65,32 @@ def test_goal_streaks_lead():
     assert stories.streak_text(3, 7, 10) == "a point in seven straight games, with a goal in each of the last three"
     assert stories.streak_text(2, 6, 10) == "a point in six straight games"
     assert stories.streak_text(3, 3, 9, " against Dallas") == "scored in three straight games against Dallas"
+
+
+def _pbp(tmp_path, plays, gid=2026020107):
+    import gzip
+    d = tmp_path / "2026" / "pbp"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{gid}.json.gz").write_bytes(gzip.compress(json.dumps({"homeTeam": {"id": 21}, "plays": plays}).encode()))
+
+
+def test_league_reviewed_goals_taken_off(tmp_path, monkeypatch):
+    """DAL at COL 2026-10-14 as the feed has it: an offside challenge by Dallas, then a league review of Colorado's
+    kicked goal (no reason given, neutral-zone restart on Colorado's side, Colorado shot two seconds before)."""
+    monkeypatch.setattr(stories, "RAW", tmp_path)
+    p1 = {"number": 1}
+
+    def play(t, kind, **det):
+        return {"typeDescKey": kind, "timeInPeriod": t, "periodDescriptor": p1, "homeTeamDefendingSide": "right", "details": det}
+    plays = [play("01:55", "stoppage", reason="chlg-vis-off-side"), play("01:55", "faceoff", xCoord=-20),
+             play("09:27", "shot-on-goal", xCoord=-66, eventOwnerTeamId=21),
+             play("09:29", "stoppage", reason="referee-or-linesman", secondaryReason="video-review"), play("09:29", "faceoff", xCoord=-20),
+             # an end-zone restart: the review found no goal, so nothing came off
+             play("12:00", "shot-on-goal", xCoord=80, eventOwnerTeamId=25),
+             play("12:01", "stoppage", reason="video-review", secondaryReason="video-review"), play("12:01", "faceoff", xCoord=69),
+             # a penalty review restarting in the neutral zone is not a goal
+             play("15:00", "shot-on-goal", xCoord=-60, eventOwnerTeamId=21),
+             play("15:02", "penalty"), play("15:02", "stoppage", reason="video-review"), play("15:02", "faceoff", xCoord=-20)]
+    _pbp(tmp_path, plays)
+    out = stories._overturned(2026020107, 2026)
+    assert [(x["home"], x["why"], x["sec"]) for x in out] == [(True, "for offside", 115), (True, "after a video review", 569)]
