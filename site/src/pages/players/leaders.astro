@@ -43,6 +43,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
         <span>in</span>
         <select id="year" aria-label="Season">{yrs.map((s) => <option value={s}>{yearWord(s)}</option>)}</select>
       </div>
+      <div class="ldr-grid" id="ldr"></div>
       <div class="lead-tools">
         <label class="search for-p">
           <span class="stsr">Find a player in this list</span>
@@ -50,6 +51,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
           <input id="q" type="search" placeholder="Find a name" autocomplete="off" spellcheck="false" />
         </label>
         <p class="pick sortpick"><span>sorted by</span><select id="sort" aria-label="Sort by"></select></p>
+        <p class="pick sortpick" id="grp-wrap"><span>showing</span><select id="grp" aria-label="Which stats"></select></p>
       </div>
       <p class="lead-tip" id="lead-tip" aria-live="polite"></p>
       <div class="card lead-card">
@@ -86,6 +88,17 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
       t: ['gp', 'w', 'l', 'otl', 'pts', 'ptspct', 'rw', 'gf', 'ga', 'gfpg', 'gapg', 'diff', 'pppct', 'ppg', 'ppo', 'pkpct', 'ppga', 'tsh', 'shgf', 'shga', 'sfpg', 'sapg', 'fopct', 'hit', 'blk', 'tk', 'gv'],
     };
     const FIRST: Record<string, string> = { s: 'p', g: 'w', t: 'pts' };
+    // Column groups, like the career ledger's menu; the sorted column always shows.
+    const GROUPS: Record<string, [string, string, string[]][]> = {
+      s: [['sc', 'scoring', ['gp', 'g', 'a', 'p', 'pm', 'pim']], ['sp', 'power play and shorthanded', ['gp', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'pptoi', 'shtoi']],
+        ['sh', 'shooting and ice time', ['gp', 's', 'spct', 'gwg', 'otg', 'toi', 'fopct']], ['ph', 'hits and blocks', ['gp', 'hit', 'blk', 'tk', 'gv']]],
+      g: [],
+      t: [['sc', 'results', ['gp', 'w', 'l', 'otl', 'pts', 'ptspct', 'rw', 'gf', 'ga', 'diff']], ['sp', 'power play and penalty kill', ['gp', 'pppct', 'ppg', 'ppo', 'pkpct', 'ppga', 'tsh', 'shgf', 'shga']],
+        ['sh', 'shots and goals a game', ['gp', 'gfpg', 'gapg', 'sfpg', 'sapg', 'fopct']], ['ph', 'hits and blocks', ['gp', 'hit', 'blk', 'tk', 'gv']]],
+    };
+    // The leader cards above the table: the top three in the stats fans look up first.
+    const LEAD: Record<string, string[]> = { s: ['p', 'g', 'a', 'ppg'], g: ['w', 'svpct', 'gaa', 'so'], t: ['pts', 'diff', 'pppct', 'pkpct'] };
+    const grpSel = $('grp');
     // Ties on the sorted stat: the usual tiebreaks (more goals, fewer games; more wins; better points %).
     const TIE: Record<string, [string, number][]> = { s: [['g', -1], ['gp', 1]], g: [['svpct', -1], ['gp', 1]], t: [['ptspct', -1], ['rw', -1]] };
     const files: Record<string, any> = {};
@@ -100,6 +113,9 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
 
     const fillSort = () => {
       const k = kindSel.value, d = defs[k];
+      const gs = GROUPS[k];
+      $('grp-wrap').hidden = !gs.length;
+      grpSel.innerHTML = gs.map(([v, w]) => `<option value="${v}">${w}</option>`).join('') + '<option value="all">every stat</option>';
       sortSel.innerHTML = COLS[k].filter((c) => c !== 'gp' || k === 's').map((c) => `<option value="${c}">${esc(d[c].name.toLowerCase())}</option>`).join('');
       if (!COLS[k].includes(sortKey)) sortKey = FIRST[k];
       sortSel.value = sortKey;
@@ -114,6 +130,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
       // The most games any club has played, for who qualifies on a rate.
       const tf = await load('t');
       const gp = Math.max(1, ...(tf.seasons[year] ?? []).map((r: any[]) => r[tf.cols.indexOf('gp')]));
+      const team = k === 't' ? '' : teamSel.value;
       const st = d[sortKey], dir = (st.low ? 1 : -1) * (flip ? -1 : 1);
       const qual = (r: any) => !st.q || QUAL[st.q as keyof typeof QUAL](r, gp);
       const words = fold(q.value.trim()).split(/\s+/).filter(Boolean);
@@ -134,11 +151,23 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
         prev = r[sortKey];
         r._rk = rank;
       });
-      const team = k === 't' ? '' : teamSel.value;
       const xs = pool.filter((r: any) => (!team || String(r.team ?? '').split(', ').includes(team)) && (k === 't' || words.every((w) => fold(r.name).includes(w))));
       const at = focus ? xs.findIndex((r: any) => String(r.id ?? r.team) === focus) : -1;
       const limit = words.length || team ? xs.length : Math.max(shown, at + 6);
-      const cols = narrow.matches ? [sortKey, ...COLS[k].filter((c) => c !== sortKey)] : COLS[k];
+      const grp = GROUPS[k].find(([v]) => v === grpSel.value);
+      const shownCols = grp ? COLS[k].filter((c) => grp[2].includes(c) || c === sortKey) : COLS[k];
+      const cols = narrow.matches ? [sortKey, ...shownCols.filter((c) => c !== sortKey)] : shownCols;
+      // Leader cards: the top three on each card's stat among the players the menus pick (qualified ones on rates).
+      const inMenus = all.filter((r: any) => (k !== 's' || posOk(r.pos, posSel.value)) && (!team || String(r.team ?? '').split(', ').includes(team)));
+      $('ldr').innerHTML = LEAD[k].map((c) => {
+        const sd = d[c], sgn = sd.low ? 1 : -1;
+        const top = inMenus.filter((r: any) => r[c] != null && (!sd.q || QUAL[sd.q as keyof typeof QUAL](r, gp))).sort((a: any, b: any) => sgn * (a[c] - b[c]) || TIE[k].reduce((t, [tc, ts]) => t || ts * ((a[tc] ?? 0) - (b[tc] ?? 0)), 0)).slice(0, 3);
+        const rows = top.map((r: any) => {
+          const nm = k === 't' ? pill(r.team) : `${pages.has(r.id) ? `<a class="plink" href="${base}player/${r.id}/">${esc(r.name)}</a>` : esc(r.name)}`;
+          return `<li><span class="ldr-who">${nm}${k === 't' ? '' : String(r.team).split(', ').map(pill).join('')}</span><span class="ldr-v">${(FMT as any)[sd.f](r[c])}</span></li>`;
+        }).join('');
+        return `<div class="card ldr${c === sortKey ? ' on' : ''}"><button type="button" class="ldr-h eyebrow" data-sort="${c}">${esc(sd.name)}</button><ol>${rows}</ol></div>`;
+      }).join('');
       const head = `<thead><tr><th class="rk">#</th><th class="who">${k === 't' ? 'Team' : 'Player'}</th>${k === 't' ? '' : '<th class="tm">Team</th>'}${k === 's' ? '<th class="ps">Pos</th>' : ''}${cols.map((c) => `<th class="${c === sortKey ? 'on' : ''}"><button type="button" data-sort="${c}" data-tip="${esc(d[c].name)}: ${esc(d[c].tip)}" aria-label="Sort by ${esc(d[c].name)}">${esc(d[c].short)}${c === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`).join('')}</tr></thead>`;
       const mine = (window as any).lcPrefs?.get('team');
       const body = xs.slice(0, limit).map((r: any) => {
@@ -180,6 +209,12 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
     fillSort();
     kindSel.addEventListener('change', () => { focus = ''; shown = 50; flip = false; fillSort(); paint(); });
     [posSel, teamSel, yearSel].forEach((s) => s.addEventListener('change', () => { shown = 50; paint(); }));
+    grpSel.addEventListener('change', () => paint());
+    $('ldr').addEventListener('click', (e: Event) => {
+      const b = (e.target as HTMLElement).closest('button[data-sort]') as HTMLElement | null;
+      if (!b) return;
+      sortKey = b.dataset.sort!; flip = false; shown = 50; paint();
+    });
     sortSel.addEventListener('change', () => { sortKey = sortSel.value; flip = false; shown = 50; paint(); });
     q.addEventListener('input', () => paint());
     $('table').addEventListener('click', (e: Event) => {
@@ -205,6 +240,21 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   .lead-tools .search { display: flex; align-items: center; gap: 10px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 2px 14px; flex: 0 1 300px; min-width: 0; }
   .lead-tools .search svg { width: 20px; height: 20px; fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; flex: none; }
   .lead-tools .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--ui); padding: 10px 0; outline: none; }
+  #grp-wrap[hidden] { display: none; }
+  .ldr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 16px; }
+  .ldr { padding: 14px 16px 10px; }
+  .ldr.on { border-color: var(--ink-3); }
+  .ldr-h { all: unset; cursor: pointer; display: block; margin-bottom: 6px; }
+  .ldr-h:hover { color: var(--ink); }
+  .ldr ol { list-style: none; margin: 0; padding: 0; }
+  .ldr li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); font: 500 14px var(--ui); }
+  .ldr li:first-child { border-top: 0; }
+  .ldr li:first-child .ldr-v { font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .ldr-who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .ldr-who .plink { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 6px; margin-bottom: -6px; }
+  .ldr-who .chip { flex: none; text-decoration: none; }
+  .ldr-v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  @media (max-width: 719px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ldr { padding: 12px; } .ldr li { font-size: 13px; } .ldr-who .chip { display: none; } }
   .lead-tip { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 14px 0 0; min-height: 1.45em; }
   .lead-tip b { color: var(--ink); font-weight: 600; }
   .lead-card { margin-top: 12px; padding: 8px 0 14px; }
