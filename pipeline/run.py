@@ -190,6 +190,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["home"] = home.run(season)  # last night's results and today's games change on game nights
     from pipeline.export import stats
     out["stats"] = stats.run(season)  # tonight's goals and assists in the season lines and the Leaders page
+    from pipeline.export import ledger
+    out["ledger"] = ledger.run(season)  # this season's line in each player's career ledger
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
 

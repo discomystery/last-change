@@ -15,7 +15,7 @@ import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
 import PlayerStats from '../../components/PlayerStats.astro';
-import { lines as statLines } from '../../lib/stats';
+import { ledgerOf } from '../../lib/ledger';
 import SharePlayer from '../../components/SharePlayer.astro';
 import ShareButton from '../../components/ShareButton.astro';
 import { cardsFor } from '../../lib/reportCards';
@@ -110,7 +110,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   const top = Math.max(1, ...Object.values(areas).map((a) => a.share));
   return (a: Area) => Math.sqrt(a.share / top);
 };
-const hasLine = statLines(isG ? 'goalies' : 'skaters', p.id).length > 0;
+const hasLine = !!ledgerOf(p.id)?.rows.length;
 const statsNav = hasLine ? [['stats', 'Stats']] : [];
 const nav = isG && !g ? [] : isG ? [['role', 'Role'], ...statsNav, ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...statsNav, ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.

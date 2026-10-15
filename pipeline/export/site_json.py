@@ -31,6 +31,8 @@ def run(season: int) -> dict:
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import stats
     stats.run(season)  # the league's own counting stats: player and team pages, the Leaders page
+    from pipeline.export import ledger
+    ledger.run(season)  # player pages' career ledger: every season's line and his trophies
     from pipeline.export import previews
     previews.run()  # last: reads the JSON written above
     from pipeline.export import pregame
