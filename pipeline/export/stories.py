@@ -1939,7 +1939,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             first = "first goal" if pr["g"] == 1 else f"first {num(int(pr['g']))} goals"  # Crosby scored two (2026-10-13)
             items.append({"tag": "Finally", "text": f"{N[pr['player_id']]} scored his {first} of the season.", "score": 48})
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
-    items += _club_lists(r["date"], tonight, N, W, season)
+    league = []
+    try:
+        from pipeline.export import league_lists
+        league = league_lists.moves(gid, r["date"], tonight.filter(pl.col("pts") > 0)["player_id"].to_list(), N, season, _club_logs())
+    except Exception as e:  # a nice-to-have: never lose the story over it
+        print(f"league lists for {gid} unavailable: {e!r}")
+    items += league
+    items += [x for x in _club_lists(r["date"], tonight, N, W, season) if x["pid"] not in {y["pid"] for y in league}]
     if any(x["tag"] == "Rematch" and "split the two-game set" in x["text"] for x in items):  # same news, said once
         items = [x for x in items if "bounced back after" not in x["text"]]
     nxt = _next_games(r["date"], (away, home))

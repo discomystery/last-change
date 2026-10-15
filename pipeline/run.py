@@ -81,6 +81,7 @@ def update(season: int) -> dict:
         out["careers"] = careers.update(season)  # NHL career history for the page intros, a capped batch per run
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
         out["records"] = records.update()  # franchise all-time scoring lists from records.nhl.com, weekly
+        out["league_lists"] = records.league_update(season)  # NHL all-time lists, a snapshot each update, for post-game stories
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
     if season == CURRENT_SEASON:

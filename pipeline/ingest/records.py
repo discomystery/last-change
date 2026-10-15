@@ -95,3 +95,56 @@ def seasons_of(fid: int) -> int:
 @lru_cache(maxsize=None)
 def leaders(fid: int) -> list[dict]:
     return _read(f"leaders/{fid}.json") or []
+
+
+# --- league-wide lists (Sora, 2026-10-15: "Sebastian Aho is second in 3-on-3 overtime game-winning goals") ---------
+
+LEAGUE = DIR / "league"
+LEAGUE_DEPTH = 100
+LEAGUE_KEEP = 3  # days of snapshots kept: stories use the latest, wound back to each game with our own counts
+# name: (source, sort field, first season counted); the records site's career rows with no franchise are NHL careers
+LISTS = {
+    "goals": ("records", "goals", None),
+    "assists": ("records", "assists", None),
+    "points": ("records", "points", None),
+    "gwg": ("records", "gameWinningGoals", None),
+    "otg": ("records", "overtimeGoals", None),
+    "otg3": ("stats", "otGoals", 20152016),  # overtime went to 3-on-3 in 2015-16
+}
+KEEP = ("playerId", "goals", "assists", "points", "gameWinningGoals", "overtimeGoals", "otGoals", "firstName", "lastName",
+        "skaterFullName", "activePlayer")
+
+
+def league_update(season: int) -> dict:
+    """Today's top LEAGUE_DEPTH on each league-wide list, saved as one snapshot with the time it was taken."""
+    if OFFLINE:
+        return {"skipped": "offline"}
+    from pipeline.config import NHL_STATS
+    out = {"fetched": time.time(), "lists": {}}
+    try:
+        for name, (src, field, first) in LISTS.items():
+            sort = json.dumps([{"property": field, "direction": "DESC"}, {"property": "playerId", "direction": "ASC"}])
+            if src == "records":
+                rows = _query("skater-career-scoring-regular-season", cayenneExp="franchiseId=null", sort=sort, limit=LEAGUE_DEPTH)
+            else:
+                from urllib.parse import urlencode
+                exp = f"seasonId>={first} and seasonId<={season}{season + 1} and gameTypeId=2"
+                rows = get(f"{NHL_STATS}/skater/summary?" + urlencode({"cayenneExp": exp, "isAggregate": "true", "isGame": "false",
+                                                                       "sort": sort, "limit": LEAGUE_DEPTH})).json()["data"]
+            out["lists"][name] = [{k: r[k] for k in KEEP if k in r} for r in rows]
+    except Exception as e:  # never stops the update
+        print(f"league lists unavailable: {e!r}")
+        return {"error": repr(e)[:200]}
+    day = time.strftime("%Y-%m-%dT%H%M", time.gmtime(out["fetched"]))
+    LEAGUE.mkdir(parents=True, exist_ok=True)
+    (LEAGUE / f"{day}.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
+    for old in sorted(LEAGUE.glob("*.json"))[:-LEAGUE_KEEP * 4]:  # up to four runs a day
+        old.unlink()
+    league_snapshots.cache_clear()
+    return {"lists": len(out["lists"])}
+
+
+@lru_cache(maxsize=1)
+def league_snapshots() -> list[dict]:
+    """Every saved snapshot, oldest first."""
+    return [json.loads(p.read_text()) for p in sorted(LEAGUE.glob("*.json"))] if LEAGUE.exists() else []
