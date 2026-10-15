@@ -128,7 +128,49 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           if (cur !== out) write(out);
         };
         const skip = (el) => el && el.closest && el.closest(SKIP);
-        const fixText = (t) => { if (!skip(t.parentElement)) redo(t, t.data, (v) => { t.data = v; }); };
+        // Numbers in the serif text are set in the sans (Sora, 2026-10-15, after the line-matchups mock-up): a stat inside
+        // a sentence ("7:47 of their 11:28", "68%", "0.38 to 0.11", "3rd") reads as a figure. Only text drawn in the body
+        // serif; dates ("Oct 13"), seasons (2025-26) and term-like numbers ("5-on-5", "L1") stay in the serif. A number
+        // keeps its unit in the same piece ("34 ft") so the metric switch above still sees them together; each piece is
+        // split off before it is converted, so it keeps its own original.
+        const STAT = /(^|[^\w.\-–#])([+−-]?\d(?:[\d,]*\d)?(?:[.:]\d+)?(?:[-–]\d+)*(?:%|st|nd|rd|th)?(?:\s?(?:mph|ft|feet|miles?|km\/h|km|metres?))?)(?![\w\-–]|[.:]\d)/g;
+        const DATE = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s$/;
+        const serif = new WeakMap();
+        const inSerif = (el) => {
+          if (!el || el.closest('.sn,select,option,svg,title,head,[data-serif-num]')) return false;
+          if (!serif.has(el)) serif.set(el, /Literata/.test(getComputedStyle(el).fontFamily.split(',')[0]));
+          return serif.get(el);
+        };
+        const sansNumbers = (t) => {
+          const s = t.data;
+          if (!/\d/.test(s) || !inSerif(t.parentElement)) return null;
+          const bits = [];
+          let last = 0;
+          s.replace(STAT, (m, pre, n, i) => {
+            const at = i + pre.length;
+            if (/^(19|20)\d\d(?:[-–]\d\d)?$/.test(n) || DATE.test(s.slice(0, at))) return m;
+            bits.push([last, at, false], [at, at + n.length, true]);
+            last = at + n.length;
+            return m;
+          });
+          if (!bits.length) return null;
+          bits.push([last, s.length, false]);
+          const out = [], frag = document.createDocumentFragment();
+          for (const [a, b, num] of bits) {
+            if (a === b) continue;
+            const tx = document.createTextNode(s.slice(a, b));
+            if (num) { const sp = document.createElement('span'); sp.className = 'sn'; sp.append(tx); frag.append(sp); } else frag.append(tx);
+            out.push(tx);
+          }
+          t.replaceWith(frag);
+          return out;
+        };
+        const fixText = (t) => {
+          if (skip(t.parentElement)) return;
+          const parts = sansNumbers(t);
+          if (parts) return parts.forEach((x) => redo(x, x.data, (v) => { x.data = v; }));
+          redo(t, t.data, (v) => { t.data = v; });
+        };
         const fixAttrs = (el) => {
           if (skip(el)) return;
           ATTRS.forEach((a) => {
@@ -146,7 +188,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           if (node.nodeType !== 1) return;
           fixAttrs(node);
           const w = document.createTreeWalker(node, 5);
-          for (let n = w.nextNode(); n; n = w.nextNode()) n.nodeType === 3 ? fixText(n) : fixAttrs(n);
+          const seen = [];
+          for (let n = w.nextNode(); n; n = w.nextNode()) seen.push(n);
+          seen.forEach((n) => (n.nodeType === 3 ? fixText(n) : fixAttrs(n)));  // collected first: fixText may split a text node
         };
         const root = document.documentElement;
         new MutationObserver((list) => list.forEach((m) => {
@@ -545,6 +589,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--ice); color: var(--ink); font: 400 17px/1.6 var(--body); font-variant-numeric: lining-nums tabular-nums; }
+  /* A number in serif text, set in the sans (see the spelling script): the same size, a touch heavier, full ink. */
+  .sn { font-family: var(--ui); font-weight: 600; color: var(--ink); letter-spacing: 0; }
+  a .sn, .term .sn, [class*='t-'] .sn { color: inherit; }
   h1, h2, h3, h4 { font-variation-settings: 'SOFT' 100; }
   .site-foot, .ph, .chip, .key, .note, .bar, .wordmark-note, .n, .cite, table, dl { font-family: var(--ui); }
   a { color: inherit; text-decoration: none; }
