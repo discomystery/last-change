@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 17  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 18  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -43,6 +43,7 @@ RULES_VERSION = 17  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 16: a chattier, hotter voice (Sora, 2026-10-14): more wording per call, hot words only where the numbers are extreme
 # 17: sentence rules (Sora, 2026-10-15): one contrast word per sentence, a team named by place once a sentence, and
 # an edge body never opens by repeating its headline
+# 18: a projected starting goalie is named where a call or note would say "their goalie" (Sora, 2026-10-15)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -1119,6 +1120,47 @@ def projected_starters(g: dict, likely: dict, rebuilt: bool = False) -> dict[str
     return out
 
 
+def _full_names(ids: set[int]) -> dict[int, str]:
+    """"Connor Hellebuyck" for each player id, from this season's and last season's game sheets (goalies.json only has
+    "C. Hellebuyck")."""
+    import polars as pl
+    from pipeline.config import CURRENT_SEASON, TABLES
+    out = {}
+    for season in (CURRENT_SEASON - 1, CURRENT_SEASON):  # this season's spelling wins
+        path = TABLES / str(season) / "players.parquet"
+        if ids and path.exists():
+            rows = pl.read_parquet(path, columns=["game_id", "player_id", "first", "last"]).filter(pl.col("player_id").is_in(list(ids)))
+            out |= {r["player_id"]: f"{r['first']} {r['last']}" for r in rows.sort("game_id").iter_rows(named=True)}
+    return out
+
+
+def name_goalies(claims: list[dict], projected: dict, goalies_site: dict, places: dict, full: dict | None = None) -> dict[str, str]:
+    """Calls that speak of a team's goalie ("Somebody warn the Jets’ goalie") name him instead when we have a projected
+    starter (Sora, 2026-10-15): full name the first time in a call, last name after. Returns each team's projected
+    starter's full name, for the other places that would otherwise say "their goalie"."""
+    ids = {p["id"] for p in projected.values()}
+    if full is None:
+        try:
+            full = _full_names(ids)
+        except Exception as e:  # the goalies' own short names still beat "their goalie"
+            print(f"goalie names unavailable: {e!r}")
+            full = {}
+    names = {g["id"]: full.get(g["id"]) or g["name"] for t in projected for g in (goalies_site.get("teams", {}).get(t) or [])}
+    out = {t: names[p["id"]] for t, p in projected.items() if names.get(p["id"])}
+    for t, full in out.items():
+        generic = re.compile(re.escape(team_words(t, places, "Y")["Yp"]) + " goalie", re.I)
+        for c in claims:
+            seen = [False]
+
+            def say(_m, full=full, seen=seen):
+                first, seen[0] = not seen[0], True
+                return full if first else _last(full)
+            for k in ("head", "body", "call", "see", "gist"):
+                if isinstance(c.get(k), str):
+                    c[k] = generic.sub(say, c[k])
+    return out
+
+
 def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
              likely: dict | None = None, **extra) -> dict:
     """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
@@ -1138,6 +1180,8 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
     bench = coaches.for_game(CURRENT_SEASON, g["id"], home, day)
     claims = calls(g["id"], away, home, fp, site["lines"]["teams"], places,
                    {**call_extras(site, day), "likely": likely, "rest": rest, "rest_usual": rest_usual, "bench": bench})
+    projected = projected_starters(g, likely, bool(extra.get("rebuilt")))
+    in_net = name_goalies(claims, projected, site.get("goalies") or {}, places)
     from pipeline.export import surprises, wording
     for c in claims:
         rep = special_teams_record(c, wording.places(places), surprises)
@@ -1151,10 +1195,10 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
            "snapshot_at": now.isoformat(timespec="seconds"), "rules": RULES_VERSION, "data_as_of": site["fingerprints"]["generated_at"], **extra,
            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),
            "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)},
-           "projected": projected_starters(g, likely, bool(extra.get("rebuilt")))}
+           "projected": projected}
     if chance:
         from pipeline.export import outlook
-        out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
+        out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places, in_net)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
         out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
