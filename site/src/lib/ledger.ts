@@ -3,7 +3,12 @@
 // underneath; highs, totals and per-82 figures are worked out here so the page and the data stay small.
 import type { Row } from './statDefs';
 
-export type Ledger = { cols: string[]; rows: (string | number | null)[][]; awards: { name: string; short: string; yrs: number[] }[]; complete: boolean };
+export type Ledger = {
+  cols: string[]; rows: (string | number | null)[][]; awards: { name: string; short: string; yrs: number[] }[]; complete: boolean;
+  // Ice time by strength, shifts a game and the average shift, per season and game type ("2026-2"), from 1997-98 on.
+  // One line per season, so a season split by a trade has them on its total line only.
+  ice_cols?: string[]; ice?: Record<string, (number | null)[]>;
+};
 export type Season = Row & { yr: number; teams: string[]; main: string; parts: Row[] };
 
 const files = import.meta.glob('../../public/data/careers/*.json', { eager: true, import: 'default' }) as Record<string, Ledger>;
@@ -31,6 +36,15 @@ export function combine(parts: Row[], goalie: boolean): Row {
     const fgp = fo.reduce((t, p) => t + p.gp, 0);
     r.fopct = fgp ? fo.reduce((t, p) => t + p.fopct * p.gp, 0) / fgp : null;
     r.spct = r.s ? r.g / r.s : null;
+    // Ice time by strength and shifts: averaged over the seasons that have them, weighted by games; the average shift
+    // is all that ice time over all those shifts.
+    const iced = parts.filter((p) => p.shifts != null);
+    const igp = iced.reduce((t, p) => t + p.gp, 0);
+    if (igp) {
+      for (const k of ['evtoi', 'pptoi', 'shtoi', 'shifts']) r[k] = iced.reduce((t, p) => t + (p[k] ?? 0) * p.gp, 0) / igp;
+      const time = iced.reduce((t, p) => t + p.tps * p.shifts * p.gp, 0);
+      r.tps = r.shifts ? time / (r.shifts * igp) : null;
+    }
   }
   return r;
 }
@@ -47,7 +61,9 @@ export function seasons(l: Ledger, gt: 2 | 3, goalie: boolean): Season[] {
   return [...by.entries()].sort((a, b) => b[0] - a[0]).map(([yr, parts]) => {
     const teams = parts.flatMap((p) => String(p.team).split(', '));
     const main = parts.slice().sort((a, b) => b.gp - a.gp)[0].team.split(', ')[0];
-    return { ...combine(parts, goalie), yr, teams, main, parts: parts.length > 1 ? parts : [] };
+    const ice = l.ice?.[`${yr}-${gt}`];
+    const extra = ice ? Object.fromEntries(l.ice_cols!.map((c, i) => [c, ice[i]])) : {};
+    return { ...combine(parts, goalie), ...extra, yr, teams, main, parts: parts.length > 1 ? parts : [] };
   });
 }
 

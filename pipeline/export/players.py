@@ -15,7 +15,7 @@ import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
-from pipeline.ingest import careers, edge, rosters
+from pipeline.ingest import careers, edge, official_stats, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
 
@@ -170,6 +170,7 @@ def run(season: int) -> int:
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     goalies = json.loads((SITE_DATA / "goalies.json").read_text())
     carried = carries.run(season, latest, lines, abbr, idle)
+    shift_table = _shift_table(season)
 
     # Team games played this season, and each skater's ice time rank among teammates at his position.
     team_games = pg.filter(pl.col("season") == season).group_by("team_id").agg(pl.col("game_id").n_unique().alias("n"))
@@ -286,7 +287,7 @@ def run(season: int) -> int:
             if rec is None:
                 continue
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
-                     "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0)),
+                     "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0), shift_table),
                      "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
@@ -323,7 +324,35 @@ def _add(a: dict | None, b: dict | None) -> dict | None:
     return {k: a[k] + b[k] for k in a}
 
 
-def _role(pid: int, row: dict, ln: dict, per: pl.DataFrame, team_games: int) -> dict:
+def _shift_table(season: int) -> tuple[dict[int, dict], dict[str, int]]:
+    """The league's shift counts this season (skater/timeonice): player -> {shifts, toi}, and the average shift of
+    every forward and every defenseman (total ice time over total shifts), for the Role section's shift line."""
+    rows = {r["playerId"]: r for r in official_stats.read(season, "skater/timeonice") if r.get("shifts")}
+    avg = {}
+    for g in ("F", "D"):
+        sub = [r for r in rows.values() if (r["positionCode"] == "D") == (g == "D")]
+        n = sum(r["shifts"] for r in sub)
+        if n:
+            avg[g] = round(sum(r["timeOnIce"] for r in sub) / n)
+    return rows, avg
+
+
+def _shifts(pid: int, mates: list[int], shifts: tuple[dict[int, dict], dict[str, int]], group: str) -> dict | None:
+    """His average shift and shifts a game (the league's own figures, which match our shift charts), its rank among
+    the teammates the ice-time rank uses (1 = longest), and the league average at his position (Sora, 2026-10-15)."""
+    rows, avg = shifts
+    me = rows.get(pid)
+    if not me:
+        return None
+    tps = lambda r: r["timeOnIce"] / r["shifts"]
+    pool = [tps(rows[m]) for m in mates if m in rows]
+    out = {"tps": round(tps(me)), "per_game": round(me["shifts"] / me["gamesPlayed"], 1), "avg": avg.get(group)}
+    if len(pool) > 1 and pid in mates:
+        out |= {"rank": sum(t > tps(me) for t in pool) + 1, "of": len(pool)}
+    return out
+
+
+def _role(pid: int, row: dict, ln: dict, per: pl.DataFrame, team_games: int, shifts=None) -> dict:
     """Where he fits on his team right now: line or pair, special-teams units, ice time and its rank."""
     out = {"team_games": team_games}
     unit = next((u for u in ln.get("units", []) if pid in u["ids"]), None)
@@ -355,6 +384,8 @@ def _role(pid: int, row: dict, ln: dict, per: pl.DataFrame, team_games: int) -> 
         out["toi_of"] = mates.height
         out["gp"] = int(me["gp"][0])
         out["toi"] = {k: round(me[k][0]) for k in ("toi", "toi5", "toi_pp", "toi_pk")}
+        if shifts:
+            out["shifts"] = _shifts(pid, mates["player_id"].to_list(), shifts, "D" if is_d else "F")
     return out
 
 
