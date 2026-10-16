@@ -162,14 +162,26 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
             return word[0] === 'T' ? out[0].toUpperCase() + out.slice(1) : out;
           });
         };
-        const convert = (s, el) => { const t = when(spell(s), el); return target === 'ca' ? metric(t) : t; };
+        // Possessives of words ending in s take only the apostrophe (Sora, 2026-10-16): "Matthews’", "Rangers’", "Islanders’".
+        // Generated text writes "’s" after every name, so it is fixed here, for every page, tooltip and share card. A name
+        // inside a link or other element, followed by ’s, is seen from the text right after it (`after`).
+        const POSS = /([A-Za-zÀ-ÖØ-öø-ž]*[sS])([’'])s\b/g;
+        const poss = (s, after) => {
+          let t = s.replace(POSS, (m, w, ap) => w + ap);
+          if (after && /^[’']s\b/.test(t)) t = t[0] + t.slice(2);
+          return t;
+        };
+        const convert = (s, el, after) => { const t = when(poss(spell(s), after), el); return target === 'ca' ? metric(t) : t; };
+        // The text node right after an element whose text ends in s (a linked or styled name).
+        const afterS = (n) => n.nodeType === 3 && n.previousSibling?.nodeType === 1 && /[sS]$/.test(n.previousSibling.textContent || '');
         // Original and changed text, per text node and per element attribute, so a switch can start again from the original.
         const was = new WeakMap();
         const redo = (key, cur, write) => {
           const o = was.get(key);
           const src = o && cur === o.out ? o.src : cur;
-          if (!o && !/[a-z]{2}/i.test(src)) return;
-          const out = convert(src, key.nodeType === 3 ? key.parentElement : key);
+          const after = afterS(key);
+          if (!o && !after && !/[a-z]{2}/i.test(src)) return;
+          const out = convert(src, key.nodeType === 3 ? key.parentElement : key, after);
           if (out === src) was.delete(key); else was.set(key, { src, out });
           if (cur !== out) write(out);
         };
