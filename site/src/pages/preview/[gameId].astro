@@ -163,10 +163,9 @@ import recapIndex from '../../../public/data/recaps/index.json';
   <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
-    <GameTrail id={snap.game_id} part="crumbs">{!played && <ShareButton kind="preview" label="Share" />}</GameTrail>
-    {played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}
+    <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p></GameTrail>
+    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.

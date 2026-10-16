@@ -1,21 +1,18 @@
 ---
-// One game, two pages: folder tabs on the rink's top boards that flip between the preview and the post-game page,
-// the page being read as the white tab joined to the ice. Shown only once both pages exist.
+// One game, two pages: a quiet link from the preview to the post-game page and back, styled like the Share link it
+// sits beside under the rink. Shown only once both pages exist.
 interface Props { id: number; on: 'preview' | 'recap' }
 const { id, on } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const pages = [['preview', 'Preview', `${base}preview/${id}/`], ['recap', 'Post-game', `${base}recap/${id}/`]] as const;
 ---
-<nav class="gswitch" aria-label="This game's pages">
-  {pages.map(([key, label, href]) => key === on
-    ? <span class="tab" aria-current="page">{label}</span>
-    : <a class="tab" href={href}>{label}</a>)}
-</nav>
+{on === 'recap'
+  ? <a class="gswitch" href={`${base}preview/${id}/`}><span aria-hidden="true">‹</span> <span class="u">Read the preview</span></a>
+  : <a class="gswitch" href={`${base}recap/${id}/`}><span class="u">See the post-game</span> <span aria-hidden="true">›</span></a>}
 
 <style>
-  /* Sits right above the rink; the current tab overlaps the top boards so it reads as part of the ice. */
-  .gswitch { position: relative; z-index: 2; display: flex; justify-content: center; margin: 22px 0 -1.5px; }
-  .tab { font: 600 14px/1 var(--ui); padding: 10px 20px 10px; border: 1.5px solid transparent; border-bottom: 0; border-radius: 12px 12px 0 0; color: var(--ink-3); text-decoration: none; }
-  a.tab:hover { color: var(--ink); }
-  .tab[aria-current] { background: var(--sheet); color: var(--ink); border-color: color-mix(in oklab, var(--ink-3) 55%, var(--sheet)); }
+  /* Same look as .share-btn (ShareDialog.astro), but a plain link so the share script leaves it alone. */
+  .gswitch { display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); text-decoration: none; }
+  .gswitch .u { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 5px; text-decoration-thickness: 1px; }
+  .gswitch:hover, .gswitch:focus-visible { color: var(--ink); }
+  .gswitch:hover .u { text-decoration-color: var(--ink-3); }
 </style>

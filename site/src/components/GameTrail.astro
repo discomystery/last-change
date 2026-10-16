@@ -33,7 +33,7 @@ const around = [g.away, g.home].map((me) => {
 });
 ---
 {g && part === 'crumbs' && (
-  <div class="crumbrow"><nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav><slot /></div>
+  <nav class="crumbs" aria-label="Where this game sits"><a href={`${base}games/`}>Games</a><span aria-hidden="true">›</span><a href={`${base}games/#${g.date}`}>{day(g.date, { weekday: 'long', month: 'long', day: 'numeric' })}</a><span aria-hidden="true">›</span><span aria-current="page">{g.away} at {g.home}</span></nav>
 )}
 {g && part === 'around' && (
   <div class="under">
@@ -51,9 +51,6 @@ const around = [g.away, g.home].map((me) => {
 )}
 
 <style>
-  /* The trail back to the day's games, with the page's Share link at the far right. */
-  .crumbrow { display: flex; align-items: center; justify-content: space-between; gap: 4px 16px; margin: 18px 0 12px; }
-  .crumbrow .crumbs { margin: 0; }
   /* Under the rink: when the game is in the middle, and each team's previous and next game under its own end of the rink. */
   .under { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: 'away when home'; align-items: center; gap: 14px 20px; margin: 16px 0 12px; padding-inline: 5.5%; }
   /* The side padding lines the buttons up with the rink's goal lines, not its rounded ends. */
