@@ -77,12 +77,13 @@ def _fit(*options: str | None) -> str | None:
     return next((o for o in options if o and len(o) <= NOTE_MAX), None)
 
 
-def _pick(parts: list[tuple[float, str | None, str | None]]) -> tuple[int, list[str], str | None]:
-    """(score, chips, note) from (weight, chip, note) parts."""
+def _pick(parts: list[tuple[float, str | None, str | tuple[str, ...] | None]]) -> tuple[int, list[str], str | None]:
+    """(score, chips, note) from (weight, chip, note) parts; a note may be a tuple of wordings, longest first."""
     parts = sorted((p for p in parts if p[0] > 0), key=lambda p: -p[0])
     chips = list(dict.fromkeys(c for _, c, _ in parts if c))[:CHIPS]
     # the note is the strongest reason that is particular to this game; a plain "One-goal game" only when nothing is
-    note = next((_fit(n, c) for _, c, n in parts if n and _fit(n, c)), None) or next((_fit(c) for c in chips if _fit(c)), None)
+    opts = lambda n, c: (*(n if isinstance(n, tuple) else (n,)), c)
+    note = next((_fit(*opts(n, c)) for _, c, n in parts if n and _fit(*opts(n, c))), None) or next((_fit(c) for c in chips if _fit(c)), None)
     return round(sum(p[0] for p in parts)), chips, note
 
 
@@ -162,8 +163,11 @@ def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dic
             parts.append((26, f"{nm.last(pid)} scored {_num(len(gs))}", f"{nm.last(pid)} scored {_num(len(gs))}"))
         elif len(gs) == 3:
             natural = storylines.natural_hat(goals) == pid
+            # a long name drops "natural" (the chip still says it) before the note loses the name: "Brady Tkachuk’s
+            # natural hat trick" ran past a phone line and fell back to a bare "Natural hat trick" (Sora, 2026-10-16)
+            who = nm.last(pid)
             parts.append((22 if natural else 18, "Natural hat trick" if natural else "Hat trick",
-                          f"{nm.last(pid)}’s {'natural ' if natural else ''}hat trick"))
+                          (f"{who}’s natural hat trick", f"{who}’s hat trick") if natural else f"{who}’s hat trick"))
         if len(gs) >= 3:
             helper = storylines.set_up_all(goals, pid)
             if helper:
