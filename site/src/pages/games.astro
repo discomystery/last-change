@@ -70,12 +70,12 @@ const base = import.meta.env.BASE_URL;
       teamsBox.append(row(g.away, g.as, 'away'), row(g.home, g.hs, 'home'));
       const acts = el('span', 'g-acts');
       // A game with a page is one card that opens it; the button is the cue, the whole card is the target.
-      const go = (label, href) => { const a = el('a', 'g-btn pill go-link', label); a.href = href; acts.append(a); li.classList.add('go'); };
+      const go = (label, href) => { const a = el('a', 'g-btn go-link', `${label} ›`); a.href = href; acts.append(a); li.classList.add('go'); };
       if (g.final && RECAPS.has(g.id)) go('Post-game', `${base}recap/${g.id}/`);
       else if (!g.final && L.get(g.id)?.st === 'post') acts.append(el('span', 'n', 'Post-game soon'));
       else if (!g.final && PREVIEWS.has(g.id)) go('Preview', `${base}preview/${g.id}/`);
       else if (!g.final) acts.append(el('span', 'n', 'Preview opens a week before'));
-      li.append(when, teamsBox, acts, el('span', 'g-venue n', g.venue ?? ''));
+      li.append(when, teamsBox, el('span', 'g-venue n', g.venue ?? ''), acts);
       if (me) li.classList.add(g.home === me ? 'home' : 'road');
       if (!g.final) { li.dataset.live = g.id; window.lcLive.paint(li); }
       return li;
@@ -244,8 +244,11 @@ const base = import.meta.env.BASE_URL;
   .gcard .g-nick { flex: 1; min-width: 0; font: 400 14px var(--ui); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gcard .g-sc { font: 600 23px/1.1 var(--display); font-variation-settings: 'SOFT' 100; }
   .gcard .g-sc.l { color: var(--ink-3); }
+  .gcard .g-teams { grid-column: 1 / -1; }
   .gcard .g-acts { justify-self: end; }
-  .gcard .g-venue { grid-column: 1 / -1; font-size: 12px; }
+  .gcard .g-acts .n { font: 500 12px var(--ui); color: var(--ink-3); }
+  .gcard .g-venue { font-size: 12px; }
   .gcard.next { outline: 2px solid var(--ink); }
-  .gcard.go:hover .g-btn { background: var(--rule); color: var(--ink); }
+  .gcard .g-btn { font: 600 13px var(--ui); color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .gcard.go:hover .g-btn { text-decoration: underline; text-underline-offset: 4px; }
 </style>
