@@ -515,7 +515,8 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
     out = []
     o = teams.get(opp, {"place": opp, "nick": opp})
     O = f"the {_nick(o)}"
-    when = "tonight" if tonight else "next time out"
+    # "tonight" is rewritten in the browser to the visitor's own day ("tomorrow", "on Saturday", "next time out"; Base.astro).
+    when = "tonight"
     reg = [g for g in games if g["type"] == REGULAR]
     vs = [g for g in reg if g["opponentAbbrev"] == opp and g["teamAbbrev"] != opp]
     former = [s for s in stints[:-1] if s["team"] == opp]
@@ -527,7 +528,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
             out.append(f"This one’s personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
         elif spell >= 2:
-            out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
+            out.append(f"He has a date with his old team {when}: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
     if len(vs) >= 3:
         gn, _ = _streak(vs, "goals")
         pn, pts = _streak(vs, "points")
