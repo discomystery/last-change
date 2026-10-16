@@ -24,6 +24,7 @@ export const QUAL = {
   shots: (r: Row, gp: number) => r.s >= Math.min(50, gp),
   fo: (r: Row, gp: number) => r.fow + r.fol >= Math.min(100, 2 * gp),
   gs: (r: Row, gp: number) => r.gs >= Math.min(10, Math.ceil(gp / 3)),
+  games: (r: Row, gp: number) => r.gp >= Math.min(20, Math.ceil(gp / 2)),
 };
 const build = (list: Raw[]): Record<string, Stat> => Object.fromEntries(list.map((s) => [s.key, { ...s, fmt: FMT[s.f] }]));
 
@@ -45,8 +46,11 @@ export const SKATER: Record<string, Stat> = build([
   { key: 's', short: 'S', name: 'Shots on goal', tip: 'Shots that reached the net: saves plus goals.', f: 'num' },
   { key: 'spct', short: 'S%', name: 'Shooting percentage', tip: 'Goals per shot on goal. Ranked only with 50 shots on goal (or one a game for a season under way).', f: 'pct1', q: 'shots' },
   { key: 'toi', short: 'TOI', name: 'Ice time a game', tip: 'Average minutes a game, all situations.', f: 'time' },
+  { key: 'evtoi', short: 'EV TOI', name: 'Even-strength time a game', tip: 'Average minutes a game with the same number of skaters on each side (5-on-5, 4-on-4, 3-on-3).', f: 'time' },
   { key: 'pptoi', short: 'PP TOI', name: 'Power-play time a game', tip: 'Average power-play minutes a game.', f: 'time' },
   { key: 'shtoi', short: 'SH TOI', name: 'Shorthanded time a game', tip: 'Average penalty-killing minutes a game.', f: 'time' },
+  { key: 'shifts', short: 'SHFT', name: 'Shifts a game', tip: 'How many times a game he went over the boards, on average.', f: 'dec1' },
+  { key: 'tps', short: 'TOI/SHFT', name: 'Average shift', tip: 'How long he stays on the ice each time he goes out: his ice time divided by his shifts. Most skaters average between 0:40 and 0:55; defensemen stay out a little longer than forwards. Longer isn’t better or worse: it follows his role and his coach. Ranked only with 20 games (or half his team’s games for a season under way).', f: 'time', q: 'games' },
   { key: 'fopct', short: 'FO%', name: 'Faceoff win %', tip: 'Share of his faceoffs won. Ranked only with 100 faceoffs (or two a game for a season under way).', f: 'pct1', q: 'fo' },
   { key: 'hit', short: 'HIT', name: 'Hits', tip: 'Hits credited to him, as recorded by each arena’s scorer.', f: 'num' },
   { key: 'blk', short: 'BLK', name: 'Blocked shots', tip: 'Shots he blocked, as recorded.', f: 'num' },

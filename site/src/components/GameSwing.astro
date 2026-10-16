@@ -261,8 +261,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .sw-who { white-space: nowrap; }
   .sw-who i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; vertical-align: 1px; }
   .sw-lead-n { font: 700 15px var(--ui); color: var(--ink-2); }
-  .jpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 600 20px var(--display); }
-  .jpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
+  .jpick { margin-top: 18px; }
   .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
   .sw-team { margin-top: 18px; --sw-base: var(--sheet); }
   /* On the dark page the lighter parts fade toward the text colour instead, so they stay visible. */

@@ -23,9 +23,11 @@ entry becomes a report dated when ESPN last changed it:
   suspended   suspended (also ESPN's non-roster entries given the reason "Suspension")
   personal    away for personal reasons
   cleared     on one day's list and gone from the next (dated that next day): no longer reported injured
-Contract disputes (unsigned restricted free agents) are skipped: not an injury, and the club's roster listing already
-leaves them off. Players are matched by full name on the club's roster listing or game rosters, then by a full name
-that belongs to one player only.
+  unsigned    a contract dispute: an unsigned restricted free agent whose rights the club holds (never an injury; ESPN
+              moves these between "Out" and the injured non-roster list as bookkeeping, as it did with Nikishin and
+              Edvinsson on 2026-10-14); availability.py keeps it from reading as an injury
+Players are matched by full name on the club's roster listing or game rosters, then by a full name that belongs to one
+player only.
 """
 import gzip
 import json
@@ -43,7 +45,6 @@ from pipeline.ingest.transactions import ESPN_ABBR
 URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries"
 PAGE = "https://www.espn.com/nhl/injuries"  # stored as each report's url, so pages can credit the source
 MIN_ENTRIES = 40  # a list shorter than this is treated as a failed load: no "cleared" reports are read from it
-SKIP = {"contract dispute"}
 
 
 def raw_dir(season: int):
@@ -101,8 +102,8 @@ def _injury(e: dict) -> str | None:
 def classify(e: dict, season: int) -> tuple[str, str | None] | None:
     """(status, timeline) for one entry, or None when it is skipped."""
     kind, st, fan = (e.get("type") or "").lower(), (e.get("status") or "").lower(), (e.get("fantasy") or "").upper()
-    if kind in SKIP:
-        return None
+    if kind == "contract dispute":
+        return "unsigned", None
     if kind == "suspension" or st == "suspension":
         return "suspended", None
     if kind == "personal":
@@ -170,7 +171,7 @@ def build(season: int) -> dict:
                 continue
             now[pid] = e
             rows.append({"date": min(e.get("date") or day, day), "player_id": pid, "name": e.get("name"), "section": e.get("team"),
-                         "status": kind[0], "injury": _injury(e) if kind[0] not in ("suspended", "personal") else None,
+                         "status": kind[0], "injury": _injury(e) if kind[0] not in ("suspended", "personal", "unsigned") else None,
                          "timeline": kind[1], "note": None, "url": PAGE})
         if len(entries) >= MIN_ENTRIES:
             if prev is not None:

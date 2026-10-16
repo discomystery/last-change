@@ -29,10 +29,14 @@ def run(season: int) -> dict:
     roster.run(season)  # every club's full roster and who is out, from availability.parquet
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
+    from pipeline.export import similar
+    similar.run()  # Compare page: three skaters with a similar style for each skater (reads the player JSON)
     from pipeline.export import stats
     stats.run(season)  # the league's own counting stats: player and team pages, the Leaders page
     from pipeline.export import ledger
     ledger.run(season)  # player pages' career ledger: every season's line and his trophies
+    from pipeline.export import record_book
+    record_book.run(season)  # player pages' "In the record books": NHL and club all-time lists (reads players/index.json)
     from pipeline.export import previews
     previews.run()  # last: reads the JSON written above
     from pipeline.export import pregame
@@ -45,6 +49,8 @@ def run(season: int) -> dict:
     game_scores.run(season)  # post-game Swing: one number per player, with its parts
     from pipeline.export import flow
     flow.run(season)  # post-game flow chart: every shot, power play and shift, read in the browser
+    from pipeline.export import matchups
+    matchups.run(season)  # post-game "who played against whom": line-against-line time (reads the recaps' exits)
     from pipeline.export import stories
     stories.run_recaps(season)  # last: the plain-English story reads the recap, report cards and Swing
     from pipeline.export import track

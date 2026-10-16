@@ -16,7 +16,7 @@ from pipeline.ingest import official_stats
 OUT = SITE_DATA / "stats"
 
 SKATER = ["id", "name", "team", "pos", "gp", "g", "a", "p", "pm", "pim", "ppg", "ppp", "shg", "shp", "evg", "evp", "gwg", "otg",
-          "s", "spct", "toi", "pptoi", "shtoi", "fow", "fol", "fopct", "hit", "blk", "tk", "gv"]
+          "s", "spct", "toi", "evtoi", "pptoi", "shtoi", "shifts", "tps", "fow", "fol", "fopct", "hit", "blk", "tk", "gv"]
 GOALIE = ["id", "name", "team", "gp", "gs", "w", "l", "otl", "sa", "sv", "ga", "svpct", "gaa", "so", "toi"]
 TEAM = ["team", "gp", "w", "l", "otl", "pts", "ptspct", "rw", "gf", "ga", "gfpg", "gapg", "diff", "ppg", "ppo", "pppct", "ppga",
         "tsh", "pkpct", "shgf", "shga", "sfpg", "sapg", "fopct", "hit", "blk", "tk", "gv"]
@@ -50,19 +50,29 @@ def _teams(abbrevs: str | None) -> str | None:
     return abbrevs.replace(",", ", ") if abbrevs else None
 
 
+def ice(ti: dict) -> dict:
+    """Ice time by strength a game, shifts a game and the average shift (seconds), from one skater/timeonice row
+    (Sora, 2026-10-15: shift length on player pages). The league counts a shift each time he goes over the boards."""
+    if not ti:
+        return {"evtoi": None, "pptoi": None, "shtoi": None, "shifts": None, "tps": None}
+    return {"evtoi": round(ti.get("evTimeOnIcePerGame") or 0), "pptoi": round(ti.get("ppTimeOnIcePerGame") or 0),
+            "shtoi": round(ti.get("shTimeOnIcePerGame") or 0), "shifts": _r(ti.get("shiftsPerGame"), 1),
+            "tps": round(ti["timeOnIcePerShift"]) if ti.get("timeOnIcePerShift") else None}
+
+
 def skaters(season: int, names: dict[int, str]) -> list[list]:
     by = lambda report: {r["playerId"]: r for r in official_stats.read(season, report)}
-    real, ice, fo = by("skater/realtime"), by("skater/timeonice"), by("skater/faceoffwins")
+    real, tois, fo = by("skater/realtime"), by("skater/timeonice"), by("skater/faceoffwins")
     rows = []
     for r in official_stats.read(season, "skater/summary"):
         pid = r["playerId"]
-        rt, ti, f = real.get(pid, {}), ice.get(pid, {}), fo.get(pid, {})
+        rt, ti, f = real.get(pid, {}), tois.get(pid, {}), fo.get(pid, {})
         fow, fol = f.get("totalFaceoffWins") or 0, f.get("totalFaceoffLosses") or 0
         rec = {"id": pid, "name": names.get(pid) or r["skaterFullName"], "team": _teams(r.get("teamAbbrevs")), "pos": r["positionCode"],
                "gp": r["gamesPlayed"], "g": r["goals"], "a": r["assists"], "p": r["points"], "pm": r["plusMinus"], "pim": r["penaltyMinutes"],
                "ppg": r["ppGoals"], "ppp": r["ppPoints"], "shg": r["shGoals"], "shp": r["shPoints"], "evg": r["evGoals"], "evp": r["evPoints"],
                "gwg": r["gameWinningGoals"], "otg": r["otGoals"], "s": r["shots"], "spct": _r(r.get("shootingPct")),
-               "toi": round(r["timeOnIcePerGame"] or 0), "pptoi": round(ti.get("ppTimeOnIcePerGame") or 0), "shtoi": round(ti.get("shTimeOnIcePerGame") or 0),
+               "toi": round(r["timeOnIcePerGame"] or 0), **ice(ti),
                "fow": fow, "fol": fol, "fopct": _r(fow / (fow + fol)) if fow + fol else None,
                "hit": rt.get("hits"), "blk": rt.get("blockedShots"), "tk": rt.get("takeaways"), "gv": rt.get("giveaways")}
         rows.append([rec[k] for k in SKATER])

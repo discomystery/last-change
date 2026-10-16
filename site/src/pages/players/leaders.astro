@@ -24,7 +24,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
 <Base section="players" title="Leaders" description="Every NHL skater, goalie and team with goals, assists, points, power-play and shorthanded goals, save percentage and more, sortable by any stat.">
   <header class="page-top"><h1>Leaders</h1></header>
   <p class="lede">Every player’s and every team’s season totals, as the NHL records them. Tap a column to sort by it.</p>
-  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`} aria-current="page">Leaders</a></nav>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`} aria-current="page">Leaders</a><a class="ptab pill" href={`${base}players/compare/`}>Compare</a></nav>
 
   {yrs.length === 0 ? <p class="note">The season totals arrive with the next update.</p> : (
     <>
@@ -83,7 +83,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
     const narrow = matchMedia('(max-width: 719px)');
     // Columns shown for each list, in order; the first sort is the usual leaderboard's.
     const COLS: Record<string, string[]> = {
-      s: ['gp', 'g', 'a', 'p', 'pm', 'pim', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'gwg', 'otg', 's', 'spct', 'toi', 'pptoi', 'shtoi', 'fopct', 'hit', 'blk', 'tk', 'gv'],
+      s: ['gp', 'g', 'a', 'p', 'pm', 'pim', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'gwg', 'otg', 's', 'spct', 'toi', 'evtoi', 'pptoi', 'shtoi', 'shifts', 'tps', 'fopct', 'hit', 'blk', 'tk', 'gv'],
       g: ['gp', 'gs', 'w', 'l', 'otl', 'sa', 'sv', 'ga', 'svpct', 'gaa', 'so', 'toi'],
       t: ['gp', 'w', 'l', 'otl', 'pts', 'ptspct', 'rw', 'gf', 'ga', 'gfpg', 'gapg', 'diff', 'pppct', 'ppg', 'ppo', 'pkpct', 'ppga', 'tsh', 'shgf', 'shga', 'sfpg', 'sapg', 'fopct', 'hit', 'blk', 'tk', 'gv'],
     };
@@ -91,7 +91,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
     // Column groups, like the career ledger's menu; the sorted column always shows.
     const GROUPS: Record<string, [string, string, string[]][]> = {
       s: [['sc', 'scoring', ['gp', 'g', 'a', 'p', 'pm', 'pim']], ['sp', 'power play and shorthanded', ['gp', 'evg', 'evp', 'ppg', 'ppp', 'shg', 'shp', 'pptoi', 'shtoi']],
-        ['sh', 'shooting and ice time', ['gp', 's', 'spct', 'gwg', 'otg', 'toi', 'fopct']], ['ph', 'hits and blocks', ['gp', 'hit', 'blk', 'tk', 'gv']]],
+        ['sh', 'shooting and ice time', ['gp', 's', 'spct', 'gwg', 'otg', 'toi', 'evtoi', 'pptoi', 'shtoi', 'shifts', 'tps', 'fopct']], ['ph', 'hits and blocks', ['gp', 'hit', 'blk', 'tk', 'gv']]],
       g: [],
       t: [['sc', 'results', ['gp', 'w', 'l', 'otl', 'pts', 'ptspct', 'rw', 'gf', 'ga', 'diff']], ['sp', 'power play and penalty kill', ['gp', 'pppct', 'ppg', 'ppo', 'pkpct', 'ppga', 'tsh', 'shgf', 'shga']],
         ['sh', 'shots and goals a game', ['gp', 'gfpg', 'gapg', 'sfpg', 'sapg', 'fopct']], ['ph', 'hits and blocks', ['gp', 'hit', 'blk', 'tk', 'gv']]],

@@ -8,7 +8,8 @@ daily in data/raw/players/ (offline runs use the cache):
   transactions.parquet    roster moves from ESPN's league-wide list (injured reserve, minors, suspensions), read as
                           reports with report_url null (ingest/transactions.py)
   injuries.parquet        ESPN's league-wide injury list, saved daily, read as reports with report_url set to ESPN's
-                          injuries page (ingest/injuries.py); a player dropped from the list ("cleared") ends his report
+                          injuries page (ingest/injuries.py); a player dropped from the list ("cleared") ends his report,
+                          and a contract dispute ("unsigned") is a report but never an injury
 
 Table data/tables/{season}/availability.parquet, one row per (date, team, player_id), from the season's first game
 day to the run day (Eastern). Columns:
@@ -30,7 +31,8 @@ day to the run day (Eastern). Columns:
                     no_club     a regular for this club last season whom the league lists with no club now and who
                                 has not played this season (unsigned, retired, abroad: the data cannot say which)
                     not_listed  the league says the club holds him, but its roster listing leaves him off (in the
-                                minors, or some long-term injuries), nothing reported
+                                minors, some long-term injuries, or unsigned: report_status "unsigned" when ESPN's
+                                injury list says contract dispute)
                     off_roster  left off the game-day roster, nothing reported (for a listed player almost always
                                 injured reserve)
                     available   anything else (no game that day, nothing reported)
@@ -107,6 +109,14 @@ def build(season: int, day: str | None = None) -> dict:
     # read the same way: each is a "report" about a player that stays in effect until a newer one or until he dresses.
     # ESPN's injury list joins them the same way (NHL.com wins a tie on the same date, being listed first).
     rep = pl.concat([status_report.load(season), transactions.load(season), injuries.load(season)])
+    # An unsigned restricted free agent is not injured. ESPN files contract disputes on the injured non-roster list
+    # at times, and its transactions list then reads "Placed D X on the injured/non-roster list" (Nikishin and
+    # Edvinsson, 2026-10-14), so a non-roster placement for a player ESPN already lists as unsigned is dropped.
+    unsigned = rep.filter(pl.col("status") == "unsigned").group_by("player_id").agg(pl.col("date").min().alias("since"))
+    rep = (rep.join(unsigned, on="player_id", how="left")
+           .filter(~((pl.col("url").is_null() & pl.col("timeline").str.contains("non-roster").fill_null(False))
+                     & (pl.col("since") <= pl.col("date")).fill_null(False)))
+           .drop("since"))
     prev = _last_season_regulars(season)
 
     names: dict[int, dict] = {pid: info for pid, (_, info) in prev.items()}

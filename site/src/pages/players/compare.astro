@@ -1,0 +1,251 @@
+---
+// Compare two skaters side by side: the plain numbers first (this season or last, as a tug of war in their team
+// colors), then every rating on the player page with each player on his own lane. The page address carries both
+// players (#id-id). Suggestions under the names come from players/similar.json (pipeline/export/similar.py): three
+// skaters with a similar style. Everything is drawn in the browser from the player JSON.
+import Base from '../../layouts/Base.astro';
+import index from '../../../public/data/players/index.json';
+import { matchupTable } from '../../lib/teams';
+import '../../styles/blocks.css';
+
+type P = { id: number; name: string; last: string; team: string; pos: string };
+const skaters = (index as P[]).filter((p) => p.pos !== 'G').sort((a, b) => a.last.localeCompare(b.last) || a.name.localeCompare(b.name));
+const base = import.meta.env.BASE_URL;
+const boot = { base, players: skaters.map((p) => [p.id, p.name, p.team, p.pos]), colors: matchupTable() };
+---
+<Base section="players" title="Compare players" description="Any two NHL skaters side by side: their stats this season and last, then how they play.">
+  <div class="cmp-page"><header class="page-top"><h1>Players</h1></header>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`}>Leaders</a><a class="ptab pill" href={`${base}players/compare/`} aria-current="page">Compare</a></nav>
+  <p class="lede">Any two skaters side by side: their stats first, then how they play. Type two names, or start from one of the suggestions.</p>
+  <div class="cmp-pick">
+    <label for="cmp-a">Compare</label>
+    <input id="cmp-a" list="cmp-names" autocomplete="off" spellcheck="false" placeholder="Type a name" />
+    <label for="cmp-b">with</label>
+    <input id="cmp-b" list="cmp-names" autocomplete="off" spellcheck="false" placeholder="Type a name" />
+  </div>
+  <datalist id="cmp-names"></datalist>
+  <p class="cmp-sugg" id="cmp-sugg" hidden></p>
+  <p class="note" id="cmp-empty" hidden>Pick two skaters to compare. Goalies can’t be compared yet.</p>
+
+  <div id="cmp-body" hidden>
+    <div class="cmp-duo" id="cmp-duo"></div>
+    <p class="note cmp-pos" id="cmp-pos" hidden></p>
+
+    <section class="sec" id="numbers" aria-labelledby="numbers-h">
+      <header class="sec-head"><h2 id="numbers-h">The numbers</h2></header>
+      <p class="cmp-yr" role="group" aria-label="Season"><button type="button" class="pill on" data-yr="season" aria-pressed="true">This season</button><button type="button" class="pill" data-yr="last" aria-pressed="false">Last season</button></p>
+      <div class="card"><div class="tug" id="cmp-tug"></div></div>
+    </section>
+
+    <section class="sec" id="style" aria-labelledby="style-h">
+      <header class="sec-head"><h2 id="style-h">How they play</h2></header>
+      <p class="takeaway cmp-take">Each player is rated against his own position, following the Seasons setting. Further right is better. Tap a rating to see both players in words.</p>
+      <div class="fpr-groups"><div class="fpr-cols" id="cmp-rows"></div></div>
+    </section>
+  </div>
+  </div>
+  <script type="application/json" id="cmp-boot" set:html={JSON.stringify(boot)}></script>
+</Base>
+
+<script>
+  import { TRAITS, EDGE, GROUPS, peerOf, posWord, ordinal } from '../../lib/players';
+  import { clock, compared } from '../../lib/format';
+
+  type Boot = { base: string; players: [number, string, string, string][]; colors: { c: Record<string, string>; s: Record<string, string> } };
+  const boot = JSON.parse(document.getElementById('cmp-boot')!.textContent!) as Boot;
+  const SLATE = 'light-dark(#6b7785, #9aa6b2)';
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l').trim();
+  const label = (r: Boot['players'][number]) => `${r[1]} (${r[2]})`;
+  const rows = boot.players;
+  const byId = new Map(rows.map((r) => [String(r[0]), r]));
+  const dl = document.getElementById('cmp-names')!;
+  rows.forEach((r) => dl.append(new Option(label(r))));
+  const find = (v: string) => {
+    const f = fold(v);
+    if (!f) return undefined;
+    return rows.find((r) => fold(label(r)) === f) ?? rows.find((r) => fold(r[1]) === f) ?? rows.find((r) => fold(r[1]).split(' ').some((w) => w.startsWith(f)) || fold(r[1]).startsWith(f));
+  };
+
+  const cache = new Map<string, Promise<any>>();
+  const load = (id: string) => {
+    if (!cache.has(id)) cache.set(id, fetch(`${boot.base}data/players/${id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+    return cache.get(id)!;
+  };
+  let similar: Promise<Record<string, number[]>> | null = null;
+  const loadSimilar = () => (similar ??= fetch(`${boot.base}data/players/similar.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+
+  const ia = document.getElementById('cmp-a') as HTMLInputElement, ib = document.getElementById('cmp-b') as HTMLInputElement;
+  let ids: [string | null, string | null] = [null, null];
+  let A: any = null, B: any = null;
+  let yr: 'season' | 'last' = 'season';
+
+  const paints = (a: any, b: any) => [boot.colors.c[a.team] ?? SLATE, a.team === b.team ? SLATE : boot.colors.s[`${b.team}@${a.team}`] ?? boot.colors.c[b.team] ?? SLATE];
+
+  // The numbers: a tug of war per stat, in each player's team color. Ice time by situation is only kept for this season.
+  const STATS: [string, (s: any, p: any) => number | null | undefined, (v: number) => string, string?][] = [
+    ['Games', (s) => s.gp, String],
+    ['Goals', (s) => s.g, String],
+    ['Assists', (s) => s.a, String],
+    ['Points', (s) => s.p, String],
+    ['Points a game', (s) => (s.gp ? s.p / s.gp : 0), (v) => v.toFixed(2)],
+    ['Shots on goal', (s) => s.sog, String],
+    ['Shooting %', (s) => (s.sog ? (100 * s.g) / s.sog : 0), (v) => `${v.toFixed(1)}%`, 'Goals per shot on goal.'],
+    ['Ice time a game', (s) => s.toi, clock, 'Average ice time per game, all situations.'],
+    ['5-on-5 a game', (_s, p) => (yr === 'season' ? p.role?.toi?.toi5 : null), clock],
+    ['Power play a game', (_s, p) => (yr === 'season' ? p.role?.toi?.toi_pp : null), clock],
+    ['Penalty kill a game', (_s, p) => (yr === 'season' ? p.role?.toi?.toi_pk : null), clock],
+    ['Penalties taken', (s) => s.pim_pens, String, 'Minor and major penalties he took.'],
+  ];
+  function drawTug(pa: string, pb: string) {
+    const box = document.getElementById('cmp-tug')!;
+    const sa = A.stats?.[yr], sb = B.stats?.[yr];
+    const head = `<p class="tug-head"><span style="--team:${pa}"><i></i>${esc(A.last)}</span><span style="--team:${pb}"><i></i>${esc(B.last)}</span></p>`;
+    if (!sa || !sb) {
+      const who = [!sa && A, !sb && B].filter(Boolean).map((p: any) => p.last);
+      box.innerHTML = `${head}<p class="note">${esc(who.join(' and '))} ${yr === 'season' ? 'hasn’t played this season' : 'didn’t play in the NHL last season'}.</p>`;
+      return;
+    }
+    box.innerHTML = head + STATS.map(([name, val, f, tip]) => {
+      const x = val(sa, A), y = val(sb, B);
+      if (x == null || y == null) return '';
+      const g = x + y > 0 ? [x, y] : [1, 1];
+      const nm = tip ? `<span class="term" tabindex="0" data-tip="${esc(tip)}">${name}</span>` : `<span>${name}</span>`;
+      return `<div class="tug-row"><p class="tug-top"><strong>${f(x)}</strong>${nm}<strong>${f(y)}</strong></p><div class="rope" aria-hidden="true"><b style="--team:${pa};--g:${g[0]}"></b><b style="--team:${pb};--g:${g[1]}"></b></div></div>`;
+    }).join('');
+  }
+
+  // How they play: every rating as compact rows (FpRow), a lane per player; both modes are drawn and the Seasons
+  // setting picks one in CSS, as on the player page.
+  type Info = (typeof TRAITS)[string];
+  const groups: [string, [string, Info, 'traits' | 'edge'][]][] = [
+    ...GROUPS.map((g) => [g, Object.entries(TRAITS).filter(([, t]) => t.group === g).map(([k, t]) => [k, t, 'traits'])] as [string, [string, Info, 'traits' | 'edge'][]]),
+    ['Skating and shot', Object.entries(EDGE).map(([k, t]) => [k, t, 'edge'] as [string, Info, 'edge'])],
+  ];
+  const est = (p: any, src: 'traits' | 'edge', k: string, m: 'blend' | 'season') => (src === 'traits' ? p.traits?.[k]?.[m] : p.edge?.[m]?.[k]) ?? null;
+  const lane = (p: any, src: 'traits' | 'edge', k: string, paint: string) => {
+    const b = est(p, src, k, 'blend'), s = est(p, src, k, 'season');
+    if (!b && !s) return `<div class="lane none" style="--team:${paint}"></div>`;
+    const bb = b ?? s, ss = s ?? b;
+    const v = (e: any, key: 'lo' | 'hi') => e[key] ?? e.pct;
+    return `<div class="lane${s ? '' : ' no-season'}" style="--team:${paint};--b:${bb.pct};--blo:${v(bb, 'lo')};--bhi:${v(bb, 'hi')};--c:${ss.pct};--clo:${v(ss, 'lo')};--chi:${v(ss, 'hi')}"><span class="whisk"></span><span class="dot"></span></div>`;
+  };
+  const words = (p: any, src: 'traits' | 'edge', k: string, t: Info, m: 'blend' | 'season') => {
+    const e = est(p, src, k, m);
+    if (!e) return m === 'season' ? 'Not rated this season' : 'Not rated: too little time';
+    const group = peerOf(k, e.vs ?? p.group);
+    const stat = e.raw !== undefined ? t.short(e.index ?? 100) : t.short(e.v);
+    const cmp = src === 'edge' ? compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', group, true) : compared(e.pct, 'better than', 'behind', group, true);
+    return `${stat}, ${cmp}`;
+  };
+  const rank = (p: any, src: 'traits' | 'edge', k: string, m: 'blend' | 'season') => { const e = est(p, src, k, m); return e ? ordinal(e.pct) : '–'; };
+  function drawRows(pa: string, pb: string) {
+    const box = document.getElementById('cmp-rows')!;
+    const shown = groups.map(([g, list]) => [g, list.filter(([k, , src]) => est(A, src, k, 'blend') || est(B, src, k, 'blend') || est(A, src, k, 'season') || est(B, src, k, 'season'))] as const).filter(([, list]) => list.length);
+    const card = ([g, list]: (typeof shown)[number]) => `<div class="card fpr-grp"><h3>${g}</h3>${list.map(([k, t, src]) => `
+      <details class="fpr"><summary><span class="fpr-name">${t.label}</span>
+        <span class="fpr-rk">${(['blend', 'season'] as const).map((m) => [[A, pa], [B, pb]].map(([p, c]) => `<span class="t-away r-${m === 'blend' ? 'b' : 's'}" style="--team:${c}">${esc(p.last)} ${rank(p, src, k, m)}</span>`).join('')).join('')}</span>
+        <span class="fpr-scale"><span class="fpr-lo">${t.lo}</span><span class="lanes">${lane(A, src, k, pa)}${lane(B, src, k, pb)}</span><span class="fpr-hi">${t.hi}</span></span></summary>
+        <div class="fpr-say">${[[A, pa], [B, pb]].map(([p, c]) => `<div class="fpr-side" style="--team:${c}"><i></i>${(['blend', 'season'] as const).map((m) => `<p class="fpc-line m-${m}"><span><b>${esc(p.last)}:</b> ${esc(words(p, src, k, t, m))}</span></p>`).join('')}</div>`).join('')}<p class="fpr-tip">${esc(t.tip)}</p></div></details>`).join('')}</div>`;
+    // Two columns on a computer, split where the heights come out closest.
+    const sizes = shown.map(([, l]) => l.length + 1.5), total = sizes.reduce((a, b) => a + b, 0);
+    let run = 0, cut = shown.length;
+    for (let i = 0; i < shown.length; i++) { run += sizes[i]; if (run >= total / 2) { cut = Math.abs(run - total / 2) < Math.abs(run - sizes[i] - total / 2) ? i + 1 : i; break; } }
+    box.innerHTML = `<div class="fpr-col">${shown.slice(0, cut).map(card).join('')}</div><div class="fpr-col">${shown.slice(cut).map(card).join('')}</div>`;
+  }
+
+  async function show() {
+    const [a, b] = ids;
+    document.getElementById('cmp-empty')!.hidden = !!(a && b);
+    ia.value = a ? label(byId.get(a)!) : ''; ib.value = b ? label(byId.get(b)!) : '';
+    try { history.replaceState(null, '', a ? `#${a}${b ? `-${b}` : ''}` : location.pathname); } catch {}
+    const sim = await loadSimilar();
+    const sugg = document.getElementById('cmp-sugg')!;
+    const opts = a ? (sim[a] ?? []).map(String).filter((x) => byId.has(x)) : [];
+    sugg.hidden = !opts.length;
+    if (a && opts.length) {
+      sugg.innerHTML = `<span>Similar style to ${esc(byId.get(a)![1].split(' ').slice(1).join(' '))}:</span>${opts.map((x) => `<button type="button" class="pill${x === b ? ' on' : ''}" data-id="${x}" aria-pressed="${x === b}">${esc(byId.get(x)![1])}</button>`).join('')}`;
+      sugg.querySelectorAll<HTMLButtonElement>('.pill').forEach((btn) => btn.addEventListener('click', () => { ids = [a, btn.dataset.id!]; show(); }));
+    }
+    const body = document.getElementById('cmp-body')!;
+    if (!a || !b) { body.hidden = true; return; }
+    [A, B] = await Promise.all([load(a), load(b)]);
+    if (ids[0] !== a || ids[1] !== b) return;
+    if (!A || !B) { body.hidden = true; return; }
+    body.hidden = false;
+    const [pa, pb] = paints(A, B);
+    ia.style.setProperty('--team', pa); ib.style.setProperty('--team', pb);
+    document.getElementById('cmp-duo')!.innerHTML = [[A, pa], [B, pb]].map(([p, c]) => `<div class="card cmp-who" style="--team:${c}">
+      <h2><i></i><a href="${boot.base}player/${p.id}/">${esc(p.name)}</a></h2>
+      <p class="cmp-meta"><a class="teampill" href="${boot.base}team/${p.team}/"><b>${p.team}</b><span class="sep">·</span>${posWord[p.pos] ?? p.pos}</a>${p.age ? `<span class="cmp-age">${p.age} years old</span>` : ''}</p></div>`).join('');
+    const pos = document.getElementById('cmp-pos')!;
+    pos.hidden = A.group === B.group;
+    pos.textContent = `${A.last} is a ${(posWord[A.pos] ?? '').toLowerCase()} and ${B.last} a ${(posWord[B.pos] ?? '').toLowerCase()}, so each is rated against his own position.`;
+    drawTug(pa, pb);
+    drawRows(pa, pb);
+  }
+
+  const pick = (inp: HTMLInputElement, i: 0 | 1) => inp.addEventListener('change', () => {
+    const r = find(inp.value);
+    if (!r) { inp.value = ids[i] ? label(byId.get(ids[i]!)!) : ''; return; }
+    const id = String(r[0]);
+    if (i === 0) {
+      ids = [id, ids[1] === id ? null : ids[1]];
+      if (!ids[1]) loadSimilar().then((sim) => { const first = (sim[id] ?? []).map(String).find((x) => byId.has(x)); if (first && ids[0] === id && !ids[1]) { ids = [id, first]; show(); } });
+    } else if (id !== ids[0]) ids = [ids[0], id];
+    show();
+  });
+  pick(ia, 0); pick(ib, 1);
+  document.querySelectorAll<HTMLButtonElement>('[data-yr]').forEach((btn) => btn.addEventListener('click', () => {
+    yr = btn.dataset.yr as 'season' | 'last';
+    document.querySelectorAll('[data-yr]').forEach((x) => { x.setAttribute('aria-pressed', String(x === btn)); x.classList.toggle('on', x === btn); });
+    if (A && B) { const [pa, pb] = paints(A, B); drawTug(pa, pb); }
+  }));
+
+  // Open on the players in the address (one id: him beside his closest style match); with none, wait for a name.
+  const [h0, h1] = location.hash.slice(1).split('-').map((x) => (byId.has(x) ? x : null));
+  ids = [h0 ?? null, h1 ?? null];
+  if (ids[0] && !ids[1]) loadSimilar().then((sim) => { const first = (sim[ids[0]!] ?? []).map(String).find((x) => byId.has(x)); ids = [ids[0], first ?? null]; show(); });
+  else show();
+</script>
+
+<style is:global>
+  .cmp-page .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
+  .cmp-page .lede { margin-top: 18px; }
+  .cmp-pick { margin-top: 18px; }
+  .cmp-pick input { field-sizing: fixed; width: min(100%, 12em); border-bottom-color: var(--team, var(--ink-3)); }
+  .cmp-sugg { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font: 400 14px var(--ui); color: var(--ink-2); }
+  .cmp-sugg[hidden] { display: none; }
+  #cmp-empty { margin-top: 18px; }
+  .cmp-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px; }
+  .cmp-who { display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .cmp-who h2 { display: flex; align-items: center; gap: 10px; font: 700 26px/1.1 var(--display); }
+  .cmp-who h2 i { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--team); }
+  .cmp-who h2 a { color: inherit; }
+  .cmp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font: 400 14px var(--ui); color: var(--ink-2); }
+  .cmp-pos { margin-top: 12px; }
+  .cmp-pos[hidden] { display: none; }
+  .cmp-yr { display: flex; gap: 6px; margin-bottom: 12px; }
+  .cmp-take { margin: -4px 0 18px; }
+  .cmp-page .tug { display: grid; gap: 14px; }
+  .cmp-page .tug .tug-head { display: flex; justify-content: space-between; font: 600 14px var(--ui); }
+  .cmp-page .tug .tug-head span { display: inline-flex; align-items: center; gap: 7px; }
+  .cmp-page .tug .tug-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .cmp-page .tug .tug-row { display: grid; gap: 6px; }
+  .cmp-page .tug .tug-top { display: grid; grid-template-columns: 5em 1fr 5em; align-items: baseline; font: 500 14px var(--ui); color: var(--ink-2); }
+  .cmp-page .tug .tug-top > span { justify-self: center; text-align: center; }
+  .cmp-page .tug .tug-top strong { font: 700 20px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cmp-page .tug .tug-top strong:last-child { text-align: right; }
+  .cmp-page .tug .rope { position: relative; display: flex; gap: 3px; height: 10px; }
+  .cmp-page .tug .rope b { flex: var(--g) 1 0; min-width: 4px; border-radius: 5px; background: var(--team); transition: flex-grow 1s cubic-bezier(0.3, 0.9, 0.25, 1); }
+  .cmp-page .tug .rope::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.6; }
+  #cmp-rows .lane.none::before { opacity: 0.5; }
+  @media (prefers-reduced-motion: reduce) { .tug .rope b { transition: none; } }
+  @media (max-width: 560px) {
+    .cmp-duo { gap: 8px; }
+    .cmp-duo .card { padding: 14px; }
+    .cmp-who h2 { font-size: 19px; align-items: flex-start; }
+    .cmp-who h2 i { margin-top: 5px; }
+    .cmp-age { display: none; }
+  }
+</style>

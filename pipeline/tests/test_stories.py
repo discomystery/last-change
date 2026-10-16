@@ -101,3 +101,44 @@ def test_a_fill_in_who_scored_in_the_missing_players_spot(tmp_path, monkeypatch)
     assert item["text"] == "With Jordan Staal out, Mark Jankowski took his spot and scored, though he won only 3 of 10 faceoffs."
     monkeypatch.setattr(stories, "_roles_on", lambda s, day: {12: {1: {"toi_rank": 7}, 4: {"toi_rank": 2}}})
     assert stories._filled_in(9, "2026-10-13", "CAR", 12, 2026, N, lambda pid: N[pid]) is None  # a bigger player moved over
+
+
+def _pbp(tmp_path, plays, gid=2026020107):
+    import gzip
+    d = tmp_path / "2026" / "pbp"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{gid}.json.gz").write_bytes(gzip.compress(json.dumps({"homeTeam": {"id": 21}, "plays": plays}).encode()))
+
+
+def test_league_reviewed_goals_taken_off(tmp_path, monkeypatch):
+    """DAL at COL 2026-10-14 as the feed has it: an offside challenge by Dallas, then a league review of Colorado's
+    kicked goal (no reason given, neutral-zone restart on Colorado's side, Colorado shot two seconds before)."""
+    monkeypatch.setattr(stories, "RAW", tmp_path)
+    p1 = {"number": 1}
+
+    def play(t, kind, **det):
+        return {"typeDescKey": kind, "timeInPeriod": t, "periodDescriptor": p1, "homeTeamDefendingSide": "right", "details": det}
+    plays = [play("01:55", "stoppage", reason="chlg-vis-off-side"), play("01:55", "faceoff", xCoord=-20),
+             play("09:27", "shot-on-goal", xCoord=-66, eventOwnerTeamId=21),
+             play("09:29", "stoppage", reason="referee-or-linesman", secondaryReason="video-review"), play("09:29", "faceoff", xCoord=-20),
+             # an end-zone restart: the review found no goal, so nothing came off
+             play("12:00", "shot-on-goal", xCoord=80, eventOwnerTeamId=25),
+             play("12:01", "stoppage", reason="video-review", secondaryReason="video-review"), play("12:01", "faceoff", xCoord=69),
+             # a penalty review restarting in the neutral zone is not a goal
+             play("15:00", "shot-on-goal", xCoord=-60, eventOwnerTeamId=21),
+             play("15:02", "penalty"), play("15:02", "stoppage", reason="video-review"), play("15:02", "faceoff", xCoord=-20)]
+    _pbp(tmp_path, plays)
+    out = stories._overturned(2026020107, 2026)
+    assert [(x["home"], x["why"], x["sec"]) for x in out] == [(True, "for offside", 115), (True, "after a video review", 569)]
+
+
+def test_goals_taken_off_get_a_follow_up():
+    pk = lambda pool: pool[0]
+    off = [{"period": 1, "sec": 100}]
+    g = lambda per, sec, home, st="ev": {"period": per, "sec": sec, "home": home, "strength": st}
+    assert stories._wipe_after(off, [g(2, 50, False)], True, False, 1, "REG", pk) == " That one stung in a one-goal loss."
+    assert stories._wipe_after(off + [{"period": 1, "sec": 500}], [], True, False, 1, "SO", pk) == " Those stung in a game that went to a shootout."
+    assert stories._wipe_after(off, [g(1, 145, True)], True, True, 2, "REG", pk) == " They got it back just 45 seconds later."
+    assert stories._wipe_after(off, [g(2, 10, True, "pp")], True, True, 2, "REG", pk) == " The power play gave it back."
+    assert stories._wipe_after(off, [g(2, 10, True)], True, True, 2, "REG", pk) == " It didn’t cost them in the end."
+    assert stories._wipe_after(off, [g(2, 10, False)], True, False, 4, "REG", pk) == ""  # a rout: the goal didn't decide it

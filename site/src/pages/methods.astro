@@ -343,8 +343,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
 
 <style is:global>
   .try { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
-  .try-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font: 600 18px var(--display); margin: 0 0 12px; }
-  .try-pick select { font: 600 15px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 5px 8px; max-width: 100%; cursor: pointer; }
+  .try-pick { margin: 0 0 12px; }
   .try-body { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 18px 28px; align-items: center; }
   #try-rink { width: 100%; height: auto; display: block; touch-action: none; cursor: grab; user-select: none; }
   .try-cell { fill: var(--ink); fill-opacity: calc(var(--v) * 0.75); }
@@ -389,7 +388,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', t
 <style>
   .lede a { color: inherit; }
   .explain { margin-top: 18px; display: grid; gap: 12px; }
-  .explain p { font: 400 16px/1.6 var(--body); }
+  .explain p:not(.try-pick) { font: 400 16px/1.6 var(--body); }
   .tablecard { overflow-x: auto; margin-top: 12px; }
   .at { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
   .at th, .at td { text-align: right; padding: 8px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }

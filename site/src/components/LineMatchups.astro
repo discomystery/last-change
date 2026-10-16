@@ -1,0 +1,128 @@
+---
+// Post-game "Who played against whom" (Sora, 2026-10-15, after the mock-up "Post-game Line Matchups"): the preview's
+// split strips for one finished game, under a fold at the bottom of "How it unfolded". Reads matchups/{id}.json
+// (export/matchups.py): the "What changed" notes are drawn here at build time, the strips in the browser from the
+// same file embedded in the page, so the three views (whole game, before and after a player left) and both teams
+// cost one small JSON block instead of six copies of the chart.
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+interface Props { id: number; awayPlace: string; homePlace: string }
+const { id, awayPlace, homePlace } = Astro.props;
+const path = resolve(process.cwd(), 'public/data/matchups', `${id}.json`);
+const mu = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+const split = mu?.split as { name: string; side: number; sec: number } | undefined;
+const poss = (p: string) => (p.endsWith('s') ? `${p}’` : `${p}’s`);
+---
+{mu && (
+  <details class="fold pgmu-fold">
+    <summary><span class="closed">Show who played against whom</span><span class="opened">Hide who played against whom</span></summary>
+    <h3 class="sub pgmu-h">Who played against whom</h3>
+    <p class="pgmu-lede">{mu.lede}</p>
+    {mu.notes.length > 0 && (
+      <div class="card pgmu-changed">
+        <p class="box-h">What changed</p>
+        <ul>{mu.notes.map((n: { head: string; text: string }) => <li><strong>{n.head}</strong><p>{n.text}</p></li>)}</ul>
+        {mu.foot && <p class="pgmu-foot">{mu.foot}</p>}
+      </div>
+    )}
+    <div class="pick pgmu-pick">
+      <span>Show</span>
+      <select id="pgmu-team" aria-label="Team"><option value="1" selected>{poss(homePlace)}</option><option value="0">{poss(awayPlace)}</option></select>
+      <span>lines</span>
+      {split
+        ? <select id="pgmu-when" aria-label="Part of the game"><option value="all">over the whole game</option><option value="before">before {split.name} left</option><option value="after">after {split.name} left</option></select>
+        : <span>over the whole game</span>}
+      <span>with boxes</span>
+      <select id="pgmu-size" aria-label="Box sizes"><option value="share">sized by ice time</option><option value="even">in even columns</option></select>
+    </div>
+    <div class="card stripcard" id="pgmu" data-away={awayPlace} data-home={homePlace}>
+      <p class="opp-key" id="pgmu-key"></p>
+      <h4 class="mini-h" id="pgmu-hf"></h4>
+      <ul class="strips" id="pgmu-f"></ul>
+      <h4 class="mini-h" id="pgmu-hd"></h4>
+      <ul class="strips" id="pgmu-d"></ul>
+      <p class="note">Each strip is one group’s 5-on-5 time, split across the other team’s four forward lines, numbered as in the Swing section. Darker means more time. At the right: the group’s 5-on-5 time against those lines and the chances for and against while it was on, in expected goals. Faded rows had under three minutes. With no line matching, each group would face an opposing line about as often as that line is on the ice.</p>
+    </div>
+    <script type="application/json" id="pgmu-data" set:html={JSON.stringify(mu.periods).replace(/</g, '\\u003c')}></script>
+  </details>
+)}
+
+<style is:global>
+  .pgmu-fold .pgmu-h { margin-top: 4px; }
+  .pgmu-lede { font: 400 17px/1.5 var(--body); color: var(--ink-2); margin: 0 0 14px; }
+  .pgmu-changed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .pgmu-changed li { display: grid; gap: 2px; }
+  .pgmu-changed li strong { font: 700 15px var(--ui); }
+  .pgmu-changed li p { margin: 0; font: 400 15.5px/1.55 var(--body); color: var(--ink-2); }
+  .pgmu-foot { font: 400 13.5px/1.5 var(--ui); color: var(--ink-3); margin: 14px 0 0; }
+  .pgmu-pick { margin-top: 22px; }
+  #pgmu .opp-key { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; font: 400 14px var(--ui); color: var(--ink-2); padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+  #pgmu .opp-key .mini-h { width: 100%; margin: 0; }
+  #pgmu .opp-key b { color: var(--team); margin-right: 5px; }
+  #pgmu h4.mini-h { margin: 18px 0 10px; }
+  #pgmu .lab b { color: var(--team); }
+  #pgmu .strips li { grid-template-columns: minmax(150px, 250px) 1fr 128px; }
+  #pgmu .how { font: 400 13px/1.35 var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  #pgmu .how strong { color: var(--ink); font-weight: 600; }
+  #pgmu .how > span { display: block; }
+  #pgmu .chip { margin-left: 6px; vertical-align: 1px; }
+  #pgmu { --even: 0; transition: --even 0.5s cubic-bezier(0.3, 0.7, 0.2, 1); }
+  #pgmu.even { --even: 1; }
+  @media (max-width: 640px) {
+    #pgmu .strips li { grid-template-columns: 1fr; gap: 4px; }
+    #pgmu .how { display: flex; gap: 12px; }
+  }
+</style>
+
+<script>
+  type Row = { label: string; names: string[]; new?: boolean; sec: number; mixed: number; vs: number[]; xgf: number; xga: number; gf: number; ga: number; cells: number[][] };
+  type View = { rows: Row[]; expected: number[] };
+  const card = document.getElementById('pgmu');
+  const raw = document.getElementById('pgmu-data');
+  if (card && raw) {
+    const D = JSON.parse(raw.textContent || '{}') as Record<string, Record<string, View>>;
+    const PLACE: Record<number, string> = { 0: card.dataset.away!, 1: card.dataset.home! };
+    const SIDE: Record<number, string> = { 0: 't-away', 1: 't-home' };
+    const ORD = ['first', 'second', 'third', 'fourth'];
+    const $ = (id: string) => document.getElementById(id) as HTMLSelectElement | null;
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    const goals = (n: number) => (n === 1 ? 'one goal' : `${n} goals`);
+    const render = () => {
+      const h = Number($('pgmu-team')?.value ?? 1), o = 1 - h;
+      const when = $('pgmu-when')?.value ?? 'all';
+      const B = D[when][String(h)], O = D[when][String(o)];
+      const oppNames = (j: number) => O.rows.find((r) => r.label === `L${j + 1}`)?.names ?? [];
+      const key = document.getElementById('pgmu-key')!;
+      key.className = `opp-key ${SIDE[o]}`;
+      key.innerHTML = `<span class="mini-h">${esc(PLACE[o])}’s forward lines</span>` + [0, 1, 2, 3].map((j) => `<span><b>L${j + 1}</b>${esc(oppNames(j).join(' · '))}</span>`).join('');
+      document.getElementById('pgmu-hf')!.textContent = `${PLACE[h]} forward lines against ${PLACE[o]} forward lines`;
+      document.getElementById('pgmu-hd')!.textContent = `${PLACE[h]} defense pairs against ${PLACE[o]} forward lines`;
+      for (const [kind, el] of [['L', 'pgmu-f'], ['P', 'pgmu-d']] as const) {
+        document.getElementById(el)!.innerHTML = B.rows.filter((r) => r.label[0] === kind).map((r) => {
+          const mine = r.names.join(', ');
+          const boxes = r.vs.map((v, j) => {
+            const p = r.sec ? Math.round((100 * v) / r.sec) : null;
+            const cls = p === null ? '' : p >= 46 ? 'hot hotter' : p >= 36 ? 'hot' : '';
+            const [f, a, gf, ga] = r.cells[j];
+            const tip = p === null ? 'No 5-on-5 time against a set line.'
+              : `${mine} (${r.label}) spent ${clock(v)}, ${p}% of their 5-on-5 time, against ${oppNames(j).join(', ')}, ${PLACE[o]}’s ${ORD[j]} line. With no line matching it would be about ${B.expected[j]}%.` +
+                (v >= 60 ? ` Chances in that time: ${f.toFixed(2)} to ${a.toFixed(2)} expected goals.` : '') + (gf || ga ? ` ${PLACE[h]} scored ${goals(gf)}, ${PLACE[o]} ${goals(ga)}.` : '');
+            return `<span class="${cls}" style="--f:${Math.max(p ?? 0, 1)};--h:${p ?? 0}" data-tip="${esc(tip)}"><i>L${j + 1}</i>${p === null ? '–' : `${p}%`}</span>`;
+          }).join('');
+          const labTip = `${mine}. ${clock(r.sec)} of 5-on-5 against a set ${PLACE[o]} line${r.mixed >= 20 ? `, plus ${clock(r.mixed)} against mixed lines` : ''}.` + (r.new ? ' This is how the line went out in this part of the game.' : '');
+          const g = r.gf || r.ga ? `<span>Goals <strong>${r.gf}–${r.ga}</strong></span>` : '';
+          return `<li class="${r.sec < 180 ? 'thin' : ''}"><span class="lab ${SIDE[h]}" tabindex="0" data-tip="${esc(labTip)}"><b>${r.label}</b>${esc(r.names.join(' · '))}${r.new ? '<span class="chip">New</span>' : ''}</span><span class="strip">${boxes}</span><span class="how"><span><strong>${clock(r.sec)}</strong> at 5-on-5</span><span>Chances <strong>${r.xgf.toFixed(2)}–${r.xga.toFixed(2)}</strong></span>${g}</span></li>`;
+        }).join('');
+      }
+    };
+    const size = $('pgmu-size');
+    const apply = (v: string) => card.classList.toggle('even', v === 'even');
+    try { const saved = localStorage.getItem('lc-mu-size'); if (saved && size) { size.value = saved; apply(saved); } } catch {}
+    size?.addEventListener('change', () => { apply(size.value); try { localStorage.setItem('lc-mu-size', size.value); } catch {} });
+    $('pgmu-team')?.addEventListener('change', render);
+    $('pgmu-when')?.addEventListener('change', render);
+    render();
+  }
+</script>
