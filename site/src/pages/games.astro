@@ -108,7 +108,7 @@ const base = import.meta.env.BASE_URL;
 
     // Day view: a strip of every date with games; opens on today (or the next day with games).
     const dates = [...new Set(games.map((g) => g.date))];
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = window.lcDay();
     let current = location.hash.slice(1);
     if (!dates.includes(current)) current = dates.find((d) => d >= today) ?? dates[dates.length - 1];
     const strip = document.getElementById('days');
