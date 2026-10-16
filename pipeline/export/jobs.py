@@ -313,6 +313,15 @@ def scoring_odds(goals_before: float, games_before: int, group_avg: float) -> fl
     return 1 - math.exp(-lam)
 
 
+def _value(trait: str, s: np.ndarray) -> np.ndarray:
+    """A player's level as the cards read it. Faceoffs stay the plain share of draws won (not the adjusted score on
+    player pages), because a night is graded on the draws he actually won."""
+    if trait != "faceoffs":
+        return P._value(trait, s)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return P._faceoffs_recorded(s)
+
+
 def shrink(n: float, v: float, k: float, prior: float) -> float:
     return (n * v + k * prior) / (n + k)
 
@@ -355,9 +364,9 @@ class Reference:
             base = "D" if g == "D" else "F"
             self.mu[g], self.pool[g] = {}, {}
             for t in self.stab[base]:
-                self.mu[g][t] = float(P._value(t, tot))
+                self.mu[g][t] = float(_value(t, tot))
                 k = self.stab[base][t]["k"]
-                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(P._value(t, s))), k, self.mu[g][t])
+                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(_value(t, s))), k, self.mu[g][t])
                                             for s in (sums[p].sum(axis=0) for p in members if len(sums[p]) >= REF_GAMES)])
 
     def usual(self, trait: str, g: str, sb: str, prev: np.ndarray | None, before: np.ndarray) -> tuple[float, float, float, str]:
@@ -367,8 +376,8 @@ class Reference:
         k = self.stab[g][trait]["k"]
         prior = self.mu[peer][trait]
         if prev is not None and P._weight(trait, prev) > 0:
-            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(P._value(trait, prev))), k, prior)
-        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(P._value(trait, before))), k, prior)
+            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(_value(trait, prev))), k, prior)
+        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(_value(trait, before))), k, prior)
         return v, self.mu[peer][trait], P._pct(v, self.pool[peer][trait], P.TRAITS[trait][2]), peer
 
 

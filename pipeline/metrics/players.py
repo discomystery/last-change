@@ -14,7 +14,7 @@ Z80 = 1.2816
 
 COLS = ["sec", "sec5", "sec_pp", "icf5", "ixg5", "ixg_pp", "ixg_net", "iff_net", "g_net", "a1_5", "a1_pp", "on_xgf_adj", "on_xga_adj",
         "t_xgf_adj", "t_xga_adj", "t_sec5", "hits", "hits_adj", "takes", "takes_adj", "blocks", "blocks_adj", "gives", "gives_adj", "fow", "fol",
-        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf"]
+        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf", "fo_xw"]
 C = {c: i for i, c in enumerate(COLS)}
 GROUP = {"C": "F", "L": "F", "R": "F", "D": "D"}
 SUB = {"C": "C", "L": "W", "R": "W", "D": "D"}
@@ -36,6 +36,12 @@ def _rate(num: str, den: str, mult: float = 3600.0):
 
 
 def _faceoffs(s):
+    """Share of draws he would win against average opposition in even spots: 50 plus his wins above what an average
+    faceoff man would have won against the same opponents, at the same manpower and end of the ice (faceoffs.py)."""
+    return 50 + 100 * (s[..., C["fow"]] - s[..., C["fo_xw"]]) / (s[..., C["fow"]] + s[..., C["fol"]])
+
+
+def _faceoffs_recorded(s):
     return 100 * s[..., C["fow"]] / (s[..., C["fow"]] + s[..., C["fol"]])
 
 
@@ -62,7 +68,8 @@ TRAITS = {
     "discipline": (_rate("pen_taken", "sec"), "sec", False, None),
     "faceoffs": (_faceoffs, _faceoff_weight, True, {"blend": 200, "season": 40}),
 }
-RAW = {"hits": _rate("hits", "sec"), "blocks": _rate("blocks", "sec"), "takeaways": _rate("takes", "sec")}  # as recorded, for the Raw switch
+# As recorded, for the Recorded switch. Faceoffs: the plain share of draws won, as NHL.com shows it.
+RAW = {"hits": _rate("hits", "sec"), "blocks": _rate("blocks", "sec"), "takeaways": _rate("takes", "sec"), "faceoffs": _faceoffs_recorded}
 INDEXED = set(RAW)
 
 
@@ -219,6 +226,7 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
                 pool = np.array([players[pid]["est"]["blend"][t] for pid in members if ok_ref(players[pid])])
                 mean = float(pool.mean()) if len(pool) else float("nan")
                 raw_pool = np.array([float(RAW[t](both(players[pid], "blend"))) for pid in members if ok_ref(players[pid])]) if t in RAW else None
+                raw_mean = float(raw_pool.mean()) if raw_pool is not None and len(raw_pool) else 0.0
                 for pid in members:
                     p = players[pid]
                     v = p["est"][mode][t]
@@ -228,7 +236,10 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
                            "rank": int((pool > v).sum() + 1 if higher else (pool < v).sum() + 1)}
                     if t in RAW:
                         s_ = both(p, mode)
-                        raw = float(RAW[t](s_)) if s_[C["sec"]] > 0 else 0.0
+                        with np.errstate(divide="ignore", invalid="ignore"):
+                            raw = float(RAW[t](s_)) if s_[C["sec"]] > 0 else 0.0
+                        if not np.isfinite(raw):
+                            raw = raw_mean  # never took a draw: shown at the average, greyed out like the rating
                         rec |= {"index": round(100 * v / mean) if mean else None, "raw": round(raw, 2), "raw_pct": round(_pct(raw, raw_pool, higher))}
                     out[pid]["traits"].setdefault(t, {})[mode] = rec
 
