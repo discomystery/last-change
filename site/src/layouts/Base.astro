@@ -220,6 +220,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         window.lcSpell = { get: () => target, set: (v) => { if (v === target) return; target = v; root.dataset.spell = v; fix(root); } };
       })();
     </script>
+    <script is:inline src={`${base}live.js`}></script>
     <script is:inline>
       // The two ticket stubs (styles above) for home and team pages: next game and latest post-game, each a link.
       // g: a schedule game with t (Date); final games carry as/hs and end. colour(abbr, g) gives a team's matchup colour.
@@ -247,102 +248,6 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         return card;
       };
 
-      // Live scores (Sora, 2026-10-16). The NHL's own feed can't be read from a browser on another site, so the
-      // visitor's browser reads ESPN's public scoreboard (it allows that) every 30 s, only while a game the page shows is
-      // between 20 minutes before puck drop and 5 hours after it, and only while the tab is open in front.
-      // Scores only: nothing else from it is shown or saved, and the nightly data still owns every final.
-      // Markup: a container with data-live="{game id}" holding .lv-clock (its text becomes "2nd 9:16", "Final (OT)"...),
-      // .lv-sc[data-side=away|home] (the scores), .lv-at ("at", hidden once live) and .lv-dash ("–", shown once live).
-      // The container gets .live-on while the game is on and .live-done once ESPN calls it final.
-      window.lcLive = (() => {
-        const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard';
-        const AB = { TB: 'TBL', NJ: 'NJD', SJ: 'SJS', LA: 'LAK', UTAH: 'UTA' };
-        const EVERY = 30e3, BEFORE = 20 * 60e3, AFTER = 5 * 3600e3;
-        const state = new Map();
-        const games = new Map();
-        let timer = null, busy = false;
-        const ord = (n) => ['1st', '2nd', '3rd'][n - 1] ?? `${n}th`;
-        const period = (n) => (n <= 3 ? ord(n) : n === 4 ? 'OT' : `${n - 3}OT`);
-        const clockOf = (s, playoff) => {
-          const t = s.type ?? {};
-          if (t.state === 'post') return s.period > 3 ? `Final (${s.period === 5 && !playoff ? 'SO' : 'OT'})` : 'Final';
-          if (t.state !== 'in') return /POSTPONED|CANCELED|SUSPENDED|DELAYED/.test(t.name ?? '') ? t.description : null;
-          if (s.period === 5 && !playoff) return 'Shootout';
-          if (t.name === 'STATUS_END_PERIOD' || (s.clock === 0 && t.name !== 'STATUS_IN_PROGRESS')) return `End of ${period(s.period)}`;
-          return `${period(s.period)} ${s.displayClock}`;
-        };
-        const due = () => {
-          const now = Date.now();
-          return [...games.values()].filter((g) => {
-            const t = +new Date(g.start);
-            return !g.final && state.get(g.id)?.st !== 'post' && now >= t - BEFORE && now <= t + AFTER;
-          });
-        };
-        const paint = (root = document) => {
-          const nodes = root.matches?.('[data-live]') ? [root] : [...root.querySelectorAll('[data-live]')];
-          nodes.forEach((box) => {
-            const s = state.get(Number(box.dataset.live));
-            const on = !!s && (s.st === 'in' || s.st === 'post');
-            box.classList.toggle('live-on', on && s.st === 'in');
-            box.classList.toggle('live-done', on && s.st === 'post');
-            box.querySelectorAll('.lv-sc').forEach((n) => { n.textContent = on ? String(s[n.dataset.side === 'home' ? 'hs' : 'as']) : ''; });
-            box.querySelectorAll('.lv-clock').forEach((n) => {
-              if (!('orig' in n.dataset)) n.dataset.orig = n.textContent;
-              n.textContent = s?.clock && (on || s.st === 'off') ? s.clock : n.dataset.orig;
-            });
-            if (on) box.setAttribute('aria-label', `${s.away} ${s.as}, ${s.home} ${s.hs}, ${s.clock}`);
-          });
-        };
-        const poll = async () => {
-          clearTimeout(timer);
-          timer = null;
-          const want = due();
-          if (busy || document.hidden) return;
-          if (!want.length) { plan(); return; }
-          busy = true;
-          const days = [...new Set(want.map((g) => g.date))];
-          const got = await Promise.all(days.map((d) => fetch(`${ESPN}?dates=${d.replaceAll('-', '')}`, { cache: 'no-store', credentials: 'omit' })
-            .then((r) => (r.ok ? r.json() : null)).catch(() => null)));
-          busy = false;
-          got.forEach((data, i) => (data?.events ?? []).forEach((e) => {
-            const c = e.competitions?.[0];
-            const side = (k) => c?.competitors?.find((x) => x.homeAway === k);
-            const [a, h] = [side('away'), side('home')];
-            if (!a || !h) return;
-            const abbr = (x) => AB[x.team?.abbreviation] ?? x.team?.abbreviation;
-            const g = [...games.values()].find((x) => x.date === days[i] && x.away === abbr(a) && x.home === abbr(h));
-            if (!g) return;
-            const s = e.status ?? c.status ?? {};
-            const st = s.type?.state;
-            const clock = clockOf(s, g.playoff);
-            state.set(g.id, { st: clock && st === 'pre' ? 'off' : st, as: Number(a.score ?? 0), hs: Number(h.score ?? 0), clock, away: g.away, home: g.home });
-          }));
-          paint();
-          document.dispatchEvent(new CustomEvent('live'));
-          plan();
-        };
-        // Every 30 s while a game is on; otherwise wake when the next game we know about is 20 minutes out, if that's soon.
-        const plan = () => {
-          if (timer || busy) return;
-          if (due().length) { timer = setTimeout(poll, EVERY); return; }
-          const now = Date.now();
-          const next = Math.min(...[...games.values()].filter((g) => !g.final).map((g) => +new Date(g.start) - BEFORE).filter((t) => t > now));
-          if (next - now < 12 * 3600e3) timer = setTimeout(poll, next - now + 1000);
-        };
-        // Pages hand over the games they show (schedule rows: id, start, date, away, home, final).
-        const watch = (list) => {
-          list.forEach((g) => { if (g?.id && g.start && !games.has(g.id)) games.set(g.id, g); });
-          if (due().length && !busy) poll(); else plan();
-        };
-        document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) poll(); });
-        // The middle of a matchup line: "at" before the game, "3 – 2" once it's on.
-        // cls names each page's own styles for the three parts.
-        const middle = ({ at = 'tk-at', sc = 'tk-sc', dash = 'tk-dash' } = {}) => {
-          const sp = (cls, text, sideName) => { const n = document.createElement('span'); n.className = cls; if (text) n.textContent = text; if (sideName) n.dataset.side = sideName; return n; };
-          return [sp(`${at} lv-at`, 'at'), sp(`${sc} lv-sc`, '', 'away'), sp(`${dash} lv-dash`, '–'), sp(`${sc} lv-sc`, '', 'home')];
-        };
-        return { watch, paint, middle, get: (id) => state.get(id) ?? null };
-      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -852,7 +757,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   /* Next game and latest post-game on home and team pages: two ticket stubs side by side, each one a link to its
      preview or post-game page. The date sits on the stub, torn off by a dashed line; teams are abbreviations in their
      matchup colours, and a final score sits between them in the serif, as on the post-game rink. */
-  .tickets { display: grid; gap: 14px; }
+  .tickets { display: grid; gap: 14px; align-items: start; }
   @media (min-width: 820px) { .tickets { grid-template-columns: 1fr 1fr; } }
   .card.tk { display: grid; grid-template-columns: 84px 1fr; padding: 0; overflow: hidden; color: var(--ink); text-decoration: none; }
   a.tk:hover { border-color: var(--ink); }
@@ -871,6 +776,40 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .live-on .lv-clock::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 0.08em; }
   html.motion .live-on .lv-clock::before { animation: lv-beat 2s ease-in-out infinite; }
   @keyframes lv-beat { 50% { opacity: 0.25; } }
+  /* The live card (lcLive.card): score, shots, goal timeline, last goal. */
+  .card.lcard { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 14px; }
+  .lcard .lc-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .lcard .lc-clock { font: 700 12px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lcard .lc-where { font: 500 12px var(--ui); color: var(--ink-3); text-align: right; }
+  .lcard .lc-row { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+  .lcard .lc-ab { font: 700 26px/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); min-width: 58px; }
+  .lcard .lc-nick { font: 400 14px var(--ui); color: var(--ink-2); }
+  .lcard .lc-shots { font: 400 12px var(--ui); color: var(--ink-3); margin-right: auto; }
+  .lcard .lc-sc { font: 600 32px/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .lcard .lc-sc.l { color: var(--ink-3); }
+  .lcard .lc-line { position: relative; height: 36px; margin-top: 4px; }
+  .lcard .lc-track, .lcard .lc-played { position: absolute; left: 0; top: 17px; height: 2px; background: var(--track); }
+  .lcard .lc-track { right: 0; }
+  .lcard .lc-played { top: 16px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--ink-3) 45%, var(--track)); }
+  .lcard .lc-tick { position: absolute; top: 12px; width: 1px; height: 12px; background: color-mix(in oklab, var(--ink-3) 45%, var(--track)); }
+  .lcard .lc-now { position: absolute; top: 11px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--live); }
+  .lcard .lc-goal { position: absolute; width: 11px; height: 11px; margin-left: -5.5px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--t, var(--ink)); background: var(--t, var(--ink)); top: 0; }
+  .lcard .lc-goal.home { top: 25px; }
+  .lcard .lc-goal.pp { background: var(--sheet); }
+  .lcard .lc-pers { display: flex; margin-top: -6px; font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lcard .lc-last { margin: 2px 0 0; font: 400 15px/1.45 var(--body); color: var(--ink-2); }
+  .lcard .lc-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--track); padding-top: 10px; font: 500 12px var(--ui); color: var(--ink-3); }
+  .lcard .lc-foot a { font: 600 13px var(--ui); color: var(--ink); text-decoration: none; }
+  @media (max-width: 480px) { .lcard .lc-nick { display: none; } }
+  /* The small tiles in the home page's "On now" strip. */
+  .lv-tiles { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: thin; padding: 2px 2px 6px; }
+  .card.lv-tile { flex: 0 0 auto; width: 158px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 11px 14px; border-radius: 14px; color: var(--ink); text-decoration: none; }
+  .lv-tile .lv-clock { font: 700 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lv-tile .lt-r { display: flex; justify-content: space-between; align-items: baseline; }
+  .lv-tile .lt-ab { font: 700 19px/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
+  .lv-tile .lt-sc { font: 600 21px/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .lv-tile .lt-sc.l { color: var(--ink-3); }
+  .lv-tile .lt-note { font: 400 12px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tk-end { align-self: center; font: 600 12px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); }
   .tk-sub { font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .tk-sub strong { color: var(--ink); font-weight: 600; }

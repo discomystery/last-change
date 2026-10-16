@@ -20,6 +20,12 @@ const base = import.meta.env.BASE_URL;
       <div class="tickets" id="tickets"></div>
     </section>
 
+    <section id="onnow" class="band-sec" hidden>
+      <h2 class="band">On now around the league</h2>
+      <p class="band-sub" id="onnow-sub"></p>
+      <div class="lv-tiles" id="onnow-tiles"></div>
+    </section>
+
     <section id="night" class="band-sec">
       <h2 class="band" id="night-h">Last night</h2>
       <p class="band-sub" id="night-sub"></p>
@@ -67,7 +73,11 @@ const base = import.meta.env.BASE_URL;
     const PREVIEWS = new Set((pv ?? []).map((p) => p.id));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
-    window.lcLive.watch(sched.games);
+    const L = window.lcLive;
+    L.watch(sched.games);
+    // Live cards spell names our way and link them; the player list is fetched only once a game is on.
+    let player = null;
+    const names = () => { if (!player) { player = () => null; get('players/index').then((ix) => { player = L.players(ix, base); document.dispatchEvent(new CustomEvent('live')); }); } return (n, t) => player(n, t); };
     const MC = JSON.parse(document.getElementById('mcol').textContent);
     const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -242,6 +252,40 @@ const base = import.meta.env.BASE_URL;
       fill();
     };
 
+    // On now: a small tile for every game being played (the visitor's own game is in the tickets above), their division
+    // first, then any game still to come today. Hidden when nothing is on.
+    const renderOnNow = (me) => {
+      const sec = document.getElementById('onnow');
+      const today = games.filter((g) => !g.final && ['in', 'post'].includes(L.get(g.id)?.st) && g.away !== me && g.home !== me);
+      const live = today.filter((g) => L.get(g.id).st === 'in');
+      if (!live.length) { sec.hidden = true; return; }
+      const done = today.filter((g) => L.get(g.id).st === 'post');
+      const later = games.filter((g) => !g.final && (L.get(g.id)?.st ?? 'pre') === 'pre' && g.date === live[0].date && g.away !== me && g.home !== me);
+      const lift = (g) => boost({ score: 0, away: g.away, home: g.home }, me);
+      L.want(live.map((g) => g.id));
+      const tile = (g) => {
+        const s = L.get(g.id);
+        const a = el('a', 'card lv-tile');
+        a.dataset.live = g.id;
+        a.href = PREVIEWS.has(g.id) ? `${base}preview/${g.id}/` : `${base}games/#${g.date}`;
+        a.append(el('span', 'lv-clock', time.format(g.t)));
+        const on = s && s.st !== 'pre';
+        const r = (x, sc, other) => { const p = el('span', 'lt-r'); p.append(ab(x, g, 'lt-ab'), el('span', `lt-sc${sc < other ? ' l' : ''}`, on ? String(sc) : '')); return p; };
+        a.append(r(g.away, s?.as, s?.hs), r(g.home, s?.hs, s?.as));
+        const x = L.goals(g.id)?.at(-1);
+        const who = x && (names()(x.scorer, x.side === 'home' ? g.home : g.away)?.last ?? x.scorer?.split(' ').slice(1).join(' '));
+        a.append(el('span', 'lt-note', !on ? (g.venue ?? '') : who ? `Last goal: ${who}` : s.st === 'in' ? 'No goals yet' : ''));
+        L.paint(a);
+        return a;
+      };
+      const rows = [...[...live].sort((x, y) => lift(y) - lift(x) || x.t - y.t), ...done, ...later];
+      const all = el('a', 'more', 'All games ›');
+      all.href = `${base}games/#${live[0].date}`;
+      document.getElementById('onnow-tiles').replaceChildren(...rows.map(tile), all);
+      document.getElementById('onnow-sub').textContent = [`${plural(live.length, 'game')} on`, done.length ? `${done.length} just finished` : null, later.length ? `${later.length} still to come` : null].filter(Boolean).join(' · ');
+      sec.hidden = false;
+    };
+
     // League leaders, with what each player added on the latest game day.
     const NOTES = {
       p: 'Goals plus assists.',
@@ -322,7 +366,11 @@ const base = import.meta.env.BASE_URL;
           if (head && !/ beat | roll past /.test(head)) sub.push(` ${head}.`);
           tickets.push(window.lcTicket(last, { eyebrow: 'Last game', href: `${base}recap/${last.id}/`, sub, colour: colourOf }));
         }
-        if (next) {
+        const on = next && L.get(next.id);
+        if (on && (on.st === 'in' || on.st === 'post')) {
+          document.getElementById('mine-eyebrow').append(` · ${on.st === 'in' ? 'On now' : 'Just finished'}`);
+          tickets.push(L.card(next, { colour: colourOf, nick: (a) => byAbbr[a]?.nick, player: names(), href: PREVIEWS.has(next.id) ? `${base}preview/${next.id}/` : null }));
+        } else if (next) {
           const has = PREVIEWS.has(next.id);
           const when = [el('strong', 'lv-clock', time.format(next.t)), ` · ${next.venue ?? ''}`];
           if (!has) when.push(el('br'), 'Preview opens a week before the game');
@@ -330,12 +378,21 @@ const base = import.meta.env.BASE_URL;
         }
         document.getElementById('tickets').replaceChildren(...tickets);
       }
+      renderOnNow(me);
       renderNight(me);
       renderToday(me);
       renderLeaders(me);
     };
     render();
     document.addEventListener('prefs', (e) => { if (e.detail.key === 'team') render(); });
+    // Live updates: the tiles redraw; the whole page only when the visitor's own game starts or ends.
+    let mineKind = null;
+    const kindOf = () => { const me = window.lcPrefs.get('team'); const g = me && games.find((x) => (x.home === me || x.away === me) && !x.final && x.t > new Date(Date.now() - 4 * 3600e3)); return g ? (L.get(g.id)?.st ?? 'pre') : null; };
+    mineKind = kindOf();
+    document.addEventListener('live', () => {
+      const k = kindOf();
+      if (k !== mineKind) { mineKind = k; render(); } else renderOnNow(window.lcPrefs.get('team'));
+    });
     addEventListener('resize', () => fill());
     document.fonts?.ready.then(() => fill());
   })();
@@ -391,6 +448,7 @@ const base = import.meta.env.BASE_URL;
   @media (max-width: 719px) { #home .row { padding: 9px 14px; gap: 2px 10px; } #home .row .tag { font-size: 13px; } }
   #home .more { display: block; padding: 11px 18px 8px; border-top: 1px solid var(--rule); font: 600 14px var(--ui); text-decoration: none; color: var(--ink); }
   #home .more:hover { text-decoration: underline; }
+  #home .lv-tiles .more { border: 0; align-self: center; flex: 0 0 auto; white-space: nowrap; }
   #home .skel-row { min-height: 220px; border-radius: 18px; }
 
   /* Leaders */
