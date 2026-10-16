@@ -200,7 +200,7 @@ import ShareButton from '../../components/ShareButton.astro';
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">
-      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
+      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; anything that takes many games to show a real pattern leans more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
       <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
@@ -514,8 +514,8 @@ import ShareButton from '../../components/ShareButton.astro';
   <aside class="card about" id="notes" aria-labelledby="notes-h">
     <h2 class="box-h" id="notes-h">About these numbers</h2>
     <div class="about-cols">
-      <p class="m-blend"><strong>Blended with last season.</strong> A few games can say a lot about a team or almost nothing, so most numbers mix this season with last. {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}; traits that take longer to settle lean more on last season. Pick “This season” under Seasons in the settings to see this season alone. <a href={`${base}methods/#blend`}>How blending works</a></p>
-      <p class="m-season"><strong>This season only.</strong> These numbers use only {place(away)}’s {fpT[away].games} games and {place(home)}’s {fpT[home].games}, so expect them to swing. Pick “Blended” under Seasons in the settings to mix in last season, which steadies traits that take longer to settle. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p class="m-blend"><strong>Blended with last season.</strong> A few games can say a lot about a team or almost nothing, so most numbers mix this season with last. {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}; anything that takes many games to show a real pattern leans more on last season. Pick “This season” under Seasons in the settings to see this season alone. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p class="m-season"><strong>This season only.</strong> These numbers use only {place(away)}’s {fpT[away].games} games and {place(home)}’s {fpT[home].games}, so expect them to swing. Pick “Blended” under Seasons in the settings to mix in last season, which steadies anything that takes many games to show a real pattern. <a href={`${base}methods/#blend`}>How blending works</a></p>
       <p><strong>Adjusted for the arena.</strong> Hits, giveaways, takeaways and blocked shots are counted by each arena’s scorer, and some buildings count far more than others. Those numbers, and anything built on them, are corrected for the arena and shown as a score where 100 is league average. Pick “Recorded” under Adjusted stats to see the counts as they were written down. <a href={`${base}methods/#arena`}>How the arena correction works</a></p>
     </div>
   </aside>
