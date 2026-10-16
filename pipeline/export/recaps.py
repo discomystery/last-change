@@ -97,7 +97,13 @@ class Season:
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
-        ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period_type"])
+        ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period", "period_type"])
+        # Goals and shots on goal by period, for the score table (shootout left out; their sum equals team_game's sf).
+        self.by_period = {}
+        for gid, tid, per, ptype, n, gl in (ev.filter(pl.col("type").is_in(["shot-on-goal", "goal"]) & (pl.col("period_type") != "SO"))
+                                            .group_by("game_id", "team_id", "period", "period_type")
+                                            .agg(pl.len(), (pl.col("type") == "goal").sum()).iter_rows()):
+            self.by_period[(gid, tid, per)] = (ptype, int(gl), int(n))
         pen = pl.read_parquet(d / "events.parquet", columns=["game_id", "p1", "pen_type"]) if "pen_type" in pl.read_parquet_schema(d / "events.parquet") else None
         self.ejected = set() if pen is None else {(g, p) for g, p in pen.filter(pl.col("pen_type").is_in(["GAM", "MAT"])).select("game_id", "p1").iter_rows()}
         self.goal_times = {}
@@ -396,6 +402,23 @@ def team_numbers(S: Season, gid: int, abbr: str) -> dict:
             "pp_goals": ppg, "pp_opps": ppo}
 
 
+def periods(S: Season, gid: int, g: dict) -> list[dict]:
+    """The score table: goals and shots on goal for each team in each period played (overtime as "OT"), then a
+    shootout column ("SO", goals only) when the game went to one: the shootout winner's goal is the difference between
+    the final score and the goals in play."""
+    teams = {g["away"]: g["away_id"], g["home"]: g["home_id"]}
+    last = max([p for (x, _, p) in S.by_period if x == gid] + [4 if g["last_period"] in ("OT", "SO") else 3])
+    out = []
+    for per in range(1, last + 1):
+        label = ("1st", "2nd", "3rd")[per - 1] if per <= 3 else "OT" if per == 4 else f"{per - 3}OT"
+        cell = {a: S.by_period.get((gid, t, per), (None, 0, 0)) for a, t in teams.items()}
+        out.append({"label": label, "goals": {a: c[1] for a, c in cell.items()}, "shots": {a: c[2] for a, c in cell.items()}})
+    if g["last_period"] == "SO":
+        play = {a: sum(p["goals"][a] for p in out) for a in teams}
+        out.append({"label": "SO", "goals": {g["away"]: g["away_score"] - play[g["away"]], g["home"]: g["home_score"] - play[g["home"]]}, "shots": None})
+    return out
+
+
 def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     out = []
     for r in S.goalies.filter(pl.col("game_id") == gid).sort("team_id", "sec", descending=[False, True]).iter_rows(named=True):
@@ -523,7 +546,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
-               "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
+               "reveal": reveals.get(gid), "numbers": nums, "periods": periods(S, gid, g), "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
         if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
             gone = [{"id": x["id"], "team": t, "sec": x["sec"]} for t in (g["away"], g["home"])
