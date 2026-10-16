@@ -25,7 +25,7 @@ import PkRoles from '../../components/PkRoles.astro';
 import KeyPlayers from '../../components/KeyPlayers.astro';
 import Intro from '../../components/Intro.astro';
 import { teamIntro } from '../../lib/intros';
-import { teamPaint, matchupTable } from '../../lib/teams';
+import { teamPaint, cardTable } from '../../lib/teams';
 import Roster from '../../components/Roster.astro';
 import { KEY_COUNT } from '../../lib/keyPlayers';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
@@ -498,7 +498,7 @@ const coachSince = coach && (team as any).coach_since
   </Section>
 
   <script type="application/json" id="team-games" set:html={JSON.stringify(games)}></script>
-  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(cardTable())}></script>
   <script type="application/json" id="team-names" set:html={JSON.stringify(names)}></script>
   <script type="application/json" id="team-places" set:html={JSON.stringify(places)}></script>
   <script type="application/json" id="team-previews" set:html={JSON.stringify(previewIds)}></script>

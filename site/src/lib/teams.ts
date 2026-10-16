@@ -97,6 +97,33 @@ export function matchupPaint(away: string, home: string): { away: string; home: 
   return { away: both(matchupColours(away, home).away, darkAway(away, home)), home: teamPaint(home) };
 }
 
+/** Colours for score cards and ticket stubs (Sora, 2026-10-16): the abbreviations there are labelled text, so a clash
+ * only switches the visitors to their second colour when that is a real colour (not black, grey or white) and clears
+ * the same bar as the matchup colours; otherwise both teams keep their own colour (PHI orange beside DET red), never the
+ * grey, road white or slate fallbacks. Charts that tell teams apart by colour alone use `matchupPaint`. */
+const isGrey = (hex: string) => { const [, a, b] = oklab(hex); return Math.hypot(a, b) < 0.03; };
+function cardPaint(away: string, home: string): string {
+  const second = SECOND[away] && !isGrey(SECOND[away]) ? SECOND[away] : null;
+  const own = teamColour(away), h = teamColour(home);
+  const light = distance(own, h) >= MIN_DISTANCE || !second || distance(second, h) < MIN_DISTANCE ? own : second;
+  const ownD = darkShade(own, away), hD = darkShade(h, home), secD = second && darkShade(second, away);
+  const dark = distance(ownD, hD) >= DARK_MIN_DISTANCE || !secD || distance(secD, hD) < DARK_MIN_DISTANCE ? ownD : secD;
+  return both(light, dark);
+}
+
+/** `matchupTable` for score cards: each club's own colour, plus the visitors' second colour for the pairs where
+ * `cardPaint` switches it. */
+export function cardTable(): { c: Record<string, string>; s: Record<string, string> } {
+  const s: Record<string, string> = {};
+  const c = Object.fromEntries(Object.keys(COLOURS).map((a) => [a, teamPaint(a)]));
+  for (const a of Object.keys(COLOURS)) for (const h of Object.keys(COLOURS)) {
+    if (a === h) continue;
+    const m = cardPaint(a, h);
+    if (m !== c[a]) s[`${a}@${h}`] = m;
+  }
+  return { c, s };
+}
+
 /** Every matchup's colours in a small table for pages that draw games in the browser (home, team pages): each club's
  * own colour, plus the visitors' replacement for the pairs where either mode switches it (all as light-dark values). */
 export function matchupTable(): { c: Record<string, string>; s: Record<string, string> } {

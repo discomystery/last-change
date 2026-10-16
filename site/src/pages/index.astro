@@ -4,7 +4,7 @@
 // tomorrow only when there's room), and league leaders with last night's standout stat. Built in the browser from
 // home.json (export/home.py), the schedule and the standings, so the visitor's team and division can lift games.
 import Base from '../layouts/Base.astro';
-import { matchupTable } from '../lib/teams';
+import { cardTable } from '../lib/teams';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="home" title="Spare Line Change">
@@ -62,7 +62,7 @@ const base = import.meta.env.BASE_URL;
       </div>
     </section>
   </div>
-  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(cardTable())}></script>
 </Base>
 
 <script is:inline>

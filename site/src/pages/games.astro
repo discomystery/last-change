@@ -2,7 +2,7 @@
 // Every game, by day. Built in the browser from the latest schedule, so today's slate and the Preview / Post-game
 // buttons are always current. "My team's games" shows the whole season for the visitor's team instead.
 import Base from '../layouts/Base.astro';
-import { matchupTable } from '../lib/teams';
+import { cardTable } from '../lib/teams';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="games" title="Games" description="Every NHL game: previews before puck drop, post-game pages after.">
@@ -22,7 +22,7 @@ const base = import.meta.env.BASE_URL;
     <ul class="glist" id="day-games">{Array.from({ length: 4 }, () => <li class="skel skel-card" aria-hidden="true"></li>)}</ul>
   </div>
   <div id="team-view" hidden></div>
-  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(cardTable())}></script>
   <p class="note">Times are shown in your own time zone. Scores update live while games are on (from ESPN’s scoreboard). Previews open a week before each game; post-game pages appear soon after the final horn.</p>
 </Base>
 
@@ -53,7 +53,7 @@ const base = import.meta.env.BASE_URL;
       if (me) when.append(dayShort.format(asDate(g.date)) + ' · ');
       when.append(g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : el('span', 'lv-clock', time.format(g.t)));
       const row = (a, score, side) => {
-        // Score bug like the home page's tiles: the club's abbreviation in its matchup colour, the score in the serif.
+        // Score bug like the home page's tiles: the club’s abbreviation in its own colour, the score in the serif.
         const r = el('span', 'g-team');
         const ab = el('span', 'g-ab', a);
         const c = colourOf(a, g);
