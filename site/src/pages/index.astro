@@ -351,7 +351,7 @@ const base = import.meta.env.BASE_URL;
       } else {
         const t = byAbbr[me];
         const mine = games.filter((g) => g.home === me || g.away === me);
-        const next = mine.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
+        let next = mine.find((g) => !g.final && g.t > new Date(now - 4 * 3600e3));
         const eb = document.getElementById('mine-eyebrow');
         const link = el('a', null, 'Team page');
         link.href = `${base}team/${me}/`;
@@ -371,8 +371,10 @@ const base = import.meta.env.BASE_URL;
         const on = next && L.get(next.id);
         const liveBox = document.getElementById('mine-live');
         if (on && (on.st === 'in' || on.st === 'post')) {
-          liveBox.replaceChildren(el('span', 'eyebrow', on.st === 'in' ? 'On now' : 'Just finished'), L.card(next, { colour: colourOf, nick: (a) => byAbbr[a]?.nick, player: names(), href: PREVIEWS.has(next.id) ? `${base}preview/${next.id}/` : null }));
+          liveBox.replaceChildren(el('span', 'eyebrow', on.st === 'in' ? 'On now' : 'Just finished'), L.card(next, { wide: true, colour: colourOf, nick: (a) => byAbbr[a]?.nick, player: names(), href: PREVIEWS.has(next.id) ? `${base}preview/${next.id}/` : null }));
           liveBox.hidden = false;
+          // The Next game ticket moves on to the game after this one.
+          next = mine.find((g) => !g.final && g.t > next.t);
         } else { liveBox.hidden = true; liveBox.replaceChildren(); }
         if (next) {
           const has = PREVIEWS.has(next.id);

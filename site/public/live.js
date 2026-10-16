@@ -202,16 +202,33 @@ window.lcLive = (() => {
     const foot = el('div', 'lc-foot');
     foot.append(el('span', null, goals.some((x) => x.str === 'pp') ? 'Hollow dots: power-play goals' : ''));
     if (o.href) { const a = el('a', null, o.label ?? 'Preview ›'); a.href = o.href; foot.append(a); }
-    const kids = [top, row('away'), row('home'), line, pers];
     const last = lastGoal(g, s, goals, o);
-    if (last) kids.push(last);
-    kids.push(foot);
-    box.replaceChildren(...kids);
+    if (o.wide) {
+      // The big card on the home page: a score bug like the Last game / Next game tickets on the left,
+      // the goal line and the last goal on the right (stacked on phones).
+      box.classList.add('wide');
+      const ab = (a) => { const n = el('span', 'tk-ab', a); const c = o.colour?.(a, g); if (c) n.style.setProperty('--team', c); return n; };
+      const m = el('p', 'tk-m');
+      m.append(ab(g.away), el('span', `tk-sc${s.as < s.hs ? ' l' : ''}`, String(s.as)), el('span', 'tk-dash', '–'), el('span', `tk-sc${s.hs < s.as ? ' l' : ''}`, String(s.hs)), ab(g.home));
+      const bug = el('div', 'lc-bug');
+      bug.append(top, m);
+      if (s.sa != null && s.sh != null) bug.append(el('p', 'lc-shotline', `Shots on goal: ${g.away} ${s.sa}, ${g.home} ${s.sh}`));
+      const rest = el('div', 'lc-rest');
+      rest.append(line, pers, ...(last ? [last] : []));
+      const split = el('div', 'lc-split');
+      split.append(bug, rest);
+      box.replaceChildren(split, foot);
+    } else {
+      const kids = [top, row('away'), row('home'), line, pers];
+      if (last) kids.push(last);
+      kids.push(foot);
+      box.replaceChildren(...kids);
+    }
     box.setAttribute('aria-label', `${g.away} ${s.as}, ${g.home} ${s.hs}, ${s.clock}`);
   };
   const redraw = () => cards.forEach((c) => (c.el.isConnected ? draw(c) : cards.delete(c)));
   document.addEventListener('live', redraw);
-  // A live card for one game. o: colour(abbr, g), nick(abbr), player(espnName, abbr), href, label.
+  // A live card for one game. o: colour(abbr, g), nick(abbr), player(espnName, abbr), href, label, wide (the home page's big card).
   const card = (g, o = {}) => {
     const box = el('article', 'card lcard');
     box.dataset.live = g.id;

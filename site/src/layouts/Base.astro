@@ -800,6 +800,17 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .lcard .lc-last { margin: 2px 0 0; font: 400 15px/1.45 var(--body); color: var(--ink-2); }
   .lcard .lc-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--track); padding-top: 10px; font: 500 12px var(--ui); color: var(--ink-3); }
   .lcard .lc-foot a { font: 600 13px var(--ui); color: var(--ink); text-decoration: none; }
+  .card.lcard.wide { padding: 18px 22px 14px; }
+  .lcard .lc-split { display: grid; gap: 14px; }
+  .lcard .lc-bug, .lcard .lc-rest { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .lcard .lc-bug .tk-m { margin: 4px 0 0; }
+  .lcard .tk-sc.l { color: var(--ink-3); }
+  .lcard .lc-shotline { margin: 0; font: 400 14px var(--ui); color: var(--ink-2); }
+  @media (min-width: 720px) {
+    .lcard .lc-split { grid-template-columns: auto minmax(0, 1fr); gap: 32px; align-items: start; }
+    .lcard .lc-bug { padding-right: 32px; border-right: 2px dashed var(--rule); }
+    .lcard .lc-rest { padding-top: 22px; }
+  }
   @media (max-width: 480px) { .lcard .lc-nick { display: none; } }
   /* The small tiles in the home page's "On now" strip. */
   .lv-tiles { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: thin; padding: 2px 2px 6px; }

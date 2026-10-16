@@ -53,9 +53,16 @@ const base = import.meta.env.BASE_URL;
       if (me) when.append(dayShort.format(asDate(g.date)) + ' · ');
       when.append(g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : el('span', 'lv-clock', time.format(g.t)));
       const row = (a, score, side) => {
+        // Score bug like the home page's tiles: the club's abbreviation in its matchup colour, the score in the serif.
         const r = el('span', 'g-team');
-        r.append(el('span', null, T[a]?.name ?? a));
-        if (g.final) r.append(el('strong', 'g-sc', String(score)));
+        const ab = el('span', 'g-ab', a);
+        const c = colourOf(a, g);
+        if (c) ab.style.setProperty('--t', c);
+        const nm = el('span', 'g-nick', T[a]?.nick ?? '');
+        nm.title = T[a]?.name ?? a;
+        r.append(ab, nm);
+        const other = side === 'home' ? g.as : g.hs;
+        if (g.final) r.append(el('strong', `g-sc${score < other ? ' l' : ''}`, String(score)));
         else { const s = el('strong', 'g-sc lv-sc'); s.dataset.side = side; r.append(s); }
         return r;
       };
@@ -232,8 +239,11 @@ const base = import.meta.env.BASE_URL;
   .gcard { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; }
   .gcard .g-when { grid-column: 1 / -1; font: 600 11px var(--ui); color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; }
   .gcard .g-teams { display: grid; gap: 4px; }
-  .gcard .g-team { display: flex; justify-content: space-between; gap: 12px; font: 600 16px var(--ui); }
-  .gcard .g-sc { font: 700 17px var(--display); }
+  .gcard .g-team { display: flex; align-items: baseline; gap: 10px; }
+  .gcard .g-ab { min-width: 50px; font: 700 21px/1.1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
+  .gcard .g-nick { flex: 1; min-width: 0; font: 400 14px var(--ui); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcard .g-sc { font: 600 23px/1.1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .gcard .g-sc.l { color: var(--ink-3); }
   .gcard .g-acts { justify-self: end; }
   .gcard .g-venue { grid-column: 1 / -1; font-size: 12px; }
   .gcard.next { outline: 2px solid var(--ink); }
