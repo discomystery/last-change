@@ -6,6 +6,7 @@ import PLink from './PLink.astro';
 import Pips from './Pips.astro';
 import { clock, signed } from '../lib/format';
 import { jobsFor, scoresFor } from '../lib/gameFiles';
+import { isPale, matchupDark } from '../lib/teams';
 
 type Row = { id: number; name: string; team: string; pos: string; score: number; pct: number | null; parts: { sheet?: number; play?: number; special?: number; usage?: number; net?: number }; st?: { pp_gf?: number; pp_ga?: number; pk_gf?: number; pk_ga?: number }; f?: Facts };
 // What went into each part (game_scores.facts): penalties drawn and taken, faceoffs, own shots, 5-on-5 goals with him on,
@@ -75,6 +76,9 @@ const table = (r: Row, k: string, opp: string, own: string): Facts2 => {
   return rows.length ? { rows: [], grid: { cols: ['', 'Time', 'Chances', 'Average', ...(goals ? ['Goals'] : [])], rows } } : { rows: [['Special-teams time', 'None']] };
 };
 const order = d ? [d.away, d.home] : [];
+// A team drawn in road white on the dark page can't fade toward the white text colour, so its parts fade toward the sheet.
+const darkHex = d ? matchupDark(d.away, d.home) : null;
+const pale = (t: string) => !!darkHex && isPale(t === d!.away ? darkHex.away : darkHex.home);
 const one = signed;
 const last = (r?: Row) => r?.name.replace(/^.\. /, '') ?? '?';
 const peer: Record<string, string> = { D: 'defensemen', G: 'goalies' };
@@ -148,7 +152,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
       const us = units(t);
       const of = new Map(us.flatMap((u) => u.ids.map((i) => [i, u.key] as const)));
       return (
-        <div class={`sw-team card t-${side(t)}`} data-team={t}>
+        <div class:list={['sw-team card', `t-${side(t)}`, { pale: pale(t) }]} data-team={t}>
           {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
           <p class="sw-key" aria-hidden="true">{PARTS.map((p) => <span><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}</p>
           <ol class="sw-rows">
@@ -265,7 +269,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
   .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
   .sw-team { margin-top: 18px; --sw-base: var(--sheet); }
   /* On the dark page the lighter parts fade toward the text colour instead, so they stay visible. */
-  @media (prefers-color-scheme: dark) { .sw-team { --sw-base: var(--ink); } }
+  @media (prefers-color-scheme: dark) { .sw-team { --sw-base: var(--ink); } .sw-team.pale { --sw-base: var(--sheet); } }
   .sw-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 600 12px var(--ui); color: var(--ink-2); margin-bottom: 10px; }
   .sw-key span { display: inline-flex; align-items: center; gap: 6px; }
   .sw-key i { width: 14px; height: 10px; border-radius: 2px; background: color-mix(in oklab, var(--team) var(--mix), var(--sw-base)); }
