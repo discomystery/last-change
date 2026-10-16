@@ -141,6 +141,8 @@ def league_update(season: int) -> dict:
     for old in sorted(LEAGUE.glob("*.json"))[:-LEAGUE_KEEP * 4]:  # up to four runs a day
         old.unlink()
     league_snapshots.cache_clear()
+    from pipeline.ingest import names
+    names.fill_countries([r["playerId"] for k in ("goals", "assists", "points") for r in out["lists"].get(k, [])[:60]])
     return {"lists": len(out["lists"])}
 
 

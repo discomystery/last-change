@@ -146,6 +146,11 @@ def moves(gid: int, day: str, tonight_pids: list[int], N: dict, season: int, log
                 f, l = names_.spell(r["playerId"], r.get("firstName"), r.get("lastName"))
                 return f"{f} {l}"
             unit = " points" if name == "points" else ""
+            usa = _usa_leader(name, pid, b, a, others, N, who)
+            if usa:  # "the NHL record for U.S.-born players" is the story, not a place on the whole list (Kane, 2026-10-15)
+                out.append({"tag": "NHL history", "text": usa, "score": 90 - rank / 2, "pid": pid})
+                done.add(pid)
+                continue
             if standing:
                 ahead = [r for _, _, ra, r in others if ra > a]
                 phrase = ("the most" if rank == 1 and not level else f"tied for the most with {who(level[0])}" if rank == 1 and len(level) == 1
@@ -172,6 +177,25 @@ def moves(gid: int, day: str, tonight_pids: list[int], N: dict, season: int, log
             out.append({"tag": "NHL history", "text": text, "score": (86 if big else 74) - rank / 2, "pid": pid})
             done.add(pid)
     return sorted(out, key=lambda x: -x["score"])[:2]
+
+
+def _usa_leader(name: str, pid: int, b: int, a: int, others: list, N: dict, who) -> str | None:
+    """A U.S.-born player who tonight passed the U.S.-born leader on goals, assists or points: the all-time record for
+    American players. Needs birth countries for the list (`names.fill_countries`); a list without them says nothing."""
+    from pipeline.ingest import names
+    if name not in ("goals", "assists", "points"):
+        return None
+    c = names.countries()
+    if c.get(str(pid)) != "USA":
+        return None
+    usa = [(ra, rb, r) for _, rb, ra, r in others if c.get(str(r["playerId"])) == "USA"]
+    if not usa:
+        return None
+    best, was, lead = max(usa, key=lambda x: x[0])
+    if a <= best or b > was:  # passed him tonight (not a record he already held)
+        return None
+    what = {"goals": "goals", "assists": "assists", "points": "points"}[name]
+    return f"{N[pid]} set the NHL record for {what} by a U.S.-born player, passing {who(lead)}, with {a:,}."
 
 
 def _ord(n: int) -> str:
