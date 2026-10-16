@@ -948,8 +948,12 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
   /* The space under the heading's rule lives on the heading itself, so whatever comes next (a card, a picker, a grid
      of cards, a table) never sits flush against the line. It collapses with the next block's own top margin. */
-  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin-bottom: 18px; }
-  .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
+  /* Section titles are a sans capitals label with a hairline running out to the edge (Sora, 2026-10-16, option 6). */
+  .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .sec-head h2 { font: 700 16px/1.25 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; font-variation-settings: normal; min-width: 0; }
+  .sec-head::after { content: ''; order: 2; flex: 1 1 24px; min-width: 24px; height: 1px; background: var(--ink-3); transform-origin: left; }
+  .sec-head > :not(h2, .xp-q) { order: 3; }
+  .sec-head .xp-q { width: 20px; height: 20px; font-size: 11px; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
   .takeaway { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
   .sub { font: 600 22px/1.15 var(--display); margin: 40px 0 12px; }
