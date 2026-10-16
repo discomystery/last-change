@@ -2,6 +2,7 @@
 // Every game, by day. Built in the browser from the latest schedule, so today's slate and the Preview / Post-game
 // buttons are always current. "My team's games" shows the whole season for the visitor's team instead.
 import Base from '../layouts/Base.astro';
+import { matchupTable } from '../lib/teams';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="games" title="Games" description="Every NHL game: previews before puck drop, post-game pages after.">
@@ -21,7 +22,8 @@ const base = import.meta.env.BASE_URL;
     <ul class="glist" id="day-games">{Array.from({ length: 4 }, () => <li class="skel skel-card" aria-hidden="true"></li>)}</ul>
   </div>
   <div id="team-view" hidden></div>
-  <p class="note">Times are shown in your own time zone. Previews open a week before each game; post-game pages appear once the nightly update has the final result.</p>
+  <script type="application/json" id="mcol" set:html={JSON.stringify(matchupTable())}></script>
+  <p class="note">Times are shown in your own time zone. Scores update live while games are on (from ESPN’s scoreboard). Previews open a week before each game; post-game pages appear soon after the final horn.</p>
 </Base>
 
 <script is:inline>
@@ -33,6 +35,12 @@ const base = import.meta.env.BASE_URL;
     const PREVIEWS = new Set(pv.map((p) => p.id));
     const RECAPS = new Set(rc.games.map((g) => g.id));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    const L = window.lcLive;
+    L.watch(sched.games);
+    const MC = JSON.parse(document.getElementById('mcol').textContent);
+    const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
+    let player = null;
+    const names = () => { if (!player) { player = () => null; get('players/index').then((ix) => { player = L.players(ix, base); document.dispatchEvent(new CustomEvent('live')); }).catch(() => {}); } return (n, t) => player(n, t); };
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
     const dayLong = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
@@ -41,21 +49,62 @@ const base = import.meta.env.BASE_URL;
 
     const card = (g, me) => {
       const li = el('li', 'card row gcard');
-      const when = el('span', 'g-when', g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : time.format(g.t));
-      if (me) when.textContent = dayShort.format(asDate(g.date)) + ' · ' + when.textContent;
-      const row = (a, score) => { const r = el('span', 'g-team'); r.append(el('span', null, T[a]?.name ?? a)); if (g.final) r.append(el('strong', 'g-sc', String(score))); return r; };
+      const when = el('span', 'g-when');
+      if (me) when.append(dayShort.format(asDate(g.date)) + ' · ');
+      when.append(g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : el('span', 'lv-clock', time.format(g.t)));
+      const row = (a, score, side) => {
+        // Score bug like the home page's tiles: the club's abbreviation in its matchup colour, the score in the serif.
+        const r = el('span', 'g-team');
+        const ab = el('span', 'g-ab', a);
+        const c = colourOf(a, g);
+        if (c) ab.style.setProperty('--t', c);
+        const nm = el('span', 'g-nick', T[a]?.nick ?? '');
+        nm.title = T[a]?.name ?? a;
+        r.append(ab, nm);
+        const other = side === 'home' ? g.as : g.hs;
+        if (g.final) r.append(el('strong', `g-sc${score < other ? ' l' : ''}`, String(score)));
+        else { const s = el('strong', 'g-sc lv-sc'); s.dataset.side = side; r.append(s); }
+        return r;
+      };
       const teamsBox = el('span', 'g-teams');
-      teamsBox.append(row(g.away, g.as), row(g.home, g.hs));
+      teamsBox.append(row(g.away, g.as, 'away'), row(g.home, g.hs, 'home'));
       const acts = el('span', 'g-acts');
       // A game with a page is one card that opens it; the button is the cue, the whole card is the target.
-      const go = (label, href) => { const a = el('a', 'g-btn pill go-link', label); a.href = href; acts.append(a); li.classList.add('go'); };
+      const go = (label, href) => { const a = el('a', 'g-btn go-link', `${label} ›`); a.href = href; acts.append(a); li.classList.add('go'); };
       if (g.final && RECAPS.has(g.id)) go('Post-game', `${base}recap/${g.id}/`);
+      else if (!g.final && L.get(g.id)?.st === 'post') acts.append(el('span', 'n', 'Post-game soon'));
       else if (!g.final && PREVIEWS.has(g.id)) go('Preview', `${base}preview/${g.id}/`);
       else if (!g.final) acts.append(el('span', 'n', 'Preview opens a week before'));
-      li.append(when, teamsBox, acts, el('span', 'g-venue n', g.venue ?? ''));
+      li.append(when, teamsBox, el('span', 'g-venue n', g.venue ?? ''), acts);
       if (me) li.classList.add(g.home === me ? 'home' : 'road');
+      if (!g.final) { li.dataset.live = g.id; window.lcLive.paint(li); }
       return li;
     };
+
+    // A day with a game on splits into On now (a live card each), Later and Final; other days are one list.
+    const stOf = (g) => (g.final ? 'post' : L.get(g.id)?.st ?? 'pre');
+    const groupKey = (d) => games.filter((g) => g.date === d).map((g) => `${g.id}:${stOf(g)}`).join(',');
+    let shownKey = '';
+    const head = (text, liveDot) => { const h = el('li', 'g-group'); if (liveDot) h.append(el('span', 'g-dot')); h.append(text); return h; };
+    const dayCards = (d) => {
+      const day = games.filter((g) => g.date === d);
+      const on = day.filter((g) => stOf(g) === 'in');
+      if (!on.length) return day.map((g) => card(g));
+      const later = day.filter((g) => stOf(g) === 'pre' || stOf(g) === 'off');
+      const done = day.filter((g) => stOf(g) === 'post');
+      const live = on.map((g) => {
+        const li = el('li', 'g-live');
+        li.append(L.card(g, { colour: colourOf, nick: (a) => T[a]?.nick, player: names(), href: PREVIEWS.has(g.id) ? `${base}preview/${g.id}/` : null }));
+        return li;
+      });
+      return [
+        head(`On now · ${on.length}`, true), ...live,
+        ...(later.length ? [head(`Later · ${later.length}`), ...later.map((g) => card(g))] : []),
+        ...(done.length ? [head(`Final · ${done.length}`), ...done.map((g) => card(g))] : []),
+      ];
+    };
+    // When a game starts or ends, the day on show is regrouped; scores in between update in place.
+    document.addEventListener('live', () => { if (scope.value === 'all' && current && groupKey(current) !== shownKey) { shownKey = groupKey(current); document.getElementById('day-games').replaceChildren(...dayCards(current)); } });
 
     // Day view: a strip of every date with games; opens on today (or the next day with games).
     const dates = [...new Set(games.map((g) => g.date))];
@@ -92,12 +141,13 @@ const base = import.meta.env.BASE_URL;
       monthPick.value = d.slice(0, 7);
       document.getElementById('day-h').textContent = (d === today ? 'Today, ' : '') + dayLong.format(asDate(d));
       const list = document.getElementById('day-games');
-      const cards = games.filter((g) => g.date === d).map((g) => card(g));
+      const cards = dayCards(d);
       if (from) cards.forEach((c, i) => { c.classList.add('rv', 'seen'); c.style.setProperty('--k', String(Math.min(i, 8))); });
       list.classList.remove('from-l', 'from-r');
       void list.offsetWidth;
       if (from) list.classList.add(from);
       list.replaceChildren(...cards);
+      shownKey = groupKey(d);
       const b = strip.querySelector(`[data-date="${d}"]`);
       if (b) puck.style.translate = `${b.parentElement.offsetLeft + b.offsetWidth / 2}px 0`;
     };
@@ -181,13 +231,24 @@ const base = import.meta.env.BASE_URL;
   .day-h { font: 600 22px/1.15 var(--display); margin: 26px 0 10px; scroll-margin-top: 80px; }
   .glist { display: grid; gap: 8px; }
   @media (min-width: 820px) { .glist { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1000px) { .glist { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .glist .g-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 18px 0 2px; font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
+  .glist .g-group:first-child { margin-top: 0; }
+  .glist .g-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+  .glist .g-live { display: grid; }
   .gcard { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; }
   .gcard .g-when { grid-column: 1 / -1; font: 600 11px var(--ui); color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; }
   .gcard .g-teams { display: grid; gap: 4px; }
-  .gcard .g-team { display: flex; justify-content: space-between; gap: 12px; font: 600 16px var(--ui); }
-  .gcard .g-sc { font: 700 17px var(--display); }
+  .gcard .g-team { display: flex; align-items: baseline; gap: 10px; }
+  .gcard .g-ab { min-width: 50px; font: 700 21px/1.1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
+  .gcard .g-nick { flex: 1; min-width: 0; font: 400 14px var(--ui); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcard .g-sc { font: 600 23px/1.1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .gcard .g-sc.l { color: var(--ink-3); }
+  .gcard .g-teams { grid-column: 1 / -1; }
   .gcard .g-acts { justify-self: end; }
-  .gcard .g-venue { grid-column: 1 / -1; font-size: 12px; }
+  .gcard .g-acts .n { font: 500 12px var(--ui); color: var(--ink-3); }
+  .gcard .g-venue { font-size: 12px; }
   .gcard.next { outline: 2px solid var(--ink); }
-  .gcard.go:hover .g-btn { background: var(--rule); color: var(--ink); }
+  .gcard .g-btn { font: 600 13px var(--ui); color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .gcard.go:hover .g-btn { text-decoration: underline; text-underline-offset: 4px; }
 </style>

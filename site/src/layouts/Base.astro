@@ -220,6 +220,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         window.lcSpell = { get: () => target, set: (v) => { if (v === target) return; target = v; root.dataset.spell = v; fix(root); } };
       })();
     </script>
+    <script is:inline src={`${base}live.js`}></script>
     <script is:inline>
       // The two ticket stubs (styles above) for home and team pages: next game and latest post-game, each a link.
       // g: a schedule game with t (Date); final games carry as/hs and end. colour(abbr, g) gives a team's matchup colour.
@@ -235,13 +236,18 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           row.append(ab(g.away), el('span', 'tk-sc', String(g.as)), el('span', 'tk-dash', '–'), el('span', 'tk-sc', String(g.hs)), ab(g.home));
           if (g.end && g.end !== 'REG') row.append(el('span', 'tk-end', g.end));
           row.setAttribute('aria-label', `${g.away} ${g.as}, ${g.home} ${g.hs}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`);
-        } else row.append(ab(g.away), el('span', 'tk-at', 'at'), ab(g.home));
+        } else {
+          row.append(ab(g.away), ...window.lcLive.middle(), ab(g.home));
+          card.dataset.live = g.id;
+        }
         const main = el('div', 'tk-main');
         main.append(el('span', 'eyebrow', eyebrow), row);
         if (sub) { const p = el('p', 'tk-sub'); p.append(...sub); main.append(p); }
         card.append(stub, main);
+        window.lcLive.paint(card);
         return card;
       };
+
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -569,6 +575,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     --ink: #0f1c2b;
     --ink-2: #48586a;
     --ink-3: #6f7e8e;
+    --live: #c8423b;
     --rule: #d2dce5;
     --track: #e4ebf1;
     --heat: var(--ink);            /* matchup boxes: share of ice time, sheet → heat */
@@ -590,6 +597,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       --ink: #e6edf3;
       --ink-2: #a9b6c3;
       --ink-3: #7c8a98;
+      --live: #f07a6e;
       --rule: #25333f;
       --track: #26384a;
       --heat: #8fb3e8;
@@ -749,7 +757,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   /* Next game and latest post-game on home and team pages: two ticket stubs side by side, each one a link to its
      preview or post-game page. The date sits on the stub, torn off by a dashed line; teams are abbreviations in their
      matchup colours, and a final score sits between them in the serif, as on the post-game rink. */
-  .tickets { display: grid; gap: 14px; }
+  .tickets { display: grid; gap: 14px; align-items: start; }
   @media (min-width: 820px) { .tickets { grid-template-columns: 1fr 1fr; } }
   .card.tk { display: grid; grid-template-columns: 84px 1fr; padding: 0; overflow: hidden; color: var(--ink); text-decoration: none; }
   a.tk:hover { border-color: var(--ink); }
@@ -762,6 +770,57 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .tk-at { font: italic 500 18px/1 var(--body); color: var(--ink-2); }
   .tk-sc { font: 600 34px/1 var(--display); font-variation-settings: 'SOFT' 100; }
   .tk-dash { font: 400 30px/1 var(--display); color: var(--ink-3); }
+  /* Live scores (window.lcLive): scores and dash only once a game is on, "at" only before. */
+  [data-live]:not(.live-on, .live-done) :is(.lv-sc, .lv-dash), :is(.live-on, .live-done) .lv-at { display: none; }
+  .live-on .lv-clock { color: var(--ink); font-weight: 700; }
+  .live-on .lv-clock::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 0.08em; }
+  html.motion .live-on .lv-clock::before { animation: lv-beat 2s ease-in-out infinite; }
+  @keyframes lv-beat { 50% { opacity: 0.25; } }
+  /* The live card (lcLive.card): score, shots, goal timeline, last goal. */
+  .card.lcard { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 14px; }
+  .lcard .lc-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .lcard .lc-clock { font: 700 12px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lcard .lc-where { font: 500 12px var(--ui); color: var(--ink-3); text-align: right; }
+  .lcard .lc-row { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+  .lcard .lc-ab { font: 700 26px/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); min-width: 58px; }
+  .lcard .lc-nick { font: 400 14px var(--ui); color: var(--ink-2); }
+  .lcard .lc-shots { font: 400 12px var(--ui); color: var(--ink-3); margin-right: auto; }
+  .lcard .lc-sc { font: 600 32px/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .lcard .lc-sc.l { color: var(--ink-3); }
+  .lcard .lc-line { position: relative; height: 36px; margin-top: 4px; }
+  .lcard .lc-track, .lcard .lc-played { position: absolute; left: 0; top: 17px; height: 2px; background: var(--track); }
+  .lcard .lc-track { right: 0; }
+  .lcard .lc-played { top: 16px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--ink-3) 45%, var(--track)); }
+  .lcard .lc-tick { position: absolute; top: 12px; width: 1px; height: 12px; background: color-mix(in oklab, var(--ink-3) 45%, var(--track)); }
+  .lcard .lc-now { position: absolute; top: 11px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; background: var(--live); }
+  .lcard .lc-goal { position: absolute; width: 11px; height: 11px; margin-left: -5.5px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--t, var(--ink)); background: var(--t, var(--ink)); top: 0; }
+  .lcard .lc-goal.home { top: 25px; }
+  .lcard .lc-goal.pp { background: var(--sheet); }
+  .lcard .lc-pers { display: flex; margin-top: -6px; font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lcard .lc-last { margin: 2px 0 0; font: 400 15px/1.45 var(--body); color: var(--ink-2); }
+  .lcard .lc-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--track); padding-top: 10px; font: 500 12px var(--ui); color: var(--ink-3); }
+  .lcard .lc-foot a { font: 600 13px var(--ui); color: var(--ink); text-decoration: none; }
+  .card.lcard.wide { padding: 18px 22px 14px; }
+  .lcard .lc-split { display: grid; gap: 14px; }
+  .lcard .lc-bug, .lcard .lc-rest { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .lcard .lc-bug .tk-m { margin: 4px 0 0; }
+  .lcard .tk-sc.l { color: var(--ink-3); }
+  .lcard .lc-shotline { margin: 0; font: 400 14px var(--ui); color: var(--ink-2); }
+  @media (min-width: 720px) {
+    .lcard .lc-split { grid-template-columns: auto minmax(0, 1fr); gap: 32px; align-items: start; }
+    .lcard .lc-bug { padding-right: 32px; border-right: 2px dashed var(--rule); }
+    .lcard .lc-rest { padding-top: 22px; }
+  }
+  @media (max-width: 480px) { .lcard .lc-nick { display: none; } }
+  /* The small tiles in the home page's "On now" strip. */
+  .lv-tiles { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: thin; padding: 2px 2px 6px; }
+  .card.lv-tile { flex: 0 0 auto; width: 158px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 11px 14px; border-radius: 14px; color: var(--ink); text-decoration: none; }
+  .lv-tile .lv-clock { font: 700 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .lv-tile .lt-r { display: flex; justify-content: space-between; align-items: baseline; }
+  .lv-tile .lt-ab { font: 700 19px/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
+  .lv-tile .lt-sc { font: 600 21px/1 var(--display); font-variation-settings: 'SOFT' 100; }
+  .lv-tile .lt-sc.l { color: var(--ink-3); }
+  .lv-tile .lt-note { font: 400 12px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tk-end { align-self: center; font: 600 12px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); }
   .tk-sub { font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .tk-sub strong { color: var(--ink); font-weight: 600; }
