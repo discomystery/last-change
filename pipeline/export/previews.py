@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 19  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 20  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -47,6 +47,7 @@ RULES_VERSION = 19  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 #     does it most nights; NHL.com's projected lines and status facts in Who to watch (2026-10-16)
 # 19: "best against best" only for two of the league's best teams meeting (Sora, 2026-10-16): duels and top-line
 #     matchups get other headlines, and the story leads with it when the standings say so
+# 20: power-play calls say how many power plays to expect from the two teams' penalties taken and drawn (context only)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -382,6 +383,62 @@ def _fmt(text: str, **w) -> str:
     out = text.format(**w)
     out = _cap(out)
     return ". ".join(_cap(s) if s else s for s in out.split(". "))
+
+
+# How many power plays a team should get: half from how often the opponent goes shorthanded, half from how often it
+# draws calls (fingerprints' `taken` and `drawn`, per 60 of play). Over 2024-25 to 2026-27 a team 0.15+ above the
+# league on this got 2.90 power plays a game and one 0.15+ below got 2.34 (2.67 for all), but a graded call on the
+# count held only about 4 in 10 against 1 in 3 by chance, so it is told as context on power-play calls, never graded
+# (Sora chose "Context only", 2026-10-16). The ends are about the top and bottom seventh of matchups.
+PP_CHANCES = 0.15
+PEN_TAKES, PEN_DRAWS = 30, 70  # percentiles that count as a reason: takes a lot (fewer is better), draws a lot
+PEN_MORE = ["{Y} take a lot of penalties and {X} draw plenty of them, so their power play should get its chances.",
+            "{Y} take a lot of penalties, so {Xp} power play should get its chances.",
+            "{X} draw a lot of penalties, so their power play should get its chances."]
+PEN_FEWER = ["{Y} rarely take penalties and {X} rarely draw them, so their power play may not get many chances.",
+             "{Y} rarely take penalties, so {Xp} power play may not get many chances.",
+             "{X} rarely draw penalties, so their power play may not get many chances."]
+PEN_BOTH = {True: "These two hand each other plenty of power plays, so special teams should get a real say.",
+            False: "These two rarely give each other power plays, so special teams may not get much of a say."}
+
+
+def penalty_context(c: dict, fp: dict, places: dict) -> str | None:
+    """A sentence on how many power plays to expect, for a power-play or penalty-kill call: the second link of a
+    chain whose first link is the graded call. Clashes and duels follow the call's power play; an edge (which compares
+    both sides' special teams) gets the game as a whole."""
+    m, kind = c.get("metric"), c.get("kind")
+    if m not in ("pp", "pk") or kind not in ("clash", "duel", "edge"):
+        return None
+    try:
+        e = lambda t, k: fp[t]["dims"][k]["blend"]
+        league = sum(e(t, "taken")["v"] for t in fp) / len(fp)
+        chances = lambda x, y: (e(y, "taken")["v"] + e(x, "drawn")["v"]) / 2 - league
+        if kind == "edge":
+            a, h = c["team"], c["opp"]
+            both = (chances(a, h) + chances(h, a)) / 2
+            sides = [chances(a, h), chances(h, a)]
+            if both >= PP_CHANCES and min(sides) > 0:
+                return PEN_BOTH[True]
+            if both <= -PP_CHANCES and max(sides) < 0:
+                return PEN_BOTH[False]
+            return None
+        x, y = c["team"], c["opp"]
+        v = chances(x, y)
+        tk, dr = e(y, "taken")["pct"], e(x, "drawn")["pct"]
+    except (KeyError, TypeError, ZeroDivisionError):  # fingerprints saved before `taken` and `drawn`
+        return None
+    w = {**team_words(x, places, "X"), **team_words(y, places, "Y")}
+    if v >= PP_CHANCES:
+        why = (tk <= PEN_TAKES, dr >= PEN_DRAWS)
+        pool = PEN_MORE
+    elif v <= -PP_CHANCES:
+        why = (tk >= 100 - PEN_TAKES, dr <= 100 - PEN_DRAWS)
+        pool = PEN_FEWER
+    else:
+        return None
+    if not any(why):
+        return None
+    return _fmt(pool[0] if all(why) else pool[1] if why[0] else pool[2], **w)
 
 
 def clash_claims(gid: int, away: str, home: str, fp: dict, places: dict) -> list[dict]:
@@ -1187,6 +1244,9 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
         rep = special_teams_record(c, wording.places(places), surprises)
         if rep:
             c["body"] = f"{c['body']} {rep}"
+        pen = penalty_context(c, site["fingerprints"]["teams"], places)
+        if pen:
+            c["body"] = f"{c['body']} {pen}"
     for c in claims:  # "the Islanders play", not "plays": templates are written for place names
         for k in ("head", "body", "call", "see", "gist"):
             if isinstance(c.get(k), str):
