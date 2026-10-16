@@ -1,6 +1,6 @@
 ---
-// One game, two pages: a pair of pills under the rink that flips between the preview and the post-game page,
-// the page being read filled in. Shown only once both pages exist, so it reads the same on either side of the final.
+// One game, two pages: folder tabs on the rink's top boards that flip between the preview and the post-game page,
+// the page being read as the white tab joined to the ice. Shown only once both pages exist.
 interface Props { id: number; on: 'preview' | 'recap' }
 const { id, on } = Astro.props;
 const base = import.meta.env.BASE_URL;
@@ -8,10 +8,14 @@ const pages = [['preview', 'Preview', `${base}preview/${id}/`], ['recap', 'Post-
 ---
 <nav class="gswitch" aria-label="This game's pages">
   {pages.map(([key, label, href]) => key === on
-    ? <span class="pill" aria-current="page">{label}</span>
-    : <a class="pill" href={href}>{label}</a>)}
+    ? <span class="tab" aria-current="page">{label}</span>
+    : <a class="tab" href={href}>{label}</a>)}
 </nav>
 
 <style>
-  .gswitch { display: inline-flex; gap: 6px; margin-top: 4px; }
+  /* Sits right above the rink; the current tab overlaps the top boards so it reads as part of the ice. */
+  .gswitch { position: relative; z-index: 2; display: flex; justify-content: center; margin: 22px 0 -1.5px; }
+  .tab { font: 600 14px/1 var(--ui); padding: 10px 20px 10px; border: 1.5px solid transparent; border-bottom: 0; border-radius: 12px 12px 0 0; color: var(--ink-3); text-decoration: none; }
+  a.tab:hover { color: var(--ink); }
+  .tab[aria-current] { background: var(--sheet); color: var(--ink); border-color: color-mix(in oklab, var(--ink-3) 55%, var(--sheet)); }
 </style>
