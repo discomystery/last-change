@@ -158,6 +158,14 @@ def ordinal(n: int) -> str:
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
+def faced_out(x: dict | None) -> dict | None:
+    """A line's numbers allowing for the opponents it faced (units.faced), for the Competition switch."""
+    if not x:
+        return None
+    return {"xgf60": round(x["xgf60"], 2), "xga60": round(x["xga60"], 2), "share": round(x["share"], 1), "score": round(x["score"]),
+            "opp_off": round(x["opp_off"], 3), "opp_def": round(x["opp_def"], 3), "pct": {k: x[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "score", "opp_off")}}
+
+
 def export_lines(season: int) -> int:
     """Usual lines and pairs for every team, how the last game differed, and notes on changed special-teams roles."""
     from pipeline.metrics import units
@@ -166,6 +174,8 @@ def export_lines(season: int) -> int:
     if not (d / "game_units.parquet").exists():  # update, quick and publish build it before the export
         units.game_units(season)
     usual = units.usual(season)
+    from pipeline.metrics import rapm
+    units.faced(season, usual, rapm.chained(season))
     games = pl.read_parquet(d / "games.parquet")
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     info = {g["game_id"]: g for g in games.iter_rows(named=True)}
@@ -298,7 +308,7 @@ def export_lines(season: int) -> int:
             "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": None if u["sec_pg"] is None else round(u["sec_pg"] / 60, 1), "toi_sec": None if u["sec_pg"] is None else round(u["sec_pg"]), "gp": u["gp"], "new": u["new"],
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets,
-                       "shared": u.get("shared")} for u in e["units"]],
+                       "shared": u.get("shared"), "faced": faced_out(u.get("faced"))} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
                      "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
             "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] not in ("eleven", "shuffle"), n["kind"] != "eleven", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],

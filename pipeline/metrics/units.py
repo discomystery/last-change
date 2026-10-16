@@ -324,6 +324,74 @@ def usual(season: int) -> dict[int, dict]:
     return teams
 
 
+FACED_MIN_SEC = 600  # ten minutes together before a line gets a line score
+
+
+def faced(season: int, teams: dict[int, dict], ratings: pl.DataFrame) -> None:
+    """Line scores that allow for the opponents each line has been out against (the Competition switch).
+
+    For each listed line and pair, every 5-on-5 stretch of the window's games with the whole group on the ice: the five
+    opposing skaters' summed ratings (rapm.chained), offense and defense, averaged over the group's time together and
+    compared with an average 5-on-5 stretch. Chances created get back what good defenders took off them, chances
+    allowed lose what good attackers added: `xgf60_c = xgf60 + (opp_def - avg)`, `xga60_c = xga60 - (opp_off - avg)`.
+    The line score is the adjusted chances created per chance allowed against the average for that line number
+    (100 = an average first line, for a first line; 120 = 20% more for every chance allowed). Adds `faced` to each
+    unit, in place."""
+    from pipeline.metrics import rapm
+
+    off = dict(zip(ratings["player_id"].to_list(), ratings["off"].to_list()))
+    dfn = dict(zip(ratings["player_id"].to_list(), ratings["def"].to_list()))
+    st = rapm.stretches(season)
+    home = dict(pl.read_parquet(TABLES / str(season) / "games.parquet").select("game_id", "home_id").iter_rows())
+    windows = {}
+    gu =pl.read_parquet(TABLES / str(season) / "game_units.parquet").select("game_id", "team_id", "date").unique()
+    for (tid,), t in gu.group_by("team_id"):
+        windows[tid] = set(t.sort("date", "game_id").tail(WINDOW_GAMES)["game_id"].to_list())
+    # League average opposition over all 5-on-5 time (the same for both sides of every stretch).
+    tot = sum_off = sum_def = 0.0
+    acc: dict[tuple[int, str], list[float]] = {}  # (team, unit) -> seconds, opp off x sec, opp def x sec
+    want: dict[int, dict[int, list[tuple[frozenset, str]]]] = {}
+    for tid, e in teams.items():
+        groups = [(frozenset(int(p) for p in u["unit"].split("-")), u["unit"]) for u in e["units"]]
+        for g in windows.get(tid, ()):
+            want.setdefault(g, {})[tid] = groups
+    for gid, hs, as_, d in zip(st["game_id"].to_list(), st["home_skaters"].to_list(), st["away_skaters"].to_list(), st["duration"].to_list()):
+        o_h, d_h = sum(off.get(p, 0.0) for p in hs), sum(dfn.get(p, 0.0) for p in hs)
+        o_a, d_a = sum(off.get(p, 0.0) for p in as_), sum(dfn.get(p, 0.0) for p in as_)
+        tot += 2 * d
+        sum_off += (o_h + o_a) * d
+        sum_def += (d_h + d_a) * d
+        for tid, groups in want.get(gid, {}).items():
+            mine, oo, od = (set(hs), o_a, d_a) if home.get(gid) == tid else (set(as_), o_h, d_h)
+            for ids, key in groups:
+                if ids <= mine:
+                    a = acc.setdefault((tid, key), [0.0, 0.0, 0.0])
+                    a[0] += d
+                    a[1] += oo * d
+                    a[2] += od * d
+    mu_off, mu_def = (sum_off / tot, sum_def / tot) if tot else (0.0, 0.0)
+    by_label = defaultdict(list)
+    for tid, e in teams.items():
+        for u in e["units"]:
+            a = acc.get((tid, u["unit"]))
+            if not a or a[0] < FACED_MIN_SEC:
+                u["faced"] = None
+                continue
+            o, dd = a[1] / a[0] - mu_off, a[2] / a[0] - mu_def
+            f, ag = u["xgf60"] + dd, max(0.01, u["xga60"] - o)
+            u["faced"] = {"sec": a[0], "opp_off": o, "opp_def": dd, "xgf60": f, "xga60": ag, "share": 100 * f / (f + ag)}
+            by_label[u["label"]].append(u["faced"])
+    for label, group in by_label.items():
+        mean = sum(x["xgf60"] / x["xga60"] for x in group) / len(group)
+        for x in group:
+            x["score"] = 100 * x["xgf60"] / x["xga60"] / mean
+        for stat, higher in (("xgf60", True), ("xga60", False), ("share", True), ("score", True), ("opp_off", True)):
+            vals = [x[stat] for x in group]
+            for x in group:
+                below = sum(v < x[stat] for v in vals) if higher else sum(v > x[stat] for v in vals)
+                x[f"{stat}_pct"] = round(100 * (below + 0.5) / len(vals))
+
+
 def special_usage(season: int) -> pl.DataFrame:
     """Per player and team: share of the team's power-play and penalty-kill time he was on for, in games he dressed."""
     d = TABLES / str(season)

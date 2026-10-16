@@ -14,7 +14,7 @@ Z80 = 1.2816
 
 COLS = ["sec", "sec5", "sec_pp", "icf5", "ixg5", "ixg_pp", "ixg_net", "iff_net", "g_net", "a1_5", "a1_pp", "on_xgf_adj", "on_xga_adj",
         "t_xgf_adj", "t_xga_adj", "t_sec5", "hits", "hits_adj", "takes", "takes_adj", "blocks", "blocks_adj", "gives", "gives_adj", "fow", "fol",
-        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf", "fo_xw"]
+        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf", "fo_xw", "on_xgf", "on_xga"]
 C = {c: i for i, c in enumerate(COLS)}
 GROUP = {"C": "F", "L": "F", "R": "F", "D": "D"}
 SUB = {"C": "C", "L": "W", "R": "W", "D": "D"}
@@ -250,15 +250,25 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
     for mode, fit_ in fits.items():
         est = {r["player_id"]: r for r in fit_.iter_rows(named=True)}
         for key, col in (("offImpact", "off"), ("defImpact", "def")):
+            # As recorded (the Competition switch): his team's chances for or against per 60 with him on the ice at
+            # 5-on-5, whoever he played with or against.
+            on, higher_raw = ("on_xgf", True) if key == "offImpact" else ("on_xga", False)
+            on_rate = lambda s_: 3600 * float(s_[C[on]]) / float(s_[C["sec5"]]) if s_[C["sec5"]] > 0 else float("nan")
             for g in ("F", "D"):
                 members = [pid for pid, p in players.items() if p["group"] == g and pid in est]
                 ref = {r["player_id"]: r[col] for r in fits["blend"].iter_rows(named=True)}
                 pool = np.array([ref[pid] for pid in members if pid in ref and regular(players[pid], "blend")])
+                raw_pool = np.array([on_rate(both(players[pid], "blend")) for pid in members if regular(players[pid], "blend")])
+                raw_pool = raw_pool[np.isfinite(raw_pool)]
                 for pid in members:
                     v, sd = est[pid][col], est[pid][f"{col}_sd"]
                     a, b = sorted((_pct(v - Z80 * sd, pool, True), _pct(v + Z80 * sd, pool, True)))
-                    out[pid]["traits"].setdefault(key, {})[mode] = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": regular(players[pid], mode),
-                                                                     "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
+                    rec = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": regular(players[pid], mode),
+                           "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
+                    raw = on_rate(both(players[pid], mode))
+                    if np.isfinite(raw) and len(raw_pool):
+                        rec |= {"raw": round(raw, 2), "raw_pct": round(_pct(raw, raw_pool, higher_raw))}
+                    out[pid]["traits"].setdefault(key, {})[mode] = rec
         # Power-play impact: the same idea on 5-on-4 play (rapm.power_play), for players with real power-play time.
         pp = rapm.power_play(list(range(rapm.FIRST_SEASON, season + 1)) if mode == "blend" else [season], fit_)
         est_pp = {r["player_id"]: r for r in pp.iter_rows(named=True)}
