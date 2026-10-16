@@ -149,7 +149,7 @@ const _ = ordinal;
 import SharePreview from '../../components/SharePreview.astro';
 import ShareButton from '../../components/ShareButton.astro';
 ---
-<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)}>
+<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)} gameStart={snap.start}>
   <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">

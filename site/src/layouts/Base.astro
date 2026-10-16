@@ -8,8 +8,9 @@ import type { OgCard } from '../lib/og';
 import { createHash } from 'node:crypto';
 import { OG_REV } from '../lib/og';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
-interface Props { title: string; description?: string; section?: Section; og?: OgCard }
-const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
+// gameStart: on a page about one upcoming game, its puck drop (ISO), so the page's "tonight" follows the visitor's day.
+interface Props { title: string; description?: string; section?: Section; og?: OgCard; gameStart?: string }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section, gameStart } = Astro.props;
 // Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
@@ -131,14 +132,44 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           }
           return to;
         });
-        const convert = (s) => { const t = spell(s); return target === 'ca' ? metric(t) : t; };
+        // "Tonight" in text about one game (inside an element with data-game-start, the game's puck drop) is only true on
+        // the game's own day, counted like window.lcDay (3 AM turnover, visitor's time zone): on other days it reads
+        // "tomorrow", the weekday ("on Saturday", "Saturday’s") or, a week or more out, "next time out" ("Oct 23’s"),
+        // so a preview read days ahead never says tonight.
+        const NIGHT = /\b(tonight)(’s|'s)?\b/gi;
+        const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+        const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+        const gameWords = (start) => {
+          const t = new Date(start);
+          if (isNaN(t)) return null;
+          const day = (d) => { const x = new Date(d - 3 * 3600e3); return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()); };
+          const gap = Math.round((day(t) - day(Date.now())) / 864e5);
+          if (gap === 0) return null;
+          if (gap === 1) return ['tomorrow', 'tomorrow'];
+          const d = new Date(t - 3 * 3600e3);
+          if (gap > 6) return ['next time out', MONTH_DAY.format(d)];
+          const wd = WEEKDAY.format(d);
+          return [`on ${wd}`, wd];
+        };
+        const when = (s, el) => {
+          if (!/tonight/i.test(s)) return s;
+          const g = el && el.closest && el.closest('[data-game-start]');
+          const w = g && gameWords(g.dataset.gameStart);
+          if (!w) return s;
+          return s.replace(NIGHT, (m, word, poss) => {
+            const out = poss ? w[1] + poss : w[0];
+            if (word === 'TONIGHT') return out.toUpperCase();
+            return word[0] === 'T' ? out[0].toUpperCase() + out.slice(1) : out;
+          });
+        };
+        const convert = (s, el) => { const t = when(spell(s), el); return target === 'ca' ? metric(t) : t; };
         // Original and changed text, per text node and per element attribute, so a switch can start again from the original.
         const was = new WeakMap();
         const redo = (key, cur, write) => {
           const o = was.get(key);
           const src = o && cur === o.out ? o.src : cur;
           if (!o && !/[a-z]{2}/i.test(src)) return;
-          const out = convert(src);
+          const out = convert(src, key.nodeType === 3 ? key.parentElement : key);
           if (out === src) was.delete(key); else was.set(key, { src, out });
           if (cur !== out) write(out);
         };
@@ -204,7 +235,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
             if (v == null) return;
             let m = was.get(el);
             if (!m) { m = {}; was.set(el, m); }
-            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src);
+            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src, el);
             m[a] = out === src ? undefined : { src, out };
             if (v !== out) el.setAttribute(a, out);
           });
@@ -286,7 +317,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </div>
     </header>
     <div class="navpin"><SiteTools menu /></div>
-    <main><slot /></main>
+    <main data-game-start={gameStart}><slot /></main>
     <div class="dock">
     <button type="button" class="setrow" data-prefs-open aria-haspopup="dialog" aria-expanded="false" aria-controls="prefs"><span class="tp-dot" aria-hidden="true"></span><span class="tp-ab">Your team</span><span class="sr-st"><span aria-hidden="true">·</span> <b data-show="mode"></b> <span aria-hidden="true">·</span> <b data-show="arena"></b></span><span class="sr-go">Settings<svg viewBox="0 0 11 7" aria-hidden="true"><path d="M1 6l4.5-4.5L10 6" /></svg></span></button>
     <nav class="tabbar" aria-label="Site">
