@@ -67,11 +67,11 @@ export function seasons(l: Ledger, gt: 2 | 3, goalie: boolean): Season[] {
   });
 }
 
-/** Trophies of a season for one game type: the Cup on both, the Conn Smythe with the playoffs, the rest with the
- *  regular season. */
+/** Trophies of a season for one game type: the Cup and the Conn Smythe on both (Sora, 2026-10-16: a playoff MVP
+ *  belongs on the season's main line too), the rest with the regular season only. */
 export function awardsIn(l: Ledger, yr: number, gt: 2 | 3) {
   const all = l.awards.filter((a) => a.yrs.includes(yr));
   const cup = all.some((a) => a.name === 'Stanley Cup');
-  const other = all.filter((a) => a.name !== 'Stanley Cup' && (a.short === 'Conn Smythe') === (gt === 3));
+  const other = all.filter((a) => a.name !== 'Stanley Cup' && (gt === 2 || a.short === 'Conn Smythe'));
   return { cup, other };
 }

@@ -1,0 +1,11 @@
+---
+// A line or pair's players: last name (first initial only when the name is shared) and sweater number.
+import PLink from './PLink.astro';
+import { sweater, shortName } from '../lib/playerLinks';
+interface Props { players: string[]; ids?: (number | null)[]; clash: Set<string> }
+const { players, ids = [], clash } = Astro.props;
+---
+<p class="unit-names">{players.map((n, i) => {
+  const no = sweater(ids[i]);
+  return <span class="unit-p">{no != null && <span class="unit-no" aria-label={`number ${no}`}>{no}</span>}<PLink id={ids[i]} name={shortName(ids[i], n, clash)} /></span>;
+})}</p>

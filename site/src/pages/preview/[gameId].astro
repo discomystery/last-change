@@ -16,6 +16,8 @@ import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
+import UnitNames from '../../components/UnitNames.astro';
+import { clashes } from '../../lib/playerLinks';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -61,6 +63,7 @@ const played = schedule.games.find((g) => g.id === snap.game_id && g.final);
 const base = import.meta.env.BASE_URL;
 const { away, home } = snap;
 const order = [away, home] as const;
+const clash = clashes([away, home]);
 const side = (a: string) => (a === away ? 'away' : 'home');
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
@@ -148,7 +151,7 @@ const story = snap.story;
 type ProjSide = { lines: { id: number; name: string }[][]; pairs: { id: number; name: string }[][]; extra_d: { id: number; name: string }[]; f: number; d: number; eleven: boolean };
 const nhlLineup = ((snap as any).nhl_lineup?.teams && Object.keys((snap as any).nhl_lineup.teams).length ? (snap as any).nhl_lineup : null) as { teams: Record<string, ProjSide> } | null;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
-const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
+const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
@@ -156,7 +159,7 @@ const _ = ordinal;
 import SharePreview from '../../components/SharePreview.astro';
 import ShareButton from '../../components/ShareButton.astro';
 ---
-<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)}>
+<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)} gameStart={snap.start}>
   <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
@@ -200,7 +203,7 @@ import ShareButton from '../../components/ShareButton.astro';
 
   <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">
-      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
+      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; anything that takes many games to show a real pattern leans more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
       <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
@@ -248,13 +251,13 @@ import ShareButton from '../../components/ShareButton.astro';
                   <span class="unit-label">{u.label}</span>
                   <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
-                <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
+                <UnitNames players={u.players} ids={(u as any).ids} clash={clash} />
                 {doublesNote(LN[a].units as any, u as any) && <p class="unit-two">{doublesNote(LN[a].units as any, u as any)}</p>}
                 <dl class="stats">
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share than', 'a worse share than', peer[u.label])}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone."><span class="lab-long">Off. zone draws</span><span class="lab-short">O-zone draws</span></span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
                 </dl>
               </li>
             ))}
@@ -511,17 +514,14 @@ import ShareButton from '../../components/ShareButton.astro';
     ))}
   </Section>
 
-  <Section id="notes" title="Data notes" placeholder={false}>
-    <ul class="notes">
-      <li><strong>Sources.</strong> Game data from the NHL; expected goals from this site’s own model.</li>
-      <li><strong>Early season.</strong> {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}, so most numbers blend this season with last. The season switch at the top shows this season alone.</li>
-      <li><strong>Percentiles and ranks</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
-      <li><strong>Blind spots.</strong> Public game data doesn’t record passes before a shot, where defenders are standing, or rushes up the ice, so the site shows none of those.</li>
-      <li><strong>Hits, giveaways and takeaways</strong> depend on each arena’s scorer; anything built on them is arena-adjusted. <a href={`${base}methods/`}>How it works</a>.</li>
-      <li><strong>Key players</strong> for each side are on the team pages.</li>
-    </ul>
-    <p class="note">Team pages: <a href={`${base}team/${away}/`}>{full(away)}</a> · <a href={`${base}team/${home}/`}>{full(home)}</a></p>
-  </Section>
+  <aside class="card about" id="notes" aria-labelledby="notes-h">
+    <h2 class="box-h" id="notes-h">About these numbers</h2>
+    <div class="about-cols">
+      <p class="m-blend"><strong>Blended with last season.</strong> A few games can say a lot about a team or almost nothing, so most numbers mix this season with last. {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}; anything that takes many games to show a real pattern leans more on last season. Pick “This season” under Seasons in the settings to see this season alone. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p class="m-season"><strong>This season only.</strong> These numbers use only {place(away)}’s {fpT[away].games} games and {place(home)}’s {fpT[home].games}, so expect them to swing. Pick “Blended” under Seasons in the settings to mix in last season, which steadies anything that takes many games to show a real pattern. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p><strong>Adjusted for the arena.</strong> Hits, giveaways, takeaways and blocked shots are counted by each arena’s scorer, and some buildings count far more than others. Those numbers, and anything built on them, are corrected for the arena and shown as a score where 100 is league average. Pick “Recorded” under Adjusted stats to see the counts as they were written down. <a href={`${base}methods/#arena`}>How the arena correction works</a></p>
+    </div>
+  </aside>
   {!played && <SharePreview snap={snap as any} records={{ [away]: rec(away), [home]: rec(home) }} />}
 </Base>
 
@@ -576,7 +576,13 @@ import ShareButton from '../../components/ShareButton.astro';
   .two-n { gap: 14px; }
   .two-n > span { display: inline-flex; align-items: center; gap: 5px; min-width: 52px; font-weight: 600; }
   .two-n i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
+  .about { margin-top: 48px; padding: 18px 22px; }
+  .about .box-h { margin: 0 0 10px; }
+  .about-cols { display: grid; gap: 12px 32px; font: 400 15px/1.55 var(--ui); color: var(--ink-2); }
+  .about-cols p { margin: 0; }
+  .about-cols strong { color: var(--ink); }
+  :global(html[data-mode='season']) .about-cols .m-season { display: block; }
+  @media (min-width: 720px) { .about-cols { grid-template-columns: 1fr 1fr; } }
   .team-h { margin-top: 8px; }
   .units { display: grid; gap: 14px; }
   .opp-key { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; font: 400 14px var(--ui); margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
@@ -606,9 +612,11 @@ import ShareButton from '../../components/ShareButton.astro';
     let pinned = null;
     const show = (el) => {
       const id = el?.dataset.shooter;
-      map.classList.toggle('focus', !!id);
-      map.querySelectorAll('[data-p]').forEach((d) => d.classList.toggle('on', d.dataset.p === id));
-      const n = id ? map.querySelectorAll(`[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
+      // The map's own styles fade the rest and show only his dots under `.picking` / `.hl` (ShotMap.astro).
+      map.querySelector('.shotmap')?.classList.toggle('picking', !!id);
+      map.querySelectorAll('.shot[data-p]').forEach((d) => d.classList.toggle('hl', d.dataset.p === id));
+      panel.querySelectorAll('[data-shooter]').forEach((x) => x.classList.toggle('on', !!id && x === el));
+      const n = id ? map.querySelectorAll(`.shot[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
       who.textContent = id ? `${el.textContent}: ${n} of these shots` : ' ';
     };
     panel.querySelectorAll('[data-shooter]').forEach((el) => {

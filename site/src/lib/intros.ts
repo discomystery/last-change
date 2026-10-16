@@ -1,6 +1,7 @@
 // Plain-English intros written by pipeline/export/intros.py. Read through a glob so a build without them still works.
 import teams from '../../public/data/teams.json';
 import previewIndex from '../../public/data/previews/index.json';
+import schedule from '../../public/data/schedule.json';
 
 type Game = { date: string; opp: string; id: number; home: boolean };
 type TeamIntro = { text: string[] };
@@ -13,9 +14,10 @@ export const playerIntro = (id: number): PlayerIntro | null => pick('players')?.
 
 /** "Sat, Oct 10 · at San Jose", linked to the preview when one exists. */
 export function nextGame(g: Game | undefined, base: string) {
-  if (!g) return { label: undefined, href: null };
+  if (!g) return { label: undefined, href: null, start: undefined };
   const opp = teams.find((t) => t.abbr === g.opp);
   const day = new Date(`${g.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
   const has = previewIndex.some((p) => p.id === g.id);
-  return { label: `Next game · ${day} · ${g.home ? 'vs' : 'at'} ${opp?.place ?? g.opp}`, href: has ? `${base}preview/${g.id}/` : null };
+  const start = (schedule as any).games.find((x: any) => x.id === g.id)?.start as string | undefined;
+  return { label: `Next game · ${day} · ${g.home ? 'vs' : 'at'} ${opp?.place ?? g.opp}`, href: has ? `${base}preview/${g.id}/` : null, start };
 }

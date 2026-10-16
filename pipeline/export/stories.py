@@ -353,7 +353,7 @@ def _filled_in(gid: int, day: str, team: str, tid: int, season: int, N: dict, na
         f = me.row(0, named=True)
         g, a = int(f["g"]), int(f["a1"] + f["a2"])
         did = ("had a goal and an assist" if g == 1 and a == 1 else
-               ("scored twice" if g == 2 else f"scored {num(g)} times" if g > 2 else "scored") + (f" and added {_count(a, 'assist')}" if a else "") if g
+               ("scored twice" if g == 2 else "had a hat trick" if g == 3 else f"scored {num(g)} times" if g > 3 else "scored") + (f" and added {_count(a, 'assist')}" if a else "") if g
                else f"had {num(a)} assists" if a >= 2 else "")  # a lone assist is not the story
         draws = ""
         his = pg.filter((pl.col("player_id") == n["pid"]) & (pl.col("team_id") == tid))
@@ -1771,6 +1771,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             # A hat trick in a loss is a clause, not the headline (NHL.com and AP led with the Sabres' comeback and Power's
             # overtime winner, not Marchenko's three; Sora, 2026-10-16). Any result headline above beats it.
             heads.append((70, pk([f"{last(pid)}’s {'natural ' if storylines.natural_hat(goals) == pid else ''}hat trick isn’t enough",
+                                  f"{last(pid)} gets a hat trick, but {W.the(loser)} lose" if len(gs) == 3 else
                                   f"{last(pid)} scores {num(len(gs))}, but {W.the(loser)} lose"], "hatl")))
         elif len(gs) >= 4:
             heads.append((100, pk([f"{last(pid)} scores {num(len(gs))}", f"{last(pid)} goes off for {num(len(gs))}"], "4")))
@@ -1779,7 +1780,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         elif storylines.natural_hat(goals) == pid:  # three in a row, nobody else scoring (Sora's notes, 2026-10-14)
             heads.append((96, f"A natural hat trick for {last(pid)}"))
         else:
-            heads.append((95, pk([f"A hat trick for {last(pid)}{hats}", f"{last(pid)} bags a hat trick", f"{last(pid)} lights the lamp three times"], "hat")))
+            heads.append((95, pk([f"A hat trick for {last(pid)}{hats}", f"{last(pid)} bags a hat trick", f"{last(pid)} lights the lamp for a hat trick"], "hat")))
     wg = gl.get(winner)
     if ls == 0 and wg:
         G_ = last(wg["id"]) or wg["name"].split(" ", 1)[-1]
@@ -1885,20 +1886,28 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             s1.append(pk([f"{_cap(num(len(scorers)))} different {W.nick.get(winner, winner)} scored.",
                           f"The goals came from everywhere: {num(len(scorers))} different {W.nick.get(winner, winner)} scored."], "spread"))
         if hat:
+            # The first mention of three goals always says hat trick (or natural hat trick); counts come after (Sora,
+            # 2026-10-16: "Kirill Marchenko scored three").
             pid, gs = max(hat, key=lambda x: len(x[1]))
             kinds = [{"ev": "at even strength", "pp": "on the power play", "sh": "shorthanded", "en": "into an empty net",
                       "ps": "on a penalty shot"}[g["strength"]] for g in gs]
             natural = storylines.natural_hat(goals) == pid
-            if len(set(kinds)) == len(kinds):
-                s1.append(f"{name(pid)} scored {num(len(gs))}: {_and(['one ' + k for k in kinds])}.")
+            # a losing side's hat trick names his team, or it reads as the winners' (Marchenko, after Quinn's two for Buffalo)
+            who = (f"{_cap(W.poss(loser))} " if side(gs[0]) == loser and pid not in said else "") + name(pid)
+            if len(set(kinds)) == len(kinds) and len(gs) == 3:
+                s1.append(f"{who} had a hat trick: {_and(['one ' + k for k in kinds])}.")
+            elif len(set(kinds)) == len(kinds):
+                s1.append(f"{who} scored {num(len(gs))}: {_and(['one ' + k for k in kinds])}.")
             elif natural and len(gs) == 3 and len({g["period"] for g in gs}) == 1 and gs[0]["period"] <= 3:
-                s1.append(f"{name(pid)} scored three straight goals in the {PERIODS[gs[0]['period']]} period, a natural hat trick.")
+                s1.append(f"{who} had a natural hat trick, three straight goals in the {PERIODS[gs[0]['period']]} period.")
             elif natural and len(gs) == 3:
-                s1.append(f"{name(pid)} scored three goals in a row, a natural hat trick, with nobody else scoring in between.")
+                s1.append(f"{who} had a natural hat trick, three goals in a row with nobody else scoring in between.")
             elif natural:
-                s1.append(f"{name(pid)} scored {num(len(gs))}, three of them in a row with nobody else scoring in between.")
+                s1.append(f"{who} scored {num(len(gs))}, with a natural hat trick among them.")
+            elif len(gs) == 3:
+                s1.append(f"{who} had a hat trick.")
             else:
-                s1.append(f"{name(pid)} scored {num(len(gs))}.")
+                s1.append(f"{who} scored {num(len(gs))}.")
             run_ = _hat_run(P, pid, gid)
             if run_ >= 2:  # Brady Tkachuk's second straight natural hat trick (NHL.com and AP both led with it, 2026-10-15)
                 s1.append(f"It was his {ORDINALS.get(run_, str(run_) + 'th')} straight hat trick.")
