@@ -235,13 +235,114 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           row.append(ab(g.away), el('span', 'tk-sc', String(g.as)), el('span', 'tk-dash', '–'), el('span', 'tk-sc', String(g.hs)), ab(g.home));
           if (g.end && g.end !== 'REG') row.append(el('span', 'tk-end', g.end));
           row.setAttribute('aria-label', `${g.away} ${g.as}, ${g.home} ${g.hs}${g.end && g.end !== 'REG' ? ` (${g.end})` : ''}`);
-        } else row.append(ab(g.away), el('span', 'tk-at', 'at'), ab(g.home));
+        } else {
+          row.append(ab(g.away), ...window.lcLive.middle(), ab(g.home));
+          card.dataset.live = g.id;
+        }
         const main = el('div', 'tk-main');
         main.append(el('span', 'eyebrow', eyebrow), row);
         if (sub) { const p = el('p', 'tk-sub'); p.append(...sub); main.append(p); }
         card.append(stub, main);
+        window.lcLive.paint(card);
         return card;
       };
+
+      // Live scores (Sora, 2026-10-16). The NHL's own feed can't be read from a browser on another site, so the
+      // visitor's browser reads ESPN's public scoreboard (it allows that) every 30 s, only while a game the page shows is
+      // between 20 minutes before puck drop and 5 hours after it, and only while the tab is open in front.
+      // Scores only: nothing else from it is shown or saved, and the nightly data still owns every final.
+      // Markup: a container with data-live="{game id}" holding .lv-clock (its text becomes "2nd 9:16", "Final (OT)"...),
+      // .lv-sc[data-side=away|home] (the scores), .lv-at ("at", hidden once live) and .lv-dash ("–", shown once live).
+      // The container gets .live-on while the game is on and .live-done once ESPN calls it final.
+      window.lcLive = (() => {
+        const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard';
+        const AB = { TB: 'TBL', NJ: 'NJD', SJ: 'SJS', LA: 'LAK', UTAH: 'UTA' };
+        const EVERY = 30e3, BEFORE = 20 * 60e3, AFTER = 5 * 3600e3;
+        const state = new Map();
+        const games = new Map();
+        let timer = null, busy = false;
+        const ord = (n) => ['1st', '2nd', '3rd'][n - 1] ?? `${n}th`;
+        const period = (n) => (n <= 3 ? ord(n) : n === 4 ? 'OT' : `${n - 3}OT`);
+        const clockOf = (s, playoff) => {
+          const t = s.type ?? {};
+          if (t.state === 'post') return s.period > 3 ? `Final (${s.period === 5 && !playoff ? 'SO' : 'OT'})` : 'Final';
+          if (t.state !== 'in') return /POSTPONED|CANCELED|SUSPENDED|DELAYED/.test(t.name ?? '') ? t.description : null;
+          if (s.period === 5 && !playoff) return 'Shootout';
+          if (t.name === 'STATUS_END_PERIOD' || (s.clock === 0 && t.name !== 'STATUS_IN_PROGRESS')) return `End of ${period(s.period)}`;
+          return `${period(s.period)} ${s.displayClock}`;
+        };
+        const due = () => {
+          const now = Date.now();
+          return [...games.values()].filter((g) => {
+            const t = +new Date(g.start);
+            return !g.final && state.get(g.id)?.st !== 'post' && now >= t - BEFORE && now <= t + AFTER;
+          });
+        };
+        const paint = (root = document) => {
+          const nodes = root.matches?.('[data-live]') ? [root] : [...root.querySelectorAll('[data-live]')];
+          nodes.forEach((box) => {
+            const s = state.get(Number(box.dataset.live));
+            const on = !!s && (s.st === 'in' || s.st === 'post');
+            box.classList.toggle('live-on', on && s.st === 'in');
+            box.classList.toggle('live-done', on && s.st === 'post');
+            box.querySelectorAll('.lv-sc').forEach((n) => { n.textContent = on ? String(s[n.dataset.side === 'home' ? 'hs' : 'as']) : ''; });
+            box.querySelectorAll('.lv-clock').forEach((n) => {
+              if (!('orig' in n.dataset)) n.dataset.orig = n.textContent;
+              n.textContent = s?.clock && (on || s.st === 'off') ? s.clock : n.dataset.orig;
+            });
+            if (on) box.setAttribute('aria-label', `${s.away} ${s.as}, ${s.home} ${s.hs}, ${s.clock}`);
+          });
+        };
+        const poll = async () => {
+          clearTimeout(timer);
+          timer = null;
+          const want = due();
+          if (busy || document.hidden) return;
+          if (!want.length) { plan(); return; }
+          busy = true;
+          const days = [...new Set(want.map((g) => g.date))];
+          const got = await Promise.all(days.map((d) => fetch(`${ESPN}?dates=${d.replaceAll('-', '')}`, { cache: 'no-store', credentials: 'omit' })
+            .then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+          busy = false;
+          got.forEach((data, i) => (data?.events ?? []).forEach((e) => {
+            const c = e.competitions?.[0];
+            const side = (k) => c?.competitors?.find((x) => x.homeAway === k);
+            const [a, h] = [side('away'), side('home')];
+            if (!a || !h) return;
+            const abbr = (x) => AB[x.team?.abbreviation] ?? x.team?.abbreviation;
+            const g = [...games.values()].find((x) => x.date === days[i] && x.away === abbr(a) && x.home === abbr(h));
+            if (!g) return;
+            const s = e.status ?? c.status ?? {};
+            const st = s.type?.state;
+            const clock = clockOf(s, g.playoff);
+            state.set(g.id, { st: clock && st === 'pre' ? 'off' : st, as: Number(a.score ?? 0), hs: Number(h.score ?? 0), clock, away: g.away, home: g.home });
+          }));
+          paint();
+          document.dispatchEvent(new CustomEvent('live'));
+          plan();
+        };
+        // Every 30 s while a game is on; otherwise wake when the next game we know about is 20 minutes out, if that's soon.
+        const plan = () => {
+          if (timer || busy) return;
+          if (due().length) { timer = setTimeout(poll, EVERY); return; }
+          const now = Date.now();
+          const next = Math.min(...[...games.values()].filter((g) => !g.final).map((g) => +new Date(g.start) - BEFORE).filter((t) => t > now));
+          if (next - now < 12 * 3600e3) timer = setTimeout(poll, next - now + 1000);
+        };
+        // Pages hand over the games they show (schedule rows: id, start, date, away, home, final).
+        const watch = (list) => {
+          list.forEach((g) => { if (g?.id && g.start && !games.has(g.id)) games.set(g.id, g); });
+          if (due().length && !busy) poll(); else plan();
+        };
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy) poll(); });
+        // The middle of a matchup line: "at" before the game, "3 – 2" once it's on.
+        // cls names each page's own styles for the three parts.
+        const middle = ({ at = 'tk-at', sc = 'tk-sc', dash = 'tk-dash' } = {}) => {
+          const sp = (cls, text, sideName) => { const n = document.createElement('span'); n.className = cls; if (text) n.textContent = text; if (sideName) n.dataset.side = sideName; return n; };
+          return [sp(`${at} lv-at`, 'at'), sp(`${sc} lv-sc`, '', 'away'), sp(`${dash} lv-dash`, '–'), sp(`${sc} lv-sc`, '', 'home')];
+        };
+        return { watch, paint, middle, get: (id) => state.get(id) ?? null };
+      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -569,6 +670,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     --ink: #0f1c2b;
     --ink-2: #48586a;
     --ink-3: #6f7e8e;
+    --live: #c8423b;
     --rule: #d2dce5;
     --track: #e4ebf1;
     --heat: var(--ink);            /* matchup boxes: share of ice time, sheet → heat */
@@ -590,6 +692,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       --ink: #e6edf3;
       --ink-2: #a9b6c3;
       --ink-3: #7c8a98;
+      --live: #f07a6e;
       --rule: #25333f;
       --track: #26384a;
       --heat: #8fb3e8;
@@ -762,6 +865,12 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .tk-at { font: italic 500 18px/1 var(--body); color: var(--ink-2); }
   .tk-sc { font: 600 34px/1 var(--display); font-variation-settings: 'SOFT' 100; }
   .tk-dash { font: 400 30px/1 var(--display); color: var(--ink-3); }
+  /* Live scores (window.lcLive): scores and dash only once a game is on, "at" only before. */
+  [data-live]:not(.live-on, .live-done) :is(.lv-sc, .lv-dash), :is(.live-on, .live-done) .lv-at { display: none; }
+  .live-on .lv-clock { color: var(--ink); font-weight: 700; }
+  .live-on .lv-clock::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 0.08em; }
+  html.motion .live-on .lv-clock::before { animation: lv-beat 2s ease-in-out infinite; }
+  @keyframes lv-beat { 50% { opacity: 0.25; } }
   .tk-end { align-self: center; font: 600 12px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); }
   .tk-sub { font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .tk-sub strong { color: var(--ink); font-weight: 600; }

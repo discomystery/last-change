@@ -513,6 +513,7 @@ const coachSince = coach && (team as any).coach_since
     const me = host.dataset.team, base = host.dataset.base;
     const names = JSON.parse(document.getElementById('team-names').textContent);
     const games = JSON.parse(document.getElementById('team-games').textContent).map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    window.lcLive.watch(games);
     const MC = JSON.parse(document.getElementById('mcol').textContent);
     const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -525,7 +526,7 @@ const coachSince = coach && (team as any).coach_since
     const places = JSON.parse(document.getElementById('team-places').textContent);
     const tickets = [];
     if (next) {
-      const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+      const when = [el('strong', 'lv-clock', time.format(next.t)), ` · ${next.venue ?? ''}`];
       if (!PREVIEWS[next.id]) when.push(el('br'), 'Preview opens a week before the game');
       tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: PREVIEWS[next.id] ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
     }

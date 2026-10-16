@@ -67,6 +67,7 @@ const base = import.meta.env.BASE_URL;
     const PREVIEWS = new Set((pv ?? []).map((p) => p.id));
     const byAbbr = Object.fromEntries(teams.map((t) => [t.abbr, t]));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    window.lcLive.watch(sched.games);
     const MC = JSON.parse(document.getElementById('mcol').textContent);
     const colourOf = (a, g) => (a === g.away ? MC.s[`${g.away}@${g.home}`] : null) ?? MC.c[a];
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -100,13 +101,18 @@ const base = import.meta.env.BASE_URL;
       const a = el('a', 'card feat');
       a.href = href;
       const top = el('div', 'feat-top');
-      top.append(el('span', 'box-h', kind === 'result' ? 'Game of the night' : 'Game to watch'), el('span', 'eyebrow', kind === 'result' ? (r.venue ?? '') : `${time.format(g.t)}${r.venue ? ` · ${r.venue}` : ''}`));
+      const eb = el('span', 'eyebrow', kind === 'result' ? (r.venue ?? '') : null);
+      if (kind !== 'result') eb.append(el('span', 'lv-clock', time.format(g.t)), r.venue ? ` · ${r.venue}` : '');
+      top.append(el('span', 'box-h', kind === 'result' ? 'Game of the night' : 'Game to watch'), eb);
       const m = el('p', 'feat-m');
       if (kind === 'result') {
         m.append(ab(r.away, g), el('span', 'sc', String(r.as)), el('span', 'dash', '–'), el('span', 'sc', String(r.hs)), ab(r.home, g));
         if (r.end && r.end !== 'REG') m.append(el('span', 'end', r.end));
         m.setAttribute('aria-label', `${r.away} ${r.as}, ${r.home} ${r.hs}`);
-      } else m.append(ab(r.away, g), el('span', 'tk-at', 'at'), ab(r.home, g));
+      } else {
+        m.append(ab(r.away, g), ...window.lcLive.middle({ sc: 'sc', dash: 'dash' }), ab(r.home, g));
+        a.dataset.live = r.id;
+      }
       a.append(top, m);
       if (r.head) a.append(el('h3', null, r.head));
       if (r.story) a.append(el('p', 'story', r.story));
@@ -119,6 +125,7 @@ const base = import.meta.env.BASE_URL;
       const foot = el('div', 'feat-foot');
       foot.append(el('span', null, kind === 'result' ? (r.calls ?? '') : `${record(r.away)} · ${record(r.home)}`), el('span', 'go', kind === 'result' ? 'Post-game ›' : (r.preview ? 'Preview ›' : 'That day’s games ›')));
       a.append(foot);
+      window.lcLive.paint(a);
       return a;
     };
 
@@ -137,13 +144,16 @@ const base = import.meta.env.BASE_URL;
         m.setAttribute('aria-label', `${r.away} ${r.as}, ${r.home} ${r.hs}`);
         a.append(m);
       } else {
-        const tm = el('span', 'time', time.format(g.t));
+        const tm = el('span', 'time');
+        tm.append(el('span', 'lv-clock', time.format(g.t)));
         const d = divTag(r, me);
         if (d) tm.append(el('span', 'div chip', d));
-        m.append(ab(r.away, g), el('span', 'at', 'at'), ab(r.home, g));
+        m.append(ab(r.away, g), ...window.lcLive.middle({ at: 'at', sc: 'sc', dash: 'l' }), ab(r.home, g));
         a.append(tm, m);
+        a.dataset.live = r.id;
       }
       a.append(el('span', 'tag', r.pending ? 'Still coming in' : (r.note ?? '')));
+      window.lcLive.paint(a);
       return a;
     };
     const card = (head, side, cls = 'card list') => {
@@ -314,7 +324,7 @@ const base = import.meta.env.BASE_URL;
         }
         if (next) {
           const has = PREVIEWS.has(next.id);
-          const when = [el('strong', null, time.format(next.t)), ` · ${next.venue ?? ''}`];
+          const when = [el('strong', 'lv-clock', time.format(next.t)), ` · ${next.venue ?? ''}`];
           if (!has) when.push(el('br'), 'Preview opens a week before the game');
           tickets.push(window.lcTicket(next, { eyebrow: 'Next game', href: has ? `${base}preview/${next.id}/` : null, sub: when, colour: colourOf }));
         }

@@ -21,7 +21,7 @@ const base = import.meta.env.BASE_URL;
     <ul class="glist" id="day-games">{Array.from({ length: 4 }, () => <li class="skel skel-card" aria-hidden="true"></li>)}</ul>
   </div>
   <div id="team-view" hidden></div>
-  <p class="note">Times are shown in your own time zone. Previews open a week before each game; post-game pages appear once the nightly update has the final result.</p>
+  <p class="note">Times are shown in your own time zone. Scores update live while games are on (from ESPN’s scoreboard). Previews open a week before each game; post-game pages appear soon after the final horn.</p>
 </Base>
 
 <script is:inline>
@@ -33,6 +33,7 @@ const base = import.meta.env.BASE_URL;
     const PREVIEWS = new Set(pv.map((p) => p.id));
     const RECAPS = new Set(rc.games.map((g) => g.id));
     const games = sched.games.map((g) => ({ ...g, t: new Date(g.start) })).sort((a, b) => a.t - b.t);
+    window.lcLive.watch(sched.games);
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
     const dayLong = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
@@ -41,11 +42,18 @@ const base = import.meta.env.BASE_URL;
 
     const card = (g, me) => {
       const li = el('li', 'card row gcard');
-      const when = el('span', 'g-when', g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : time.format(g.t));
-      if (me) when.textContent = dayShort.format(asDate(g.date)) + ' · ' + when.textContent;
-      const row = (a, score) => { const r = el('span', 'g-team'); r.append(el('span', null, T[a]?.name ?? a)); if (g.final) r.append(el('strong', 'g-sc', String(score))); return r; };
+      const when = el('span', 'g-when');
+      if (me) when.append(dayShort.format(asDate(g.date)) + ' · ');
+      when.append(g.final ? (g.end && g.end !== 'REG' ? `Final (${g.end})` : 'Final') : el('span', 'lv-clock', time.format(g.t)));
+      const row = (a, score, side) => {
+        const r = el('span', 'g-team');
+        r.append(el('span', null, T[a]?.name ?? a));
+        if (g.final) r.append(el('strong', 'g-sc', String(score)));
+        else { const s = el('strong', 'g-sc lv-sc'); s.dataset.side = side; r.append(s); }
+        return r;
+      };
       const teamsBox = el('span', 'g-teams');
-      teamsBox.append(row(g.away, g.as), row(g.home, g.hs));
+      teamsBox.append(row(g.away, g.as, 'away'), row(g.home, g.hs, 'home'));
       const acts = el('span', 'g-acts');
       // A game with a page is one card that opens it; the button is the cue, the whole card is the target.
       const go = (label, href) => { const a = el('a', 'g-btn pill go-link', label); a.href = href; acts.append(a); li.classList.add('go'); };
@@ -54,6 +62,7 @@ const base = import.meta.env.BASE_URL;
       else if (!g.final) acts.append(el('span', 'n', 'Preview opens a week before'));
       li.append(when, teamsBox, acts, el('span', 'g-venue n', g.venue ?? ''));
       if (me) li.classList.add(g.home === me ? 'home' : 'road');
+      if (!g.final) { li.dataset.live = g.id; window.lcLive.paint(li); }
       return li;
     };
 
