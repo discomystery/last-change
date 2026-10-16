@@ -38,3 +38,11 @@ def test_team_hook_uses_record_and_history():
     out = I.team_intro("SJS", TEAMS["SJS"], fp, {"SJS": {"share": 0.45, "rank": 28, "gp": 4, "better": 1}}, hist, [])
     assert "no playoffs in four seasons" in out["text"][0]
     assert all("it " not in s.lower().split(".")[0][:3] for s in out["text"])  # teams are "they"
+
+
+def test_conn_smythe_named_by_spring():
+    one = {"landing": {"awards": [{"trophy": "Conn Smythe Trophy", "seasons": [20232024]}, {"trophy": "Hart Memorial Trophy", "seasons": [20222023]}]}}
+    assert I.conn_smythe(one) == "He won the Conn Smythe as the playoffs’ most valuable player in 2024."
+    two = {"landing": {"awards": [{"trophy": "Conn Smythe Trophy", "seasons": [20162017, 20152016]}]}}
+    assert "twice, in 2016 and 2017" in I.conn_smythe(two)
+    assert I.conn_smythe({"landing": {"awards": []}}) is None and I.conn_smythe(None) is None

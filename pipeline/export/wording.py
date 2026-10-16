@@ -126,6 +126,50 @@ def number_clashes(season: int, fmt) -> dict[int, str]:
     return out
 
 
+def short_names(rows, key=None) -> dict:
+    """Names for lists and charts that sit inside one club or one game: the last name alone, "M. Tkachuk" when two
+    players in the same group share a last name, and "E. Pettersson (#40)" when the initial still matches. `rows` are
+    players.parquet rows (player_id, first, last, number); `key` groups them (club or game), all together when None.
+    Returns {player_id: name}, or {(group, player_id): name} when `key` is given."""
+    from collections import defaultdict
+
+    groups = defaultdict(dict)
+    for r in rows:
+        groups[key(r) if key else None][r["player_id"]] = r
+    out = {}
+    for g, members in groups.items():
+        lasts = defaultdict(list)
+        for r in members.values():
+            lasts[r["last"]].append(r)
+        for last, rs in lasts.items():
+            for r in rs:
+                name = last
+                if len(rs) > 1:
+                    name = initials(r)
+                    if sum(initials(x) == name for x in rs) > 1 and r.get("number") is not None:
+                        name = f"{name} (#{r['number']})"
+                out[(g, r["player_id"]) if key else r["player_id"]] = name
+    return out
+
+
+def club_short_names(season: int) -> dict[int, str]:
+    """`short_names` for team pages: grouped by club over this season (a player who changed clubs keeps an initial
+    if either club has a namesake). Players who have not dressed this season are not included."""
+    import polars as pl
+
+    from pipeline.config import TABLES
+    path = TABLES / str(season) / "players.parquet"
+    if not path.exists():
+        return {}
+    rows = list(pl.read_parquet(path).sort("game_id").unique(["player_id", "team_id"], keep="last").iter_rows(named=True))
+    by = short_names(rows, key=lambda r: r["team_id"])
+    out: dict[int, str] = {}
+    for (_, pid), name in by.items():
+        if pid not in out or len(name) > len(out[pid]):
+            out[pid] = name
+    return out
+
+
 def initials(r: dict) -> str:
     return f"{(r.get('first') or '?')[0]}. {r['last']}"
 

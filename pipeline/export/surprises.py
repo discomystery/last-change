@@ -566,30 +566,31 @@ def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
     expected than his team won by, empty-net goals left out (Sora, 2026-10-12): with an average night in net they would
     not have won. Zero goals against is a shutout."""
     z = z_of("gsax", gl["gsax"])
-    t, N = gl["team"], gl["name"]
+    t, N = gl["team"], gl.get("full") or gl["name"]
     o = next(k for k in won if k != t)
     goals = score.get("goals", {t: score[t], o: score[o]})
     non_en = score.get("non_en", goals)
     blank = gl["ga"] == 0 and goals[o] == 0
     shutout = blank and not score.get("shootout")  # a 0-0 game settled by a shootout is not called a shutout
     stole = won[t] and gl["gsax"] > non_en[t] - goals[o]
+    L = N.split(" ", 1)[-1]  # the headline names him in full; the body goes on by last name
     shots = f"{gl['shots']} shots, worth {gl['xga']:.1f} expected goals"
     if z > 0:
         if shutout:
             head = f"{N} stole one with a shutout" if stole else f"A shutout for {N}"
-            body = f"{N} stopped all {shots}."
+            body = f"{L} stopped all {shots}."
         elif blank:
             head = f"{N} stole one" if stole else f"A big night for {N}"
-            body = f"{N} stopped all {shots}, through overtime."
+            body = f"{L} stopped all {shots}, through overtime."
         else:
             head = f"{N} stole one" if stole else f"{N} stood on his head" if gl["gsax"] >= 3 else f"A big night for {N}"
-            body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
+            body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
         if stole:
             en = non_en[t] < goals[t]
             body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
     else:
         head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
-        body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
+        body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
     n = every("gsax", gl["gsax"])
     body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n} starts."
     if n >= 100:  # a busy starter makes about 60 starts: at 1 in 100 a start, fewer than half see one in a season

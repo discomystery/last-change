@@ -313,6 +313,15 @@ def scoring_odds(goals_before: float, games_before: int, group_avg: float) -> fl
     return 1 - math.exp(-lam)
 
 
+def _value(trait: str, s: np.ndarray) -> np.ndarray:
+    """A player's level as the cards read it. Faceoffs stay the plain share of draws won (not the adjusted score on
+    player pages), because a night is graded on the draws he actually won."""
+    if trait != "faceoffs":
+        return P._value(trait, s)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return P._faceoffs_recorded(s)
+
+
 def shrink(n: float, v: float, k: float, prior: float) -> float:
     return (n * v + k * prior) / (n + k)
 
@@ -355,9 +364,9 @@ class Reference:
             base = "D" if g == "D" else "F"
             self.mu[g], self.pool[g] = {}, {}
             for t in self.stab[base]:
-                self.mu[g][t] = float(P._value(t, tot))
+                self.mu[g][t] = float(_value(t, tot))
                 k = self.stab[base][t]["k"]
-                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(P._value(t, s))), k, self.mu[g][t])
+                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(_value(t, s))), k, self.mu[g][t])
                                             for s in (sums[p].sum(axis=0) for p in members if len(sums[p]) >= REF_GAMES)])
 
     def usual(self, trait: str, g: str, sb: str, prev: np.ndarray | None, before: np.ndarray) -> tuple[float, float, float, str]:
@@ -367,8 +376,8 @@ class Reference:
         k = self.stab[g][trait]["k"]
         prior = self.mu[peer][trait]
         if prev is not None and P._weight(trait, prev) > 0:
-            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(P._value(trait, prev))), k, prior)
-        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(P._value(trait, before))), k, prior)
+            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(_value(trait, prev))), k, prior)
+        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(_value(trait, before))), k, prior)
         return v, self.mu[peer][trait], P._pct(v, self.pool[peer][trait], P.TRAITS[trait][2]), peer
 
 
@@ -400,7 +409,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     tj = SITE_DATA / "teams.json"
     places = wording.places({t["abbr"]: t["place"] for t in json.loads(tj.read_text())}) if tj.exists() else {}
-    names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
+    names = wording.short_names(pl.read_parquet(d / "players.parquet").iter_rows(named=True), key=lambda r: r["game_id"])  # "Aho"; "M. Tkachuk" for namesakes
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
     now = _table(season).join(games.select("game_id", "date", "home_id"), on="game_id").sort("player_id", "date", "game_id")
 
@@ -461,7 +470,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     for gid, cs in cards.items():
         g = info[gid]
         for c in cs:
-            c["name"] = names.get(c["id"], "?")
+            c["name"] = names.get((gid, c["id"]), "?")
             c["team"] = abbr.get(c.pop("team_id"))
         out = {"game_id": gid, "away": g["away"], "home": g["home"], "players": [], "stood_out": []}
         for t in (g["away"], g["home"]):
