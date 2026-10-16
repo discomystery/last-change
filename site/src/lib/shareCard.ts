@@ -4,6 +4,7 @@
 import { domToBlob } from 'modern-screenshot';
 import LOGO from '../assets/logo/full.svg?raw';
 import { signed, styleWords } from './format';
+import { scatterSvg, type View } from './scatterSvg';
 
 type Two = { light: string; dark: string };
 type Lane = { team: string | null; ends: [string, string] | null; avg: [number, ...unknown[]] | null; usual: [number, string]; now: [number, string]; ref?: [number, string] | null };
@@ -279,6 +280,24 @@ export function previewCard(d: PreviewCardData, theme: Theme) {
 <div class="sc-disp sc-fit" style="font-size:60px;margin-top:36px">${esc(d.head)}</div>
 ${d.lede ? `<div class="sc-serif sc-plede" data-opt="${d.items.length + 2}">${esc(d.lede)}</div>` : ''}${calls}${items}`;
   return shell(theme, '', body, '', 'Graded after the game · sparelinechange.com');
+}
+
+export type ScatterCardData = {
+  key: string; title: string; kick: string; sub: string; asOf: string; hi: string | null; paints: Record<string, Two>;
+  metrics: { key: string; word: string; views: Record<Mode, View> }[];
+};
+/** A league chart (lib/scatter.ts): all 32 teams on two measures, the same chart as the page, one team standing out if picked. */
+export function scatterCard(d: ScatterCardData, metric: string, mode: Mode, hi: string | null, theme: Theme) {
+  const m = d.metrics.find((x) => x.key === metric) ?? d.metrics[0];
+  const v = m.views[mode] ?? m.views.blend;
+  const paint = (t: string) => d.paints[t]?.[theme] ?? 'var(--ink3)';
+  const who = hi && v.pts.some((p) => p.t === hi) ? hi : null;
+  const body = `<div class="sc-kick">${esc(d.kick)} · ${modeWord[mode]}</div>
+<div class="sc-disp sc-fit" style="font-size:72px;margin-top:24px">${esc(d.title)}</div>
+<div class="sc-sub">${who ? `<span class="sc-dot" style="background:${paint(who)}"></span>` : ''}${esc(d.sub)}, by ${esc(m.word)}</div>
+<div class="sc-sx">${scatterSvg(v, paint, who)}</div>
+<div class="sc-sxn" data-opt="1">${esc(v.from)}</div>`;
+  return shell(theme, who ? `--team:${paint(who)}` : '', body, '', `sparelinechange.com · ${d.asOf}`);
 }
 
 // Fonts go into the image as data, since the picture is drawn away from the page: the page's own Google Fonts, Latin

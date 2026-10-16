@@ -10,6 +10,8 @@ import PLink from '../components/PLink.astro';
 import Pips from '../components/Pips.astro';
 import Marker from '../components/Marker.astro';
 import Quadrant from '../components/Quadrant.astro';
+import TeamScatter from '../components/TeamScatter.astro';
+import { specialTeams } from '../lib/scatter';
 import teamsData from '../../public/data/teams.json';
 import fpData from '../../public/data/fingerprints.json';
 import linesData from '../../public/data/lines.json';
@@ -145,7 +147,7 @@ const srcRows = (side: 'for' | 'against', key: string) => {
 };
 const pc = (v: number, min: number, max: number) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)).toFixed(1);
 
-const nav: [string, string][] = [['style', 'Team styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav: [string, string][] = [['style', 'Team styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 ---
 <Base section="league" title="League" description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
@@ -287,6 +289,13 @@ const _ = ordinal;
         </ol>
       </div>
     ))}
+  </Section>
+
+  <Section id="special" title="Special teams" placeholder={false} takeaway="Every team’s power play against its penalty kill on one chart: further right is a better power play, higher is a better kill.">
+    <Fragment slot="explain">
+      <p class="note">“Chances” rates each unit by expected goals per 60 minutes of 5-on-4 or 4-on-5 play, from our own shot model; it settles faster than goals do. “Goals” is the league’s official power-play and penalty-kill percentage, which is what the scoreboard felt like but swings a lot over a few dozen chances.</p>
+    </Fragment>
+    <TeamScatter chart={specialTeams()} />
   </Section>
 
   <Section id="goalies" title="Goalies" placeholder={false} takeaway="Who is stopping more than he should, and what each team asks their goalie to face.">

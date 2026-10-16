@@ -1,0 +1,126 @@
+---
+// A league scatter chart (lib/scatter.ts): all 32 teams on two measures, better up and to the right, with a menu for
+// what the measures are from (chances or goals), a list of who sits in each corner and a Share link. Follows the
+// Seasons setting. `hi` makes one team stand out (team pages); otherwise the visitor's own team does.
+import { scatterSvg, cardPaints, type Chart, type Mode } from '../lib/scatter';
+import { teamPaint } from '../lib/teams';
+import ShareButton from './ShareButton.astro';
+import ShareDialog from './ShareDialog.astro';
+import fpData from '../../public/data/fingerprints.json';
+
+interface Props { chart: Chart; hi?: string | null; dialog?: boolean }
+// `dialog`: false where the page already has the share sheet (team pages).
+const { chart, hi = null, dialog = true } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const modes: Mode[] = ['blend', 'season'];
+const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }).format(new Date(fpData.generated_at));
+const id = `sx-${chart.key}`;
+// Who sits in each corner, by where their dot is against the league-average lines.
+const corners = (v: Chart['metrics'][number]['views'][Mode]) => {
+  const at = (right: boolean, up: boolean) => v.pts.filter((p) => (p.px >= v.mid[0]) === right && (p.py <= v.mid[1]) === up)
+    .sort((a, b) => (right ? b.px - a.px : a.px - b.px) + (up ? a.py - b.py : b.py - a.py)).map((p) => p.t);
+  const nm = (s: string) => s.replace('|', ' ');
+  return [[nm(v.corners[1]), at(true, true)], [nm(v.corners[0]), at(false, true)], [nm(v.corners[3]), at(true, false)], [nm(v.corners[2]), at(false, false)]] as [string, string[]][];
+};
+// The share card draws the same chart again, so it gets the chart's numbers and every club's colours.
+const card = { key: chart.key, title: chart.title, kick: chart.kick, sub: chart.sub, asOf, hi, paints: cardPaints(),
+  metrics: chart.metrics.map((m) => ({ key: m.key, word: m.word, views: m.views })) };
+---
+<div class="sx-wrap" id={id} data-hi={hi ?? undefined}>
+  <div class="sx-top">
+    <div class="pick"><span>Plot them by</span>
+      <select class="sx-pick" aria-label="Chances or goals">{chart.metrics.map((m) => <option value={m.key}>{m.word}</option>)}</select>
+    </div>
+    <ShareButton kind={id} label="Share this chart" />
+  </div>
+  {chart.metrics.map((m, i) => modes.map((mode) => {
+    const v = m.views[mode];
+    return (
+      <div class={`card sx-card gmode m-${mode}`} data-metric={m.key} hidden={i !== 0}>
+        <div class="sx-chart" set:html={scatterSvg(v, teamPaint, hi, `${chart.title}, by ${m.word}`)} />
+        <div class="sx-side">
+          {corners(v).map(([name, ts]) => (
+            <div class="sx-group">
+              <p class="mini-h">{name}</p>
+              <p class="sx-teams">{ts.length ? ts.map((t, k) => <>{k > 0 && ' '}<a class:list={['tlink sx-tm', { on: t === hi }]} href={`${base}team/${t}/`} data-t={t}>{t}</a></>) : <span class="n">No one</span>}</p>
+            </div>
+          ))}
+          <p class="note">{v.from} The lines cross at the league average. Point at a dot for the numbers.</p>
+        </div>
+      </div>
+    );
+  }))}
+</div>
+<script type="application/json" data-sx-card={id} set:html={JSON.stringify(card).replace(/</g, '\\u003c')} />
+{dialog && <ShareDialog />}
+
+<script>
+  import { openShare, onShare, mode } from '../lib/shareSheet';
+  for (const wrap of document.querySelectorAll<HTMLElement>('.sx-wrap')) {
+    const id = wrap.id;
+    const sel = wrap.querySelector<HTMLSelectElement>('.sx-pick')!;
+    const key = `lc-${id}`;
+    const show = () => {
+      wrap.querySelectorAll<HTMLElement>('.sx-card').forEach((c) => { c.hidden = c.dataset.metric !== sel.value; });
+      try { localStorage.setItem(key, sel.value); } catch { /* private window */ }
+    };
+    try { const v = localStorage.getItem(key); if (v && [...sel.options].some((o) => o.value === v)) sel.value = v; } catch { /* private window */ }
+    sel.addEventListener('change', show);
+    show();
+    // Without a team of the page's own, the visitor's team stands out.
+    const mine = () => {
+      if (wrap.dataset.hi) return;
+      const team = (window as any).lcPrefs?.get('team') ?? '';
+      wrap.querySelectorAll<HTMLElement>('[data-t]').forEach((el) => el.classList.toggle('on', !!team && el.dataset.t === team));
+      // the visitor's dot is drawn last, on top of the others
+      wrap.querySelectorAll<SVGGElement>('.sx-pt.on').forEach((g) => g.parentNode?.appendChild(g));
+    };
+    mine();
+    document.addEventListener('prefs', (e) => { if ((e as CustomEvent).detail?.key === 'team') mine(); });
+    onShare(id, () => {
+      const d = JSON.parse(document.querySelector(`[data-sx-card="${id}"]`)!.textContent!);
+      const m = mode();
+      const hi: string | null = d.hi ?? (((window as any).lcPrefs?.get('team') as string) || null);
+      const metric = sel.value;
+      openShare({ title: `Share ${d.kick.toLowerCase()}`, file: `spare-line-change-${d.key}-${metric}${hi ? `-${hi}` : ''}${m === 'season' ? '-this-season' : ''}.png`, key: `${id}:${metric}:${m}:${hi}`,
+        make: async (t) => { const { scatterCard, render } = await import('../lib/shareCard'); return render(scatterCard(d, metric, m, hi, t)); } });
+    });
+  }
+</script>
+
+<style is:global>
+  .sx-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .sx-top .pick { margin-bottom: 0; }
+  .sx-card { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 14px; }
+  .sx-card[hidden] { display: none !important; }
+  .sx-chart { max-width: 520px; width: 100%; }
+  .sx { width: 100%; height: auto; display: block; }
+  .sx-box { fill: var(--ice); }
+  .sx-avg { stroke: var(--ink-3); stroke-width: 1; opacity: 0.45; }
+  .sx .sx-corner, .sx .sx-axis { font: 600 9.5px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; fill: var(--ink-3); }
+  .sx .sx-name { font: 600 10px var(--ui); fill: var(--ink-2); paint-order: stroke; stroke: var(--ice); stroke-width: 2.5px; }
+  .sx-hit { fill: transparent; }
+  .sx-lead { stroke: var(--ink-3); stroke-width: 0.7; opacity: 0.7; }
+  .sx-dot { stroke: var(--ice); stroke-width: 1.2; }
+  .sx-pt { cursor: default; outline: none; }
+  .sx-pt.on .sx-dot { r: 6.5; stroke-width: 2; }
+  .sx-pt.on .sx-name { font-weight: 700; fill: var(--ink); font-size: 11.5px; }
+  .sx-pt:is(:hover, :focus-visible) .sx-name { fill: var(--ink); }
+  .sx-pt:is(:hover, :focus-visible) .sx-dot { r: 5.5; }
+  .sx-side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; align-content: start; }
+  .sx-side .note { grid-column: 1 / -1; margin: 0; }
+  .sx-group .mini-h { margin: 0 0 6px; }
+  .sx-teams { margin: 0; font: 500 15px/1.7 var(--ui); color: var(--ink-2); }
+  .sx-teams .sx-tm { color: inherit; text-decoration: none; margin-right: 2px; }
+  .sx-teams .sx-tm:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+  .sx-teams .sx-tm.on { font-weight: 700; color: var(--ink); }
+  @media (max-width: 860px) {
+    .sx-card { grid-template-columns: 1fr; }
+    .sx-chart { margin-inline: auto; }
+  }
+  /* On phones the chart takes the card's whole width, so the team names stay readable. */
+  @media (max-width: 520px) {
+    .sx-card { padding-inline: 6px; }
+    .sx-side { padding-inline: 12px; }
+  }
+</style>

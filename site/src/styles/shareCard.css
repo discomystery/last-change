@@ -178,3 +178,16 @@
 .sc-pcalls .h.sm { font-size: 32px; }
 .sc-pcalls .call:has(.sm) { padding: 16px 0; }
 .sc-watch.sm { margin-top: 16px; }
+
+/* League scatter chart (lib/scatterSvg.ts): the page's chart drawn again in the card's own colors and sizes. */
+.sc-sx { margin-top: 34px; }
+.shc .sc-sx svg { width: 100%; height: auto; display: block; }
+.shc .sc-sx .sx-box { fill: var(--ice); }
+.shc .sc-sx .sx-avg { stroke: var(--ink3); stroke-width: 1; opacity: 0.45; }
+.shc .sc-sx .sx-corner, .shc .sc-sx .sx-axis { font: 600 9.5px 'Hanken Grotesk'; letter-spacing: 0.07em; text-transform: uppercase; fill: var(--ink3); }
+.shc .sc-sx .sx-name { font: 600 10px 'Hanken Grotesk'; fill: var(--ink2); paint-order: stroke; stroke: var(--ice); stroke-width: 2.5px; }
+.shc .sc-sx .sx-dot { stroke: var(--ice); stroke-width: 1.2; }
+.shc .sc-sx .sx-pt.on .sx-dot { r: 6.5; stroke-width: 2; }
+.shc .sc-sx .sx-pt.on .sx-name { font-weight: 750; fill: var(--ink); font-size: 11.5px; }
+.sc-sxn { margin-top: 18px; font-size: 24px; line-height: 1.35; color: var(--ink3); }
+.shc .sc-sx .sx-lead { stroke: var(--ink3); stroke-width: 0.7; opacity: 0.7; }

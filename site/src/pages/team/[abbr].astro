@@ -45,6 +45,8 @@ import SeasonMap from '../../components/SeasonMap.astro';
 import ShareTeam from '../../components/ShareTeam.astro';
 import ShareGoalies from '../../components/ShareGoalies.astro';
 import ShareButton from '../../components/ShareButton.astro';
+import TeamScatter from '../../components/TeamScatter.astro';
+import { specialTeams } from '../../lib/scatter';
 import { trendFor } from '../../lib/trend';
 
 export function getStaticPaths() {
@@ -380,6 +382,8 @@ const coachSince = coach && (team as any).coach_since
         </div>
       </>
     )}
+    <h3 class="sub">Against the rest of the league</h3>
+    <TeamScatter chart={specialTeams()} hi={abbr!} dialog={false} />
   </Section>
 
   <Section id="goalies" title="Goalies" placeholder={false} takeaway="Is he stopping more than he should, and what is his team asking him to face?">
