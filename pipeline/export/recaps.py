@@ -92,6 +92,9 @@ class Season:
         self.name = {r["player_id"]: f"{r['first'][0]}. {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
+        self.full |= wording.number_clashes(season, wording.full)
+        # lists on the page (the goalie table): "Andersen", "M. Tkachuk" when both brothers play
+        self.gshort = wording.short_names(players.iter_rows(named=True), key=lambda r: r["game_id"])
         self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
         self.first_game = {(t, p): g for t, p, g in players.group_by("team_id", "player_id").agg(pl.col("game_id").min()).iter_rows()}
         self._pg, self._av = None, None
@@ -376,7 +379,7 @@ def measure_history(claim: dict, glines: list) -> dict:
     sv = g["saves"] / g["shots"]
     verdict = "held" if abs(sv - chk["baseline"]) < abs(sv - chk["record"]) else "missed"
     return {"verdict": verdict,
-            "happened": f"{g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
+            "happened": f"{g.get('full') or g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
             "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None, "_v": sv, "_name": g["name"]}
 
 
@@ -451,7 +454,8 @@ def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     out = []
     for r in S.goalies.filter(pl.col("game_id") == gid).sort("team_id", "sec", descending=[False, True]).iter_rows(named=True):
         sv = (r["sa"] - r["ga"]) / r["sa"] if r["sa"] else None
-        out.append({"id": r["goalie_id"], "name": S.name.get(r["goalie_id"], "?"), "team": abbr_of[r["team_id"]], "started": r["started"],
+        out.append({"id": r["goalie_id"], "name": S.gshort.get((gid, r["goalie_id"])) or S.name.get(r["goalie_id"], "?"),
+                    "full": S.full.get(r["goalie_id"]) or S.name.get(r["goalie_id"], "?"), "team": abbr_of[r["team_id"]], "started": r["started"],
                     "toi": clock(r["sec"]), "shots": r["sa"], "saves": r["sa"] - r["ga"], "ga": r["ga"], "xga": round(r["xga"], 2),
                     "gsax": round(r["xga"] - r["ga"], 2), "sv": round(sv, 3) if sv is not None else None,
                     "high": {"shots": r["sa_high"], "goals": r["ga_high"]}})
@@ -486,7 +490,7 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         for r in units.iter_rows(named=True):
             ids = {int(x) for x in r["unit"].split("-")}
             if ids not in usual:
-                trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"]), ids))
+                trios.append((t, (lambda xs: ", ".join(xs[:-1]) + " and " + xs[-1])([S.full.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, "").split(" ", 1)[-1])]), int(r["sec"]), ids))
                 break
     left = {t: [x for x in S.exits(gid, S.team_id[(gid, t)]) if x["regular"]] for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
