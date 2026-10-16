@@ -26,3 +26,11 @@ def test_rules_read_each_player_from_his_own_words():
 
 def test_no_report_no_rows():
     assert sr.parse({}, "2026-10-10") == []
+
+
+def test_timeline_given_as_for_some_months():
+    """NHL.com, 2026-10-14: "already without captain Jordan Staal for 1-2 months because of a calf tear"."""
+    body = ("## **Carolina Hurricanes**\n\nThe Hurricanes, who are already without captain Jordan Staal for 1-2 months because "
+            "of a calf tear, recalled forward Bradly Nadeau from Chicago of the American Hockey League on Wednesday.")
+    rows = {r["player_id"]: r for r in sr.parse({"body": body, "links": [[1, "Jordan Staal"], [2, "Bradly Nadeau"]]}, "2026-10-14")}
+    assert rows[1]["timeline"] == "out 1-2 months" and rows[1]["injury"] == "calf tear"

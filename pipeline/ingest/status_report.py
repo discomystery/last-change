@@ -64,11 +64,18 @@ RULES = [
 INJURY = re.compile(r"(?:\(([a-z][a-z\- ]{2,25})\))|((?:upper|lower)[- ]body injury|undisclosed injury|illness|concussion|"
                     r"(?:knee|ankle|shoulder|hand|wrist|foot|groin|back|neck|hip|head|leg|arm|finger|thumb|elbow|abdominal|"
                     r"adductor|hamstring|oblique|rib|jaw|eye|face|facial|achilles|quad|calf|core) (?:injury|surgery|fracture|"
-                    r"strain|sprain|issue))", re.I)
+                    r"strain|sprain|issue|tear))", re.I)
 TIMELINE = re.compile(rf"(out (?:for the (?:rest of the |remainder of the )?season|indefinitely|(?:at least |about |approximately |another |up to )?"
                       rf"{_NUM}(?:[- ]to[- ]{_NUM}|-\d+)? (?:weeks|months))|re-evaluated in {_NUM}(?:[- ]to[- ]{_NUM}|-\d+)? (?:weeks|months)|"
+                      rf"\bfor {_NUM}(?:[- ]to[- ]{_NUM}|-\d+)? (?:weeks|months)|"
                       r"week[- ]to[- ]week|day[- ]to[- ]day|season-ending)", re.I)
 LINK = re.compile(r'<a href="(?:https://www\.nhl\.com)?/player/[a-z0-9\-]+-(\d{7})"[^>]*>([^<]+)</a>')
+
+
+def _timeline(text: str) -> str:
+    """"without captain Jordan Staal for 1-2 months" reads as "out 1-2 months", like the league's usual wording."""
+    text = text.lower()
+    return "out " + text[4:] if text.startswith("for ") else text
 
 
 def url_for(day: str) -> str:
@@ -175,7 +182,7 @@ def parse(page: dict, day: str, known: dict[str, int] | None = None) -> list[dic
                 out.append({"date": day, "player_id": pid, "name": next((t for p, t in page.get("links", []) if p == pid), n.title()),
                             "section": section, "status": status,
                             "injury": (inj.group(1) or inj.group(2)).lower().replace("-", " ") if inj else None,
-                            "timeline": tl.group(1).lower() if tl else None, "note": used[:240], "url": url_for(day)})
+                            "timeline": _timeline(tl.group(1)) if tl else None, "note": used[:240], "url": url_for(day)})
     return out
 
 
