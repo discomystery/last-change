@@ -403,7 +403,9 @@ const base = import.meta.env.BASE_URL;
       const k = kindOf();
       if (k !== mineKind) { mineKind = k; render(); } else renderOnNow(window.lcPrefs.get('team'));
     });
-    addEventListener('resize', () => fill());
+    // Phones fire resize as the address bar slides away while scrolling: refill only when the width changes.
+    let fillW = innerWidth;
+    addEventListener('resize', () => { if (innerWidth !== fillW) { fillW = innerWidth; fill(); } });
     document.fonts?.ready.then(() => fill());
   })();
 </script>

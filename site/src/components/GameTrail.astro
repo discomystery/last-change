@@ -64,7 +64,7 @@ const around = [g.away, g.home].map((me) => {
   .pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .home .pills { justify-content: flex-end; }
   @media (max-width: 719px) {
-    .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; }
+    .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; padding-inline: 0; }
     .who { display: block; }
     .pills { flex-direction: column; align-items: flex-start; }
     .home .pills { align-items: flex-end; }

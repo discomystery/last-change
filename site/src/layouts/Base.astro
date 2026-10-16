@@ -294,10 +294,10 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       <a href={`${base}games/`} aria-current={cur('games')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>Games</a>
       <a href={`${base}teams/`} aria-current={cur('teams')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z" /></svg>Teams</a>
       <a href={`${base}players/`} aria-current={cur('players')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></svg>Players</a>
-      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
+      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="morepanel" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
     </nav>
     </div>
-    <div class="more" id="more" hidden>
+    <div class="morepanel" id="morepanel" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
       <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
@@ -400,7 +400,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         // on phones the settings menu is a sheet just above the tab bar.
         const phone = matchMedia('(max-width: 719px)');
         const prefs = document.getElementById('prefs'), scrim = document.getElementById('prefs-scrim'), nav = document.getElementById('navmenu');
-        const more = document.getElementById('more'), moreBtn = document.getElementById('more-toggle');
+        const more = document.getElementById('morepanel'), moreBtn = document.getElementById('more-toggle');
         let open = null; // { panel, opener }
         const place = () => {
           if (!open) return;
@@ -681,7 +681,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .site-nav a[aria-current='page'] { border-bottom-color: var(--ink); }
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
-  .tabbar, .more, .dock { display: none; }
+  .tabbar, .morepanel, .dock { display: none; }
   @media (max-width: 719px) {
     .site-nav { display: none; }
     body { padding-bottom: var(--dock-h, calc(102px + env(safe-area-inset-bottom))); }
@@ -691,11 +691,11 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
     .tabbar [aria-current='page'], .tabbar button[aria-expanded='true'] { color: var(--ink); }
     .tabbar [aria-current='page'] svg { stroke-width: 2.4; }
-    .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(var(--dock-h, calc(102px + env(safe-area-inset-bottom))) + 8px); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
-    .more a, .more .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
-    .more a:hover { background: var(--track); }
-    .more .soon { color: var(--ink-3); font-weight: 500; }
-    .more em { font-style: normal; font-size: 12px; margin-left: 6px; }
+    .morepanel:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(var(--dock-h, calc(102px + env(safe-area-inset-bottom))) + 8px); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
+    .morepanel a, .morepanel .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
+    .morepanel a:hover { background: var(--track); }
+    .morepanel .soon { color: var(--ink-3); font-weight: 500; }
+    .morepanel em { font-style: normal; font-size: 12px; margin-left: 6px; }
   }
   /* Team pill (SiteTools.astro): the team in its colour, any setting off its usual value, a chevron. It opens the
      settings menu. Beside it, once the top menu has scrolled away, a quiet three-line icon opens the page list. */
