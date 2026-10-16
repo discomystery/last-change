@@ -84,7 +84,6 @@ const base = import.meta.env.BASE_URL;
     const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const dateOf = (s) => new Date(`${s}T12:00:00`);
     const RECAP = new Set((home?.results ?? []).flatMap((b) => b.rows.filter((r) => !r.pending).map((r) => r.id)));
     const SHORT = { Metropolitan: 'Metro' };
@@ -174,15 +173,19 @@ const base = import.meta.env.BASE_URL;
     };
     const more = (text, href) => { const a = el('a', 'more', text); a.href = href; return a; };
 
-    // Last night: the latest game day before today wherever the visitor is.
+    // Last night: the latest game day before today wherever the visitor is (the day turns over at 3 AM, window.lcDay).
+    // Today's own results take over once none of today's games are left to play, or after midnight (before the 3 AM
+    // turnover), so late at night tonight's scores lead instead of the night before's.
     const renderNight = (me) => {
-      const today = iso(new Date());
+      const today = window.lcDay();
       const blocks = (home?.results ?? []).filter((b) => b.rows.length);
-      const b = [...blocks].reverse().find((x) => x.date < today) ?? blocks[blocks.length - 1];
+      const late = today !== window.lcDay.clock();
+      const left = !late && (home?.coming ?? []).some((x) => x.date === today && x.rows.length);
+      const b = [...blocks].reverse().find((x) => x.date < today || (x.date === today && !left)) ?? blocks[blocks.length - 1];
       const sec = document.getElementById('night');
       if (!b) { sec.hidden = true; return; }
-      const yest = iso(new Date(Date.now() - 864e5));
-      document.getElementById('night-h').textContent = b.date === yest ? 'Last night' : 'Latest results';
+      const yest = window.lcDay(-1);
+      document.getElementById('night-h').textContent = b.date === today ? 'Tonight’s results' : b.date === yest ? 'Last night' : 'Latest results';
       document.getElementById('night-sub').textContent = `${day.format(dateOf(b.date))} · ${plural(b.games, 'game')}`;
       const ranked = rank(b.rows, me);
       const top = ranked.find((r) => r.away !== me && r.home !== me && !r.pending) ?? ranked[0];
@@ -196,14 +199,14 @@ const base = import.meta.env.BASE_URL;
     // Today: tonight's games first; tomorrow only fills room left beside the game to watch, else it's a one-line button.
     let fill = () => {};
     const renderToday = (me) => {
-      const today = iso(new Date());
+      const today = window.lcDay();
       const blocks = (home?.coming ?? []).filter((b) => b.rows.length);
       // games already under way stay in tonight's list until the page is rebuilt
       let i = blocks.findIndex((x) => x.date >= today);
       const sec = document.getElementById('today');
       if (i < 0) { sec.hidden = true; return; }
       const tn = blocks[i], tm = blocks[i + 1];
-      document.getElementById('today-h').textContent = tn.date === today ? 'Today around the league' : `Around the league, ${day.format(dateOf(tn.date))}`;
+      document.getElementById('today-h').textContent = tn.date === today ? 'Today around the league' : tn.date === window.lcDay(1) ? 'Tomorrow around the league' : `Around the league, ${day.format(dateOf(tn.date))}`;
       document.getElementById('today-sub').textContent = `${day.format(dateOf(tn.date))} · ${plural(tn.games, 'game')}`;
       const ranked = rank(tn.rows, me);
       const top = ranked.find((r) => r.away !== me && r.home !== me) ?? ranked[0];
@@ -213,7 +216,7 @@ const base = import.meta.env.BASE_URL;
       const lists = el('div', 'stack');
       split.replaceChildren(feat, lists);
       const tmRanked = tm ? rank(tm.rows, me) : [];
-      const tmLabel = tm ? (tm.date === iso(new Date(Date.now() + 864e5)) ? 'Tomorrow' : day.format(dateOf(tm.date)).split(',')[0]) : null;
+      const tmLabel = tm ? (tm.date === window.lcDay(1) ? 'Tomorrow' : day.format(dateOf(tm.date)).split(',')[0]) : null;
       const tmAll = tm ? `All of ${tmLabel === 'Tomorrow' ? 'tomorrow’s' : `${tmLabel}’s`} games ›` : null;
       fill = () => {
         const side = getComputedStyle(split).gridTemplateColumns.split(' ').length > 1;
@@ -309,8 +312,9 @@ const base = import.meta.env.BASE_URL;
       if (!L) return;
       document.getElementById('leaders').hidden = false;
       const lastDay = (home.results ?? []).filter((b) => b.rows.length).at(-1)?.date;
-      const yest = iso(new Date(Date.now() - 864e5));
-      document.getElementById('lead-sub').textContent = lastDay ? `This season · grey figures are what each player added ${lastDay === yest ? 'last night' : `on ${day.format(dateOf(lastDay))}`}` : 'This season';
+      const yest = window.lcDay(-1), today = window.lcDay();
+      const when = lastDay === today ? 'tonight' : lastDay === yest ? 'last night' : `on ${day.format(dateOf(lastDay))}`;
+      document.getElementById('lead-sub').textContent = lastDay ? `This season · grey figures are what each player added ${when}` : 'This season';
       const sel = document.getElementById('stat');
       const draw = () => {
         const k = sel.value;
@@ -325,7 +329,7 @@ const base = import.meta.env.BASE_URL;
       const so = document.getElementById('standout');
       so.hidden = !S;
       if (S) {
-        so.querySelector('.box-h').textContent = lastDay === yest ? 'Last night’s standout stat' : 'The latest standout stat';
+        so.querySelector('.box-h').textContent = lastDay === today ? 'Tonight’s standout stat' : lastDay === yest ? 'Last night’s standout stat' : 'The latest standout stat';
         document.getElementById('so-h').textContent = S.head;
         document.getElementById('so-sub').textContent = S.sub;
         document.getElementById('so-board').replaceChildren(...boardRows(S.rows, S.stat, me, S.id));

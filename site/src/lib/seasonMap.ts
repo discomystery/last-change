@@ -63,7 +63,7 @@ export function mountSeasonMap(root) {
   const placeOf = (key) => PL[key]?.city ?? D.teamPlaces[key] ?? key;
   const abroadOf = (key) => (PL[key] && !HOME_COUNTRIES.has(PL[key].country) ? PL[key].country : null);
   const mi = (a, b) => milesLL(PL[a].ll, PL[b].ll);
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = window.lcDay();
 
   // ---- The schedule, in order, placed where each game is played ----
   const all = D.games.map((g) => {

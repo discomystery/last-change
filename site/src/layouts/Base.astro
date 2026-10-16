@@ -61,6 +61,21 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
     <script is:inline>
+      // The site's day turns over at 3 AM, not midnight (Sora, 2026-10-16): someone checking late at night still wants
+      // that evening's games, so until 3 AM in the visitor's own time zone "today" is the day before. lcDay() gives that
+      // day as YYYY-MM-DD; lcDay(1) the day after it, lcDay(-1) the day before. Every page asks this, never new Date().
+      // lcDay.clock() is the plain calendar date, to tell the hours after midnight apart.
+      {
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        window.lcDay = (shift = 0) => {
+          const d = new Date(Date.now() - 3 * 3600e3);
+          d.setDate(d.getDate() + shift);
+          return iso(d);
+        };
+        window.lcDay.clock = () => iso(new Date());
+      }
+    </script>
+    <script is:inline>
       // Motion (styles/motion.css) only for visitors who have not asked for less of it, and never in automated browsers,
       // so screenshots and checks see every card. If the reveal script below never starts, the class comes off again.
       if (!navigator.webdriver && matchMedia('(prefers-reduced-motion: no-preference)').matches) {
