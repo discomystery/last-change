@@ -94,6 +94,8 @@ def add_coaches(season: int) -> None:
 
 
 # Traits whose numbers are checked and ready to show.
+# Exported beside the traits for the previews' calls, never shown as traits (not in `ready`).
+CALL_ONLY = ["taken", "drawn"]
 READY = ["volume", "quality", "rebounds", "turnover", "dShots", "inClose", "shotsThrough", "suppression", "qualityAllowed", "breakdowns", "longShifts", "blocking", "pointAllowed", "icing", "goalie", "pace", "forecheck", "physical", "rough", "depth", "pp", "pk", "powerKill", "discipline"]
 
 
@@ -119,7 +121,7 @@ def export_fingerprints(season: int, idle: bool = False) -> int:
     # How often the club dresses 11 forwards and 7 defensemen: its depth trait leaves those games out, and the page
     # says "plays eleven forwards" rather than ranking a habit as a weakness.
     lineup = lambda tid: {"eleven": eleven.get(tid, (0, 0))[0], "games": eleven.get(tid, (0, 0))[1], "habit": units.plays_eleven(*eleven.get(tid, (0, 0)))}
-    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY}, "lineup": lineup(tid)} for tid, t in out["teams"].items()}
+    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY + CALL_ONLY}, "lineup": lineup(tid)} for tid, t in out["teams"].items()}
     from pipeline.metrics import rink_bias
     (SITE_DATA / "arena_factors.json").write_text(json.dumps({"seasons": "2023-24 to 2025-26", "home_road": rink_bias.home_road(), "arenas": rink_bias.factors().to_dicts()}, separators=(",", ":")))
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "ready": READY,
