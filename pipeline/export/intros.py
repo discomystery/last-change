@@ -501,6 +501,10 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
         elif lp >= 45 or (p["pos"] == "D" and lp >= 35):
             out.append(f"He had {lp} points last season.")
 
+    cs = conn_smythe(career)
+    if cs:
+        out.append(cs)
+
     stories = []
     if career and next_game and not p.get("unplayed"):  # next-game storylines assume he plays
         p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
@@ -515,7 +519,8 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
     out = []
     o = teams.get(opp, {"place": opp, "nick": opp})
     O = f"the {_nick(o)}"
-    when = "tonight" if tonight else "next time out"
+    # "tonight" is rewritten in the browser to the visitor's own day ("tomorrow", "on Saturday", "next time out"; Base.astro).
+    when = "tonight"
     reg = [g for g in games if g["type"] == REGULAR]
     vs = [g for g in reg if g["opponentAbbrev"] == opp and g["teamAbbrev"] != opp]
     former = [s for s in stints[:-1] if s["team"] == opp]
@@ -527,7 +532,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
             out.append(f"This one’s personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
         elif spell >= 2:
-            out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
+            out.append(f"He has a date with his old team {when}: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
     if len(vs) >= 3:
         gn, _ = _streak(vs, "goals")
         pn, pts = _streak(vs, "points")
@@ -561,6 +566,18 @@ def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> 
                 if hi >= lo and _seasons_span(lo, hi) >= 4:
                     return [f"He’ll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
     return []
+
+
+def conn_smythe(career: dict | None) -> str | None:
+    """A sentence for a Conn Smythe winner (Sora, 2026-10-16), named by the spring it was won in."""
+    springs = sorted({y // 10000 + 1 for a in ((career or {}).get("landing") or {}).get("awards") or []
+                      if "Conn Smythe" in (a.get("trophy") or "") for y in a.get("seasons", [])})
+    if not springs:
+        return None
+    if len(springs) == 1:
+        return f"He won the Conn Smythe as the playoffs’ most valuable player in {springs[0]}."
+    times = {2: "twice", 3: "three times"}.get(len(springs), f"{len(springs)} times")
+    return f"He’s won the Conn Smythe as the playoffs’ most valuable player {times}, in {_and([str(y) for y in springs])}."
 
 
 def _nhl_seasons(career: dict) -> list[dict]:
