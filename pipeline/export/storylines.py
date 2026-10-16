@@ -35,7 +35,7 @@ BASEMENT_GP = 4  # games each team must have played before a record says much
 # last spring's run alone isn't enough; both clubs must be among the SUMMIT best by it, and each must have made last
 # spring's playoffs or be at SUMMIT_FLOOR or better this season, and no club below the floor after SUMMIT_GP games
 # counts (Philadelphia made the second round in 2026 and then fell apart).
-SUMMIT, SUMMIT_K, SUMMIT_FLOOR, SUMMIT_GP = 6, 20, 0.600, 8
+SUMMIT, SUMMIT_K, SUMMIT_FLOOR, SUMMIT_GP = 8, 20, 0.575, 8  # widened from 6 and .600 (Sora: "expand it a tad")
 FIGHT_SEASONS = (2022, 2023, 2024, 2025, 2026)  # seasons with penalty rows on file
 RARE_FIGHTS = 2  # fights in the seasons on file before this one, at most, for a fight to be out of character
 ORDINALS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
