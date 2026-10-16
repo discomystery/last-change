@@ -21,3 +21,10 @@ export const shortName = (id: number | undefined | null, name: string, clash: Se
   const last = id != null ? lastOf.get(id) : undefined;
   return last && !clash.has(last) ? last : name;
 };
+
+// Full names for tooltips and sentences, and a unit's short names (line and pair labels
+// arrive already shortened for the club; this applies the page's own clash set).
+const fullOf = new Map((index as { id: number; name: string }[]).map((p) => [p.id, p.name]));
+export const fullName = (id: number | undefined | null, fallback: string) => (id != null ? fullOf.get(id) ?? fallback : fallback);
+export const unitShort = (u: { players: string[]; ids?: number[] } | undefined, clash: Set<string>) =>
+  (u?.players ?? []).map((n, i) => shortName(u?.ids?.[i], n, clash));

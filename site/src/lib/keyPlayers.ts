@@ -121,7 +121,7 @@ export function keyGoalie(abbr: string, place: string): KeyGoalie | null {
   if (ahead.length) {
     const g = ahead[0], r = rosterOf(g.id)!;
     jobs.push({
-      text: `In for ${(onClub[g.id]?.last as string) ?? nameOf(g).split(' ').slice(1).join(' ')}`,
+      text: `In for ${(onClub[g.id]?.last as string) ?? (nameOf(g).split(' ').slice(1).join(' ') || nameOf(g))}`,
       tip: `${nameOf(g)} has started the most, ${starts(g)} of ${place}’s ${teamStarts} games, but is out for now (${describe(r).tag[0].toLowerCase()}${describe(r).tag.slice(1)}). ${name} has started ${starts(pick)}.`,
     });
   } else jobs.push({

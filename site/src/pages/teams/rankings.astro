@@ -71,7 +71,6 @@ type Unit = { label: string; players: string[]; ids?: number[]; toi_sec: number 
 const ln = linesData.teams as Record<string, { games: number; units: Unit[] }>;
 const unitNames: [string, string][] = [['L1', 'first lines'], ['L2', 'second lines'], ['L3', 'third lines'], ['L4', 'fourth lines'], ['P1', 'top defense pairs'], ['P2', 'second defense pairs'], ['P3', 'third defense pairs']];
 const unitStats: [string, string][] = [['share', 'share of chances'], ['xgf60', 'chances created'], ['xga60', 'fewest chances allowed'], ['sec_pg', 'ice time together']];
-const last = (n: string) => n.split(' ').slice(1).join(' ');
 const unitRows = (label: string) => {
   const rows = teams.flatMap((t) => { const u = ln[t.abbr]?.units.find((x) => x.label === label); return u ? [{ t, u }] : []; });
   const order: Record<string, Map<string, number>> = {};
@@ -277,7 +276,7 @@ const _ = ordinal;
               <span class="rk">{unitStats.map(([s]) => <span class={`v-${s}`}>{order[s]}</span>)}</span>
               <span class="uwho">
                 <TeamLink abbr={t.abbr} class="rname"><span class="full">{t.name}</span><span class="ab">{t.abbr}</span></TeamLink>
-                <span class="unames">{u.players.map((n, j) => <PLink id={u.ids?.[j]} name={last(n)} />)}</span>
+                <span class="unames">{u.players.map((n, j) => <PLink id={u.ids?.[j]} name={n} />)}</span>
               </span>
               <span class="uval">
                 <span class="v-share"><strong>{u.share.toFixed(1)}%</strong> of chances<Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share of chances than', 'a worse share of chances than', words)}.`} /></span>
