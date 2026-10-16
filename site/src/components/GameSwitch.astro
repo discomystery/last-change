@@ -1,0 +1,18 @@
+---
+// One game, two pages: a quiet link from the preview to the post-game page and back, styled like the Share link it
+// sits beside under the rink. Shown only once both pages exist.
+interface Props { id: number; on: 'preview' | 'recap' }
+const { id, on } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+{on === 'recap'
+  ? <a class="gswitch" href={`${base}preview/${id}/`}><span aria-hidden="true">‹</span> <span class="u">Read the preview</span></a>
+  : <a class="gswitch" href={`${base}recap/${id}/`}><span class="u">See the post-game</span> <span aria-hidden="true">›</span></a>}
+
+<style>
+  /* Same look as .share-btn (ShareDialog.astro), but a plain link so the share script leaves it alone. */
+  .gswitch { display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); text-decoration: none; }
+  .gswitch .u { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 5px; text-decoration-thickness: 1px; }
+  .gswitch:hover, .gswitch:focus-visible { color: var(--ink); }
+  .gswitch:hover .u { text-decoration-color: var(--ink-3); }
+</style>

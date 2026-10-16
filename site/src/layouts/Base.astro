@@ -892,6 +892,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   /* The game's day, set large under a rink header on preview and post-game pages. */
   .when-day { font: 600 20px/1.2 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-bottom: 2px; }
   .when-day + p strong { color: var(--ink); font-weight: 600; }
+  /* Under the rink on game pages: the link to the game's other page beside Share, on one quiet line. */
+  .gamelinks { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
+  .gamelinks:empty { display: none; }
   .a-raw { display: none; }
   html[data-arena='raw'] .a-raw { display: inline; }
   html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
