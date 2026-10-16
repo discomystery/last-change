@@ -606,9 +606,11 @@ import ShareButton from '../../components/ShareButton.astro';
     let pinned = null;
     const show = (el) => {
       const id = el?.dataset.shooter;
-      map.classList.toggle('focus', !!id);
-      map.querySelectorAll('[data-p]').forEach((d) => d.classList.toggle('on', d.dataset.p === id));
-      const n = id ? map.querySelectorAll(`[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
+      // The map's own styles fade the rest and show only his dots under `.picking` / `.hl` (ShotMap.astro).
+      map.querySelector('.shotmap')?.classList.toggle('picking', !!id);
+      map.querySelectorAll('.shot[data-p]').forEach((d) => d.classList.toggle('hl', d.dataset.p === id));
+      panel.querySelectorAll('[data-shooter]').forEach((x) => x.classList.toggle('on', !!id && x === el));
+      const n = id ? map.querySelectorAll(`.shot[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
       who.textContent = id ? `${el.textContent}: ${n} of these shots` : ' ';
     };
     panel.querySelectorAll('[data-shooter]').forEach((el) => {
