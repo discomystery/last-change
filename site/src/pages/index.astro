@@ -45,16 +45,13 @@ const base = import.meta.env.BASE_URL;
       <div class="lead-grid">
         <div class="card lead-main">
           <div class="lead-top lead-main-top">
-            <span class="box-h">Season leaders</span>
+            <div class="lead-h"><span class="box-h">Season leaders</span><a class="lead-all" id="board-all" href="players/leaders/">See every player →</a></div>
             <p class="pick"><label for="stat">Show leaders in</label> <select id="stat">
               <option value="p">points</option><option value="g">goals</option><option value="a">assists</option><option value="x">expected goals</option><option value="gs">goals saved above expected</option>
             </select></p>
+            <p class="foot-note" id="board-note"></p>
           </div>
           <ol class="board" id="board"></ol>
-          <div class="board-foot">
-            <p class="foot-note" id="board-note"></p>
-            <p class="foot-note"><a id="board-all" href="players/leaders/">See every player →</a></p>
-          </div>
         </div>
         <div class="card dyn" id="standout" hidden>
           <div class="lead-top">
@@ -299,7 +296,6 @@ const base = import.meta.env.BASE_URL;
 
     // League leaders, with what each player added on the latest game day.
     const NOTES = {
-      p: 'Goals plus assists.',
       x: 'Expected goals from his own shots: who gets the best chances, whether or not they go in. Empty-net shots left out.',
       gs: 'Goals saved above expected: goals an average goalie would have let in on the same shots, minus his.',
     };
@@ -327,7 +323,9 @@ const base = import.meta.env.BASE_URL;
         const k = sel.value;
         document.getElementById('board').replaceChildren(...boardRows(L[k] ?? [], k, me));
         const mine = (L[k] ?? []).some((r) => r.team === me);
-        document.getElementById('board-note').textContent = `${NOTES[k] ?? ''}${mine ? ' Your team’s players are in bold.' : ''}`.trim();
+        const note = document.getElementById('board-note');
+        note.textContent = `${NOTES[k] ?? ''}${mine ? ' Your team’s players are in bold.' : ''}`.trim();
+        note.hidden = !note.textContent;
         document.getElementById('board-all').href = `${base}players/leaders/${k === 'gs' ? '?k=g' : ['g', 'a'].includes(k) ? `?s=${k}` : ''}`;
       };
       sel.onchange = draw;
@@ -473,13 +471,17 @@ const base = import.meta.env.BASE_URL;
 
   /* Leaders */
   #home .lead-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
-  /* Side by side, the two cards share rows (heading, list, notes), so both lists start on the same line and the cards end level. */
+  /* Side by side, the two cards share rows (heading, list), so both lists start on the same line and the cards end level. */
   @media (min-width: 820px) {
-    #home .lead-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto; row-gap: 0; align-items: stretch; }
-    #home .lead-grid > .card { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
+    #home .lead-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; row-gap: 0; align-items: stretch; }
+    #home .lead-grid > .card { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
   }
   #home .lead-main .pick { margin: 6px 0 0; }
   #home .lead-main-top { justify-content: space-between; }
+  #home .lead-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  #home .lead-all { font: 600 13px var(--ui); color: var(--ink-2); text-decoration: none; }
+  #home .lead-all:hover { color: var(--ink); text-decoration: underline; }
+  #home .lead-main-top .foot-note { margin-top: 2px; }
   #home .board li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--rule); font: 400 15px var(--ui); }
   #home .board li:first-child { border-top: 0; }
   #home .board .rk { font: 600 13px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
