@@ -69,9 +69,7 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
     from pipeline.ingest.client import get
 
     standings = get(f"{NHL_WEB}/v1/standings/now").json()["standings"]
-    teams = sorted(({"abbr": t["teamAbbrev"]["default"], "name": t["teamName"]["default"], "place": t["placeName"]["default"],
-                     "nick": t["teamCommonName"]["default"], "w": t["wins"], "l": t["losses"], "otl": t["otLosses"],
-                     "gp": t["gamesPlayed"], "pts": t["points"], "conference": t["conferenceName"], "division": t["divisionName"], "div_rank": t["divisionSequence"]} for t in standings), key=lambda t: t["name"])
+    teams = sorted((_team_row(t) for t in standings), key=lambda t: t["name"])
     (SITE_DATA / "teams.json").write_text(json.dumps(teams, separators=(",", ":")))
     add_coaches(season)
     games = [{"id": g["game_id"], "start": g["start_utc"], "date": g["date"], "home": g["home"], "away": g["away"], "venue": g["venue"],
@@ -79,6 +77,19 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
              for g in nhl.season_games(season) if g["game_type"] == 2]
     (SITE_DATA / "schedule.json").write_text(json.dumps({"season": season, "games": games}, separators=(",", ":")))
     return len(teams), len(games)
+
+
+def _team_row(t: dict) -> dict:
+    """One club's line in teams.json: names, record and the full standings line (Teams > Standings)."""
+    split = lambda side: [t.get(f"{side}Wins", 0), t.get(f"{side}Losses", 0), t.get(f"{side}OtLosses", 0)]
+    streak = f"{t['streakCode']}{t['streakCount']}" if t.get("streakCode") and t.get("streakCount") else None
+    return {"abbr": t["teamAbbrev"]["default"], "name": t["teamName"]["default"], "place": t["placeName"]["default"],
+            "nick": t["teamCommonName"]["default"], "w": t["wins"], "l": t["losses"], "otl": t["otLosses"],
+            "gp": t["gamesPlayed"], "pts": t["points"], "conference": t["conferenceName"], "division": t["divisionName"],
+            "div_rank": t["divisionSequence"], "conf_rank": t.get("conferenceSequence"), "league_rank": t.get("leagueSequence"),
+            "wc_rank": t.get("wildcardSequence"), "pt_pct": t.get("pointPctg"), "rw": t.get("regulationWins"),
+            "row": t.get("regulationPlusOtWins"), "gf": t.get("goalFor"), "ga": t.get("goalAgainst"),
+            "home": split("home"), "road": split("road"), "l10": split("l10"), "streak": streak, "clinch": t.get("clinchIndicator")}
 
 
 def add_coaches(season: int) -> None:
