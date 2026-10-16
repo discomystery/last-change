@@ -2,7 +2,6 @@
 // The post-game numbers band (Sora picked layout C1, 2026-10-16): the score by period in a pale panel like "What it
 // means", and the four tug-of-war bars beside it in two short columns, stretched to the panel's height so both sides
 // start and end together. On phones the panel sits above the bars.
-// The title shortens to "Score" when overtime or a shootout adds columns, and on phones, so it stays on one line.
 // periods: from pipeline/export/recaps.py `periods` (goals and shots on goal per period; a shootout column has goals only).
 export type Period = { label: string; goals: Record<string, number>; shots: Record<string, number> | null };
 export type Row = { name: string; tip: string; vals: [string, string]; g: [number, number] };
@@ -16,7 +15,7 @@ const shotTot = (a: string) => periods.reduce((n, p) => n + (p.shots?.[a] ?? 0),
     <div class="ls-box">
       <table class="ls">
         <caption class="sr-only">Goals and shots on goal by period</caption>
-        <thead><tr><th scope="col" class="ls-h">Score{periods.length <= 3 && <span class="bp"> by period</span>}</th>{periods.map((p) => <th scope="col">{p.label}</th>)}<th scope="col">Final</th></tr></thead>
+        <thead><tr><th scope="col" class="ls-h">Score</th>{periods.map((p) => <th scope="col">{p.label}</th>)}<th scope="col">Final</th></tr></thead>
         <tbody>
           {order.map((a, i) => (
             <>
@@ -83,6 +82,5 @@ const shotTot = (a: string) => periods.reduce((n, p) => n + (p.shots?.[a] ?? 0),
   }
   @media (max-width: 560px) {
     .tug { grid-template-columns: 1fr; }
-    .bp { display: none; }
   }
 </style>
