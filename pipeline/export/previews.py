@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 18  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 19  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -45,6 +45,8 @@ RULES_VERSION = 18  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # an edge body never opens by repeating its headline
 # 18: clubs that dress 11 forwards and 7 defensemen: depth leaves those games out and is never an edge for a club that
 #     does it most nights; NHL.com's projected lines and status facts in Who to watch (2026-10-16)
+# 19: "best against best" only for two of the league's best teams meeting (Sora, 2026-10-16): duels and top-line
+#     matchups get other headlines, and the story leads with it when the standings say so
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -225,7 +227,7 @@ DUELS = {  # offense trait: (defense trait, weights, what the offense does, what
     "pp": ("pk", (0.897, 0.589), "the power play", "the penalty kill"),
 }
 DUEL_BAR = 75  # both teams at or above this percentile
-DUEL_HEADS = ["Something has to give", "Strength against strength", "The matchup inside the matchup", "Best against best",
+DUEL_HEADS = ["Something has to give", "Strength against strength", "The matchup inside the matchup", "Who blinks first?",
               "Unstoppable force, meet immovable object", "Heavyweight bout"]
 DUEL_LEAN = {  # who we side with
     "offense": ["We think {X} still get theirs.", "Our lean: {Xp} {oname} wins out.", "We’ll side with {X}.",
@@ -264,7 +266,7 @@ MATCHUP_WORDS = {
              "{Coach} has been chasing an easier matchup for the team’s scorers."),
     "shadow": (["A shadow job for {mine}", "{H} will send their checkers at {Ostar}", "{Ostar} gets company tonight"],
                "{Coach} has been using this group as a checking line on {theirline}."),
-    "best": (["Best on best: {Hstar} against {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power against power"],
+    "best": (["Top line on top line: {Hstar} against {Ostar}", "{H} want {Hstar} head to head with {Ostar}", "Power against power"],
              "{Coach} has been choosing strength on strength."),
     "even": (["{H} like {Hstar}’s line against {Ostar}’s", "Like for like: {Hstar} against {Ostar}"],
              "{Coach} keeps choosing line for line."),

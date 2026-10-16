@@ -13,6 +13,8 @@ spring's playoff series, never from a list.
   star fights       a star or franchise player in a fight, and how rarely he fights (since 2022-23)
   neighbors         arenas close enough that fans make the trip (site/src/data/arenas.json)
   basement          two of the league's worst records meeting
+  summit            two of the league's best teams meeting ("best against best"): this season's points percentage
+                    blended with last season's, and both either made last spring's playoffs or are winning this season
 """
 import gzip
 import json
@@ -28,6 +30,12 @@ PLAYOFFS = 3
 NEIGHBOR_MILES = 150  # Rangers-Devils, Islanders-Rangers, Sabres-Leafs, Kings-Ducks: a drive, not a flight
 BASEMENT = 6  # both teams among this many worst points percentages (about the bottom fifth)
 BASEMENT_GP = 4  # games each team must have played before a record says much
+# Best against best (Sora, 2026-10-16: the words should mean the league's best teams, not two strong habits). A club's
+# standing is this season's points percentage pulled toward last season's by SUMMIT_K games, so a fast start alone or
+# last spring's run alone isn't enough; both clubs must be among the SUMMIT best by it, and each must have made last
+# spring's playoffs or be at SUMMIT_FLOOR or better this season, and no club below the floor after SUMMIT_GP games
+# counts (Philadelphia made the second round in 2026 and then fell apart).
+SUMMIT, SUMMIT_K, SUMMIT_FLOOR, SUMMIT_GP = 6, 20, 0.600, 8
 FIGHT_SEASONS = (2022, 2023, 2024, 2025, 2026)  # seasons with penalty rows on file
 RARE_FIGHTS = 2  # fights in the seasons on file before this one, at most, for a fight to be out of character
 ORDINALS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
@@ -267,3 +275,40 @@ def basement(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> bool:
     rec = table_before(G, season, before)
     return all(t in rec and rec[t]["gp"] >= BASEMENT_GP and rec[t]["worst"] <= BASEMENT for t in (a, b))
 
+
+
+def _playoff_teams(season: int) -> set[str]:
+    g = _playoff_games(season)
+    return set() if g.is_empty() else set(g["home"].to_list()) | set(g["away"].to_list())
+
+
+def standing(G: pl.DataFrame, season: int, before: str) -> dict[str, dict]:
+    """Each club's blended standing before a date: this season's points percentage pulled toward last season's by
+    SUMMIT_K games, its rank by it (1 = best), and whether it made last spring's playoffs."""
+    now = table_before(G, season, before)
+    last = table_before(G, season - 1, "9999-12-31")
+    po = _playoff_teams(season - 1)
+    out = {}
+    for t in set(now) | set(last):
+        gp = now.get(t, {}).get("gp", 0)
+        prior = last[t]["pct"] if t in last else 0.5
+        cur = now[t]["pct"] if gp else prior
+        out[t] = {"gp": gp, "pct": cur, "blend": (gp * cur + SUMMIT_K * prior) / (gp + SUMMIT_K), "playoffs": t in po}
+    for i, t in enumerate(sorted(out, key=lambda t: -out[t]["blend"])):
+        out[t]["rank"] = i + 1
+    return out
+
+
+def summit(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> bool:
+    """Best against best: both clubs among the league's best by blended standing, each with last spring's playoffs or
+    a strong record this season behind it, and neither below the floor once the season is under way."""
+    st = standing(G, season, before)
+    for t in (a, b):
+        x = st.get(t)
+        if x is None or x["rank"] > SUMMIT:
+            return False
+        if x["gp"] >= SUMMIT_GP and x["pct"] < SUMMIT_FLOOR:
+            return False
+        if not x["playoffs"] and not (x["gp"] >= SUMMIT_GP and x["pct"] >= SUMMIT_FLOOR):
+            return False
+    return True
