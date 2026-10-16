@@ -94,6 +94,7 @@ class Season:
         self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
         self.first_game = {(t, p): g for t, p, g in players.group_by("team_id", "player_id").agg(pl.col("game_id").min()).iter_rows()}
+        self._pg, self._av = None, None
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
@@ -154,8 +155,33 @@ class Season:
             ejected = (gid, p) in self.ejected
             if not ejected and nxt and (nxt, p) in self.dressed and gone < BENCHED_SEC:
                 continue
-            out.append({"id": p, "name": self.full.get(p, self.name.get(p, "?")), "pos": self.pos.get((gid, p)), "sec": int(at), "ejected": ejected})
+            out.append({"id": p, "name": self.full.get(p, self.name.get(p, "?")), "pos": self.pos.get((gid, p)), "sec": int(at), "ejected": ejected,
+                        "regular": self.regular(gid, tid, p), "confirmed": self.confirmed_out(gid, tid, p, nxt)})
         return sorted(out, key=lambda x: x["sec"])
+
+    def regular(self, gid: int, tid: int, pid: int) -> bool:
+        """A top-nine forward or top-four defenseman by average ice time in the club's earlier games this season (three
+        games needed). A depth forward who stops playing mid-game is as likely a coach's choice as anything else (Sora,
+        2026-10-16: MacEwen, a healthy scratch for six games, was told as having left; McKenna's was the coach's call)."""
+        if self._pg is None:
+            self._pg = pl.read_parquet(TABLES / str(self.season) / "player_game.parquet", columns=["game_id", "player_id", "team_id", "pos", "sec"])
+        mine = self._pg.filter((pl.col("team_id") == tid) & (pl.col("game_id") < gid)).group_by("player_id", "pos").agg(
+            pl.col("sec").mean().alias("avg"), pl.len().alias("n")).filter(pl.col("n") >= 3)
+        pos = self.pos.get((gid, pid))
+        d = pos == "D"
+        pool = mine.filter((pl.col("pos") == "D") if d else (pl.col("pos") != "D") & (pl.col("pos") != "G")).sort("avg", descending=True)
+        return pid in pool["player_id"].head(4 if d else 9).to_list()
+
+    def confirmed_out(self, gid: int, tid: int, pid: int, nxt: int | None) -> bool:
+        """Whether something besides the shift chart says he was out: he sat out the club's next game, or the daily
+        availability table (NHL.com Status Report, ESPN injuries, roster moves) has a report on him after this game."""
+        if nxt and (nxt, pid) not in self.dressed:
+            return True
+        if self._av is None:
+            f = TABLES / str(self.season) / "availability.parquet"
+            self._av = pl.read_parquet(f, columns=["date", "player_id", "report_status", "report_date"]).drop_nulls("report_status") if f.exists() else pl.DataFrame()
+        day = self.games[gid]["date"]
+        return bool(self._av.height and self._av.filter((pl.col("player_id") == pid) & (pl.col("report_date") >= day)).height)
 
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
@@ -460,7 +486,7 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
             if ids not in usual:
                 trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"]), ids))
                 break
-    left = {t: S.exits(gid, S.team_id[(gid, t)]) for t in (a, h)}
+    left = {t: [x for x in S.exits(gid, S.team_id[(gid, t)]) if x["regular"]] for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
     absent = {t: [{"id": p, "name": S.full.get(p, S.name.get(p, "?"))} for p in sorted({p for u in usual_lines.get(t, []) for p in u})
                   if (gid, p) not in S.dressed and S.first_game.get((S.team_id[(gid, t)], p), gid) < gid] for t in (a, h)}
@@ -549,7 +575,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
                "reveal": reveals.get(gid), "numbers": nums, "periods": periods(S, gid, g), "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
         if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
-            gone = [{"id": x["id"], "team": t, "sec": x["sec"]} for t in (g["away"], g["home"])
+            gone = [{"id": x["id"], "team": t, "sec": x["sec"], "regular": x["regular"], "confirmed": x["confirmed"]} for t in (g["away"], g["home"])
                     for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
             if gone:
                 rec["left"] = sorted(gone, key=lambda x: x["sec"])

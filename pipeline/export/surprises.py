@@ -678,6 +678,16 @@ def when_left(sec: int) -> str:
     return f"in the {ORDINAL[per]} period"
 
 
+def clock_at(sec: int) -> str:
+    """"10:20 of the second period" for the exact moment, or "the first period" when it was the horn."""
+    if sec > 0 and sec % 1200 == 0 and sec <= 2400:
+        return f"the {ORDINAL[sec // 1200]} period"
+    per, into = min(sec // 1200 + 1, 3), sec % 1200
+    if per == 3 and sec >= 3600:
+        return f"{(sec - 3600) // 60}:{(sec - 3600) % 60:02d} of overtime"
+    return f"{into // 60}:{into % 60:02d} of the {ORDINAL[per]} period"
+
+
 def _names(xs: list[str]) -> str:
     return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + f" and {xs[-1]}"
 

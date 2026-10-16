@@ -142,3 +142,38 @@ def test_goals_taken_off_get_a_follow_up():
     assert stories._wipe_after(off, [g(2, 10, True, "pp")], True, True, 2, "REG", pk) == " The power play gave it back."
     assert stories._wipe_after(off, [g(2, 10, True)], True, True, 2, "REG", pk) == " It didn’t cost them in the end."
     assert stories._wipe_after(off, [g(2, 10, False)], True, False, 4, "REG", pk) == ""  # a rout: the goal didn't decide it
+
+
+def test_one_second_left_is_singular():
+    assert stories._left({"sec": 1199}) == "1 second"
+    assert stories._left({"sec": 1180}) == "20 seconds"
+    assert stories._when({"period": 2, "sec": 1}) == "1 second into the second period" or "1 second" in stories._when({"period": 1, "sec": 1})
+
+
+def _players(rows):
+    import polars as pl
+    return pl.DataFrame(rows, schema={"player_id": pl.Int64, "game_id": pl.Int64, "date": pl.Utf8, "g": pl.Int64, "a1": pl.Int64, "a2": pl.Int64, "season": pl.Int64})
+
+
+def test_consecutive_hat_tricks_are_counted():
+    P = _players([(1, 10, "2026-10-13", 3, 0, 1, 2026), (1, 11, "2026-10-15", 3, 0, 0, 2026), (2, 11, "2026-10-15", 3, 0, 0, 2026)])
+    assert stories._hat_run(P, 1, 11) == 2
+    assert stories._hat_run(P, 2, 11) == 1
+
+
+def test_drought_counts_games_played_and_names_a_long_gap():
+    rows = [(1, 1, "2026-02-28", 1, 0, 0, 2025)] + [(1, 2 + i, f"2026-03-{1 + i:02d}", 0, 0, 0, 2025) for i in range(5)]
+    rows += [(1, 20 + i, f"2026-10-{1 + i:02d}", 0, 1, 0, 2026) for i in range(8)] + [(1, 40, "2026-10-15", 1, 0, 0, 2026)]
+    P = _players(rows)
+    text = stories._drought(P, 1, 40, "2026-10-15")
+    assert text.startswith(", his first since Feb 28") and "13 games played since" in text
+    # a short gap in the same season: games, not a date
+    P2 = _players([(1, 1, "2026-10-01", 1, 0, 0, 2026)] + [(1, 2 + i, f"2026-10-{2 + i:02d}", 0, 0, 0, 2026) for i in range(11)] + [(1, 30, "2026-10-14", 1, 0, 0, 2026)])
+    assert stories._drought(P2, 1, 30, "2026-10-14") == ", his first in eleven games"
+    assert stories._drought(_players([(1, 30, "2026-10-14", 1, 0, 0, 2026)]), 1, 30, "2026-10-14") == ""
+
+
+def test_neutral_clock_for_an_exit():
+    from pipeline.export import surprises
+    assert surprises.clock_at(1200 + 620) == "10:20 of the second period"
+    assert surprises.clock_at(1200) == "the first period"
