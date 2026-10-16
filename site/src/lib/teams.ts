@@ -92,6 +92,13 @@ function darkAway(away: string, home: string): string {
   return options.find((c) => distance(c, h) >= DARK_MIN_DISTANCE) ?? options.reduce((x, y) => (distance(x, h) >= distance(y, h) ? x : y));
 }
 
+/** Whether a dark-mode colour is so pale (road white) that lighter shades of it toward the text colour can't be told
+ * apart; charts built from shades fade those toward the dark sheet instead. */
+export const isPale = (hex: string) => oklab(hex)[0] >= 0.8 && Math.hypot(oklab(hex)[1], oklab(hex)[2]) < 0.03;
+
+/** The dark-mode colours `matchupPaint` gives each team, as plain hex values. */
+export const matchupDark = (away: string, home: string) => ({ away: darkAway(away, home), home: darkShade(teamColour(home), home) });
+
 /** `matchupColours` as CSS values that follow light and dark mode. */
 export function matchupPaint(away: string, home: string): { away: string; home: string } {
   return { away: both(matchupColours(away, home).away, darkAway(away, home)), home: teamPaint(home) };
