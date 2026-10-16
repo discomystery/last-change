@@ -324,8 +324,10 @@ def coming_interest(g: dict, nm: Namer, div: dict[str, str], season: int, star_i
                 parts.append((14, f"{nm.last(sf[0]['pid'])} fought last time", f"{nm.last(sf[0]['pid'])} fought last time"))
             else:
                 parts.append((blood["score"] / 8, "Bad blood last time", None))
-    if facts.get("summit"):
+    if facts.get("tier") == "best":
         parts.append((10, "Best against best", "Best against best"))
+    elif facts.get("tier") == "good":
+        parts.append((6, "Two good teams", "Two good teams"))
     parts += [x for x in _rivals(away, home, season, div) if x[1] != "Playoff rematch"]  # told by the preview's item
     claims = pv.get("claims") or []
     for k, c in enumerate(claims[:2]):

@@ -32,10 +32,13 @@ BASEMENT = 6  # both teams among this many worst points percentages (about the b
 BASEMENT_GP = 4  # games each team must have played before a record says much
 # Best against best (Sora, 2026-10-16: the words should mean the league's best teams, not two strong habits). A club's
 # standing is this season's points percentage pulled toward last season's by SUMMIT_K games, so a fast start alone or
-# last spring's run alone isn't enough; both clubs must be among the SUMMIT best by it, and each must have made last
-# spring's playoffs or be at SUMMIT_FLOOR or better this season, and no club below the floor after SUMMIT_GP games
+# last spring's run alone isn't enough; both clubs must be near the top by it, and each must have made last
+# spring's playoffs or be at the floor or better this season, and no club below the floor after SUMMIT_GP games
 # counts (Philadelphia made the second round in 2026 and then fell apart).
-SUMMIT, SUMMIT_K, SUMMIT_FLOOR, SUMMIT_GP = 8, 20, 0.575, 8  # widened from 6 and .600 (Sora: "expand it a tad")
+# Two tiers (Sora, 2026-10-16): the top six with a .600 floor are "best against best"; the top eight with a .575 floor
+# that miss it are "two good teams", which never claims they are the best.
+SUMMIT_K, SUMMIT_GP = 20, 8
+TIERS = (("best", 6, 0.600), ("good", 8, 0.575))  # (tier, top this many, record floor)
 FIGHT_SEASONS = (2022, 2023, 2024, 2025, 2026)  # seasons with penalty rows on file
 RARE_FIGHTS = 2  # fights in the seasons on file before this one, at most, for a fight to be out of character
 ORDINALS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
@@ -299,16 +302,19 @@ def standing(G: pl.DataFrame, season: int, before: str) -> dict[str, dict]:
     return out
 
 
-def summit(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> bool:
-    """Best against best: both clubs among the league's best by blended standing, each with last spring's playoffs or
-    a strong record this season behind it, and neither below the floor once the season is under way."""
+def summit(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> str | None:
+    """Two strong clubs meeting: "best" when both are among the league's best by blended standing, "good" when both
+    are near the top without both making that bar, else None. Each club needs last spring's playoffs or a strong
+    record this season behind it, and none counts below the floor once the season is under way."""
     st = standing(G, season, before)
-    for t in (a, b):
-        x = st.get(t)
-        if x is None or x["rank"] > SUMMIT:
-            return False
-        if x["gp"] >= SUMMIT_GP and x["pct"] < SUMMIT_FLOOR:
-            return False
-        if not x["playoffs"] and not (x["gp"] >= SUMMIT_GP and x["pct"] >= SUMMIT_FLOOR):
-            return False
-    return True
+    for tier, top, floor in TIERS:
+        ok = True
+        for t in (a, b):
+            x = st.get(t)
+            if (x is None or x["rank"] > top or (x["gp"] >= SUMMIT_GP and x["pct"] < floor)
+                    or (not x["playoffs"] and not (x["gp"] >= SUMMIT_GP and x["pct"] >= floor))):
+                ok = False
+                break
+        if ok:
+            return tier
+    return None

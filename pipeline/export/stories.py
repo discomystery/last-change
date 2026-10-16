@@ -679,9 +679,15 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
     if storylines.basement(G, away, home, season, before):
         out["basement"] = "Both teams are near the bottom of the standings."
         out["heads"].append((66, "Somebody has to win"))
-    if storylines.summit(G, away, home, season, before):  # Sora, 2026-10-16: the words belong to the standings
+    tier = storylines.summit(G, away, home, season, before)  # Sora, 2026-10-16: the words belong to the standings
+    if tier == "best":
         out["summit"] = "Two of the league’s best teams meet."
         out["heads"].append((77, _pick(["Best against best", "A heavyweight meeting", "Two of the best"], gid, "summit")))
+    elif tier == "good":
+        out["summit"] = "Two good teams meet."
+        out["heads"].append((70, _pick(["Two good teams", "A good test for both", "A measuring-stick game"], gid, "summit")))
+    if tier:
+        out["tier"] = tier
     if gid is not None:
         items += _new_coach(gid, (away, home), before, W, season)
     from pipeline.ingest import standings_daily as sd
