@@ -2,12 +2,13 @@
 // One team in a list: colour dot, name linking to its page, record and points. The page fills in `.tnext` (next game)
 // in the browser, so it stays current between builds.
 import { teamPaint } from '../lib/teams';
-interface Props { t: { abbr: string; name: string; w: number; l: number; otl: number; pts: number } }
-const { t } = Astro.props;
+// `pos` adds the club's place in a ranked list (the league standings view).
+interface Props { t: { abbr: string; name: string; w: number; l: number; otl: number; pts: number }; pos?: number }
+const { t, pos } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 <li class="card row tcard go" data-team={t.abbr} style={`--c:${teamPaint(t.abbr)}`}>
-  <a class="tname go-link" href={`${base}team/${t.abbr}/`}><i></i>{t.name}</a>
+  <a class="tname go-link" href={`${base}team/${t.abbr}/`}>{pos && <span class="tpos">{pos}</span>}<i></i>{t.name}</a>
   <span class="trec">{t.w}-{t.l}-{t.otl} <span class="n">· {t.pts} pts</span></span>
   <span class="tnext n"></span>
 </li>
@@ -15,7 +16,9 @@ const base = import.meta.env.BASE_URL;
 <style>
   .tcard { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
   .tname { font: 600 17px var(--ui); display: inline-flex; align-items: center; gap: 9px; }
+  .tpos { min-width: 1.4em; font: 600 13px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
   .tname i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); flex: none; }
   .trec { font: 700 15px var(--ui); white-space: nowrap; }
   .tnext { grid-column: 1 / -1; font: 400 13px var(--ui); color: var(--ink-3); padding-left: 20px; }
+  .tcard:has(.tpos) .tnext { padding-left: calc(20px + 1.4em + 9px); }
 </style>

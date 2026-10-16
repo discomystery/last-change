@@ -7,7 +7,7 @@ import { teamPaint } from '../lib/teams';
 import type { OgCard } from '../lib/og';
 import { createHash } from 'node:crypto';
 import { OG_REV } from '../lib/og';
-type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
+type Section = 'home' | 'games' | 'teams' | 'players' | 'record' | 'methods';
 interface Props { title: string; description?: string; section?: Section; og?: OgCard }
 const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
 // Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
@@ -15,7 +15,6 @@ const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
   { id: 'teams', label: 'Teams', href: 'teams/' },
   { id: 'players', label: 'Players', href: 'players/' },
-  { id: 'league', label: 'League', href: 'league/' },
   { id: 'record', label: 'Track record', href: 'record/' },
 ];
 const SITE_NAME = 'Spare Line Change';
@@ -294,12 +293,11 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       <a href={`${base}games/`} aria-current={cur('games')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>Games</a>
       <a href={`${base}teams/`} aria-current={cur('teams')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z" /></svg>Teams</a>
       <a href={`${base}players/`} aria-current={cur('players')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></svg>Players</a>
-      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
+      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
     </nav>
     </div>
     <div class="more" id="more" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
-      <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
       <a href={`${base}methods/`}>Methods</a>
     </div>
