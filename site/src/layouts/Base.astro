@@ -7,6 +7,7 @@ import { teamPaint } from '../lib/teams';
 import type { OgCard } from '../lib/og';
 import { createHash } from 'node:crypto';
 import { OG_REV } from '../lib/og';
+import { ADJ_KIND } from '../lib/adjust';
 type Section = 'home' | 'games' | 'teams' | 'players' | 'record' | 'methods';
 // gameStart: on a page about one upcoming game, its puck drop (ISO), so the page's "tonight" follows the visitor's day.
 interface Props { title: string; description?: string; section?: Section; og?: OgCard; gameStart?: string }
@@ -365,11 +366,19 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </div>
       <div class="set">
         <div class="set-h"><span id="set-arena">Adjusted stats</span></div>
-        <div class="mode seg" role="group" aria-labelledby="set-arena">
-          <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
+        <div class="mode seg three" role="group" aria-labelledby="set-arena">
           <button type="button" data-pref="arena" data-value="raw">Recorded</button>
+          <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
+          <button type="button" data-pref="arena" data-value="custom">Custom</button>
         </div>
-        <p class="set-why">Adjusted evens out generous arena scorers, teams that shoot more when behind and how hard a player’s faceoffs are, and shows scores where 100 is average. Recorded shows the numbers as counted.</p>
+        <p class="set-why" data-why="raw">Recorded shows every number as it was counted.</p>
+        <p class="set-why" data-why="adjusted">Adjusted evens out generous arena scorers, teams that shoot more when behind and who a player is up against, and shows scores where 100 is average.</p>
+        <p class="set-why" data-why="custom">Pick which adjustments to use. The rest are shown as counted.</p>
+        <div class="adjmix" id="adjmix">
+          <label class="tg"><span><b>Arena scorers</b><small>Hits, blocks, giveaways and takeaways counted the same in every arena.</small></span><input type="checkbox" data-adj-kind="arena" /><span class="sw" aria-hidden="true"></span></label>
+          <label class="tg"><span><b>Score and home ice</b><small>Shot volume, shots against and pace weighted for teams chasing a game.</small></span><input type="checkbox" data-adj-kind="score" /><span class="sw" aria-hidden="true"></span></label>
+          <label class="tg"><span><b>Competition</b><small>Who a player is up against. For now, faceoffs: the man across the dot, power play or penalty kill, and the zone.</small></span><input type="checkbox" data-adj-kind="competition" /><span class="sw" aria-hidden="true"></span></label>
+        </div>
       </div>
       <p class="set-foot">Saved on this device.</p>
     </div>
@@ -392,6 +401,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
+    <script is:inline define:vars={{ adjKinds: ADJ_KIND }}>window.lcAdjKinds = adjKinds;</script>
     <script is:inline>
       // Visitor settings: remembered in this browser only, applied before anything else runs.
       (() => {
@@ -399,7 +409,28 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         const read = (k) => { try { return localStorage.getItem('lc-' + k) || defaults[k]; } catch { return defaults[k]; } };
         const root = document.documentElement;
         const info = JSON.parse(document.getElementById('team-info').textContent);
-        const words = { mode: { blend: 'Blended', season: 'This season' }, arena: { adjusted: 'Adjusted', raw: 'Recorded' } };
+        const words = { mode: { blend: 'Blended', season: 'This season' }, arena: { adjusted: 'Adjusted', raw: 'Recorded', custom: 'Custom' } };
+        // Custom: which adjustments are on, saved as a list ("arena,score"). The page reads one flag per kind that is
+        // shown as counted (data-raw-arena ...), so each stat follows its own switch; data-arena keeps the menu's word.
+        const KINDS = ['arena', 'score', 'competition'];
+        const readMix = () => { let v = null; try { v = localStorage.getItem('lc-adjmix'); } catch {} return v === null ? KINDS.slice() : v.split(',').filter((k) => KINDS.includes(k)); };
+        let mix = readMix();
+        const adjOn = (kind) => { const a = root.dataset.arena ?? defaults.arena; return a === 'adjusted' || (a === 'custom' && mix.includes(kind)); };
+        const applyMix = () => {
+          // Custom with no real mix saved (none yet, or every switch the same way) starts with every switch on.
+          if ((root.dataset.arena ?? defaults.arena) === 'custom' && !(mix.length && mix.length < KINDS.length)) {
+            mix = KINDS.slice();
+            try { localStorage.setItem('lc-adjmix', mix.join(',')); } catch {}
+          }
+          KINDS.forEach((k) => { if (adjOn(k)) delete root.dataset['raw' + k[0].toUpperCase() + k.slice(1)]; else root.dataset['raw' + k[0].toUpperCase() + k.slice(1)] = ''; });
+          const a = root.dataset.arena ?? defaults.arena;
+          document.querySelectorAll('[data-adj-kind]').forEach((c) => (c.checked = mix.includes(c.dataset.adjKind)));
+          document.querySelectorAll('[data-why]').forEach((p) => (p.hidden = p.dataset.why !== a));
+          const box = document.getElementById('adjmix');
+          if (box) box.hidden = a !== 'custom';
+        };
+        // A stat key (trait or rating) shown as counted right now?
+        window.lcRaw = (key) => { const kind = (window.lcAdjKinds || {})[key]; return kind ? !adjOn(kind) : (root.dataset.arena ?? defaults.arena) === 'raw'; };
         // Every team pill (and the phone's settings row) shows the team in its colour; a pill names a setting only when
         // it is off its usual value, so a pill reading just "CAR" means the usual numbers. The phone row names both.
         const paint = () => {
@@ -424,6 +455,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
             ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
             if (v) document.getElementById('my-team-link').textContent = `${info[v]?.n ?? v} page →`;
           }
+          if (k === 'arena') applyMix();
           if (k !== 'spell') paint();
         };
         const set = (k, v) => {
@@ -435,7 +467,15 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         Object.keys(defaults).forEach((k) => apply(k, read(k)));
         document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
         document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
-
+        // Custom's switches. All on is just Adjusted and all off just Recorded, so the menu moves there by itself (the
+        // mix is kept, so picking Custom again brings it back; an all-on or all-off mix comes back with every switch on).
+        document.querySelectorAll('[data-adj-kind]').forEach((c) => c.addEventListener('change', () => {
+          mix = KINDS.filter((k) => document.querySelector(`[data-adj-kind="${k}"]`).checked);
+          try { localStorage.setItem('lc-adjmix', mix.join(',')); } catch {}
+          if (mix.length === KINDS.length) set('arena', 'adjusted');
+          else if (!mix.length) set('arena', 'raw');
+          else set('arena', 'custom');
+        }));
         // Pop-up panels: the settings menu (from any team pill or the phone's settings row) and the page list (from the
         // three-line icon). On computers each opens under the button that opened it and follows it while scrolling;
         // on phones the settings menu is a sheet just above the tab bar.
@@ -772,6 +812,19 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .set select { font: 600 15px var(--ui); color: var(--ink); background-color: var(--sheet); border: 1px solid var(--ink); border-radius: 10px; padding: 8px 12px; width: 100%; cursor: pointer; }
   .mode.seg { display: grid; grid-template-columns: 1fr 1fr; }
   .mode.seg button { font-size: 14px; padding: 6px 10px; }
+  .mode.seg.three { grid-template-columns: 1fr 1fr 1fr; }
+  /* Custom's three switches, under the Adjusted stats choice. */
+  .adjmix:not([hidden]) { display: grid; margin-top: 2px; border-top: 1px solid var(--rule); }
+  .adjmix .tg { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 9px 2px; cursor: pointer; }
+  .adjmix .tg + .tg { border-top: 1px dashed var(--rule); }
+  .adjmix .tg b { display: block; font: 600 14px var(--ui); color: var(--ink); }
+  .adjmix .tg small { display: block; font: 400 12.5px/1.4 var(--ui); color: var(--ink-3); }
+  .adjmix input { position: absolute; opacity: 0; pointer-events: none; }
+  .adjmix .sw { position: relative; flex: none; width: 38px; height: 22px; border-radius: 999px; background: color-mix(in oklab, var(--ink-3) 35%, var(--sheet)); transition: background-color 0.15s; }
+  .adjmix .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: translate 0.15s; }
+  .adjmix input:checked + .sw { background: var(--ink); }
+  .adjmix input:checked + .sw::after { translate: 16px 0; }
+  .adjmix input:focus-visible + .sw { outline: 2px solid var(--ink-3); outline-offset: 2px; }
   .set-why { font: 400 12.5px/1.4 var(--ui); color: var(--ink-3); }
   .set-foot { font: 400 12px var(--ui); color: var(--ink-3); }
   .prefs hr, .navmenu hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
@@ -894,8 +947,12 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .gamelinks { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
   .gamelinks:empty { display: none; }
   .a-raw { display: none; }
+  /* Each score-style stat carries data-adj (its kind of adjustment, lib/adjust.ts); the settings set data-raw-{kind}
+     on the page for every kind shown as counted. */
+  html[data-raw-arena] [data-adj='arena'] .a-raw, html[data-raw-score] [data-adj='score'] .a-raw, html[data-raw-competition] [data-adj='competition'] .a-raw,
   html[data-arena='raw'] .a-raw { display: inline; }
-  html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
+  html[data-raw-arena] [data-adj='arena'] :is(.a-adj, .corner), html[data-raw-score] [data-adj='score'] :is(.a-adj, .corner), html[data-raw-competition] [data-adj='competition'] :is(.a-adj, .corner),
+  html[data-arena='raw'] :is(.a-adj, .corner) { display: none; }
   /* The logo (components/Logo.astro) in the header and the footer. */
   .brand-logo .logo { height: 40px; }
   .foot-logo { display: block; width: max-content; margin-bottom: 10px; }

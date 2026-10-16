@@ -39,6 +39,7 @@ import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits, elevenNote } from '../../lib/traits';
+import { adjKind } from '../../lib/adjust';
 import FpRow from '../../components/FpRow.astro';
 import { doublesNote } from '../../lib/lineShape';
 import { twoColumns } from '../../lib/masonry';
@@ -201,7 +202,7 @@ const coachSince = coach && (team as any).coach_since
       <div class={`gmode m-${mode}`}>
         <ul class="fpgrid">
           {fpStandouts(mode).map((c) => (
-            <li class="card fpc">
+            <li class="card fpc" data-adj={adjKind(c.key)}>
               <div class="fpc-top"><span class="term fpc-name" tabindex="0" data-tip={c.tip}>{c.label}</span>{scoreTraits.has(c.key) && <span class="corner">100 is average</span>}</div>
               <div class="ends"><span>{c.lo}</span><span>{c.hi}</span></div>
               <div class="lanes"><div class="lane" style={`--b:${c.blend.pct};--blo:${c.blend.lo};--bhi:${c.blend.hi};--c:${c.season.pct};--clo:${c.season.lo};--chi:${c.season.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>

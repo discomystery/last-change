@@ -89,7 +89,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l');
     const mode = () => (root.dataset.mode === 'season' ? 'season' : 'blend');
-    const raw = () => root.dataset.arena === 'raw';
+    const raw = () => window.lcRaw(rating.value);
     const pname = (p) => `<a class="plink" href="${base}player/${p.id}/">${esc(p.n)}</a>`;
     const tname = (abbr) => `<a class="tlink lteam" href="${base}team/${abbr}/">${abbr}</a>`;
     const params = new URLSearchParams(location.search);
