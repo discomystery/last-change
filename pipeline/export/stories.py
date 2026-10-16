@@ -1768,7 +1768,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 big_told.add(helper)
         hat_ids = {p_ for p_, _ in hat}
         for g in [g for g in goals if g["strength"] == "sh" and g["p1"] not in hat_ids and N.get(g["p1"])][:2]:  # Eichel, Glass, Thomas, Middleton: 2026-10-15
-            s1.append(pk([f"{name(g['p1'])} scored shorthanded {_when(g)}.", f"{name(g['p1'])} got one shorthanded {_when(g)}."], "shg", g["p1"], g["period"], g["sec"]))
+            s1.append(pk([f"{name(g['p1'])} scored shorthanded {_when(g)}.", f"{name(g['p1'])} added a shorthanded goal {_when(g)}."], "shg", g["p1"], g["period"], g["sec"]))
         for pid in _gordie_howe(P, gid, season):  # a goal, an assist and a fight (Ruff joked about Quinn's, 2026-10-15)
             if N.get(pid):
                 s1.append(f"{name(pid)} had a Gordie Howe hat trick: a goal, an assist and a fight.")
