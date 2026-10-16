@@ -88,8 +88,8 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'Minor and major penalties called on opponents against him, per 60 minutes in all situations.' },
   discipline: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(2)} penalties taken /60`, label: 'Staying out of the box', lo: 'Often penalized', hi: 'Clean', say: (v) => `${v.toFixed(2)} penalties taken per 60`,
     tip: 'Minor and major penalties he takes per 60 minutes in all situations. Fewer is better. Misconducts and bench minors are left out.' },
-  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(1)}% won`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
-    tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
+  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `faceoff score ${Math.round(v)}`, rawShort: (v) => `${v.toFixed(1)}% won`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `a faceoff score of ${Math.round(v)}`, raw: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
+    tip: 'How often he wins the draw, as a score (100 is the average forward who takes faceoffs), adjusted for who he faces and when: a penalty killer’s draws are harder than a power-play man’s, and some centers keep drawing against the league’s best. Recorded shows the plain share he wins. Only rated for players who take faceoffs regularly.' },
 };
 export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Special teams', 'Physical and puck', 'Penalties and faceoffs'];
 
