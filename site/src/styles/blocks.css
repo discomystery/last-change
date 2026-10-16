@@ -192,12 +192,18 @@
   .unit-toi strong { font-size: 15px; color: var(--ink); }
   .unit-gp { color: var(--ink-3); }
   .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  .unit-p { display: inline-flex; align-items: baseline; gap: 5px; }
-  .unit-no { font: 600 12px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
-  .unit-no::before { content: '#'; opacity: 0.7; }
+  .unit-p { display: inline-flex; align-items: baseline; gap: 4px; }
+  .unit-no { font: 500 11px var(--ui); color: var(--ink-3); opacity: 0.8; font-variant-numeric: tabular-nums; }
   .unit-two { font: 400 14px var(--ui); color: var(--ink-3); margin-top: 4px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
-  @media (max-width: 479px) { .stats { gap: 12px 6px; } }
+  .stats .lab-short { display: none; }
+  @media (max-width: 479px) {
+    .stats { gap: 12px 6px; }
+    .stats dt { font-size: 11.5px; white-space: nowrap; }
+    .stats .lab-long { display: none; }
+    .stats .lab-short { display: inline; }
+    .unit-names { font-size: 16px; gap: 4px 10px; }
+  }
   .stats > div { display: grid; gap: 3px; justify-items: start; align-content: end; }
   .stats dt { font-size: 12px; color: var(--ink-2); }
   .stats dd { font-weight: 600; font-size: 15px; }

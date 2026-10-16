@@ -17,6 +17,7 @@ import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
+import { clashes } from '../../lib/playerLinks';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -62,6 +63,7 @@ const played = schedule.games.find((g) => g.id === snap.game_id && g.final);
 const base = import.meta.env.BASE_URL;
 const { away, home } = snap;
 const order = [away, home] as const;
+const clash = clashes([away, home]);
 const side = (a: string) => (a === away ? 'away' : 'home');
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
@@ -249,13 +251,13 @@ import ShareButton from '../../components/ShareButton.astro';
                   <span class="unit-label">{u.label}</span>
                   <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
-                <UnitNames players={u.players} ids={(u as any).ids} />
+                <UnitNames players={u.players} ids={(u as any).ids} clash={clash} />
                 {doublesNote(LN[a].units as any, u as any) && <p class="unit-two">{doublesNote(LN[a].units as any, u as any)}</p>}
                 <dl class="stats">
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share than', 'a worse share than', peer[u.label])}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone."><span class="lab-long">Off. zone draws</span><span class="lab-short">O-zone draws</span></span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
                 </dl>
               </li>
             ))}
