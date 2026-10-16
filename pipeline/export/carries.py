@@ -13,6 +13,7 @@ Plain counts only: the hidden relevancy score (metrics/relevancy.py) is never us
 import polars as pl
 
 from pipeline.config import REGULAR, TABLES
+from pipeline.export import wording
 from pipeline.metrics.players import POOL_GAMES
 
 PP = ["5v4", "5v3", "4v3"]
@@ -61,6 +62,7 @@ def run(season: int, latest: pl.DataFrame, lines: dict, abbr: dict[int, str], id
         keep = ["player_id", "team_id", "first", "last"]
         latest = pl.concat([latest.select(keep), idle.filter(pl.col("pos") != "G").select(keep)], how="vertical_relaxed")
     name = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in latest.iter_rows(named=True)}
+    name |= wording.club_short_names(season)  # teammates by last name, "M. Tkachuk" for namesakes
     club = dict(zip(latest["player_id"], latest["team_id"]))
     by_mode = {"blend": _shares(pg), "season": _shares(pg.filter(pl.col("season") == season))}
     pools = {}

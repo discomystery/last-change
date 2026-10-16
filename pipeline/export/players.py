@@ -371,10 +371,9 @@ def _role(pid: int, row: dict, ln: dict, per: pl.DataFrame, team_games: int, shi
                              "mates": [{"id": p["id"], "name": p["name"]} for p in u["players"] if p["id"] != pid]}
                 break
     fo = sp.get("faceoff")
-    short = f'{row["first"][0]}. {row["last"]}'
-    if fo and fo["player"] == short:
+    if fo and fo.get("id") == pid:
         out["faceoff"] = fo["text"]
-    out["notes"] = [n["text"] for n in ln.get("notes", []) if n.get("player") == short]
+    out["notes"] = [n["text"] for n in ln.get("notes", []) if n.get("pid") == pid]
     team = per.filter(pl.col("team_id") == row["team_id"])
     me = team.filter(pl.col("player_id") == pid)
     if me.height:
