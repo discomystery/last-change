@@ -16,6 +16,7 @@ import linesData from '../../public/data/lines.json';
 import goalieData from '../../public/data/goalies.json';
 import howData from '../../public/data/goal_sources.json';
 import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../lib/traits';
+import { adjKind } from '../lib/adjust';
 import { clock, compared } from '../lib/format';
 import '../styles/blocks.css';
 
@@ -178,7 +179,7 @@ const _ = ordinal;
             const vars = `--ob:${d.blend.rank};--os:${d.season.rank};--b:${d.blend.pct};--blo:${d.blend.lo};--bhi:${d.blend.hi};--c:${d.season.pct};--clo:${d.season.lo};--chi:${d.season.hi}`
               + (raw ? `;--obr:${d.blend.raw_rank};--osr:${d.season.raw_rank};--br:${rawPct(d.blend.raw_rank!)};--cr:${rawPct(d.season.raw_rank!)}` : '');
             return (
-              <li data-t={tm.abbr} data-raw={raw ? '' : undefined} style={vars}>
+              <li data-t={tm.abbr} data-raw={raw ? '' : undefined} data-adj={adjKind(t.key)} style={vars}>
                 <span class="rk">
                   {modes.map((m) => <span class={`m-${m}`}>{raw ? <><span class="a-adj">{d[m].rank}</span><span class="a-raw">{d[m].raw_rank}</span></> : d[m].rank}</span>)}
                 </span>
@@ -229,7 +230,7 @@ const _ = ordinal;
           </tr>
           <tr>
             {gTraits.map((t, i) => (
-              <th class:list={['tb-h', { first: i === 0 || gTraits[i - 1].group !== t.group }]} data-k={t.key}>
+              <th class:list={['tb-h', { first: i === 0 || gTraits[i - 1].group !== t.group }]} data-k={t.key} data-adj={adjKind(t.key)}>
                 <button type="button" data-sort={t.key} data-tip={`${t.label}. ${t.tip} Darker boxes are more ${t.hi.toLowerCase()}; paler ones more ${t.lo.toLowerCase()}.`}>
                   <span class="tb-l">{t.label}</span>
                   <span class="tb-u v-num">{rawUnit[t.key] ? <><span class="a-adj">{numFmt[t.key][1]}</span><span class="a-raw">{rawUnit[t.key]}</span></> : numFmt[t.key][1]}</span>
@@ -437,7 +438,7 @@ const _ = ordinal;
     const tbody = document.querySelector('#tb tbody');
     const view = document.getElementById('tb-view'), hl = document.getElementById('tb-hl'), rest = document.getElementById('tb-rest');
     let sortBy = 'pts', dir = 1;
-    const state = (cell) => { const m = root.dataset.mode === 'season' ? 's' : 'b'; return root.dataset.arena === 'raw' && cell[m + 'r'] ? cell[m + 'r'] : cell[m]; };
+    const state = (cell, key) => { const m = root.dataset.mode === 'season' ? 's' : 'b'; return window.lcRaw(key) && cell[m + 'r'] ? cell[m + 'r'] : cell[m]; };
     const paint = () => {
       const num = view.value === 'num';
       document.getElementById('tb').classList.toggle('nums', num);
@@ -446,7 +447,7 @@ const _ = ordinal;
         tr.querySelectorAll('td[data-k]').forEach((td) => {
           const c = row[td.dataset.k];
           if (!c) return;
-          const x = state(c);
+          const x = state(c, td.dataset.k);
           td.textContent = num ? x.n : x.r;
           td.style.setProperty('--h', x.p);
           td.dataset.tip = x.t;
@@ -528,11 +529,11 @@ const _ = ordinal;
   .ranks li, .rank-ends { display: grid; grid-template-columns: 2.2em minmax(150px, 210px) minmax(120px, 1fr) minmax(200px, 300px); gap: 0 16px; align-items: center; }
   .ranks li { padding: 7px 8px; margin-inline: -8px; border-top: 1px solid var(--rule); order: var(--ob); }
   html[data-mode='season'] .ranks li { order: var(--os); }
-  html[data-arena='raw'] .ranks li[data-raw] { order: var(--obr); }
-  html[data-arena='raw'][data-mode='season'] .ranks li[data-raw] { order: var(--osr); }
-  html[data-arena='raw'] .ranks li[data-raw] .lane { --v: var(--br); }
-  html[data-arena='raw'][data-mode='season'] .ranks li[data-raw] .lane { --v: var(--cr); }
-  html[data-arena='raw'] .ranks li[data-raw] .whisk { display: none; }
+  html:is([data-raw-arena]) .ranks li[data-raw][data-adj='arena'], html:is([data-raw-score]) .ranks li[data-raw][data-adj='score'] { order: var(--obr); }
+  html[data-mode='season']:is([data-raw-arena]) .ranks li[data-raw][data-adj='arena'], html[data-mode='season']:is([data-raw-score]) .ranks li[data-raw][data-adj='score'] { order: var(--osr); }
+  html:is([data-raw-arena]) .ranks li[data-raw][data-adj='arena'] .lane, html:is([data-raw-score]) .ranks li[data-raw][data-adj='score'] .lane { --v: var(--br); }
+  html[data-mode='season']:is([data-raw-arena]) .ranks li[data-raw][data-adj='arena'] .lane, html[data-mode='season']:is([data-raw-score]) .ranks li[data-raw][data-adj='score'] .lane { --v: var(--cr); }
+  html:is([data-raw-arena]) .ranks li[data-raw][data-adj='arena'] .whisk, html:is([data-raw-score]) .ranks li[data-raw][data-adj='score'] .whisk { display: none; }
   .ranks li.nob { display: none; }
   html[data-mode='season'] .ranks li.nob { display: grid; }
   html[data-mode='season'] .ranks li.nos { display: none; }
