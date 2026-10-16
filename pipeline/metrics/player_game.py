@@ -1,6 +1,7 @@
 """One row per player per regular-season game: ice time by strength, what happened with him on the ice at 5-on-5
 (raw and score-and-venue adjusted, plus his team's totals so the rest of the time can be worked out), and his own
-shots, points, hits, blocks, takeaways, giveaways, faceoffs and penalties.
+shots, points, hits, blocks, takeaways, giveaways, faceoffs (with the draws an average faceoff man would have won in
+his spots, see faceoffs.py) and penalties.
 
 Hits, giveaways, takeaways and blocks also come arena-adjusted: divided by the home arena's scorer factor and
 weighted to put home and road games on the same footing (see rink_bias).
@@ -9,7 +10,7 @@ import polars as pl
 
 from pipeline.build.stints import PENALTY_SHOT
 from pipeline.config import REGULAR, TABLES
-from pipeline.metrics import adjust, rink_bias
+from pipeline.metrics import adjust, faceoffs, rink_bias
 from pipeline.metrics.team_game import TEAMMATE_BLOCK
 
 ATTEMPTS = ["shot-on-goal", "missed-shot", "goal", "blocked-shot"]
@@ -118,12 +119,13 @@ def build(season: int) -> pl.DataFrame:
     fo = ev.filter(pl.col("type") == "faceoff")
     fow = fo.filter(pl.col("p1").is_not_null()).group_by("game_id", pl.col("p1").alias("player_id")).agg(pl.len().cast(pl.Float64).alias("fow"))
     fol = fo.filter(pl.col("p2").is_not_null()).group_by("game_id", pl.col("p2").alias("player_id")).agg(pl.len().cast(pl.Float64).alias("fol"))
+    fo_xw = faceoffs.expected(season)  # draws an average faceoff man would have won in his spots, for the adjusted score
     pen = ev.filter((pl.col("type") == "penalty") & pl.col("pen_type").is_in(PENALTIES))
     taken = pen.filter(pl.col("p1").is_not_null()).group_by("game_id", pl.col("p1").alias("player_id")).agg(pl.len().cast(pl.Float64).alias("pen_taken"))
     drawn = pen.filter(pl.col("p2").is_not_null()).group_by("game_id", pl.col("p2").alias("player_id")).agg(pl.len().cast(pl.Float64).alias("pen_drawn"))
 
     out = roster.join(games.select("game_id"), on="game_id").join(toi, on=["game_id", "player_id"])
-    for part in (onice, sh, ind, a1, a2, credited, hit_on, fow, fol, taken, drawn):
+    for part in (onice, sh, ind, a1, a2, credited, hit_on, fow, fol, fo_xw, taken, drawn):
         out = out.join(part, on=["game_id", "player_id"], how="left")
     out = out.join(team.rename({"home": "is_home"}), on=["game_id", "is_home"], how="left")
     num = [c for c, t in out.schema.items() if t == pl.Float64]

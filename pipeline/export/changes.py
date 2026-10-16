@@ -41,7 +41,7 @@ LONG_OUT = 20  # games missed after which only a star is still listed as out
 
 
 def _name(r: dict) -> str:
-    return f'{(r["first"] or "?")[0]}. {r["last"]}' if r.get("first") else (r.get("last") or "?")
+    return f'{r["first"]} {r["last"]}' if r.get("first") else (r.get("last") or "?")
 
 
 def _team_ids(season: int) -> dict[str, int]:
@@ -177,7 +177,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         if f.exists():
             for r in pl.read_parquet(f).select("player_id", "first", "last").unique("player_id").iter_rows(named=True):
                 names[r["player_id"]] = _name(r)
-    names |= wording.number_clashes(season, wording.initials)  # "A. Johansson (#47)" when two teammates match
+    names |= wording.number_clashes(season, wording.full)  # "Albert Johansson (#47)" when two teammates match
     moves = pl.read_parquet(moves_path) if moves_path.exists() else None
     since = (Date.fromisoformat(day) - timedelta(days=NEW_DAYS)).isoformat()
 
@@ -248,7 +248,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 continue
             if n >= 3:
                 text += " Their recent numbers were built mostly without him."
-            found.append({"player": who, "kind": "back", "change": "back", "now": 100, "before": 0, "games": n, "text": text, "order": ro["worth_rank"]})
+            found.append({"player": who, "pid": pid, "kind": "back", "change": "back", "now": 100, "before": 0, "games": n, "text": text, "order": ro["worth_rank"]})
 
         # New: joined in the last two weeks and has dressed.
         if moves is not None:
@@ -264,7 +264,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 kind = "D" if (role.get(pid) or {}).get("grp") == "D" else "F"
                 mates = patterns._mates(u_now, tid, sorted(played[pid]), pid, kind)
                 text += f" and has played beside {' and '.join(names.get(x, '?') for x in mates[0])}." if mates and mates[0] else "."
-                found.append({"player": who, "kind": "new", "change": "new", "now": 100, "before": 0, "games": gp, "text": text, "order": 50})
+                found.append({"player": who, "pid": pid, "kind": "new", "change": "new", "now": 100, "before": 0, "games": gp, "text": text, "order": 50})
         if found:
             out[team] = found
     return out

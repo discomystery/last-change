@@ -69,9 +69,7 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
     from pipeline.ingest.client import get
 
     standings = get(f"{NHL_WEB}/v1/standings/now").json()["standings"]
-    teams = sorted(({"abbr": t["teamAbbrev"]["default"], "name": t["teamName"]["default"], "place": t["placeName"]["default"],
-                     "nick": t["teamCommonName"]["default"], "w": t["wins"], "l": t["losses"], "otl": t["otLosses"],
-                     "gp": t["gamesPlayed"], "pts": t["points"], "conference": t["conferenceName"], "division": t["divisionName"], "div_rank": t["divisionSequence"]} for t in standings), key=lambda t: t["name"])
+    teams = sorted((_team_row(t) for t in standings), key=lambda t: t["name"])
     (SITE_DATA / "teams.json").write_text(json.dumps(teams, separators=(",", ":")))
     add_coaches(season)
     games = [{"id": g["game_id"], "start": g["start_utc"], "date": g["date"], "home": g["home"], "away": g["away"], "venue": g["venue"],
@@ -79,6 +77,19 @@ def export_teams_and_schedule(season: int) -> tuple[int, int]:
              for g in nhl.season_games(season) if g["game_type"] == 2]
     (SITE_DATA / "schedule.json").write_text(json.dumps({"season": season, "games": games}, separators=(",", ":")))
     return len(teams), len(games)
+
+
+def _team_row(t: dict) -> dict:
+    """One club's line in teams.json: names, record and the full standings line (Teams > Standings)."""
+    split = lambda side: [t.get(f"{side}Wins", 0), t.get(f"{side}Losses", 0), t.get(f"{side}OtLosses", 0)]
+    streak = f"{t['streakCode']}{t['streakCount']}" if t.get("streakCode") and t.get("streakCount") else None
+    return {"abbr": t["teamAbbrev"]["default"], "name": t["teamName"]["default"], "place": t["placeName"]["default"],
+            "nick": t["teamCommonName"]["default"], "w": t["wins"], "l": t["losses"], "otl": t["otLosses"],
+            "gp": t["gamesPlayed"], "pts": t["points"], "conference": t["conferenceName"], "division": t["divisionName"],
+            "div_rank": t["divisionSequence"], "conf_rank": t.get("conferenceSequence"), "league_rank": t.get("leagueSequence"),
+            "wc_rank": t.get("wildcardSequence"), "pt_pct": t.get("pointPctg"), "rw": t.get("regulationWins"),
+            "row": t.get("regulationPlusOtWins"), "gf": t.get("goalFor"), "ga": t.get("goalAgainst"),
+            "home": split("home"), "road": split("road"), "l10": split("l10"), "streak": streak, "clinch": t.get("clinchIndicator")}
 
 
 def add_coaches(season: int) -> None:
@@ -94,6 +105,8 @@ def add_coaches(season: int) -> None:
 
 
 # Traits whose numbers are checked and ready to show.
+# Exported beside the traits for the previews' calls, never shown as traits (not in `ready`).
+CALL_ONLY = ["taken", "drawn"]
 READY = ["volume", "quality", "rebounds", "turnover", "dShots", "inClose", "shotsThrough", "suppression", "qualityAllowed", "breakdowns", "longShifts", "blocking", "pointAllowed", "icing", "goalie", "pace", "forecheck", "physical", "rough", "depth", "pp", "pk", "powerKill", "discipline"]
 
 
@@ -119,7 +132,7 @@ def export_fingerprints(season: int, idle: bool = False) -> int:
     # How often the club dresses 11 forwards and 7 defensemen: its depth trait leaves those games out, and the page
     # says "plays eleven forwards" rather than ranking a habit as a weakness.
     lineup = lambda tid: {"eleven": eleven.get(tid, (0, 0))[0], "games": eleven.get(tid, (0, 0))[1], "habit": units.plays_eleven(*eleven.get(tid, (0, 0)))}
-    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY}, "lineup": lineup(tid)} for tid, t in out["teams"].items()}
+    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY + CALL_ONLY}, "lineup": lineup(tid)} for tid, t in out["teams"].items()}
     from pipeline.metrics import rink_bias
     (SITE_DATA / "arena_factors.json").write_text(json.dumps({"seasons": "2023-24 to 2025-26", "home_road": rink_bias.home_road(), "arenas": rink_bias.factors().to_dicts()}, separators=(",", ":")))
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "ready": READY,
@@ -159,8 +172,12 @@ def export_lines(season: int) -> int:
     names = {}
     for s_ in (season - 1, season):
         for r in pl.read_parquet(TABLES / str(s_) / "players.parquet").iter_rows(named=True):
-            names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
-    names |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
+            names[r["player_id"]] = wording.full(r)
+    names |= wording.number_clashes(season, wording.full)  # "Elias Pettersson (#40)" when two teammates match
+    # Sentences use full names (later mentions the last name); lists and charts use the last name alone, with an
+    # initial only where two teammates share it. Players gone from the club keep "W. Carrier" in lists.
+    short = {pid: (n.split(" ", 1)[0][0] + ". " + n.split(" ", 1)[1]) if " " in n else n for pid, n in names.items()}
+    short |= wording.club_short_names(season)
     now = units.special_usage(season)
     before = units.special_usage(season - 1).group_by("player_id").agg(pl.col("gp").sum(), (pl.col("pp_share") * pl.col("gp")).sum() / pl.col("gp").sum(), (pl.col("pk_share") * pl.col("gp")).sum() / pl.col("gp").sum(),
                                                                      teams_last=pl.col("team_id").unique())
@@ -249,10 +266,10 @@ def export_lines(season: int) -> int:
                 cur, old = r[f"{kind}_share"], r[f"{kind}_share_last"]
                 doing, label = words[kind]
                 if cur >= started and old < 0.08:
-                    notes.append({"player": names[r["player_id"]], "kind": kind, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
                                   "text": f'{names[r["player_id"]]} has started {doing}: on the ice for {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, up from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
                 elif old >= stopped and cur < 0.05:
-                    notes.append({"player": names[r["player_id"]], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
                                   "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
         for n in missing.get(tid, []):
             rk = n.get("rank")
@@ -260,11 +277,11 @@ def export_lines(season: int) -> int:
                 continue  # only regulars who mattered: top nine forwards, top four defensemen
             text = absence_text(n, {n["player"]: rk})
             if text:
-                notes.insert(0, {"player": names.get(n["player"], "?"), "kind": "absence", "change": "out", "now": 100, "before": 0, "games": n["of"], "text": text, "order": rk})
+                notes.insert(0, {"player": names.get(n["player"], "?"), "pid": n["player"], "kind": "absence", "change": "out", "now": 100, "before": 0, "games": n["of"], "text": text, "order": rk})
         g = info[e["last_game"]]
         usual_sets = {u["label"]: u["unit"] for u in e["units"]}
         last_sets = {u["unit"] for u in e["last"]}
-        fmt = lambda unit: [names.get(int(i), "?") for i in unit.split("-")]
+        fmt = lambda unit: [short.get(int(i), "?") for i in unit.split("-")]
         if lineup_changes:
             notes = lineup_changes.get(place, []) + notes
         shuffle = shuffle_note(e)
@@ -276,7 +293,7 @@ def export_lines(season: int) -> int:
         out[place] = {
             "games": e["games"],
             "shape": e.get("shape"),
-            "seventh": None if not e.get("seventh") else {"id": e["seventh"]["player"], "name": names.get(e["seventh"]["player"], "?"), "with": [names.get(q, "?") for q in e["seventh"]["with"]], "seconds": round(e["seventh"]["sec"])},
+            "seventh": None if not e.get("seventh") else {"id": e["seventh"]["player"], "name": short.get(e["seventh"]["player"], "?"), "with": [short.get(q, "?") for q in e["seventh"]["with"]], "seconds": round(e["seventh"]["sec"])},
             "settled": {**{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e["settled"].items()}, "shuffled": shuffle is not None},
             "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": None if u["sec_pg"] is None else round(u["sec_pg"] / 60, 1), "toi_sec": None if u["sec_pg"] is None else round(u["sec_pg"]), "gp": u["gp"], "new": u["new"],
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
@@ -307,19 +324,19 @@ def export_lines(season: int) -> int:
         if shown:
             who = names.get(fo["player"], "?")
             heir = names.get(fo["replaced_by"][0][0], "?")
-            faceoff = {"names": [who, heir], "player": who, "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
+            faceoff = {"names": [who, heir], "player": who, "id": fo["player"], "draw_pct": fo["draw_pct"], "avg_stay": fo["avg_stay"], "usual_stay": fo["usual_stay"], "heir": heir,
                        "text": f'{who} is sent out to take power-play faceoffs, then changes. He has taken {fo["draw_pct"]}% of the team\u2019s power-play draws but stays on for about {fo["avg_stay"]} seconds at a time, against {fo["usual_stay"]} for the regulars, and is most often replaced by {heir} ({fo["replaced_by"][0][1]} of {fo["exits"]} changes).'}
         for kind in ("pp", "pk"):
             for u in sp[kind]:
                 after = u.pop("after_draw", {}) if shown else {}
                 u.pop("after_draw", None)
-                u["players"] = [{"id": p, "name": names.get(p, "?"), "role": u["roles"].get(str(p)), "both": p in u.get("both", []),
-                                 "after": names.get(after[str(p)]) if str(p) in after else None} for p in u["players"]]
+                u["players"] = [{"id": p, "name": short.get(p, "?"), "role": u["roles"].get(str(p)), "both": p in u.get("both", []),
+                                 "after": short.get(after[str(p)]) if str(p) in after else None} for p in u["players"]]
                 u.pop("both", None)
                 del u["roles"]
         kr = pk_roles.get(tid, {"kills": 0, "players": []})
-        roles_pk = {"kills": kr["kills"], "players": [{**r, "name": names.get(r["id"], "?")} for r in kr["players"]]}
-        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk_roles": roles_pk, "faceoff": faceoff, "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": names.get(s_["p"], "?")} for s_ in sp["shots"]]}
+        roles_pk = {"kills": kr["kills"], "players": [{**r, "name": short.get(r["id"], "?")} for r in kr["players"]]}
+        out[abbr[tid]]["special"] = {"pp": sp["pp"], "pk_roles": roles_pk, "faceoff": faceoff, "shots": [{"x": s_["x"], "y": s_["y"], "xg": s_["xg"], "p": s_["p"], "who": short.get(s_["p"], "?")} for s_ in sp["shots"]]}
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "window": units.WINDOW_GAMES, "teams": out}
     (SITE_DATA / "lines.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))
     return len(out)
@@ -338,11 +355,13 @@ def export_goalies(season: int) -> int:
         for r in pl.read_parquet(TABLES / str(yr) / "players.parquet").filter(pl.col("pos") == "G").sort("game_id").iter_rows(named=True):
             names[r["player_id"]] = f'{r["first"][0]}. {r["last"]}'
             last_team[r["player_id"]] = ab_.get(r["team_id"])
+    short = wording.club_short_names(season)
     for pt in out["league"]:
         gid = pt.pop("id")
         pt["name"], pt["team"] = names.get(gid, "?"), last_team.get(gid)
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "min_starts": out["min_starts"], "league": out["league"],
-               "teams": {abbr[tid]: [{"id": gid, "name": names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()},
+               # team pages and previews: "Andersen", initials only for namesakes; the league chart keeps "F. Andersen"
+               "teams": {abbr[tid]: [{"id": gid, "name": short.get(gid) or names.get(gid, "?"), **out["goalies"][gid]} for gid in ids] for tid, ids in out["by_team"].items()},
                # Last season's goalies with no games yet this season (injured, in the minors): only their player pages read these.
                "idle": {str(gid): {"id": gid, "name": names.get(gid, "?"), **m} for gid, m in out["idle"].items()}}
     (SITE_DATA / "goalies.json").write_text(json.dumps(payload, separators=(",", ":"), default=float))

@@ -138,7 +138,9 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
                 goalies.setdefault(r[gk], []).append((r["period"], r["start"], r["end"]))
                 side_of[r[gk]] = h
     info = {r["player_id"]: r for r in roster.iter_rows(named=True)}
-    name = lambda pid: f'{info[pid]["first"][0]}. {info[pid]["last"]}' if pid in info else str(pid)
+    from pipeline.export import wording
+    short = wording.short_names(info.values())  # "Aho"; "M. Tkachuk" when both brothers play
+    name = lambda pid: short.get(pid, str(pid))
     players = []
     for pid, spans in skaters.items():
         pos = info.get(pid, {}).get("pos")

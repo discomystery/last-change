@@ -194,7 +194,8 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
     info = {r["game_id"]: r for r in games.iter_rows(named=True)}
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
-    names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
+    from pipeline.export import wording
+    names = wording.short_names(pl.read_parquet(d / "players.parquet").iter_rows(named=True), key=lambda r: r["game_id"])  # "Aho"; "M. Tkachuk" for namesakes
     league = league_rates(season - 1)
     wanted = (set(info) if only is None else set(info) & set(only)) - pending.games(season)
     now = table(season, _ratings(season - 1), league).filter(pl.col("game_id").is_in(list(wanted)))
@@ -219,7 +220,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
         players = []
         for r in rows.sort("score", descending=True).iter_rows(named=True):
             players.append({
-                "id": r["player_id"], "name": names.get(r["player_id"], "?"), "team": abbr.get(r["team_id"]), "pos": r["pos"],
+                "id": r["player_id"], "name": names.get((gid, r["player_id"]), "?"), "team": abbr.get(r["team_id"]), "pos": r["pos"],
                 "score": round(r["score"], 2), "pct": pct(r["grp"], r["score"]),
                 "parts": {k: round(r[k], 2) for k in (("net",) if r["pos"] == "G" else ("sheet", "play", "special", "usage"))},
                 **({"st": st} if (st := {k: int(r[k]) for k in ST_GOALS if r[k]}) else {}),

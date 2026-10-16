@@ -40,6 +40,10 @@ DIMS = {
     "goalie": (["g_saved"], ["g_sec"], 3600, True),
     "breakdowns": (["bd_a"], ["sec5"], 3600, False),
     "discipline": (["pp_opps", "neg_short"], ["game_sec"], 3600, True),
+    # The two halves of discipline, for the preview's penalty call (not shown as traits): times shorthanded per 60 of
+    # play (fewer is better) and power plays drawn per 60
+    "taken": (["short_n"], ["game_sec"], 3600, False),
+    "drawn": (["pp_opps"], ["game_sec"], 3600, True),
     "physical": (["hits_adj"], ["close_sec"], 3600, True),
     "forecheck": (["fc_adj"], ["sec5"], 3600, True),
     "depth": (["bottom6_sec"], ["fwd_sec"], 100, True),
@@ -93,7 +97,8 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
     disc = pl.read_parquet(d / "discipline.parquet")
     opp = disc.join(games.select("game_id", "home_id", "away_id"), on="game_id").with_columns(
         team_id=pl.when(pl.col("team_id") == pl.col("home_id")).then(pl.col("away_id")).otherwise(pl.col("home_id"))).select("game_id", "team_id", pl.col("times_short").alias("pp_opps"))
-    disc = disc.join(opp, on=["game_id", "team_id"]).with_columns(pl.col("pp_opps", "game_sec").cast(pl.Float64), neg_short=-pl.col("times_short").cast(pl.Float64)).drop("times_short")
+    disc = disc.join(opp, on=["game_id", "team_id"]).with_columns(pl.col("pp_opps", "game_sec").cast(pl.Float64), neg_short=-pl.col("times_short").cast(pl.Float64),
+        short_n=pl.col("times_short").cast(pl.Float64)).drop("times_short")
     s5, pp, pk, net = pl.col("strength") == "5v5", pl.col("strength") == "5v4", pl.col("strength") == "4v5", pl.col("strength") != "EA"
 
     def tot(col, cond):

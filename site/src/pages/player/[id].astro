@@ -32,6 +32,7 @@ import { goalieTraitInfo } from '../../lib/traits';
 import rosterData from '../../../public/data/roster.json';
 import { describe, type RosterPlayer } from '../../lib/roster';
 import '../../styles/blocks.css';
+import { adjKind } from '../../lib/adjust';
 
 export function getStaticPaths() {
   const files = import.meta.glob('../../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
@@ -267,7 +268,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
             const tagOf = (it: (typeof x.best)[number]) => rankTag(it.rank) && <span class="rk rank" tabindex="0" data-tip={rankTip(it.rank!, it.of, it.info.label, it.vs)}>{rankTag(it.rank)}</span>;
             const cmpTip = (it: (typeof x.best)[number], lower = false) => it.edge ? compared(it.pct, it.info.up ?? 'more than', it.info.down ?? 'less than', it.vs, lower) : compared(it.pct, 'better than', 'behind', it.vs, lower);
             const cmpOf = (it: (typeof x.best)[number]) => it.est?.raw !== undefined
-              ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
+              ? <><span class="a-adj">{cmpTip(it, true)}</span><span class="a-raw">{it.key === 'faceoffs' ? compared(it.est.raw_pct!, 'better than', 'behind', it.vs, true) : compared(it.est.raw_pct!, 'more than', 'fewer than', it.vs, true)}</span></>
               : <>{cmpTip(it, true)}</>;
             if (unplayed && m === 'season') return <div class="gmode m-season"><p class="note">He hasn’t played this season. Pick “Blended” in the settings to see what he did last season.</p></div>;
             return (
@@ -275,12 +276,12 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                 <div class="two sw">
                   <div class="card">
                     <p class="mini-h">Better than most at his position</p>
-                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{headOf(it.info.label)}<span class="nw">{lastOf(it.info.label)}{tagOf(it)}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
+                    {x.best.length ? <ul class="swl">{x.best.map((it) => <li data-adj={adjKind(it.key)}><p class="sw-h"><span class="term" tabindex="0" data-tip={it.info.tip}>{headOf(it.info.label)}<span class="nw">{lastOf(it.info.label)}{tagOf(it)}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is above most {groupWord[s.group]}.</p>}
                   </div>
                   <div class="card">
                     <p class="mini-h">Behind most at his position</p>
-                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li><p class="sw-h"><span><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
+                    {x.worst.length ? <ul class="swl">{x.worst.map((it) => <li data-adj={adjKind(it.key)}><p class="sw-h"><span><span class="term" tabindex="0" data-tip={it.info.tip}>{it.info.label}</span></span><Pips pct={it.pct} tip={`${cmpTip(it)}.`} /></p><p class="sw-l"><span>{say(it)}</span><em>{cmpOf(it)}</em></p></li>)}</ul>
                       : <p class="n">Nothing yet where we can be confident he is below most {groupWord[s.group]}.</p>}
                   </div>
                 </div>
@@ -299,7 +300,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
             {unplayed
               ? <p class="note m-season">He hasn’t played this season, so there is nothing to rate yet. The gray dots show last season.</p>
               : <p class="note m-season">This season’s {s.games} {s.games === 1 ? 'game' : 'games'} only, pulled toward the average {s.group === 'D' ? 'defenseman' : 'forward'}. Expect wide ranges this early.</p>}
-            <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}); switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
+            <p class="note">Hitting, shot blocking and takeaways are arena-adjusted scores (100 is the average {s.group === 'D' ? 'defenseman' : 'forward'}){s.group === 'D' ? '' : ', and faceoffs are a score adjusted for who he draws against and when'}; switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/#players`}>How the ratings work</a>.</p>
           </Fragment>
           <div class="key"><span class="one"><i></i>{p.name}</span><span class="avg">Average {s.group === 'D' ? 'defenseman' : 'forward'}</span><span class="rng">Likely range</span></div>
           {GROUPS.map((grp) => (
@@ -311,7 +312,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   // No games this season (or no this-season rating): the season lane keeps last season's dot, greyed.
                   const cur = unplayed || !e.season ? e.blend : e.season;
                   return (
-                    <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season?.ok }]}>
+                    <li class:list={['card', 'fpc', 'mini', { thin: !e.blend.ok && !e.season?.ok }]} data-adj={adjKind(k)}>
                       <span class="fpc-name"><span class="term" tabindex="0" data-tip={t.tip}>{headOf(t.label)}<span class="nw">{lastOf(t.label)}{modes.map(([m]) => { const x = e[m]; const tag = x && rankTag(x.rank, x.ok); return tag && <a class={`rk rank rk-${m}`} href={rankHref(k, x.vs)} data-tip={rankTip(x.rank, x.of, t.label, peerOf(k, x.vs ?? s.group))}>{tag}</a>; })}</span></span></span>
                       <div class="ends"><span>{t.lo}</span><span>{t.hi}</span></div>
                       <div class="lanes"><div class:list={['lane', { noseason: cur !== e.season }]} style={`--b:${e.blend.pct};--blo:${e.blend.lo};--bhi:${e.blend.hi};--c:${cur.pct};--clo:${cur.lo};--chi:${cur.hi}`}><span class="whisk"></span><span class="dot"></span></div></div>
@@ -320,7 +321,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                           {m === 'season' && cur !== e.season ? <span class="n">{unplayed ? 'No games this season' : 'Not rated this season'}</span> : e[m].raw === undefined
                             ? <><span tabindex="0" data-tip={`${cap(t.say(e[m].v))}.`}>{t.short(e[m].v)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} /></>
                             : <><span class="a-adj" tabindex="0" data-tip={`${cap(t.say(e[m].index ?? 100))}.`}>{t.short(e[m].index ?? 100)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].pct} words={compared(e[m].pct, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group))} class='a-adj' />
-                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={compared(e[m].raw_pct!, 'more than', 'fewer than', peerOf(k, e[m].vs ?? s.group))} class='a-raw' /></>}
+                                <span class="a-raw" tabindex="0" data-tip={`${cap(t.raw!(e[m].raw!))}.`}>{t.rawShort!(e[m].raw!)}</span><Rank href={rankHref(k, e[m].vs)} ok={e[m].ok} pct={e[m].raw_pct!} words={k === 'faceoffs' ? compared(e[m].raw_pct!, 'better than', 'behind', peerOf(k, e[m].vs ?? s.group)) : compared(e[m].raw_pct!, 'more than', 'fewer than', peerOf(k, e[m].vs ?? s.group))} class='a-raw' /></>}
                         </p>
                       ))}
                     </li>
