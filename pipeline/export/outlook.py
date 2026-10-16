@@ -25,7 +25,7 @@ BANDS = [
     # games told that way, the favorite lost about one in five, and Washington had won in Raleigh days earlier).
     # Teams go by nickname with plural verbs here, as in the preview calls ("the Hurricanes have"; Sora, 2026-10-14).
     (0.30, ["A steep climb for {T}", "{T} have their work cut out", "{O} should be favored", "{T} are up against it"],
-     ["{T} can still win it {how}, but a lot has to go their way.", "{Tp} best hope is {how_bare}, plus a big night in goal.", "To pull this off, {T} need {how_bare} and a goalie who steals the show."]),
+     ["{T} can still win it {how}, but a lot has to go their way.", "{Tp} best hope is {how_bare}, plus a big night in goal.", "Pulling this off takes {how_bare} and a goalie who steals the show."]),
     (0.42, ["A tough matchup for {T}", "{T} face a real test", "Not an easy night for {T}", "{T} have a hill to climb"],
      ["{T} can pull it off {how}.", "{Tp} best way through is {how_bare}."]),
     (0.48, ["A slightly uphill night for {T}", "{T} start a half-step behind", "Close, but {O} have the slight edge"],
@@ -273,8 +273,16 @@ def _agree(text: str) -> str:
     return text[0].upper() + text[1:]
 
 
-def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) -> dict[str, dict]:
-    """The pre-game note for each team. Holds words only, never the chance itself."""
+def _in_goal(caveat: str, goalie: str | None) -> str:
+    """"a big night in goal" names the team's projected starter when there is one (Sora, 2026-10-15)."""
+    if not goalie:
+        return caveat
+    return caveat.replace("a big night in goal", f"a big night from {goalie}").replace("a goalie who steals the show", f"{goalie} stealing the show")
+
+
+def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict, goalies: dict | None = None) -> dict[str, dict]:
+    """The pre-game note for each team. Holds words only, never the chance itself. `goalies` gives each team's
+    projected starter by name, where we have one."""
     from pipeline.export.previews import team_words
     raw_places, places = places, {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
     out = {}
@@ -287,7 +295,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {**team_words(team, raw_places, "T"), **team_words(opp, raw_places, "O"), "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
-                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, nicks), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
+                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, nicks), _agree(_in_goal(_pick(caveats, gid, team, "caveat").format(**w), (goalies or {}).get(team)))))}
     return out
 
 
