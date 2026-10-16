@@ -36,8 +36,9 @@ import AreaShapes from '../../components/AreaShapes.astro';
 import ShotMap from '../../components/ShotMap.astro';
 import { clock as mmss, compared } from '../../lib/format';
 import '../../styles/blocks.css';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits } from '../../lib/traits';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, rawWords, scoreTraits, elevenNote } from '../../lib/traits';
 import FpRow from '../../components/FpRow.astro';
+import { doublesNote } from '../../lib/lineShape';
 import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
 import SeasonMap from '../../components/SeasonMap.astro';
@@ -59,12 +60,14 @@ const finals = new Set(schedule.games.filter((g) => g.final).map((g) => g.id));
 const recapIds = recapIndex.games.filter((g) => g.home === abbr || g.away === abbr).map((g) => g.id);
 const previewIds = previewIndex.filter((p) => !finals.has(p.id) && (p.home === abbr || p.away === abbr)).map((p) => p.id);
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
-const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>)[abbr!];
+const mine = (fpData.teams as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }>; lineup?: { eleven: number; games: number; habit: boolean } }>)[abbr!];
 const fp = fpData.ready.map((key) => ({ key, ...fpInfo[key], ...mine.dims[key] }));
+// A club that dresses 11 forwards most nights: depth leaves those games out, and says so instead of ranking the habit.
+const eleven = mine.lineup?.habit ? elevenNote(mine.lineup) : null;
 // "What sets them apart": traits whose likely range sits clear of the middle (above the 65th or below the 35th percentile),
 // most extreme first, two to four of them. Picked separately for the blended and season-only readings.
 const fpStandouts = (mode: 'blend' | 'season') => {
-  const ok = fp.filter((c) => c[mode] && c[mode].pct !== null && c[mode].pct !== undefined);
+  const ok = fp.filter((c) => c[mode] && c[mode].pct !== null && c[mode].pct !== undefined && !(eleven && c.key === 'depth'));
   const far = (c: (typeof fp)[number]) => Math.abs(c[mode].pct - 50);
   const clear = ok.filter((c) => c[mode].lo >= 65 || c[mode].hi <= 35).sort((x, y) => far(y) - far(x));
   return (clear.length >= 2 ? clear : [...ok].sort((x, y) => far(y) - far(x))).slice(0, 4);
@@ -81,6 +84,7 @@ const oppName = ['first', 'second', 'third', 'fourth'];
 // Box shading lives in blocks.css (it differs between light and dark mode); the page only passes the share.
 const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
 const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
+const doubles = (u: any) => doublesNote(ln.units as any, u);
 const unitNames = (label: string) => ln.units.find((u) => u.label === label)?.players.join(', ') ?? '';
 const lastNames = (label: string) => (ln.units.find((u) => u.label === label)?.players ?? []).map((n) => n.split(' ').slice(1).join(' '));
 const standouts = (rows: MRow[]) => rows.filter((r) => r.minutes >= 15).flatMap((r) => r.share.map((v, j) => ({ r, j, v: v ?? 0, gap: (v ?? 0) - r.expected[j] }))).filter((x) => x.gap >= 10).sort((a, b) => b.gap - a.gap).slice(0, 3);
@@ -221,7 +225,7 @@ const coachSince = coach && (team as any).coach_since
           {col.map(({ item: { g, cs }, order }) => (
             <div class="card fpr-grp" style={`order: ${order}`}>
               <h3>{g}</h3>
-              {cs.map((c) => <FpRow c={{ ...c, [abbr!]: { blend: c.blend, season: c.season } }} sides={[{ abbr: abbr!, cls: 't-one', place: team.place }]} />)}
+              {cs.map((c) => <FpRow c={{ ...c, [abbr!]: { blend: c.blend, season: c.season, note: c.key === 'depth' ? eleven : null } }} sides={[{ abbr: abbr!, cls: 't-one', place: team.place }]} />)}
             </div>
           ))}
         </div>
@@ -263,6 +267,7 @@ const coachSince = coach && (team as any).coach_since
                     <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={ln.games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                   </div>
                   <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
+                  {doubles(u) && <p class="unit-two">{doubles(u)}</p>}
                   <dl class="stats">
                     <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
                     <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>

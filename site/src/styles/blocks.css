@@ -192,6 +192,7 @@
   .unit-toi strong { font-size: 15px; color: var(--ink); }
   .unit-gp { color: var(--ink-3); }
   .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .unit-two { font: 400 14px var(--ui); color: var(--ink-3); margin-top: 4px; }
   .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   @media (min-width: 480px) { .stats { grid-template-columns: repeat(4, 1fr); } }
   .stats > div { display: grid; gap: 3px; justify-items: start; }

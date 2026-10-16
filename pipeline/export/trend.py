@@ -192,7 +192,10 @@ def then_now(then: dict[str, dict], now: dict, stab: dict) -> list[dict]:
     signature habits that this season's likely range still covers. At most four in all."""
     games = now.get("games", 0)
     new, kept = [], []
+    eleven = bool((now.get("lineup") or {}).get("habit"))  # 11 forwards most nights: depth leaves those games out
     for dim, t in then.items():
+        if eleven and dim == "depth":
+            continue
         s = (now["dims"].get(dim) or {}).get("season") or {}
         if s.get("pct") is None or s.get("lo") is None:
             continue

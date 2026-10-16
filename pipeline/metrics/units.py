@@ -2,6 +2,11 @@
 
 Lines are chosen by 5-on-5 ice time together over a team's last ten games (fewer early in a season), then numbered
 by what each line is: its players' average 5-on-5 and power-play ice time a game (see `_by_role`).
+
+Most nights a club dresses 12 forwards and 6 defensemen, but some go with 11 and 7 (about one team-game in ten in
+2026-27; Tampa Bay and Detroit nearly every night). Then one forward takes shifts on two lines, so the fourth line is
+the two forwards left over plus whoever doubles up with them, and the seventh defenseman rotates through the pairs
+(`shapes`, `_pick(..., share=True)`, `seventh`).
 """
 from collections import defaultdict
 from functools import lru_cache
@@ -64,18 +69,113 @@ def game_units(season: int) -> pl.DataFrame:
     return out
 
 
-def _pick(units: pl.DataFrame, count: int, by: str = "sec") -> list[dict]:
-    """Most ice time first, skipping any group that shares a player with one already chosen."""
+def _pick(units: pl.DataFrame, count: int, by: str = "sec", share: bool = False) -> list[dict]:
+    """Most ice time first, skipping any group that shares a player with one already chosen.
+
+    With `share` (a club dressing 11 forwards), a slot still empty once no separate group is left goes to the busiest
+    group that brings in all but one new player: the fourth line is the two forwards left over and the forward who
+    doubles up with them. Tampa Bay, 2026-10-15: three separate trios, then Guentzel and Point with Kucherov, who also
+    played on the Cirelli line."""
+    rows = list(units.sort(by, descending=True).iter_rows(named=True))
     chosen, used = [], set()
-    for row in units.sort(by, descending=True).iter_rows(named=True):
+    for row in rows:
         players = set(row["unit"].split("-"))
         if players & used:
             continue
         chosen.append(row)
         used |= players
         if len(chosen) == count:
-            break
+            return chosen
+    if share:
+        for row in rows:
+            players = set(row["unit"].split("-"))
+            shared = players & used
+            if len(shared) == 1 and len(players) == 3 and not any(row["unit"] == c["unit"] for c in chosen):
+                chosen.append({**row, "shared": int(next(iter(shared)))})
+                used |= players
+                if len(chosen) == count:
+                    break
     return chosen
+
+
+ELEVEN = 11  # forwards dressed when a club goes with seven defensemen
+
+
+@lru_cache(maxsize=4)
+def shapes(season: int) -> dict[tuple[int, int], tuple[int, int]]:
+    """{(game, team): (forwards, defensemen) dressed}, from the game's players. Empty when that table is missing."""
+    p = TABLES / str(season) / "players.parquet"
+    if not p.exists():
+        return {}
+    t = pl.read_parquet(p, columns=["game_id", "team_id", "pos"]).group_by("game_id", "team_id").agg(
+        f=pl.col("pos").is_in(["C", "L", "R"]).sum(), d=(pl.col("pos") == "D").sum())
+    return {(r["game_id"], r["team_id"]): (int(r["f"]), int(r["d"])) for r in t.iter_rows(named=True)}
+
+
+def eleven(season: int, gid: int, tid: int) -> bool:
+    """Whether the club dressed 11 forwards (or fewer) that game."""
+    return shapes(season).get((gid, tid), (12, 6))[0] <= ELEVEN
+
+
+def eleven_counts(season: int) -> dict[int, tuple[int, int]]:
+    """{team: (regular-season games with 11 forwards or fewer, games)} this season."""
+    games = TABLES / str(season) / "games.parquet"
+    if not games.exists():
+        return {}
+    regular = set(pl.read_parquet(games).filter(pl.col("game_type") == REGULAR)["game_id"].to_list())
+    out: dict[int, list[int]] = defaultdict(lambda: [0, 0])
+    for (gid, tid), (f, _) in shapes(season).items():
+        if gid in regular:
+            out[tid][0] += f <= ELEVEN
+            out[tid][1] += 1
+    return {t: (a, b) for t, (a, b) in out.items()}
+
+
+def plays_eleven(n11: int, games: int) -> bool:
+    """A club's habit, not a one-off: 11 forwards in at least three games and at least half of them."""
+    return n11 >= 3 and 2 * n11 >= games
+
+
+def seventh(units: pl.DataFrame, pairs: list[dict], dressed: set[int] | None = None) -> dict | None:
+    """The defenseman left out of the three pairs (with seven dressed): his 5-on-5 time in these groups and the
+    partners he played with most."""
+    used = {int(p) for u in pairs for p in u["unit"].split("-")}
+    time = defaultdict(float)
+    with_ = defaultdict(lambda: defaultdict(float))
+    for r in units.iter_rows(named=True):
+        ps = [int(p) for p in r["unit"].split("-")]
+        for p in ps:
+            if p in used or (dressed is not None and p not in dressed):
+                continue
+            time[p] += r["sec"]
+            for q in ps:
+                if q != p:
+                    with_[p][q] += r["sec"]
+    if not time:
+        return None
+    pid = max(time, key=time.get)
+    mates = sorted(with_[pid], key=lambda q: -with_[pid][q])[:2]
+    return {"player": pid, "sec": time[pid], "with": mates}
+
+
+def label_of(sets: dict[str, set], players, kind: str) -> str | None:
+    """Which numbered line (kind "L") or pair ("P") a group on the ice is: the one holding most of it, needing two of
+    three forwards or one of two defensemen. A forward listed on two lines (11 forwards dressed) counts half for each,
+    so his shifts with one line's two regulars go to that line, and him with one regular from each goes to neither."""
+    players = set(players)
+    seen = defaultdict(int)
+    for lab, members in sets.items():
+        if lab[0] == kind:
+            for p in members:
+                seen[p] += 1
+    best, score = None, 0.0
+    for lab, members in sets.items():
+        if lab[0] != kind:
+            continue
+        n = sum(1.0 if seen[p] == 1 else 0.5 for p in members & players)
+        if n > score:
+            best, score = lab, n
+    return best if score >= (2 if kind == "L" else 1) else None
 
 
 @lru_cache(maxsize=2)
@@ -116,8 +216,9 @@ def game_lines(season: int, gu: pl.DataFrame, gid: int, team_id: int) -> list[tu
     window = games.tail(WINDOW_GAMES)["game_id"].to_list()
     weight = _player_weight(season, team_id, {g: len(window) - 1 - k for k, g in enumerate(window)})
     mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
+    share = eleven(season, gid, team_id)
     return [(kind, f"{tag}{i}", u) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
-            for i, u in enumerate(_by_role(_pick(mine.filter(pl.col("kind") == kind), count), weight), 1)]
+            for i, u in enumerate(_by_role(_pick(mine.filter(pl.col("kind") == kind), count, share=share and kind == "F"), weight), 1)]
 
 
 def _by_role(chosen: list[dict], weight: dict[str, tuple[float, float]]) -> list[dict]:
@@ -149,7 +250,7 @@ def usual(season: int) -> dict[int, dict]:
         # the listed ones, from that game alone). Its ice time a game is averaged over those games only.
         proper = []
         for (gid, kind), g in sub.group_by("game_id", "kind"):
-            proper += [{"game_id": gid, "kind": kind, "unit": u["unit"]} for u in _pick(g, 4 if kind == "F" else 3)]
+            proper += [{"game_id": gid, "kind": kind, "unit": u["unit"]} for u in _pick(g, 4 if kind == "F" else 3, share=kind == "F" and eleven(season, gid, tid))]
         proper = pl.DataFrame(proper, schema={"game_id": pl.Int64, "kind": pl.String, "unit": pl.String}).with_columns(proper=pl.lit(True))
         sub = sub.join(proper, on=["game_id", "kind", "unit"], how="left").with_columns(pl.col("proper").fill_null(False))
         recent = sub.group_by("kind", "unit").agg(
@@ -157,21 +258,37 @@ def usual(season: int) -> dict[int, dict]:
             in_last=(pl.col("proper") & (pl.col("game_id") == last)).any())
         in_last = t.filter(pl.col("game_id") == last)
         weight = _player_weight(season, tid, age)
-        entry = {"games": len(window), "last_game": last, "units": [], "last": [], "settled": {}}
+        shape = shapes(season).get((last, tid))
+        share = eleven(season, last, tid)
+        # With 11 forwards and 7 defensemen last game, the groups come from the players who dressed in it: older
+        # games' trios would fill the fourth line with a forward now scratched.
+        dressed = {int(p) for u in in_last["unit"].to_list() for p in u.split("-")} if share else None
+        entry = {"games": len(window), "last_game": last, "units": [], "last": [], "settled": {},
+                 "shape": {"f": shape[0], "d": shape[1], "eleven": sum(eleven(season, g, tid) for g in window), "of": len(window)} if shape else None,
+                 "seventh": None}
         for kind, count, tag in (("F", 4, "L"), ("D", 3, "P")):
             pool = recent.filter(pl.col("kind") == kind)
+            if dressed is not None:
+                pool = pool.filter(pl.col("unit").map_elements(lambda u: all(int(p) in dressed for p in u.split("-")), return_dtype=pl.Boolean))
             # Lines are chosen by recent ice time together, each older game counting half as much as the one after it:
             # coaches change lines, and the latest combinations are the best guess for the next game. They are then
             # numbered by their players' ice time (`_by_role`).
-            for i, u in enumerate(_by_role(_pick(pool, count, by="wsec"), weight)):
+            picked = _pick(pool, count, by="wsec", share=share and kind == "F")
+            if kind == "D" and shape and shape[1] >= 7:
+                extra = seventh(in_last.filter(pl.col("kind") == "D"), picked)
+                if extra:
+                    extra["gp"] = int(sub.filter((pl.col("kind") == "D") & pl.col("unit").str.contains(str(extra["player"])))["game_id"].n_unique())
+                    entry["seventh"] = extra
+            for i, u in enumerate(_by_role(picked, weight)):
                 u["sec_pg"] = u["sec_gp"] / u["gp"] if u["gp"] else None
                 u["new"] = len(window) > 1 and u["gp"] == 1 and u["in_last"]  # a line for the first time last game
                 entry["units"].append({"label": f"{tag}{i + 1}", **u})
             # How settled the lineup is: the four most-used groups' share of all the team's 5v5 time in trios (or pairs).
-            total = pool["sec"].sum()
-            entry["settled"][kind] = sum(u["sec"] for u in _pick(pool, count)) / total if total else None
-            entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"]}
-                              for i, u in enumerate(_by_role(_pick(in_last.filter(pl.col("kind") == kind), count), weight))]
+            every = recent.filter(pl.col("kind") == kind)
+            total = every["sec"].sum()
+            entry["settled"][kind] = sum(u["sec"] for u in _pick(every, count, share=share and kind == "F")) / total if total else None
+            entry["last"] += [{"label": f"{tag}{i + 1}", "unit": u["unit"], "sec": u["sec"], "shared": u.get("shared")}
+                              for i, u in enumerate(_by_role(_pick(in_last.filter(pl.col("kind") == kind), count, share=share and kind == "F"), weight))]
         teams[tid] = entry
 
     # Rate each unit against the same-numbered unit on other teams, after pulling small samples toward that group's average.
@@ -247,7 +364,9 @@ def special_usage(season: int) -> pl.DataFrame:
 
 
 def depth_table(season: int) -> pl.DataFrame:
-    """Per team-game: how much of the forwards' 5v5 ice time went to the six least-used forwards that night."""
+    """Per team-game: how much of the forwards' 5v5 ice time went to the six least-used forwards that night, and how
+    many forwards dressed (`fwds`). With 11 forwards the bottom six are only five players, so that share is low by
+    design; the depth trait counts 12-forward games only (`team_style.per_game`)."""
     d = TABLES / str(season)
     st = pl.read_parquet(d / "stints.parquet").filter((pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null())
     pos = pl.read_parquet(d / "players.parquet").select("game_id", "player_id", "team_id", "pos")
@@ -255,6 +374,8 @@ def depth_table(season: int) -> pl.DataFrame:
     toi = long.group_by("game_id", "player_id").agg(pl.col("duration").sum().alias("sec")).join(pos, on=["game_id", "player_id"]).filter(pl.col("pos").is_in(["C", "L", "R"]))
     toi = toi.with_columns(rank=pl.col("sec").rank("ordinal", descending=True).over("game_id", "team_id"))
     out = toi.group_by("game_id", "team_id").agg(pl.col("sec").filter(pl.col("rank") > 6).sum().cast(pl.Float64).alias("bottom6_sec"), pl.col("sec").sum().cast(pl.Float64).alias("fwd_sec"))
+    dressed = pos.group_by("game_id", "team_id").agg(fwds=pl.col("pos").is_in(["C", "L", "R"]).sum().cast(pl.Int64))
+    out = out.join(dressed, on=["game_id", "team_id"], how="left")
     out.write_parquet(d / "depth.parquet")
     return out
 
@@ -558,15 +679,7 @@ def matchups(season: int, usual_units: dict[int, dict]) -> dict[int, dict]:
     sets = {tid: {u["label"]: {int(x) for x in u["unit"].split("-")} for u in e["units"]} for tid, e in usual_units.items()}
 
     def label(tid: int, players: set, kind: str) -> str | None:
-        best, score = None, 0
-        for lab, members in sets.get(tid, {}).items():
-            if lab[0] != kind:
-                continue
-            n = len(members & players)
-            if n > score:
-                best, score = lab, n
-        need = 2 if kind == "L" else 1
-        return best if score >= need else None
+        return label_of(sets.get(tid, {}), players, kind)
 
     acc = defaultdict(lambda: defaultdict(float))  # (team, venue) -> (own label, opp label) -> seconds
     played = defaultdict(set)

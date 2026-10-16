@@ -61,14 +61,7 @@ def and_list(xs: list[str]) -> str:
 def label(sets: dict[str, set], players: list[int], kind: str) -> str | None:
     """Which of tonight's lines (or pairs) this group on the ice is: the one holding most of it, needing two of three
     forwards or one of two defensemen, as `units.matchups` does."""
-    best, score = None, 0
-    for lab, members in sets.items():
-        if lab[0] != kind:
-            continue
-        n = len(members & set(players))
-        if n > score:
-            best, score = lab, n
-    return best if score >= (2 if kind == "L" else 1) else None
+    return U.label_of(sets, players, kind)
 
 
 class Season:
@@ -116,7 +109,7 @@ class Season:
             out = set()
             if mine is not None:
                 for kind, n in (("F", 4), ("D", 3)):
-                    for u in U._pick(mine.filter(pl.col("kind") == kind), n):
+                    for u in U._pick(mine.filter(pl.col("kind") == kind), n, share=kind == "F" and U.eleven(self.season, gid, tid)):
                         out |= {int(p) for p in u["unit"].split("-")}
             self._picks[(gid, tid)] = out
         return self._picks[(gid, tid)]

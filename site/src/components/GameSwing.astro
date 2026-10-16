@@ -150,7 +150,9 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
     {order.map((t) => {
       const mine = d.players.filter((r) => r.team === t);
       const us = units(t);
-      const of = new Map(us.flatMap((u) => u.ids.map((i) => [i, u.key] as const)));
+      // A forward on two lines (a club dressing 11 forwards) carries both tags.
+      const of = new Map<number, string>();
+      us.forEach((u) => u.ids.forEach((i) => of.set(i, of.has(i) ? `${of.get(i)} ${u.key}` : u.key)));
       return (
         <div class:list={['sw-team card', `t-${side(t)}`, { pale: pale(t) }]} data-team={t}>
           {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
@@ -159,7 +161,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
             {mine.map((r, i) => (
               <li class="sw-item" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} style={`--i:${Math.min(i, 20)}`}>
                 <div class="sw-row" role="button" tabindex="0" aria-expanded="false">
-                  <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag">{of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')}</span></span>
+                  <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag" data-key={of.get(r.id)?.split(' ')[0] ?? ''}>{of.get(r.id)?.replace(' ', '/') ?? (r.pos === 'G' ? 'G' : '')}</span></span>
                   <span class="sw-foot">Swing tonight</span>
                   <span class="sw-bar" aria-hidden="true" style={`--z:${zero.toFixed(1)}%`}>
                     <span class="sw-zero" style={`left:${zero.toFixed(1)}%`}></span>
@@ -212,7 +214,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
     const lineFor = (t) => document.querySelector(`.sw-line[data-team="${t}"]`);
     const mark = (box, key) => {
       box.classList.toggle('lit', !!key);
-      box.querySelectorAll('.sw-item').forEach((r) => r.classList.toggle('on', !!key && r.dataset.unit === key));
+      box.querySelectorAll('.sw-item').forEach((r) => r.classList.toggle('on', !!key && (r.dataset.unit ?? '').split(' ').includes(key)));
       box.querySelectorAll('.sw-unit').forEach((p) => { p.hidden = p.dataset.unit !== key; });
     };
     const show = () => {
@@ -225,8 +227,8 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
     document.querySelectorAll('.sw-line').forEach((s) => s.addEventListener('change', show));
     document.querySelectorAll('.sw-team').forEach((box) => {
       box.querySelectorAll('.sw-tag').forEach((tag) => {
-        const key = tag.textContent;
-        if (!key || key === 'G') return;
+        const key = tag.dataset.key;
+        if (!key) return;
         tag.addEventListener('mouseenter', () => mark(box, key));
         tag.addEventListener('mouseleave', () => mark(box, lineFor(box.dataset.team)?.value));
         tag.addEventListener('click', (e) => { e.stopPropagation(); const s = lineFor(box.dataset.team); s.value = s.value === key ? '' : key; show(); });

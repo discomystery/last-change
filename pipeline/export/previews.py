@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 17  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 18  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -43,6 +43,8 @@ RULES_VERSION = 17  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 16: a chattier, hotter voice (Sora, 2026-10-14): more wording per call, hot words only where the numbers are extreme
 # 17: sentence rules (Sora, 2026-10-15): one contrast word per sentence, a team named by place once a sentence, and
 # an edge body never opens by repeating its headline
+# 18: clubs that dress 11 forwards and 7 defensemen: depth leaves those games out and is never an edge for a club that
+#     does it most nights; NHL.com's projected lines and status facts in Who to watch (2026-10-16)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -826,11 +828,19 @@ def edge_check(k: str, top: str, bot: str, fp: dict) -> dict:
             "rule": "held if the team comes out ahead by at least half its usual margin; partly if it comes out ahead by less; otherwise didn't happen"}
 
 
+def plays_eleven(fp: dict, t: str) -> bool:
+    """A club that dresses 11 forwards and 7 defensemen most nights (`units.plays_eleven`): its bottom six is five
+    players by design, so depth is never a call or an edge for its games (Tampa Bay, 2026-10-15: "If this one comes
+    down to the bottom six, that suits the Kraken")."""
+    return bool((fp[t].get("lineup") or {}).get("habit"))
+
+
 def edge_claim(gid: int, away: str, home: str, fp: dict, places: dict, skip: set, hot_only: bool = False) -> dict | None:
     """The trait where the two teams sit furthest apart, called as: the team at the better end comes out ahead tonight.
     With `hot_only`, only a gap wide enough to be worth a call (EDGE_GAP, EDGE_END); otherwise the widest one."""
     gap = lambda k: abs(fp[away]["dims"][k]["blend"]["pct"] - fp[home]["dims"][k]["blend"]["pct"])
-    keys = [k for k in EDGE if k not in skip and k in fp[away]["dims"] and k in fp[home]["dims"]]
+    keys = [k for k in EDGE if k not in skip and k in fp[away]["dims"] and k in fp[home]["dims"]
+            and not (k == "depth" and any(plays_eleven(fp, t) for t in (away, home)))]
     if hot_only:
         keys = [k for k in keys if gap(k) >= EDGE_GAP and max(fp[t]["dims"][k]["blend"]["pct"] for t in (away, home)) >= 100 - EDGE_END
                 and min(fp[t]["dims"][k]["blend"]["pct"] for t in (away, home)) <= EDGE_END]
@@ -1119,6 +1129,38 @@ def projected_starters(g: dict, likely: dict, rebuilt: bool = False) -> dict[str
     return out
 
 
+def nhl_lineup(g: dict, rebuilt: bool = False) -> dict | None:
+    """NHL.com's projected lines and pairs for the page, named, with each club's shape (11 forwards and 7 defensemen
+    flagged), plus the status facts its rules found (`nhl_previews.status_facts`). Nothing else from the article."""
+    from pipeline.config import CURRENT_SEASON
+    from pipeline.ingest import nhl_previews as NP
+    from pipeline.export import wording
+    got = NP.projection(CURRENT_SEASON, g["id"], _iso(g["start"]) if rebuilt else None)
+    if not got:
+        return None
+    teams = (g["away"], g["home"])
+    people = NP.people_for(CURRENT_SEASON, teams)
+    clash = wording.number_clashes(CURRENT_SEASON, wording.initials)
+    name = lambda p: clash.get(p) or (f"{people[p][1][:1]}. {people[p][2]}" if p in people else None)
+    named = lambda ids: [{"id": p, "name": name(p)} for p in ids if name(p)]
+    out = {"fetched": got.get("fetched"), "published": got.get("published"), "teams": {}}
+    for t in teams:
+        lu = (got.get("lineups") or {}).get(t)
+        if not lu or not lu.get("lines"):
+            continue
+        f, d = NP.shape(lu)
+        out["teams"][t] = {"lines": [named(x) for x in lu["lines"]], "pairs": [named(x) for x in lu["pairs"]], "extra_d": named(lu.get("extra_d") or []),
+                           "f": f, "d": d, "eleven": f == 11 and d == 7}
+    teams_json = {x["abbr"]: x for x in json.loads((SITE_DATA / "teams.json").read_text())} if (SITE_DATA / "teams.json").exists() else {}
+    aliases = {t: [x for x in (teams_json.get(t, {}).get(k) for k in ("place", "nick", "name")) if x] for t in teams}
+    facts = NP.status_facts(got.get("status"), aliases, people)
+    for x in facts:  # "The Lighting are expected to dress 11...": no club named, so the one projected with 11
+        if x["kind"] == "eleven" and x["team"] is None:
+            x["team"] = next((t for t, v in out["teams"].items() if v["eleven"]), None)
+    out["facts"] = [x for x in facts if x["team"]]
+    return out if out["teams"] or out["facts"] else None
+
+
 def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
              likely: dict | None = None, **extra) -> dict:
     """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
@@ -1152,12 +1194,20 @@ def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime
            "claims": claims, "pregame": bundle(away, home, site, records(sched, g["start"])),
            "starters": {t: [pid for pid, _ in likely.get(t) or []] for t in (away, home)},
            "projected": projected_starters(g, likely, bool(extra.get("rebuilt")))}
+    try:
+        nhl = nhl_lineup(g, bool(extra.get("rebuilt")))
+    except Exception as e:  # the preview stands without it
+        print(f"NHL.com lineup for {g['id']} unreadable: {e!r}")
+        nhl = None
+    if nhl:
+        out["nhl_lineup"] = nhl
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places)
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
-        out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely)
+        out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely,
+                                             nhl=nhl, fp=fp)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out

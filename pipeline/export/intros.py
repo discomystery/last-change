@@ -194,7 +194,8 @@ def _extremes(fp: dict, keys, cut: int) -> list[tuple[str, str, int]]:
 def team_style(fp: dict) -> tuple[list[str], list[str]]:
     """Phrases for the team's two most extreme 5-on-5 traits (pairs read as one thought), and the clauses for special
     teams and goaltending at the far ends. Returns (phrases, trait keys used)."""
-    ext = [(k, end, d) for k, end, d in _extremes(fp, STYLE, 20) if STYLE[k][0 if end == "hi" else 1]]
+    eleven = bool((fp.get("lineup") or {}).get("habit"))  # 11 forwards most nights: depth is a choice, not a ranking
+    ext = [(k, end, d) for k, end, d in _extremes(fp, STYLE, 20) if STYLE[k][0 if end == "hi" else 1] and not (eleven and k == "depth")]
     phrases, used = [], []
     for k, end, _ in ext:
         if k in used or any({k, u} <= pair for u in used for pair in OPPOSED):
@@ -209,6 +210,9 @@ def team_style(fp: dict) -> tuple[list[str], list[str]]:
             used.append(k)
         if len(phrases) == 2:
             break
+    if eleven and len(phrases) < 2:
+        phrases.append("dress eleven forwards and seven defensemen")
+        used.append("depth")
     return phrases, used
 
 

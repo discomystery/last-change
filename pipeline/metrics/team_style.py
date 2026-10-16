@@ -55,6 +55,8 @@ DIMS = {
 INDEXED = {"physical": "physical_raw", "forecheck": "forecheck_raw",  # shown as a score against league average
            "volume": "volume_raw", "suppression": "suppression_raw", "pace": "pace_raw"}
 COLS = sorted({c for num, den, _, _ in DIMS.values() for c in num + den})
+# Traits that count only some games: the games where this column is above zero (depth: 12-forward games).
+COUNTED = {"depth": "fwd_sec"}
 BOOTSTRAPS = 300
 MAX_K = 400.0
 
@@ -109,10 +111,24 @@ def per_game(season: int, w: pl.DataFrame) -> pl.DataFrame:
         tot("bd_a", s5).alias("bd_a"), tot("sec", close).alias("close_sec"), tot("hits", close).alias("hits_close"),
         (pl.when(close).then(pl.col("hits") / pl.col("f_hits") * venue("hits")).otherwise(0.0).sum()).alias("hits_adj"),
         (pl.when(s5).then(fc_raw).otherwise(0.0).sum()).alias("fc_raw"), (pl.when(s5).then(fc_adj).otherwise(0.0).sum()).alias("fc_adj"),
-    ).join(disc, on=["game_id", "team_id"]).join(pl.read_parquet(d / "depth.parquet"), on=["game_id", "team_id"]).join(
+    ).join(disc, on=["game_id", "team_id"]).join(_depth(season), on=["game_id", "team_id"]).join(
         stops, on=["game_id", "team_id"], how="left").join(_icings_adjusted(season), on=["game_id", "team_id"], how="left").join(
         _rough(season), on=["game_id", "team_id"], how="left").with_columns(
         pl.col("thru_n", "blk_n", "icing_n", "rough_n", "rough_sec").fill_null(0.0)).sort("team_id", "date", "game_id")
+
+
+def _depth(season: int) -> pl.DataFrame:
+    """depth.parquet with the bottom-six share zeroed in games without 12 forwards. A club dressing 11 forwards and 7
+    defensemen has only five forwards below its top six, so its share is low by design (Tampa Bay ranked near the
+    bottom on it in 2026-27 for playing 11 every night); those games say nothing about how it spreads the minutes.
+    The trait counts the other games only (`COUNTED`)."""
+    from pipeline.metrics import units
+    p = TABLES / str(season) / "depth.parquet"
+    t = pl.read_parquet(p) if p.exists() else None
+    if t is None or "fwds" not in t.columns:  # saved before the forward count was kept
+        t = units.depth_table(season)
+    twelve = pl.col("fwds").fill_null(12) == 12
+    return t.with_columns(pl.when(twelve).then(pl.col(c)).otherwise(0.0).alias(c) for c in ("bottom6_sec", "fwd_sec")).drop("fwds")
 
 
 def _stops(season: int) -> pl.DataFrame:
@@ -298,14 +314,21 @@ def run(season: int = CURRENT_SEASON, idle: bool = False) -> dict:
     rng = np.random.default_rng(season)
     in_net = _goalie_priors(season, k["goalie"]["k_games"], league_last["goalie"])
 
+    def games(m: np.ndarray, dim: str) -> int:
+        return int((m[:, COLS.index(COUNTED[dim])] > 0).sum()) if dim in COUNTED else len(m)
+
     def estimates(mat: np.ndarray, tid: int) -> dict[str, dict[str, float]]:
-        n = len(mat)
-        obs = _values(mat) if n else {dim: None for dim in DIMS}
+        obs = _values(mat) if len(mat) else {dim: None for dim in DIMS}
         prev = _values(last[tid]) if tid in last else league_last
         out = {"season": obs, "blend": {}}
         for dim in DIMS:
             kk = k[dim]["k_games"]
-            n_prev = len(last[tid]) if tid in last else 0
+            n = games(mat, dim)
+            if not n and len(mat):
+                obs[dim] = float("nan")  # none of the games this trait counts
+            n_prev = games(last[tid], dim) if tid in last else 0
+            if not n_prev and tid in last:
+                prev = {**prev, dim: league_last[dim]}
             prior = (n_prev * prev[dim] + kk * league_last[dim]) / (n_prev + kk)  # last season, itself pulled toward the league
             if dim == "goalie" and tid in in_net:
                 prior = in_net[tid]  # this season's goalies on their own records (see _goalie_priors)
