@@ -249,7 +249,8 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   .ldr.on { border-color: var(--ink-3); }
   .ldr-h { all: unset; cursor: pointer; display: block; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ldr-h:hover { color: var(--ink); }
-  /* Names, team pills and numbers each keep one column, so every row of a card lines up. */
+  /* Names, team pills and numbers each keep one column, so every row of a card lines up. Phones have no pills, so each
+     row sizes its own number there and the leader's big one never squeezes the names below it. */
   .ldr ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
   .ldr li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; column-gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); font: 500 14px var(--ui); }
   .ldr li:first-child { border-top: 0; }
@@ -259,7 +260,7 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   .ldr-tm { display: flex; gap: 4px; }
   .ldr-tm .chip { flex: none; text-decoration: none; }
   .ldr-v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
-  @media (max-width: 719px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ldr { padding: 12px; } .ldr ol { grid-template-columns: minmax(0, 1fr) auto; } .ldr li { font-size: 13px; } .ldr-tm { display: none; } }
+  @media (max-width: 719px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ldr { padding: 12px; } .ldr ol { display: block; } .ldr li { grid-template-columns: minmax(0, 1fr) auto; font-size: 13px; } .ldr-tm { display: none; } }
   .lead-tip { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 14px 0 0; min-height: 1.45em; }
   .lead-tip b { color: var(--ink); font-weight: 600; }
   .lead-card { margin-top: 12px; padding: 8px 0 14px; }
