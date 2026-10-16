@@ -223,7 +223,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     <script is:inline src={`${base}live.js`}></script>
     <script is:inline>
       // The two ticket stubs (styles above) for home and team pages: next game and latest post-game, each a link.
-      // g: a schedule game with t (Date); final games carry as/hs and end. colour(abbr, g) gives a team's matchup colour.
+      // g: a schedule game with t (Date); final games carry as/hs and end. colour(abbr, g) gives a team's colour.
       window.lcTicket = (g, { eyebrow, href, sub, colour }) => {
         const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
         const card = el(href ? 'a' : 'div', 'card tk');
@@ -755,8 +755,8 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .mode button { font: 600 13px var(--ui); color: var(--ink); background: none; border: 0; border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .mode button[aria-pressed='true'] { background: var(--ink); color: var(--sheet); }
   /* Next game and latest post-game on home and team pages: two ticket stubs side by side, each one a link to its
-     preview or post-game page. The date sits on the stub, torn off by a dashed line; teams are abbreviations in their
-     matchup colours, and a final score sits between them in the serif, as on the post-game rink. */
+     preview or post-game page. The date sits on the stub, torn off by a dashed line; teams are abbreviations in their own
+     colours, and a final score sits between them in the serif, as on the post-game rink. */
   .tickets { display: grid; gap: 14px; align-items: start; }
   @media (min-width: 820px) { .tickets { grid-template-columns: 1fr 1fr; } }
   .card.tk { display: grid; grid-template-columns: 84px 1fr; padding: 0; overflow: hidden; color: var(--ink); text-decoration: none; }

@@ -97,11 +97,18 @@ export function matchupPaint(away: string, home: string): { away: string; home: 
   return { away: both(matchupColours(away, home).away, darkAway(away, home)), home: teamPaint(home) };
 }
 
+/** Each club's own colour as a light-dark value, for score cards and ticket stubs: the abbreviations there are labelled
+ * text (and live goal dots sit above or below the line by team), so both teams keep their full colour even when the two
+ * are alike (Sora, 2026-10-16). Charts that tell teams apart by colour alone use the matchup colours below. */
+export function ownPaints(): Record<string, string> {
+  return Object.fromEntries(Object.keys(COLOURS).map((a) => [a, teamPaint(a)]));
+}
+
 /** Every matchup's colours in a small table for pages that draw games in the browser (home, team pages): each club's
  * own colour, plus the visitors' replacement for the pairs where either mode switches it (all as light-dark values). */
 export function matchupTable(): { c: Record<string, string>; s: Record<string, string> } {
   const s: Record<string, string> = {};
-  const c = Object.fromEntries(Object.keys(COLOURS).map((a) => [a, teamPaint(a)]));
+  const c = ownPaints();
   for (const a of Object.keys(COLOURS)) for (const h of Object.keys(COLOURS)) {
     if (a === h) continue;
     const m = matchupPaint(a, h).away;
