@@ -13,6 +13,8 @@ spring's playoff series, never from a list.
   star fights       a star or franchise player in a fight, and how rarely he fights (since 2022-23)
   neighbors         arenas close enough that fans make the trip (site/src/data/arenas.json)
   basement          two of the league's worst records meeting
+  summit            two of the league's best teams meeting ("best against best"): this season's points percentage
+                    blended with last season's, and both either made last spring's playoffs or are winning this season
 """
 import gzip
 import json
@@ -28,6 +30,20 @@ PLAYOFFS = 3
 NEIGHBOR_MILES = 150  # Rangers-Devils, Islanders-Rangers, Sabres-Leafs, Kings-Ducks: a drive, not a flight
 BASEMENT = 6  # both teams among this many worst points percentages (about the bottom fifth)
 BASEMENT_GP = 4  # games each team must have played before a record says much
+# Best against best (Sora, 2026-10-16: the words should mean the league's best teams, not two strong habits). A club's
+# standing is this season's points percentage pulled toward last season's by SUMMIT_K games, so a fast start alone or
+# last spring's run alone isn't enough; both clubs must be near the top by it, and each must have made last
+# spring's playoffs or be at the floor or better this season, and no club below the floor after SUMMIT_GP games
+# counts (Philadelphia made the second round in 2026 and then fell apart).
+# Two tiers (Sora, 2026-10-16): the top six with a .600 floor are "best against best"; the top eight with a .575 floor
+# that miss it are "two good teams", which never claims they are the best.
+SUMMIT_K, SUMMIT_GP = 20, 8
+# A deep run last spring counts for something (Sora, 2026-10-16: Vegas, a Cup finalist, belongs in best against best
+# early on; Philadelphia's second round doesn't survive nine straight losses): each series won adds ROUND_BONUS to
+# last season's points percentage, so it fades with the rest of last season as games are played, and the record
+# floor still drops a club that has fallen apart.
+ROUND_BONUS = 0.015
+TIERS = (("best", 6, 0.600), ("good", 8, 0.575))  # (tier, top this many, record floor)
 FIGHT_SEASONS = (2022, 2023, 2024, 2025, 2026)  # seasons with penalty rows on file
 RARE_FIGHTS = 2  # fights in the seasons on file before this one, at most, for a fight to be out of character
 ORDINALS = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
@@ -267,3 +283,60 @@ def basement(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> bool:
     rec = table_before(G, season, before)
     return all(t in rec and rec[t]["gp"] >= BASEMENT_GP and rec[t]["worst"] <= BASEMENT for t in (a, b))
 
+
+
+def _playoff_teams(season: int) -> set[str]:
+    g = _playoff_games(season)
+    return set() if g.is_empty() else set(g["home"].to_list()) | set(g["away"].to_list())
+
+
+def series_won(season: int) -> dict[str, int]:
+    """How many playoff series each club won in that season's playoffs (a Cup winner won four)."""
+    g = _playoff_games(season)
+    wins: dict[tuple, dict[str, int]] = {}
+    for r in g.iter_rows(named=True):
+        pair = tuple(sorted((r["home"], r["away"])))
+        w = wins.setdefault(pair, {pair[0]: 0, pair[1]: 0})
+        w[r["home"] if r["home_score"] > r["away_score"] else r["away"]] += 1
+    out: dict[str, int] = {}
+    for w in wins.values():
+        t, n = max(w.items(), key=lambda kv: kv[1])
+        if n == 4:
+            out[t] = out.get(t, 0) + 1
+    return out
+
+
+def standing(G: pl.DataFrame, season: int, before: str) -> dict[str, dict]:
+    """Each club's blended standing before a date: this season's points percentage pulled toward last season's by
+    SUMMIT_K games, its rank by it (1 = best), and whether it made last spring's playoffs."""
+    now = table_before(G, season, before)
+    last = table_before(G, season - 1, "9999-12-31")
+    po = _playoff_teams(season - 1)
+    runs = series_won(season - 1)
+    out = {}
+    for t in set(now) | set(last):
+        gp = now.get(t, {}).get("gp", 0)
+        prior = (last[t]["pct"] if t in last else 0.5) + ROUND_BONUS * runs.get(t, 0)
+        cur = now[t]["pct"] if gp else prior
+        out[t] = {"gp": gp, "pct": cur, "blend": (gp * cur + SUMMIT_K * prior) / (gp + SUMMIT_K), "playoffs": t in po}
+    for i, t in enumerate(sorted(out, key=lambda t: -out[t]["blend"])):
+        out[t]["rank"] = i + 1
+    return out
+
+
+def summit(G: pl.DataFrame, a: str, b: str, season: int, before: str) -> str | None:
+    """Two strong clubs meeting: "best" when both are among the league's best by blended standing, "good" when both
+    are near the top without both making that bar, else None. Each club needs last spring's playoffs or a strong
+    record this season behind it, and none counts below the floor once the season is under way."""
+    st = standing(G, season, before)
+    for tier, top, floor in TIERS:
+        ok = True
+        for t in (a, b):
+            x = st.get(t)
+            if (x is None or x["rank"] > top or (x["gp"] >= SUMMIT_GP and x["pct"] < floor)
+                    or (not x["playoffs"] and not (x["gp"] >= SUMMIT_GP and x["pct"] >= floor))):
+                ok = False
+                break
+        if ok:
+            return tier
+    return None
