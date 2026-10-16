@@ -37,3 +37,13 @@ def test_good_tier(monkeypatch):
     now = _season(2026, "2026-10-10", {"AAA": (8, 2), "DDD": (29, 21)})
     G = _games(last + now)
     assert sl.summit(G, "AAA", "DDD", 2026, "2026-10-16") == "good"
+
+
+def test_a_deep_run_lifts_last_season(monkeypatch):
+    """Two clubs with the same records: the one that won three series last spring stands higher."""
+    monkeypatch.setattr(sl, "_playoff_teams", lambda season: {"AAA", "BBB"})
+    monkeypatch.setattr(sl, "series_won", lambda season: {"AAA": 3})
+    last = _season(2025, "2026-01-01", {"AAA": (50, 32), "BBB": (50, 32)})
+    now = _season(2026, "2026-10-10", {"AAA": (5, 2), "BBB": (5, 2)})
+    st = sl.standing(_games(last + now), 2026, "2026-10-16")
+    assert st["AAA"]["blend"] - st["BBB"]["blend"] > 0.03

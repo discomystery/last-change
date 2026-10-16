@@ -38,6 +38,11 @@ BASEMENT_GP = 4  # games each team must have played before a record says much
 # Two tiers (Sora, 2026-10-16): the top six with a .600 floor are "best against best"; the top eight with a .575 floor
 # that miss it are "two good teams", which never claims they are the best.
 SUMMIT_K, SUMMIT_GP = 20, 8
+# A deep run last spring counts for something (Sora, 2026-10-16: Vegas, a Cup finalist, belongs in best against best
+# early on; Philadelphia's second round doesn't survive nine straight losses): each series won adds ROUND_BONUS to
+# last season's points percentage, so it fades with the rest of last season as games are played, and the record
+# floor still drops a club that has fallen apart.
+ROUND_BONUS = 0.015
 TIERS = (("best", 6, 0.600), ("good", 8, 0.575))  # (tier, top this many, record floor)
 FIGHT_SEASONS = (2022, 2023, 2024, 2025, 2026)  # seasons with penalty rows on file
 RARE_FIGHTS = 2  # fights in the seasons on file before this one, at most, for a fight to be out of character
@@ -285,16 +290,33 @@ def _playoff_teams(season: int) -> set[str]:
     return set() if g.is_empty() else set(g["home"].to_list()) | set(g["away"].to_list())
 
 
+def series_won(season: int) -> dict[str, int]:
+    """How many playoff series each club won in that season's playoffs (a Cup winner won four)."""
+    g = _playoff_games(season)
+    wins: dict[tuple, dict[str, int]] = {}
+    for r in g.iter_rows(named=True):
+        pair = tuple(sorted((r["home"], r["away"])))
+        w = wins.setdefault(pair, {pair[0]: 0, pair[1]: 0})
+        w[r["home"] if r["home_score"] > r["away_score"] else r["away"]] += 1
+    out: dict[str, int] = {}
+    for w in wins.values():
+        t, n = max(w.items(), key=lambda kv: kv[1])
+        if n == 4:
+            out[t] = out.get(t, 0) + 1
+    return out
+
+
 def standing(G: pl.DataFrame, season: int, before: str) -> dict[str, dict]:
     """Each club's blended standing before a date: this season's points percentage pulled toward last season's by
     SUMMIT_K games, its rank by it (1 = best), and whether it made last spring's playoffs."""
     now = table_before(G, season, before)
     last = table_before(G, season - 1, "9999-12-31")
     po = _playoff_teams(season - 1)
+    runs = series_won(season - 1)
     out = {}
     for t in set(now) | set(last):
         gp = now.get(t, {}).get("gp", 0)
-        prior = last[t]["pct"] if t in last else 0.5
+        prior = (last[t]["pct"] if t in last else 0.5) + ROUND_BONUS * runs.get(t, 0)
         cur = now[t]["pct"] if gp else prior
         out[t] = {"gp": gp, "pct": cur, "blend": (gp * cur + SUMMIT_K * prior) / (gp + SUMMIT_K), "playoffs": t in po}
     for i, t in enumerate(sorted(out, key=lambda t: -out[t]["blend"])):
