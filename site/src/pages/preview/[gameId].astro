@@ -17,7 +17,7 @@ import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
-import { clashes } from '../../lib/playerLinks';
+import { clashes, fullName, unitShort } from '../../lib/playerLinks';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -94,7 +94,6 @@ type SUnit = { label: string; players: { id: number; name: string; role: string 
 type LT = { games: number; settled?: { shuffled?: boolean }; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
 const LN = linesData.teams as unknown as Record<string, LT>;
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top defense pairs', P2: 'second defense pairs', P3: 'third defense pairs' };
-const lastName = (n: string) => n.split(' ').slice(1).join(' ');
 const awayLine = (j: number) => LN[away]?.units.find((u) => u.label === `L${j + 1}`);
 const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === label);
 // Box shading lives in blocks.css (it differs between light and dark mode); the page only passes the share.
@@ -312,19 +311,19 @@ import recapIndex from '../../../public/data/recaps/index.json';
       <>
         {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing their forward lines, so the four named here (from their latest games) may not be the ones they send out tonight.</p>}
         <div class="card stripcard">
-          <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
+          <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {unitShort(awayLine(j) as any, clash).join(' · ') || '–'}</span>)}</p>
           {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
             <>
               <h4 class="mini-h">{place(home)} {title.toLowerCase()} against {place(away)} forward lines</h4>
               <ul class="strips">
                 {homeMu.rows.filter((r) => r.label[0] === kind).map((r) => {
-                  const mine = (homeUnit(r.label)?.players ?? []).map(lastName);
+                  const mine = unitShort(homeUnit(r.label) as any, clash);
                   return (
                     <li class:list={{ thin: r.minutes < 10 }}>
-                      <span class="lab t-home" data-tip={`${(homeUnit(r.label)?.players ?? []).join(', ')}. ${mmss(r.seconds)} of 5-on-5 at home.`}><b>{r.label}</b>{mine.join(' · ')}</span>
+                      <span class="lab t-home" data-tip={`${(homeUnit(r.label)?.players ?? []).map((n, i) => fullName((homeUnit(r.label) as any)?.ids?.[i], n)).join(', ')}. ${mmss(r.seconds)} of 5-on-5 at home.`}><b>{r.label}</b>{mine.join(' · ')}</span>
                       <span class="strip">
                         {r.share.map((v, j) => {
-                          const opp = (awayLine(j)?.players ?? []).map(lastName);
+                          const opp = unitShort(awayLine(j) as any, clash);
                           return <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `At home, ${mine.join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time against opponents’ ${['first', 'second', 'third', 'fourth'][j]} lines. With no line matching it would be about ${r.expected[j]}%. Tonight that line is ${opp.join(', ') || `${place(away)}’s L${j + 1}`}.`}><i>{away} L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>;
                         })}
                       </span>
