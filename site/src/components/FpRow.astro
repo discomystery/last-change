@@ -47,6 +47,7 @@ const rank = (e: any) => !has(e) ? '–' : e.raw === undefined ? ordinal(e.rank)
     {sides.map((s) => (
       <div class:list={['fpr-side', s.cls]}>
         {two && <i></i>}
+        {c[s.abbr].note && <p class="fpc-line fpr-note"><span>{two && <b>{s.place}: </b>}{c[s.abbr].note}</span></p>}
         {(['blend', 'season'] as const).map((mode) => {
           const e = c[s.abbr][mode];
           const who = two ? <b>{s.place}: </b> : null;

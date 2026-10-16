@@ -114,7 +114,12 @@ def export_fingerprints(season: int, idle: bool = False) -> int:
             est = {mode: {**est[mode], "raw": t["dims"][INDEXED[d]][mode]["v"], "raw_rank": t["dims"][INDEXED[d]][mode]["rank"]} for mode in est}
         return est
 
-    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY}} for tid, t in out["teams"].items()}
+    from pipeline.metrics import units
+    eleven = units.eleven_counts(season)
+    # How often the club dresses 11 forwards and 7 defensemen: its depth trait leaves those games out, and the page
+    # says "plays eleven forwards" rather than ranking a habit as a weakness.
+    lineup = lambda tid: {"eleven": eleven.get(tid, (0, 0))[0], "games": eleven.get(tid, (0, 0))[1], "habit": units.plays_eleven(*eleven.get(tid, (0, 0)))}
+    teams = {abbr[tid]: {"games": t["games"], "dims": {d: dim(t, d) for d in READY}, "lineup": lineup(tid)} for tid, t in out["teams"].items()}
     from pipeline.metrics import rink_bias
     (SITE_DATA / "arena_factors.json").write_text(json.dumps({"seasons": "2023-24 to 2025-26", "home_road": rink_bias.home_road(), "arenas": rink_bias.factors().to_dicts()}, separators=(",", ":")))
     payload = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "season": season, "ready": READY,
@@ -208,6 +213,27 @@ def export_lines(season: int) -> int:
                 "text": f'The forward lines keep changing. Even their four most-used trios over the last {e["games"]} games cover only {round(100 * share)}% of their forwards\u2019 '
                         f'5-on-5 time, {lowest} (a typical team: {round(100 * typical)}%). The lines listed lean on their latest games, but expect new combinations tonight.'}
 
+    def eleven_note(e: dict) -> dict | None:
+        """A club that went with 11 forwards and 7 defensemen last game: who took shifts on two lines and who was the
+        seventh defenseman."""
+        shape = e.get("shape")
+        if not shape or shape["f"] > units.ELEVEN:
+            return None
+        n, of = shape["eleven"], shape["of"]
+        when = "last game" if n == 1 else f"in all {of} of their last {of} games" if n == of else f"in {n} of their last {of} games, including the last one"
+        text = f"They dressed 11 forwards and {shape['d']} defensemen {when}."
+        doubled = [u for u in e["units"] if u.get("shared")]
+        if doubled:
+            pid = doubled[0]["shared"]
+            labs = [u["label"] for u in e["units"] if u["label"][0] == "L" and str(pid) in u["unit"].split("-")]
+            if len(labs) == 2:
+                text += f" {names.get(pid, '?')} takes shifts on two lines, {labs[0]} and {labs[1]}."
+        sev = e.get("seventh")
+        if sev and shape["d"] >= 7:
+            mates = " and ".join(names.get(q, "?").split(" ", 1)[-1] for q in sev["with"])
+            text += f" {names.get(sev['player'], '?')} is the seventh defenseman, rotating in" + (f" mostly beside {mates}" if mates else "") + "."
+        return {"player": None, "kind": "eleven", "change": "eleven", "now": n, "before": 0, "games": of, "text": text}
+
     every_name = sorted(set(names.values()), key=len, reverse=True)
 
     def named(text: str) -> list[str]:
@@ -244,15 +270,21 @@ def export_lines(season: int) -> int:
         shuffle = shuffle_note(e)
         if shuffle:
             notes.insert(0, shuffle)
+        eleven = eleven_note(e)
+        if eleven:
+            notes.insert(0, eleven)
         out[place] = {
             "games": e["games"],
+            "shape": e.get("shape"),
+            "seventh": None if not e.get("seventh") else {"id": e["seventh"]["player"], "name": names.get(e["seventh"]["player"], "?"), "with": [names.get(q, "?") for q in e["seventh"]["with"]], "seconds": round(e["seventh"]["sec"])},
             "settled": {**{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e["settled"].items()}, "shuffled": shuffle is not None},
             "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": None if u["sec_pg"] is None else round(u["sec_pg"] / 60, 1), "toi_sec": None if u["sec_pg"] is None else round(u["sec_pg"]), "gp": u["gp"], "new": u["new"],
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
-                       "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets} for u in e["units"]],
+                       "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets,
+                       "shared": u.get("shared")} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
-                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values()} for u in e["last"]]},
-            "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] != "shuffle", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
+                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
+            "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] not in ("eleven", "shuffle"), n["kind"] != "eleven", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
     pts = lambda x: None if x is None else round(100 * x)
     for tid, v in units.deployment_blend(season).items():

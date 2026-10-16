@@ -26,6 +26,7 @@ import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
+import { doublesNote } from '../../lib/lineShape';
 import { twoColumns } from '../../lib/masonry';
 import { clock as mmss, compared } from '../../lib/format';
 import { matchupPaint } from '../../lib/teams';
@@ -36,7 +37,7 @@ import linesAll from '../../../public/data/lines.json';
 import goalieAll from '../../../public/data/goalies.json';
 import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../lib/traits';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, elevenNote } from '../../lib/traits';
 
 type Claim = { id: string; kind: string; head: string; body: string; call?: string; nums?: string; cite: string; check: object | null };
 // `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
@@ -72,10 +73,13 @@ const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-d
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
-const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
+const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }>; lineup?: { eleven: number; games: number; habit: boolean } }>;
+// A club that dresses 11 forwards most nights: its depth row says so rather than ranking the habit.
+const eleven = (a: string) => (fpT[a].lineup?.habit ? elevenNote(fpT[a].lineup!) : null);
 // Older frozen snapshots can carry a retired trait (point shots); show only traits the site still describes.
-const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
-const gap = (c: any) => Math.abs(c[away].blend.pct - c[home].blend.pct);
+const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key],
+  [away]: { ...fpT[away].dims[key], note: key === 'depth' ? eleven(away) : null }, [home]: { ...fpT[home].dims[key], note: key === 'depth' ? eleven(home) : null } })) as any[];
+const gap = (c: any) => (c.key === 'depth' && (c[away].note || c[home].note) ? -1 : Math.abs(c[away].blend.pct - c[home].blend.pct));
 const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a) }));
 const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
 
@@ -140,6 +144,9 @@ const lgSrc = srcData.league_sources as Record<string, number>;
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
 const story = snap.story;
+// NHL.com's projected lines and pairs from its game-day preview, when it was up before this snapshot.
+type ProjSide = { lines: { id: number; name: string }[][]; pairs: { id: number; name: string }[][]; extra_d: { id: number; name: string }[]; f: number; d: number; eleven: boolean };
+const nhlLineup = ((snap as any).nhl_lineup?.teams && Object.keys((snap as any).nhl_lineup.teams).length ? (snap as any).nhl_lineup : null) as { teams: Record<string, ProjSide> } | null;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
 const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
@@ -242,6 +249,7 @@ import ShareButton from '../../components/ShareButton.astro';
                   <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
                 <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
+                {doublesNote(LN[a].units as any, u as any) && <p class="unit-two">{doublesNote(LN[a].units as any, u as any)}</p>}
                 <dl class="stats">
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
@@ -254,6 +262,28 @@ import ShareButton from '../../components/ShareButton.astro';
         </div>
       ))}
     </div>
+
+    {nhlLineup && (
+      <>
+        <h3 class="sub">NHL.com projection</h3>
+        <p class="note">The lines and pairs NHL.com expects tonight, from its game-day preview. It is a projection, posted a few hours before puck drop, and coaches can still change their minds.</p>
+        <div class="two nhl-proj">
+          {order.filter((a) => nhlLineup.teams[a]).map((a) => {
+            const t = nhlLineup.teams[a];
+            return (
+              <div class={`card proj t-${side(a)}`}>
+                <p class="proj-h"><span class="mini-h">{place(a)}</span>{t.eleven && <span class="chip phrase" data-tip="One forward takes shifts on two lines, and the seventh defenseman rotates in.">11 forwards, 7 defensemen</span>}</p>
+                <ol class="proj-rows">
+                  {t.lines.map((x, i) => <li><b>L{i + 1}</b><span>{x.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>)}
+                  {t.pairs.map((x, i) => <li><b>P{i + 1}</b><span>{x.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>)}
+                  {t.extra_d.length > 0 && <li><b>7th D</b><span>{t.extra_d.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    )}
 
     {story && lineNotes.length > 0 && (
       <div class="card worth lines-worth">
@@ -514,6 +544,12 @@ import ShareButton from '../../components/ShareButton.astro';
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
   .watch + .worth { margin-top: 16px; }
   .lines-worth { margin: 20px 0 8px; }
+  .nhl-proj { margin-bottom: 8px; }
+  .proj-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .proj-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .proj-rows li { font: 500 15px var(--ui); display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: baseline; }
+  .proj-rows li > span { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .proj-rows b { font: 700 12.5px var(--ui); letter-spacing: 0.05em; color: var(--ink-3); }
   .stpick { margin-top: 22px; }
   .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
   .projected .lbl { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 10px; }

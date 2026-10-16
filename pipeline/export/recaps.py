@@ -328,6 +328,8 @@ def measure_edge(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> di
         if not chk.get("league"):
             return {"verdict": "na", "happened": "There was no league average to score this against."}
         tv, bv = 100 * tv / chk["league"], 100 * bv / chk["league"]
+    if k == "depth" and (tv != tv or bv != bv):  # an 11-forward lineup: its bottom six is five players (team_style._depth)
+        return {"verdict": "na", "happened": "One of the teams dressed 11 forwards and 7 defensemen, so their bottom six was only five players and the share can’t be compared."}
     if tv != tv or bv != bv:  # NaN: nothing this trait counts happened
         return {"verdict": "na", "happened": "Too little of what this call counts happened to judge it."}
     d = (tv - bv) if chk["higher"] else (bv - tv)

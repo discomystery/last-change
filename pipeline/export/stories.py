@@ -954,8 +954,149 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
     return None
 
 
+SCRATCH_RUN = 3  # straight games scratched before a healthy-scratch run is worth a line
+
+
+def _scratch_runs(season: int, day: str, team: str) -> dict[int, int]:
+    """Players the club scratched in each of its last N games before `day` (N >= 1): {player: N}."""
+    p = TABLES / str(season) / "game_rosters.parquet"
+    if not p.exists():
+        return {}
+    gr = pl.read_parquet(p, columns=["game_id", "date", "team", "player_id", "status"]).filter((pl.col("team") == team) & (pl.col("date") < day[:10]))
+    games = gr.select("game_id", "date").unique().sort("date", "game_id")["game_id"].to_list()[::-1]
+    scr = {g: set(gr.filter((pl.col("game_id") == g) & (pl.col("status") == "scratched"))["player_id"].to_list()) for g in games}
+    out = {}
+    for pid in scr.get(games[0], set()) if games else ():
+        n = 0
+        for g in games:
+            if pid not in scr[g]:
+                break
+            n += 1
+        out[pid] = n
+    return out
+
+
+def _listed_injured(season: int, day: str, team: str) -> set[int]:
+    """Players NHL.com's earlier game-day previews this season listed as injured for the club (before `day`)."""
+    folder = RAW / "nhl_previews" / str(season)
+    out = set()
+    for p in folder.glob("*.json.gz") if folder.exists() else ():
+        try:
+            got = json.loads(gzip.open(p).read())
+        except (OSError, ValueError):
+            continue
+        if (got.get("fetched") or "")[:10] < day[:10]:
+            out |= set(((got.get("lineups") or {}).get(team) or {}).get("injured") or [])
+    return out
+
+
+def _game_day(nhl: dict | None, away: str, home: str, day: str, W: "Words", N: dict[int, str], lines: dict, fp: dict | None,
+              season: int) -> tuple[list[dict], set[int]]:
+    """Who to watch items from NHL.com's game-day preview (`previews.nhl_lineup`): a projected 11 forwards and 7
+    defensemen, the same lineup as last game, game-time decisions, line changes its coach made, a suspension, and a
+    healthy scratch run. Facts only, in our words, and never a reason for an absence beyond a suspension. Also returns
+    players the preview says are back, so an "Out" or "Missing" line about them alone is dropped."""
+    if not nhl:
+        return [], set()
+    items, back = [], set()
+    facts = nhl.get("facts") or []
+    proj = nhl.get("teams") or {}
+    said = lambda kind, t: [f for f in facts if f["kind"] == kind and f["team"] == t]
+    for t in (away, home):
+        mine = proj.get(t) or {}
+        habit = ((fp or {}).get(t, {}).get("lineup") or {})
+        eleven = said("eleven", t)
+        if mine.get("eleven") or any(f["sure"] for f in eleven):
+            tail = ("" if not habit.get("habit") else f", as in all {num(habit['games'])} of their games so far" if habit["eleven"] == habit["games"]
+                    else f", as in {num(habit['eleven'])} of their {num(habit['games'])} games so far")
+            items.append({"tag": "Lineup", "score": 40 if habit.get("habit") else 66,
+                          "text": f"NHL.com projects {W.the(t)} to dress 11 forwards and seven defensemen{tail}."})
+        elif eleven:
+            items.append({"tag": "Lineup", "score": 58, "text": f"{_cap(W.the(t))} could go with 11 forwards and seven defensemen, NHL.com says."})
+        elif said("same", t):
+            items.append({"tag": "Lineup", "score": 30, "text": f"NHL.com expects {W.the(t)} to dress the same lineup as last game."})
+        for f in said("gtd", t)[:2]:
+            pid = f["players"][0]
+            if N.get(pid):
+                items.append({"tag": "Game-time call", "score": 72, "pid": pid, "text": f"{N[pid]} is a game-time decision, NHL.com says."})
+        usual = [set(u.get("ids") or []) for u in (lines.get(t) or {}).get("units", []) if u["label"][0] == "L"]
+        for f in said("lines", t):
+            for pid in f["players"]:
+                line = next((x for x in mine.get("lines", []) if pid in [y["id"] for y in x]), None)
+                ids = {y["id"] for y in line} if line else set()
+                if not line or len(line) < 3 or ids in usual or not N.get(pid):
+                    continue
+                mates = [N[y["id"]] for y in line if y["id"] != pid and N.get(y["id"])]
+                items.append({"tag": "New lines", "score": 66, "pid": pid, "pids": list(ids),
+                              "text": f"{_cap(W.the(t))} have changed their lines: NHL.com projects {N[pid]} with {_and(mates)}."})
+                break
+        for f in said("suspension", t):
+            pid, n = f["players"][0], f.get("games")
+            if not N.get(pid):
+                continue
+            length = f"{num(n)}-game " if n else ""
+            if f["state"] == "returns":
+                back.add(pid)
+                items.append({"tag": "Suspension", "score": 74, "pid": pid, "text": f"{N[pid]} is back from his {length}suspension."})
+            elif f["state"] == "serving" and f.get("last"):
+                items.append({"tag": "Suspension", "score": 62, "pid": pid, "text": f"{N[pid]} serves the last game of his {length}suspension."})
+            else:
+                items.append({"tag": "Suspension", "score": 70, "pid": pid, "text": f"{N[pid]} serves a {length}suspension." if n else f"{N[pid]} is suspended."})
+        runs = _scratch_runs(season, day, t)
+        healthy = {f["players"][0] for f in said("healthy", t)}
+        hurt = set(_availability(season, day).get(t, {})) | _listed_injured(season, day, t)  # missed games for a reason: not a scratch run
+        dressed = {y["id"] for x in mine.get("lines", []) + mine.get("pairs", []) for y in x} | {y["id"] for y in mine.get("extra_d", [])}
+        for pid, n in sorted(runs.items(), key=lambda kv: -kv[1]):
+            if n < SCRATCH_RUN or not N.get(pid) or not mine or (pid in hurt and pid not in healthy):
+                continue
+            if pid in dressed:
+                back.add(pid)
+                items.append({"tag": "Back in", "score": 56, "pid": pid,
+                              "text": f"NHL.com projects {N[pid]} back in the lineup after {num(n)} straight games as a healthy scratch." if pid in healthy
+                              else f"NHL.com projects {N[pid]} back in the lineup after he was scratched for {num(n)} straight games."})
+            elif pid in healthy:
+                items.append({"tag": "Scratched", "score": 44, "pid": pid, "text": f"{N[pid]} has been a healthy scratch for {num(n)} straight games, and NHL.com expects another."})
+            break
+    return items, back
+
+
+def _vs_projection(gid: int, r: dict, tonight: pl.DataFrame, W: "Words", N: dict[int, str], season: int) -> list[dict]:
+    """Post-game: where tonight's lineup differed from NHL.com's projection before the game (`nhl_previews`): its shape
+    (11 forwards and 7 defensemen or 12 and 6), or players it had in who didn't dress. Never why."""
+    from pipeline.ingest import nhl_previews
+    from pipeline.metrics import units
+    start = (r.get("start") or "").replace("Z", "+00:00") or None
+    got = nhl_previews.projection(season, gid, start)
+    if not got:
+        return []
+    tid = {r["away"]: None, r["home"]: None}
+    for x in tonight.select("team", "team_id").unique().iter_rows(named=True):
+        tid[x["team"]] = x["team_id"]
+    out = []
+    for t in (r["away"], r["home"]):
+        lu = (got.get("lineups") or {}).get(t) or {}
+        projected = {p for x in lu.get("lines", []) + lu.get("pairs", []) for p in x} | set(lu.get("extra_d") or [])
+        if len(projected) < 17 or lu.get("missed"):  # a lineup we could not read in full says nothing about who was left out
+            continue
+        dressed = set(tonight.filter((pl.col("team") == t) & (pl.col("pos") != "G"))["player_id"].to_list())
+        if len(dressed) < 17:
+            continue
+        pf, pd = nhl_previews.shape(lu)
+        af, ad = units.shapes(season).get((gid, tid[t]), (None, None))
+        gone = [p for p in projected - dressed if N.get(p)]
+        came = [p for p in dressed - projected if N.get(p)]
+        if af and (pf, pd) != (af, ad) and {pf, af} == {11, 12}:
+            out.append({"tag": "Lineup", "score": 40, "text": f"NHL.com had projected {W.the(t)} with {pf} forwards and {num(pd)} defensemen, but they dressed {af} and {num(ad)}."})
+        elif len(gone) == 1 and len(came) == 1:
+            out.append({"tag": "Lineup", "score": 38, "pid": gone[0], "text": f"{N[gone[0]]} was in NHL.com’s projected lineup, but {N[came[0]]} played instead."})
+        elif 1 <= len(gone) <= 2:
+            out.append({"tag": "Lineup", "score": 36, "pid": gone[0], "text": f"{_and([N[p] for p in gone])} {'was' if len(gone) == 1 else 'were'} in NHL.com’s projected lineup but didn’t dress."})
+    return out
+
+
 def preview_story(gid: int, away: str, home: str, start: str, places: dict, claims: list[dict],
-                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None) -> dict:
+                  outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None,
+                  nhl: dict | None = None, fp: dict | None = None) -> dict:
     """The story for one preview, from data before the game and the calls already chosen for it. `start` is the game's
     local date: games are dated locally, so a late start's UTC date would count the game itself."""
     W = Words(places)
@@ -1035,7 +1176,9 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         + _still_out([n["text"] for n in lines.get(home, {}).get("notes", [])], home, N, season)
     out_last = {N[p].split(" ", 1)[-1] for p in facts["out"] if N.get(p)}
     still = [x for x in still if not any(f" {nm} " in " " + x["text"] for nm in out_last)]  # already an "Out"
-    items = sorted(facts["items"] + ([blood] if blood else []) + still, key=lambda i: -i["score"])
+    day_items, back = _game_day(nhl, away, home, start, W, N, lines, fp, season)
+    items = [i for i in facts["items"] if not (i["tag"] in ("Out", "Missing") and set(i.get("pids") or [i.get("pid")]) <= back)]
+    items = sorted(items + day_items + ([blood] if blood else []) + still, key=lambda i: -i["score"])
     gone = _elsewhere(season, start, (away, home))
     items = [i for i in items if not gone & set(i.get("pids") or [i.get("pid")])]
     picked, per, seen = [], {}, set()
@@ -2098,6 +2241,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             items.append({"tag": "Start", "text": f"{_cap(W.the(t))} are {record(res)}, still looking for their first win.", "score": 64 + len(res)})
     items += _new_coach(gid, (winner, loser), r["date"], W, season, {winner: True, loser: False})
     items += _race_after(gid, r["date"], (winner, loser), W, season)
+    items += _vs_projection(gid, r, P.filter(pl.col("game_id") == gid), W, N, season)
     home_games = [x for x in results(G.filter(pl.col("date") <= r["date"]), home, season) if x["home"]]
     if len(home_games) == 1 and home_games[0]["game_id"] == gid:
         items.append({"tag": "Home opener", "text": f"{_cap(W.the(home))} {'won' if winner == home else 'lost'} their home opener.", "score": 57})

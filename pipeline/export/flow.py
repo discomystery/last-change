@@ -124,7 +124,7 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
         for team_id in (g["away_id"], g["home_id"]):
             for _, label, u in U.game_lines(season, gu, gid, team_id):
                 for pid in u["unit"].split("-"):
-                    group[int(pid)] = label
+                    group.setdefault(int(pid), label)  # a forward on two lines (11 dressed) keeps the higher one
 
     skaters: dict[int, list] = {}
     goalies: dict[int, list] = {}

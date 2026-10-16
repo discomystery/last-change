@@ -87,3 +87,10 @@ export const goalieTraitInfo = [
   { key: 'gaps', label: 'Waiting between shots', tip: 'The typical wait, in game-clock time, between one shot and the next.', lo: 'Steady work', hi: 'Long waits' },
   { key: 'steady', label: 'Night-to-night steadiness', tip: 'How often he gives his team a fair chance to win.', lo: 'Streaky', hi: 'Steady' },
 ];
+
+const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const num = (n: number) => NUM[n] ?? String(n);
+/** Depth note for a club that dresses 11 forwards and 7 defensemen most nights: its bottom six is five players by
+ *  design, so those games are left out of the trait rather than ranked as a weakness. */
+export const elevenNote = (l: { eleven: number; games: number }) =>
+  `Plays eleven forwards: ${l.eleven === l.games ? `all ${num(l.games)} games` : `${num(l.eleven)} of ${num(l.games)} games`} this season with 11 forwards and 7 defensemen, so the bottom six get fewer minutes by design. Those games are left out here.`;
