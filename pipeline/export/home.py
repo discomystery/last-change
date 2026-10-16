@@ -328,9 +328,10 @@ def coming_interest(g: dict, nm: Namer, div: dict[str, str], season: int, star_i
                 parts.append((14, f"{nm.last(sf[0]['pid'])} fought last time", f"{nm.last(sf[0]['pid'])} fought last time"))
             else:
                 parts.append((blood["score"] / 8, "Bad blood last time", None))
-    rec = storylines.table_before(nm.G, season, day)
-    if all(t in rec and rec[t]["gp"] >= storylines.BASEMENT_GP and rec[t]["best"] <= 6 for t in (away, home)):
-        parts.append((6, "Two of the league’s best", "Two of the league’s best"))
+    if facts.get("tier") == "best":
+        parts.append((10, "Best against best", "Best against best"))
+    elif facts.get("tier") == "good":
+        parts.append((6, "Two good teams", "Two good teams"))
     parts += [x for x in _rivals(away, home, season, div) if x[1] != "Playoff rematch"]  # told by the preview's item
     claims = pv.get("claims") or []
     for k, c in enumerate(claims[:2]):

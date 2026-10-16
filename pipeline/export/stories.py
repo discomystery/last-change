@@ -679,6 +679,15 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
     if storylines.basement(G, away, home, season, before):
         out["basement"] = "Both teams are near the bottom of the standings."
         out["heads"].append((66, "Somebody has to win"))
+    tier = storylines.summit(G, away, home, season, before)  # Sora, 2026-10-16: the words belong to the standings
+    if tier == "best":
+        out["summit"] = "Two of the league’s best teams meet."
+        out["heads"].append((77, _pick(["Best against best", "A heavyweight meeting", "Two of the best"], gid, "summit")))
+    elif tier == "good":
+        out["summit"] = "Two good teams meet."
+        out["heads"].append((70, _pick(["Two good teams", "A good test for both", "A measuring-stick game"], gid, "summit")))
+    if tier:
+        out["tier"] = tier
     if gid is not None:
         items += _new_coach(gid, (away, home), before, W, season)
     from pipeline.ingest import standings_daily as sd
@@ -1151,6 +1160,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
                                                  if n >= 6 else [f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are searching for answers"], gid, t, "cold")))
     if facts.get("basement"):
         sents.append(facts["basement"])
+    if facts.get("summit"):
+        sents.append(facts["summit"])
     # what to look for: the gist of the top calls
     look, kinds = [], set()
     tired_told = any("back-to-back" in v.get("body", "") for v in (outlook or {}).values())
