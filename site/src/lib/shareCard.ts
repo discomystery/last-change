@@ -367,6 +367,9 @@ export async function render(html: string): Promise<Blob> {
   host.className = 'shc-host';
   host.setAttribute('aria-hidden', 'true');
   host.innerHTML = html;
+  // A preview's card says "tonight" only on game day, like the page (Base.astro reads data-game-start).
+  const gameStart = document.querySelector<HTMLElement>('main[data-game-start]')?.dataset.gameStart;
+  if (gameStart) host.dataset.gameStart = gameStart;
   document.body.appendChild(host);
   try {
     await document.fonts.ready;

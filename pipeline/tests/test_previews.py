@@ -156,3 +156,21 @@ def test_graded_shot_call_reads_in_plain_words_with_a_chart():
     assert res["lane"]["now"][0] > res["lane"]["usual"][0] > res["lane"]["avg"][0] == 50.0
     assert res["saw"].startswith("61 shot attempts at 5-on-5") and "39 shots on goal" in res["saw"]
     assert not any(k.startswith("_") for k in res)
+
+
+def test_penalty_context():
+    """Power-play calls say how many power plays to expect from penalties taken and drawn; other calls say nothing."""
+    from pipeline.export.previews import penalty_context
+
+    def team(taken, t_pct, drawn, d_pct):
+        return {"dims": {"taken": {"blend": {"v": taken, "pct": t_pct}}, "drawn": {"blend": {"v": drawn, "pct": d_pct}}}}
+
+    fp = {"AAA": team(2.5, 70, 3.2, 90), "BBB": team(3.2, 10, 2.5, 40), "CCC": team(2.6, 60, 2.6, 50), "DDD": team(2.7, 50, 2.7, 50)}
+    places = {"AAA": "Aville", "BBB": "Btown", "CCC": "Ccity", "DDD": "Dburg"}
+    clash = {"kind": "clash", "metric": "pp", "team": "AAA", "opp": "BBB"}
+    s = penalty_context(clash, fp, places)
+    assert s and "should get its chances" in s and s.count("Aville") <= 1
+    assert penalty_context({**clash, "team": "BBB", "opp": "AAA"}, fp, places).endswith("may not get many chances.")
+    assert penalty_context({**clash, "team": "CCC", "opp": "DDD"}, fp, places) is None  # nothing out of the ordinary
+    assert penalty_context({**clash, "metric": "volume"}, fp, places) is None
+    assert penalty_context(clash, {"AAA": {"dims": {}}, "BBB": {"dims": {}}}, places) is None  # older fingerprints

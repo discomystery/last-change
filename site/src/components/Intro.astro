@@ -3,8 +3,9 @@
 // have they been good; for players, storylines for the next game.
 // `parts` picks what to draw here, so a page can split the lead sentence, the rest and the next-game note across its
 // layout. MOCK-UP: player pages show three placements, switched with ?intro=a|b|c, while the user picks one.
-interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null; colour?: string; parts?: ('lead' | 'rest' | 'next')[]; class?: string }
-const { text, next = [], nextLabel, nextHref, colour = 'var(--ink-3)', parts = ['lead', 'rest', 'next'], class: cls } = Astro.props;
+// nextStart: the next game's puck drop, so the note's "tonight" follows the visitor's day (Base.astro).
+interface Props { text: string[]; next?: string[]; nextLabel?: string; nextHref?: string | null; nextStart?: string; colour?: string; parts?: ('lead' | 'rest' | 'next')[]; class?: string }
+const { text, next = [], nextLabel, nextHref, nextStart, colour = 'var(--ink-3)', parts = ['lead', 'rest', 'next'], class: cls } = Astro.props;
 const [lead, ...rest] = text;
 const show = (k: 'lead' | 'rest' | 'next') => parts.includes(k);
 const hasNext = show('next') && next.length > 0;
@@ -18,7 +19,7 @@ const hasNext = show('next') && next.length > 0;
       </div>
     )}
     {hasNext && (
-      <aside class="intro-next">
+      <aside class="intro-next" data-game-start={nextStart}>
         <p class="intro-eyebrow box-h">{nextHref ? <a href={nextHref}>{nextLabel}</a> : nextLabel}</p>
         <p class="intro-story">{next.join(' ')}</p>
       </aside>

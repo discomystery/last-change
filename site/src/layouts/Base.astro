@@ -7,15 +7,16 @@ import { teamPaint } from '../lib/teams';
 import type { OgCard } from '../lib/og';
 import { createHash } from 'node:crypto';
 import { OG_REV } from '../lib/og';
-type Section = 'home' | 'games' | 'teams' | 'players' | 'league' | 'record' | 'methods';
-interface Props { title: string; description?: string; section?: Section; og?: OgCard }
-const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section } = Astro.props;
+import { ADJ_KIND } from '../lib/adjust';
+type Section = 'home' | 'games' | 'teams' | 'players' | 'record' | 'methods';
+// gameStart: on a page about one upcoming game, its puck drop (ISO), so the page's "tonight" follows the visitor's day.
+interface Props { title: string; description?: string; section?: Section; og?: OgCard; gameStart?: string }
+const { title, description = 'Hockey matchup previews that explain how two teams play, before they play.', section, gameStart } = Astro.props;
 // Main sections. An entry with `soon` instead of `href` keeps its place in the menu before its page exists.
 const tabs: { id: Section; label: string; href?: string; soon?: string }[] = [
   { id: 'games', label: 'Games', href: 'games/' },
   { id: 'teams', label: 'Teams', href: 'teams/' },
   { id: 'players', label: 'Players', href: 'players/' },
-  { id: 'league', label: 'League', href: 'league/' },
   { id: 'record', label: 'Track record', href: 'record/' },
 ];
 const SITE_NAME = 'Spare Line Change';
@@ -131,14 +132,56 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           }
           return to;
         });
-        const convert = (s) => { const t = spell(s); return target === 'ca' ? metric(t) : t; };
+        // "Tonight" in text about one game (inside an element with data-game-start, the game's puck drop) is only true on
+        // the game's own day, counted like window.lcDay (3 AM turnover, visitor's time zone): on other days it reads
+        // "tomorrow", the weekday ("on Saturday", "Saturday’s") or, a week or more out, "next time out" ("Oct 23’s"),
+        // so a preview read days ahead never says tonight.
+        const NIGHT = /\b(tonight)(’s|'s)?\b/gi;
+        const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+        const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+        const gameWords = (start) => {
+          const t = new Date(start);
+          if (isNaN(t)) return null;
+          const day = (d) => { const x = new Date(d - 3 * 3600e3); return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()); };
+          const gap = Math.round((day(t) - day(Date.now())) / 864e5);
+          if (gap === 0) return null;
+          if (gap === 1) return ['tomorrow', 'tomorrow'];
+          const d = new Date(t - 3 * 3600e3);
+          if (gap > 6) return ['next time out', MONTH_DAY.format(d)];
+          const wd = WEEKDAY.format(d);
+          return [`on ${wd}`, wd];
+        };
+        const when = (s, el) => {
+          if (!/tonight/i.test(s)) return s;
+          const g = el && el.closest && el.closest('[data-game-start]');
+          const w = g && gameWords(g.dataset.gameStart);
+          if (!w) return s;
+          return s.replace(NIGHT, (m, word, poss) => {
+            const out = poss ? w[1] + poss : w[0];
+            if (word === 'TONIGHT') return out.toUpperCase();
+            return word[0] === 'T' ? out[0].toUpperCase() + out.slice(1) : out;
+          });
+        };
+        // Possessives of words ending in s take only the apostrophe (Sora, 2026-10-16): "Matthews’", "Rangers’", "Islanders’".
+        // Generated text writes "’s" after every name, so it is fixed here, for every page, tooltip and share card. A name
+        // inside a link or other element, followed by ’s, is seen from the text right after it (`after`).
+        const POSS = /([A-Za-zÀ-ÖØ-öø-ž]*[sS])([’'])s\b/g;
+        const poss = (s, after) => {
+          let t = s.replace(POSS, (m, w, ap) => w + ap);
+          if (after && /^[’']s\b/.test(t)) t = t[0] + t.slice(2);
+          return t;
+        };
+        const convert = (s, el, after) => { const t = when(poss(spell(s), after), el); return target === 'ca' ? metric(t) : t; };
+        // The text node right after an element whose text ends in s (a linked or styled name).
+        const afterS = (n) => n.nodeType === 3 && n.previousSibling?.nodeType === 1 && /[sS]$/.test(n.previousSibling.textContent || '');
         // Original and changed text, per text node and per element attribute, so a switch can start again from the original.
         const was = new WeakMap();
         const redo = (key, cur, write) => {
           const o = was.get(key);
           const src = o && cur === o.out ? o.src : cur;
-          if (!o && !/[a-z]{2}/i.test(src)) return;
-          const out = convert(src);
+          const after = afterS(key);
+          if (!o && !after && !/[a-z]{2}/i.test(src)) return;
+          const out = convert(src, key.nodeType === 3 ? key.parentElement : key, after);
           if (out === src) was.delete(key); else was.set(key, { src, out });
           if (cur !== out) write(out);
         };
@@ -204,7 +247,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
             if (v == null) return;
             let m = was.get(el);
             if (!m) { m = {}; was.set(el, m); }
-            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src);
+            const o = m[a], src = o && v === o.out ? o.src : v, out = convert(src, el);
             m[a] = out === src ? undefined : { src, out };
             if (v !== out) el.setAttribute(a, out);
           });
@@ -286,7 +329,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </div>
     </header>
     <div class="navpin"><SiteTools menu /></div>
-    <main><slot /></main>
+    <main data-game-start={gameStart}><slot /></main>
     <div class="dock">
     <button type="button" class="setrow" data-prefs-open aria-haspopup="dialog" aria-expanded="false" aria-controls="prefs"><span class="tp-dot" aria-hidden="true"></span><span class="tp-ab">Your team</span><span class="sr-st"><span aria-hidden="true">·</span> <b data-show="mode"></b> <span aria-hidden="true">·</span> <b data-show="arena"></b></span><span class="sr-go">Settings<svg viewBox="0 0 11 7" aria-hidden="true"><path d="M1 6l4.5-4.5L10 6" /></svg></span></button>
     <nav class="tabbar" aria-label="Site">
@@ -294,12 +337,11 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       <a href={`${base}games/`} aria-current={cur('games')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>Games</a>
       <a href={`${base}teams/`} aria-current={cur('teams')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.5 3.2 7.8 7.5 9 4.3-1.2 7.5-4.5 7.5-9V6z" /></svg>Teams</a>
       <a href={`${base}players/`} aria-current={cur('players')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></svg>Players</a>
-      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="more" aria-current={['league', 'record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
+      <button type="button" id="more-toggle" aria-expanded="false" aria-controls="morepanel" aria-current={['record', 'methods'].includes(section ?? '') ? 'page' : undefined}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>More</button>
     </nav>
     </div>
-    <div class="more" id="more" hidden>
+    <div class="morepanel" id="morepanel" hidden>
       <a id="more-my-team" href={base} data-base={base} hidden>My team</a>
-      <a href={`${base}league/`} aria-current={cur('league')}>League</a>
       <a href={`${base}record/`} aria-current={cur('record')}>Track record</a>
       <a href={`${base}methods/`}>Methods</a>
     </div>
@@ -324,11 +366,19 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </div>
       <div class="set">
         <div class="set-h"><span id="set-arena">Adjusted stats</span></div>
-        <div class="mode seg" role="group" aria-labelledby="set-arena">
-          <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
+        <div class="mode seg three" role="group" aria-labelledby="set-arena">
           <button type="button" data-pref="arena" data-value="raw">Recorded</button>
+          <button type="button" data-pref="arena" data-value="adjusted">Adjusted</button>
+          <button type="button" data-pref="arena" data-value="custom">Custom</button>
         </div>
-        <p class="set-why">Adjusted evens out generous arena scorers and teams that shoot more when behind, and shows scores where 100 is league average. Recorded shows the numbers as counted.</p>
+        <p class="set-why" data-why="raw">Recorded shows every number as it was counted.</p>
+        <p class="set-why" data-why="adjusted">Adjusted evens out generous arena scorers, teams that shoot more when behind and who a player is up against, and shows scores where 100 is average.</p>
+        <p class="set-why" data-why="custom">Pick which adjustments to use. The rest are shown as counted.</p>
+        <div class="adjmix" id="adjmix">
+          <label class="tg"><span><b>Arena scorers</b><small>Hits, blocks, giveaways and takeaways counted the same in every arena.</small></span><input type="checkbox" data-adj-kind="arena" /><span class="sw" aria-hidden="true"></span></label>
+          <label class="tg"><span><b>Score and home ice</b><small>Shot volume, shots against and pace weighted for teams chasing a game.</small></span><input type="checkbox" data-adj-kind="score" /><span class="sw" aria-hidden="true"></span></label>
+          <label class="tg"><span><b>Competition</b><small>Who a player is up against. For now, faceoffs: the man across the dot, power play or penalty kill, and the zone.</small></span><input type="checkbox" data-adj-kind="competition" /><span class="sw" aria-hidden="true"></span></label>
+        </div>
       </div>
       <p class="set-foot">Saved on this device.</p>
     </div>
@@ -351,6 +401,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
       </p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
+    <script is:inline define:vars={{ adjKinds: ADJ_KIND }}>window.lcAdjKinds = adjKinds;</script>
     <script is:inline>
       // Visitor settings: remembered in this browser only, applied before anything else runs.
       (() => {
@@ -358,7 +409,28 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         const read = (k) => { try { return localStorage.getItem('lc-' + k) || defaults[k]; } catch { return defaults[k]; } };
         const root = document.documentElement;
         const info = JSON.parse(document.getElementById('team-info').textContent);
-        const words = { mode: { blend: 'Blended', season: 'This season' }, arena: { adjusted: 'Adjusted', raw: 'Recorded' } };
+        const words = { mode: { blend: 'Blended', season: 'This season' }, arena: { adjusted: 'Adjusted', raw: 'Recorded', custom: 'Custom' } };
+        // Custom: which adjustments are on, saved as a list ("arena,score"). The page reads one flag per kind that is
+        // shown as counted (data-raw-arena ...), so each stat follows its own switch; data-arena keeps the menu's word.
+        const KINDS = ['arena', 'score', 'competition'];
+        const readMix = () => { let v = null; try { v = localStorage.getItem('lc-adjmix'); } catch {} return v === null ? KINDS.slice() : v.split(',').filter((k) => KINDS.includes(k)); };
+        let mix = readMix();
+        const adjOn = (kind) => { const a = root.dataset.arena ?? defaults.arena; return a === 'adjusted' || (a === 'custom' && mix.includes(kind)); };
+        const applyMix = () => {
+          // Custom with no real mix saved (none yet, or every switch the same way) starts with every switch on.
+          if ((root.dataset.arena ?? defaults.arena) === 'custom' && !(mix.length && mix.length < KINDS.length)) {
+            mix = KINDS.slice();
+            try { localStorage.setItem('lc-adjmix', mix.join(',')); } catch {}
+          }
+          KINDS.forEach((k) => { if (adjOn(k)) delete root.dataset['raw' + k[0].toUpperCase() + k.slice(1)]; else root.dataset['raw' + k[0].toUpperCase() + k.slice(1)] = ''; });
+          const a = root.dataset.arena ?? defaults.arena;
+          document.querySelectorAll('[data-adj-kind]').forEach((c) => (c.checked = mix.includes(c.dataset.adjKind)));
+          document.querySelectorAll('[data-why]').forEach((p) => (p.hidden = p.dataset.why !== a));
+          const box = document.getElementById('adjmix');
+          if (box) box.hidden = a !== 'custom';
+        };
+        // A stat key (trait or rating) shown as counted right now?
+        window.lcRaw = (key) => { const kind = (window.lcAdjKinds || {})[key]; return kind ? !adjOn(kind) : (root.dataset.arena ?? defaults.arena) === 'raw'; };
         // Every team pill (and the phone's settings row) shows the team in its colour; a pill names a setting only when
         // it is off its usual value, so a pill reading just "CAR" means the usual numbers. The phone row names both.
         const paint = () => {
@@ -383,6 +455,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
             ['my-team-link', 'more-my-team'].forEach((id) => { const l = document.getElementById(id); l.hidden = !v; if (v) l.href = l.dataset.base + 'team/' + v + '/'; });
             if (v) document.getElementById('my-team-link').textContent = `${info[v]?.n ?? v} page →`;
           }
+          if (k === 'arena') applyMix();
           if (k !== 'spell') paint();
         };
         const set = (k, v) => {
@@ -394,13 +467,21 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         Object.keys(defaults).forEach((k) => apply(k, read(k)));
         document.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => set(b.dataset.pref, b.dataset.value)));
         document.getElementById('team-pick').addEventListener('change', (e) => set('team', e.target.value));
-
+        // Custom's switches. All on is just Adjusted and all off just Recorded, so the menu moves there by itself (the
+        // mix is kept, so picking Custom again brings it back; an all-on or all-off mix comes back with every switch on).
+        document.querySelectorAll('[data-adj-kind]').forEach((c) => c.addEventListener('change', () => {
+          mix = KINDS.filter((k) => document.querySelector(`[data-adj-kind="${k}"]`).checked);
+          try { localStorage.setItem('lc-adjmix', mix.join(',')); } catch {}
+          if (mix.length === KINDS.length) set('arena', 'adjusted');
+          else if (!mix.length) set('arena', 'raw');
+          else set('arena', 'custom');
+        }));
         // Pop-up panels: the settings menu (from any team pill or the phone's settings row) and the page list (from the
         // three-line icon). On computers each opens under the button that opened it and follows it while scrolling;
         // on phones the settings menu is a sheet just above the tab bar.
         const phone = matchMedia('(max-width: 719px)');
         const prefs = document.getElementById('prefs'), scrim = document.getElementById('prefs-scrim'), nav = document.getElementById('navmenu');
-        const more = document.getElementById('more'), moreBtn = document.getElementById('more-toggle');
+        const more = document.getElementById('morepanel'), moreBtn = document.getElementById('more-toggle');
         let open = null; // { panel, opener }
         const place = () => {
           if (!open) return;
@@ -681,7 +762,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .site-nav a[aria-current='page'] { border-bottom-color: var(--ink); }
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
-  .tabbar, .more, .dock { display: none; }
+  .tabbar, .morepanel, .dock { display: none; }
   @media (max-width: 719px) {
     .site-nav { display: none; }
     body { padding-bottom: var(--dock-h, calc(102px + env(safe-area-inset-bottom))); }
@@ -691,11 +772,11 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     .tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
     .tabbar [aria-current='page'], .tabbar button[aria-expanded='true'] { color: var(--ink); }
     .tabbar [aria-current='page'] svg { stroke-width: 2.4; }
-    .more:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(var(--dock-h, calc(102px + env(safe-area-inset-bottom))) + 8px); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
-    .more a, .more .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
-    .more a:hover { background: var(--track); }
-    .more .soon { color: var(--ink-3); font-weight: 500; }
-    .more em { font-style: normal; font-size: 12px; margin-left: 6px; }
+    .morepanel:not([hidden]) { display: grid; position: fixed; right: 10px; bottom: calc(var(--dock-h, calc(102px + env(safe-area-inset-bottom))) + 8px); z-index: 41; min-width: 220px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); font: 600 15px var(--ui); }
+    .morepanel a, .morepanel .soon { padding: 11px 12px; border-radius: 10px; text-decoration: none; }
+    .morepanel a:hover { background: var(--track); }
+    .morepanel .soon { color: var(--ink-3); font-weight: 500; }
+    .morepanel em { font-style: normal; font-size: 12px; margin-left: 6px; }
   }
   /* Team pill (SiteTools.astro): the team in its colour, any setting off its usual value, a chevron. It opens the
      settings menu. Beside it, once the top menu has scrolled away, a quiet three-line icon opens the page list. */
@@ -731,6 +812,19 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .set select { font: 600 15px var(--ui); color: var(--ink); background-color: var(--sheet); border: 1px solid var(--ink); border-radius: 10px; padding: 8px 12px; width: 100%; cursor: pointer; }
   .mode.seg { display: grid; grid-template-columns: 1fr 1fr; }
   .mode.seg button { font-size: 14px; padding: 6px 10px; }
+  .mode.seg.three { grid-template-columns: 1fr 1fr 1fr; }
+  /* Custom's three switches, under the Adjusted stats choice. */
+  .adjmix:not([hidden]) { display: grid; margin-top: 2px; border-top: 1px solid var(--rule); }
+  .adjmix .tg { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 9px 2px; cursor: pointer; }
+  .adjmix .tg + .tg { border-top: 1px dashed var(--rule); }
+  .adjmix .tg b { display: block; font: 600 14px var(--ui); color: var(--ink); }
+  .adjmix .tg small { display: block; font: 400 12.5px/1.4 var(--ui); color: var(--ink-3); }
+  .adjmix input { position: absolute; opacity: 0; pointer-events: none; }
+  .adjmix .sw { position: relative; flex: none; width: 38px; height: 22px; border-radius: 999px; background: color-mix(in oklab, var(--ink-3) 35%, var(--sheet)); transition: background-color 0.15s; }
+  .adjmix .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: translate 0.15s; }
+  .adjmix input:checked + .sw { background: var(--ink); }
+  .adjmix input:checked + .sw::after { translate: 16px 0; }
+  .adjmix input:focus-visible + .sw { outline: 2px solid var(--ink-3); outline-offset: 2px; }
   .set-why { font: 400 12.5px/1.4 var(--ui); color: var(--ink-3); }
   .set-foot { font: 400 12px var(--ui); color: var(--ink-3); }
   .prefs hr, .navmenu hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
@@ -849,9 +943,16 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   /* The game's day, set large under a rink header on preview and post-game pages. */
   .when-day { font: 600 20px/1.2 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-bottom: 2px; }
   .when-day + p strong { color: var(--ink); font-weight: 600; }
+  /* Under the rink on game pages: the link to the game's other page beside Share, on one quiet line. */
+  .gamelinks { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
+  .gamelinks:empty { display: none; }
   .a-raw { display: none; }
+  /* Each score-style stat carries data-adj (its kind of adjustment, lib/adjust.ts); the settings set data-raw-{kind}
+     on the page for every kind shown as counted. */
+  html[data-raw-arena] [data-adj='arena'] .a-raw, html[data-raw-score] [data-adj='score'] .a-raw, html[data-raw-competition] [data-adj='competition'] .a-raw,
   html[data-arena='raw'] .a-raw { display: inline; }
-  html[data-arena='raw'] .a-adj, html[data-arena='raw'] .corner { display: none; }
+  html[data-raw-arena] [data-adj='arena'] :is(.a-adj, .corner), html[data-raw-score] [data-adj='score'] :is(.a-adj, .corner), html[data-raw-competition] [data-adj='competition'] :is(.a-adj, .corner),
+  html[data-arena='raw'] :is(.a-adj, .corner) { display: none; }
   /* The logo (components/Logo.astro) in the header and the footer. */
   .brand-logo .logo { height: 40px; }
   .foot-logo { display: block; width: max-content; margin-bottom: 10px; }
@@ -905,11 +1006,17 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   @keyframes skel-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
   /* The space under the heading's rule lives on the heading itself, so whatever comes next (a card, a picker, a grid
      of cards, a table) never sits flush against the line. It collapses with the next block's own top margin. */
-  .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin-bottom: 18px; }
-  .sec-head h2 { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; }
+  /* Section titles are a sans capitals label with a hairline running out to the edge (Sora, 2026-10-16, option 6). */
+  .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .sec-head h2 { font: 700 16px/1.25 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; font-variation-settings: normal; min-width: 0; }
+  .sec-head::after { content: ''; order: 2; flex: 1 1 24px; min-width: 24px; height: 1px; background: var(--ink-3); transform-origin: left; }
+  .sec-head > :not(h2, .xp-q) { order: 3; }
+  .sec-head .xp-q { width: 20px; height: 20px; font-size: 11px; }
   .ph { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border: 1px dashed var(--ink-3); border-radius: 3px; padding: 2px 6px; }
   .takeaway { margin-top: 14px; color: var(--ink-2); font-size: 18px; }
-  .sub { font: 600 22px/1.15 var(--display); margin: 40px 0 12px; }
+  /* Sub-headings inside a section: the section label's size in grey, no line, a step below the section label (Sora, 2026-10-16). */
+  :is(h3, h4, .xp-h).sub { font: 700 16px/1.25 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); font-variation-settings: normal; margin: 36px 0 12px; }
+  .xp-h.sub .xp-q { width: 20px; height: 20px; font-size: 11px; vertical-align: 0.1em; }
   /* Explainers on demand: a small "?" beside a heading, and the pale panel it opens under the heading. */
   .xp-q { flex: none; position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: var(--track); color: var(--ink-2); font: 700 13px/1 var(--ui); cursor: pointer; vertical-align: 0.15em; }
   .xp-q::after { content: ''; position: absolute; inset: -10px; }

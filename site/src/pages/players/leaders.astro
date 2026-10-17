@@ -164,9 +164,11 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
         const top = inMenus.filter((r: any) => r[c] != null && (!sd.q || QUAL[sd.q as keyof typeof QUAL](r, gp))).sort((a: any, b: any) => sgn * (a[c] - b[c]) || TIE[k].reduce((t, [tc, ts]) => t || ts * ((a[tc] ?? 0) - (b[tc] ?? 0)), 0)).slice(0, 3);
         const rows = top.map((r: any) => {
           const nm = k === 't' ? pill(r.team) : `${pages.has(r.id) ? `<a class="plink" href="${base}player/${r.id}/">${esc(r.name)}</a>` : esc(r.name)}`;
-          return `<li><span class="ldr-who">${nm}${k === 't' ? '' : String(r.team).split(', ').map(pill).join('')}</span><span class="ldr-v">${(FMT as any)[sd.f](r[c])}</span></li>`;
+          return `<li><span class="ldr-who">${nm}</span><span class="ldr-tm">${k === 't' ? '' : String(r.team).split(', ').map(pill).join('')}</span><span class="ldr-v">${(FMT as any)[sd.f](r[c])}</span></li>`;
         }).join('');
-        return `<div class="card ldr${c === sortKey ? ' on' : ''}"><button type="button" class="ldr-h eyebrow" data-sort="${c}">${esc(sd.name)}</button><ol>${rows}</ol></div>`;
+        // A long stat name would wrap on a phone and push its card's rows out of line with its neighbour's: use the short one.
+        const title = narrow.matches && sd.name.length > 16 ? sd.short : sd.name;
+        return `<div class="card ldr${c === sortKey ? ' on' : ''}"><button type="button" class="ldr-h eyebrow" data-sort="${c}" aria-label="${esc(sd.name)}">${esc(title)}</button><ol>${rows}</ol></div>`;
       }).join('');
       const head = `<thead><tr><th class="rk">#</th><th class="who">${k === 't' ? 'Team' : 'Player'}</th>${k === 't' ? '' : '<th class="tm">Team</th>'}${k === 's' ? '<th class="ps">Pos</th>' : ''}${cols.map((c) => `<th class="${c === sortKey ? 'on' : ''}"><button type="button" data-sort="${c}" data-tip="${esc(d[c].name)}: ${esc(d[c].tip)}" aria-label="Sort by ${esc(d[c].name)}">${esc(d[c].short)}${c === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`).join('')}</tr></thead>`;
       const mine = (window as any).lcPrefs?.get('team');
@@ -242,19 +244,23 @@ const asOfWord = when ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 
   .lead-tools .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 16px var(--ui); padding: 10px 0; outline: none; }
   #grp-wrap[hidden] { display: none; }
   .ldr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 16px; }
+  @media (max-width: 1060px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .ldr { padding: 14px 16px 10px; }
   .ldr.on { border-color: var(--ink-3); }
-  .ldr-h { all: unset; cursor: pointer; display: block; margin-bottom: 6px; }
+  .ldr-h { all: unset; cursor: pointer; display: block; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ldr-h:hover { color: var(--ink); }
-  .ldr ol { list-style: none; margin: 0; padding: 0; }
-  .ldr li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); font: 500 14px var(--ui); }
+  /* Names, team pills and numbers each keep one column, so every row of a card lines up. Phones have no pills, so each
+     row sizes its own number there and the leader's big one never squeezes the names below it. */
+  .ldr ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+  .ldr li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; column-gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); font: 500 14px var(--ui); }
   .ldr li:first-child { border-top: 0; }
   .ldr li:first-child .ldr-v { font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; }
-  .ldr-who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .ldr-who { display: flex; min-width: 0; }
   .ldr-who .plink { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 6px; margin-bottom: -6px; }
-  .ldr-who .chip { flex: none; text-decoration: none; }
-  .ldr-v { font-variant-numeric: tabular-nums; font-weight: 600; }
-  @media (max-width: 719px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ldr { padding: 12px; } .ldr li { font-size: 13px; } .ldr-who .chip { display: none; } }
+  .ldr-tm { display: flex; gap: 4px; }
+  .ldr-tm .chip { flex: none; text-decoration: none; }
+  .ldr-v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  @media (max-width: 719px) { .ldr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ldr { padding: 12px; } .ldr ol { display: block; } .ldr li { grid-template-columns: minmax(0, 1fr) auto; font-size: 13px; } .ldr-tm { display: none; } }
   .lead-tip { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 14px 0 0; min-height: 1.45em; }
   .lead-tip b { color: var(--ink); font-weight: 600; }
   .lead-card { margin-top: 12px; padding: 8px 0 14px; }

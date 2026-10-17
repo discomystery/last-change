@@ -1,22 +1,29 @@
 ---
-// Every team, by division (in standings order) or A to Z. The visitor's own team is pinned first either way.
+// Teams > All teams: every club, by division (in standings order), in league standings order, or A to Z. The visitor's own team is pinned first either way.
 import Base from '../layouts/Base.astro';
 import teams from '../../public/data/teams.json';
 import schedule from '../../public/data/schedule.json';
 import TeamCard from '../components/TeamCard.astro';
+import TeamTabs from '../components/TeamTabs.astro';
 
-type T = { abbr: string; name: string; place: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string; div_rank: number };
+type T = { abbr: string; name: string; place: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string; div_rank: number; league_rank?: number; pt_pct?: number };
 const all = teams as T[];
 const base = import.meta.env.BASE_URL;
 const confs = ['Eastern', 'Western'];
 const divs = (c: string) => [...new Set(all.filter((t) => t.conference === c).map((t) => t.division))].sort();
+// League standings: the NHL's own order when the feed gave it, else points, then fewer games, then wins.
+const byStandings = [...all].sort((a, b) => (a.league_rank ?? 99) - (b.league_rank ?? 99) || b.pts - a.pts || a.gp - b.gp || b.w - a.w);
+// Points percentage: the first tiebreaker, and fairer than points while teams have played different numbers of games.
+const pctOf = (t: T) => t.pt_pct ?? (t.gp ? t.pts / (2 * t.gp) : 0);
+const byPct = [...all].sort((a, b) => pctOf(b) - pctOf(a) || (a.league_rank ?? 99) - (b.league_rank ?? 99) || b.pts - a.pts);
 const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, start: g.start, home: g.home, away: g.away }));
 ---
 <Base section="teams" title="Teams" description="All 32 NHL teams: how each one plays, their lines, special teams and goalies.">
   <header class="page-top"><h1>Teams</h1></header>
+  <TeamTabs current="all" />
   <div class="pick">
     <span>Show teams</span>
-    <select id="teams-view" aria-label="How to list the teams"><option value="division">by division</option><option value="az">A to Z</option></select>
+    <select id="teams-view" aria-label="How to list the teams"><option value="division">by division</option><option value="league">in league standings</option><option value="pct">by points percentage</option><option value="az">A to Z</option></select>
   </div>
   <section id="mine" class="mine" hidden>
     <p class="mini-h">Your team</p>
@@ -37,10 +44,18 @@ const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, 
       </section>
     ))}
   </div>
+  <div data-view="league" hidden>
+    <ol class="tgrid az">{byStandings.map((t, i) => <TeamCard t={t} pos={i + 1} />)}</ol>
+    <p class="note">For the full table, with tiebreakers, goals and the wild-card race, see <a href={`${base}teams/standings/`}>Standings</a>.</p>
+  </div>
+  <div data-view="pct" hidden>
+    <ol class="tgrid az">{byPct.map((t, i) => <TeamCard t={t} pos={i + 1} pct />)}</ol>
+    <p class="note">Points percentage is points out of the most a team could have had, so teams that have played fewer games are not left behind. It is the NHL’s first tiebreaker.</p>
+  </div>
   <div data-view="az" hidden>
     <ul class="tgrid az">{[...all].sort((a, b) => a.name.localeCompare(b.name)).map((t) => <TeamCard t={t} />)}</ul>
   </div>
-  <p class="note">Within each division, teams are in standings order. Records are wins, losses and overtime losses.</p>
+  <p class="note" data-view="division">Within each division, teams are in standings order. Records are wins, losses and overtime losses.</p>
   <script type="application/json" id="upcoming" set:html={JSON.stringify(upcoming)}></script>
 </Base>
 
@@ -50,6 +65,7 @@ const upcoming = schedule.games.filter((g) => !g.final).map((g) => ({ id: g.id, 
     const views = document.querySelectorAll('[data-view]');
     let saved = 'division';
     try { saved = localStorage.getItem('lc-teams-view') || 'division'; } catch {}
+    if (![...sel.options].some((o) => o.value === saved)) saved = 'division';
     const apply = (v) => { sel.value = v; views.forEach((el) => { el.hidden = el.dataset.view !== v; }); };
     apply(saved);
     sel.addEventListener('change', () => { apply(sel.value); try { localStorage.setItem('lc-teams-view', sel.value); } catch {} });
