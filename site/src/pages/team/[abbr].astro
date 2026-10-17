@@ -82,6 +82,9 @@ type Faced = { xgf60: number; xga60: number; share: number; score: number; opp_o
 // Line score sentence: how it compares, then how hard its opponents have been (both against the same line number).
 const scoreWords = (p: number, peers: string) => (p >= 65 ? `Better than most ${peers}` : p <= 35 ? `Behind most ${peers}` : `About average for ${peers}`);
 const facedWords = (p: number, peers: string) => (p >= 65 ? `after facing tougher opponents than most ${peers} face` : p <= 35 ? `against easier opponents than most ${peers} face` : 'against about the usual opponents');
+// The line or pair score as a tag (the site's .chip.phrase), beside the label on wide cards and under the names on
+// narrow cards, where the label row is already full; the sentence is in its tip.
+const lsTip = (u: any) => `${scoreWords(u.faced.pct.score, peer[u.label])}, ${facedWords(u.faced.pct.opp_off, peer[u.label])}. The score is chances created for every chance allowed, allowing for the opponents this ${u.label[0] === 'L' ? 'line' : 'pair'} has been out against: 100 is average for ${peer[u.label]}, 120 means 20% more.`;
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top defense pairs', P2: 'second defense pairs', P3: 'third defense pairs' };
 type SUnit = { label: string; players: { id: number; name: string; role: string | null; both?: boolean; after?: string | null }[]; minutes: number; seconds: number; share: number; rate: number; pct?: number };
 const sp = (ln as any)?.special as { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string; player: string } | null; shots: { x: number; y: number; xg: number }[] } | undefined;
@@ -272,17 +275,12 @@ const coachSince = coach && (team as any).coach_since
                 <li class="card unit" data-adj={u.faced ? 'competition' : undefined}>
                   <div class="unit-top">
                     <span class="unit-label">{u.label}</span>
+                    {u.faced && <span class="ls-top a-adj"><span class="chip phrase" tabindex="0" data-tip={lsTip(u)}>{u.label[0] === 'L' ? 'Line' : 'Pair'} score <b>{u.faced.score}</b></span></span>}
                     <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={ln.games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                   </div>
                   <UnitNames players={u.players} ids={(u as any).ids} clash={clash} />
                   {doubles(u) && <p class="unit-two">{doubles(u)}</p>}
-                  {u.faced && (
-                    <div class="lscore a-adj">
-                      <span class="ls-n" tabindex="0" data-tip={`Chances created for every chance allowed, allowing for the opponents this ${u.label[0] === 'L' ? 'line' : 'pair'} has been out against, against the average for ${peer[u.label]}. 100 is average; 120 means 20% more.`}>{u.faced.score}</span>
-                      <span class="ls-l">{u.label[0] === 'L' ? 'Line score' : 'Pair score'}</span>
-                      <span class="ls-s">{scoreWords(u.faced.pct.score, peer[u.label])}, {facedWords(u.faced.pct.opp_off, peer[u.label])}.</span>
-                    </div>
-                  )}
+                  {u.faced && <p class="ls-below a-adj"><span class="chip phrase" tabindex="0" data-tip={lsTip(u)}>{u.label[0] === 'L' ? 'Line' : 'Pair'} score <b>{u.faced.score}</b></span></p>}
                   {u.faced && (
                   <dl class="stats a-adj">
                     <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60 with this group on the ice, allowing for how good the defenders it faced were.">Creates</span></dt><dd>{u.faced.xgf60.toFixed(2)}</dd><Pips pct={u.faced.pct.xgf60} tip={`${compared(u.faced.pct.xgf60, 'creates more than', 'creates less than', peer[u.label])}, allowing for opponents.`} /></div>
@@ -648,10 +646,13 @@ const coachSince = coach && (team as any).coach_since
   }
   /* Line and pair scores (the Competition switch): the score leads the card while it is on; Recorded shows the
      plain numbers underneath instead. Base shows .a-raw inline, so the recorded grid gets its display back here. */
-  .lscore { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; align-items: center; margin-top: 14px; padding: 10px 12px; background: var(--ice); border-radius: 10px; }
-  .ls-n { grid-row: 1 / span 2; font: 700 30px/1 var(--ui); font-variant-numeric: tabular-nums; }
-  .ls-l { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
-  .ls-s { font: 400 13.5px/1.4 var(--ui); color: var(--ink-2); }
+  .ls-top { display: inline-flex; }
+  .ls-below { display: none; margin: 12px 0 0; }
+  .ls-top :global(.chip), .ls-below :global(.chip) { cursor: help; vertical-align: 0; }
+  .ls-top :global(.chip b), .ls-below :global(.chip b) { color: var(--ink); font-weight: 700; margin-left: 2px; }
+  /* By the card's own width, so two narrow cards side by side (tablets) move it under the names too. */
+  .unit:has(.ls-top) { container-type: inline-size; }
+  @container (max-width: 470px) { .ls-top { display: none; } .ls-below { display: block; } }
   .unit dl.stats.a-raw { display: none; }
   :global(html[data-raw-competition]) .unit[data-adj='competition'] dl.stats.a-raw, :global(html[data-arena='raw']) .unit[data-adj='competition'] dl.stats.a-raw { display: grid; }
 </style>
