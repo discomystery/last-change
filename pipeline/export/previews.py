@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 20  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 21  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -48,6 +48,8 @@ RULES_VERSION = 20  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 19: "best against best" only for two of the league's best teams meeting (Sora, 2026-10-16): duels and top-line
 #     matchups get other headlines, and the story leads with it when the standings say so
 # 20: power-play calls say how many power plays to expect from the two teams' penalties taken and drawn (context only)
+# 21: a matchup call never makes the headline, "Round two" rarely does, big milestones outrank Out notes, nothing about a player
+#     listed as out, penalty context only when it points the call's way (Sora's review of 2025-26, 2026-10-17)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -186,9 +188,9 @@ CLASH_WORDS = {
 }
 PACE_WORDS = {
     "fast": (["Expect a track meet", "Shots should fly both ways", "Nobody’s sitting back in this one", "Buckle up"],
-             "{Ac} plays some of the league’s fastest games, and so does {Hc}. We think this one runs hotter than either team’s usual."),
+             "{A} play some of the league’s fastest games, and so do {H}. We think this one runs hotter than either team’s usual."),
     "slow": (["Expect a grind", "Bring a pillow", "Don’t blink and you still might miss the shots", "Trench warfare", "Every inch will be earned"],
-             "{Ac} plays some of the league’s slowest games, and so does {Hc}. We think this one is even quieter than either team’s usual."),
+             "{A} play some of the league’s slowest games, and so do {H}. We think this one is even quieter than either team’s usual."),
 }
 # The gist of each call, one short sentence with no numbers, for the story at the top of the page.
 CLASH_GIST = {"volume": "{X} shoot a lot, and {Y} give up plenty.", "quality": "{X} make their shots count, and {Y} allow dangerous ones.",
@@ -279,8 +281,7 @@ MATCHUP_WORDS = {
 # starts), a goalie's saves above expected against one team in half his meetings predicts the other half not at all
 # (r = -0.02). So a striking record against tonight's opponent is a coincidence, and the call says so.
 HISTORY_MIN_STARTS, HISTORY_MIN_SHOTS, HISTORY_GAP = 5, 120, 0.03  # save-percentage gap from his usual
-HISTORY_HEADS = {"good": ["Don’t buy {Gp} record against {O}", "{Gp} hold on {O} won’t last", "{G} doesn’t own {O}",
-                          "{Gp} spell over {O} is a myth"],
+HISTORY_HEADS = {"good": ["Don’t buy {Gp} record against {O}", "{Gp} hold on {O} won’t last", "{G} doesn’t own {O}"],
                  "bad": ["{G} is due against {O}", "Don’t buy {Gp} slump against {O}", "{O} don’t own {G}",
                          "There’s no curse: {G} against {O}"]}
 # A hotter take than "it's a coincidence" (Sora, 2026-10-12): say what to expect instead.
@@ -392,10 +393,10 @@ def _fmt(text: str, **w) -> str:
 # (Sora chose "Context only", 2026-10-16). The ends are about the top and bottom seventh of matchups.
 PP_CHANCES = 0.15
 PEN_TAKES, PEN_DRAWS = 30, 70  # percentiles that count as a reason: takes a lot (fewer is better), draws a lot
-PEN_MORE = ["{Y} take a lot of penalties and {X} draw plenty of them, so their power play should get its chances.",
+PEN_MORE = ["{Y} take a lot of penalties and {X} draw plenty of them, so {Xp} power play should get its chances.",
             "{Y} take a lot of penalties, so {Xp} power play should get its chances.",
             "{X} draw a lot of penalties, so their power play should get its chances."]
-PEN_FEWER = ["{Y} rarely take penalties and {X} rarely draw them, so their power play may not get many chances.",
+PEN_FEWER = ["{Y} rarely take penalties and {X} rarely draw them, so {Xp} power play may not get many chances.",
              "{Y} rarely take penalties, so {Xp} power play may not get many chances.",
              "{X} rarely draw penalties, so their power play may not get many chances."]
 PEN_BOTH = {True: "These two hand each other plenty of power plays, so special teams should get a real say.",
@@ -428,10 +429,13 @@ def penalty_context(c: dict, fp: dict, places: dict) -> str | None:
     except (KeyError, TypeError, ZeroDivisionError):  # fingerprints saved before `taken` and `drawn`
         return None
     w = {**team_words(x, places, "X"), **team_words(y, places, "Y")}
-    if v >= PP_CHANCES:
+    # Only when it points the call's way (Sora's review of 2025-26, 2026-10-17: "their power play should get its chances"
+    # under a call that the kill would hold): a power-play call wants more power plays, a penalty-kill call fewer.
+    wants_more = (m == "pp") if kind == "clash" else ((m == "pp") == ((c.get("lean") or "offense") == "offense"))
+    if v >= PP_CHANCES and wants_more:
         why = (tk <= PEN_TAKES, dr >= PEN_DRAWS)
         pool = PEN_MORE
-    elif v <= -PP_CHANCES:
+    elif v <= -PP_CHANCES and not wants_more:
         why = (tk >= 100 - PEN_TAKES, dr <= 100 - PEN_DRAWS)
         pool = PEN_FEWER
     else:

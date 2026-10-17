@@ -35,11 +35,12 @@ from pipeline.export.previews import a_pct
 from pipeline.ingest import history
 from pipeline.metrics import adjust, goalies, team_style
 
-BIG, SMALL = 1.75, 1.0  # scores for a surprise and for a smaller twist
+BIG, SMALL = 1.75, 1.65  # scores for a surprise and for a smaller twist (SMALL: about one team-game in twenty, Sora's review 2026-10-17)
 KNOWN_BONUS = 0.25  # "bad to worse" and "good to better" are a story of their own (Sora, 2026-10-12)
 SHOT_WEIGHT = 0.75  # shot share has to stray further (2.3 spreads) to count as a surprise
 DEPTH_WEIGHT = 0.85  # bottom-six minutes swing with penalties and injuries in the game, so they need a little more too
 MAX_SHOWN, MIN_SHOWN = 4, 2
+BLOWOUT = 3  # goal margin from which ice-time (bottom-six) surprises are not told
 TAGS = {"break": "Broke the pattern", "further": "Further than usual", "muted": "Closer than usual",
         "unusual": "Out of character", "rare": "Out of the ordinary", "worse": "Bad to worse", "better": "Good to better"}
 SIDE, EXTREME = 0.5, 0.9  # standings (bell-curve units): leaning one way, and known for it
@@ -534,8 +535,9 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season, score["pp_goals"][t]))
         u, lg = level(t, "physical")
         out.append(team_stat("hits", t, o, _hits(r), u, lg, places, None, fp, season))
-        u, lg = level(t, "depth")
-        out.append(team_stat("depth", t, o, _depth(r), u, lg, places, None, fp, season))
+        if abs(score[a] - score[h]) < BLOWOUT:  # a bench shortens or lengthens with the score (Sora's review, 2026-10-17)
+            u, lg = level(t, "depth")
+            out.append(team_stat("depth", t, o, _depth(r), u, lg, places, None, fp, season))
         out.append(pp_goals(t, o, score["pp_goals"][t], score["pp_opps"][t], fp, places, season))
     won = {a: score[a] > score[h], h: score[h] > score[a]}
     for gl in glines:

@@ -13,7 +13,7 @@ def test_pick_one_per_kind_and_never_empty():
     c = lambda kind, score: {"kind": kind, "score": score, "tag": "x", "head": kind, "body": ""}
     shown = surprises.pick([c("shots", 3.0), c("shots", 2.5), c("goalie", 2.0), c("lineup", 1.2), c("chances", 0.4)])
     assert [s["kind"] for s in shown] == ["shots", "goalie"]
-    quiet = surprises.pick([c("lineup", 1.2), c("chances", 0.4)])
+    quiet = surprises.pick([c("lineup", 1.7), c("chances", 0.4)])  # a twist needs about a one-in-twenty night (SMALL)
     assert [s["kind"] for s in quiet] == ["lineup"] and quiet[0]["mild"]
     assert surprises.pick([c("chances", 0.4)])[0]["kind"] == "form"
 

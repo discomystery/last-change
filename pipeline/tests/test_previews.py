@@ -170,7 +170,10 @@ def test_penalty_context():
     clash = {"kind": "clash", "metric": "pp", "team": "AAA", "opp": "BBB"}
     s = penalty_context(clash, fp, places)
     assert s and "should get its chances" in s and s.count("Aville") <= 1
-    assert penalty_context({**clash, "team": "BBB", "opp": "AAA"}, fp, places).endswith("may not get many chances.")
+    # a power-play call that expects FEWER power plays says nothing: the context must point the call's way (2026-10-17)
+    assert penalty_context({**clash, "team": "BBB", "opp": "AAA"}, fp, places) is None
+    # a penalty-kill clash (BBB's kill against AAA's power play) is helped by few power plays
+    assert penalty_context({**clash, "metric": "pk", "team": "BBB", "opp": "AAA"}, fp, places).endswith("may not get many chances.")
     assert penalty_context({**clash, "team": "CCC", "opp": "DDD"}, fp, places) is None  # nothing out of the ordinary
     assert penalty_context({**clash, "metric": "volume"}, fp, places) is None
     assert penalty_context(clash, {"AAA": {"dims": {}}, "BBB": {"dims": {}}}, places) is None  # older fingerprints

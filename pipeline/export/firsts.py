@@ -154,7 +154,7 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         for what, have, now, low in (("goal", g, g_now, 100), ("point", pts, pts_now, 300), ("assist", pts - g, a_now, 200), ("game", gp, 1, 500)):
             mark = (have + now) // 100 * 100
             if now and mark >= low and have < mark:
-                out.append({**item, "kind": "milestone", "what": what, "mark": mark})
+                out.append({**item, "kind": "milestone", "what": what, "mark": mark, "have": have})
                 break
         if g == 0 and g_now:
             out.append({**item, "kind": "first_goal", "debut": gp == 0})
