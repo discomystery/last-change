@@ -6,14 +6,15 @@ import teamsData from '../../public/data/teams.json';
 import fpData from '../../public/data/fingerprints.json';
 import { teamColour, darkShade } from './teams';
 import { ordinal } from './format';
-import { W, BL, PH, FONT, CHAR, type Mode, type Pt, type View, type Chart } from './scatterSvg';
+import { W0, H0, BL, BB, FONT, CHAR, type Mode, type Pt, type View, type Chart } from './scatterSvg';
 export { scatterSvg, type Mode, type View, type Chart } from './scatterSvg';
 
 type Raw = { t: string; x: number; y: number; tip: string };
 type Axis = { lowBetter?: boolean };
 
 /** Places 32 teams: scales with room for the corner names, then puts each abbreviation beside its dot where it fits. */
-function layout(rows: Raw[], ax: { x: Axis; y: Axis }, corners: View['corners'], xAxis: string, yAxis: string, from: string): View {
+function layout(rows: Raw[], ax: { x: Axis; y: Axis }, corners: View['corners'], xAxis: string, yAxis: string, from: string, size: [number, number] = [W0, H0]): View {
+  const [W, H] = size, PH = H - BB;
   const xs = rows.map((r) => r.x), ys = rows.map((r) => r.y);
   const span = (v: number[]) => Math.max(...v) - Math.min(...v) || 1;
   const xPad = span(xs) * 0.08, yPad = span(ys) * 0.24;
@@ -78,7 +79,7 @@ function layout(rows: Raw[], ax: { x: Axis; y: Axis }, corners: View['corners'],
     if (lead) leads.push(lead);
     out[i] = { t: p.t, x: p.x, y: p.y, tip: p.tip, px: p.px, py: p.py, lx: +best.lx.toFixed(1), ly: +best.ly.toFixed(1), a: best.a, lead };
   }
-  return { corners, xAxis, yAxis, mid: [X(mean(xs)), Y(mean(ys))], pts: out, from };
+  return { corners, xAxis, yAxis, mid: [X(mean(xs)), Y(mean(ys))], pts: out, from, ...(W !== W0 || H !== H0 ? { w: W, h: H } : {}) };
 }
 
 /** Each club's own colour for both card themes (share cards draw outside the page's light-dark CSS). */
@@ -92,7 +93,7 @@ const place = Object.fromEntries((teamsData as { abbr: string; place: string }[]
 type Stats = { cols: string[]; seasons: Record<string, (string | number)[][]> };
 const stats = Object.values(import.meta.glob('../../public/data/stats/teams.json', { eager: true, import: 'default' }))[0] as Stats | undefined;
 
-function chances(m: Mode): View {
+function chances(m: Mode, size?: [number, number]): View {
   const rows = Object.keys(place).flatMap((t) => {
     const pp = fp[t]?.dims.pp?.[m], pk = fp[t]?.dims.pk?.[m];
     if (!pp || !pk) return [];
@@ -101,10 +102,10 @@ function chances(m: Mode): View {
   });
   const from = m === 'blend' ? 'Expected goals per 60 at 5-on-4 and 4-on-5, this season blended with last.' : 'Expected goals per 60 at 5-on-4 and 4-on-5, this season only.';
   return layout(rows, { x: {}, y: { lowBetter: true } }, ['Kill carries|them', 'Strong|both ways', 'Struggling|both ways', 'Power play|carries them'],
-    'Power play: fewer chances ← → more', 'Kill: allows more ← → fewer', from);
+    'Power play: fewer chances ← → more', 'Kill: allows more ← → fewer', from, size);
 }
 
-function goals(stats: Stats, m: Mode): View {
+function goals(stats: Stats, m: Mode, size?: [number, number]): View {
   const c = (k: string) => stats.cols.indexOf(k);
   const seasons = Object.keys(stats.seasons).sort();
   const use = m === 'blend' ? seasons.slice(-2) : seasons.slice(-1);
@@ -122,15 +123,16 @@ function goals(stats: Stats, m: Mode): View {
     tip: `${place[t]}: power play ${x.toFixed(1)}% (${o.ppg} goals on ${o.ppo} power plays, ${ordinal(rx(t))}), penalty kill ${y.toFixed(1)}% (${o.ppga} allowed on ${o.tsh} times shorthanded, ${ordinal(ry(t))}).` }));
   const from = m === 'blend' ? 'The league’s official power-play and penalty-kill percentages, this season and last added together.' : 'The league’s official power-play and penalty-kill percentages, this season only.';
   return layout(rows, { x: {}, y: {} }, ['Kill carries|them', 'Strong|both ways', 'Struggling|both ways', 'Power play|carries them'],
-    'Power play %: lower ← → higher', 'Penalty kill %: lower ← → higher', from);
+    'Power play %: lower ← → higher', 'Penalty kill %: lower ← → higher', from, size);
 }
 
-let special: Chart | null = null;
-export const specialTeams = (): Chart => (special ??= {
+const special: Record<string, Chart> = {};
+/** `size` draws the chart wider than the usual square (in chart units). */
+export const specialTeams = (size?: [number, number]): Chart => (special[String(size ?? '')] ??= {
   key: 'special', title: 'Power play against penalty kill', kick: 'Special teams',
   sub: 'Every team’s power play against its penalty kill',
   metrics: [
-    { key: 'chances', word: 'chances', views: { blend: chances('blend'), season: chances('season') } },
-    ...(stats ? [{ key: 'goals', word: 'goals', views: { blend: goals(stats, 'blend'), season: goals(stats, 'season') } }] : []),
+    { key: 'chances', word: 'chances', views: { blend: chances('blend', size), season: chances('season', size) } },
+    ...(stats ? [{ key: 'goals', word: 'goals', views: { blend: goals(stats, 'blend', size), season: goals(stats, 'season', size) } }] : []),
   ],
 });

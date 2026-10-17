@@ -12,16 +12,19 @@ export type View = {
   pts: Pt[];
   /** One line under the chart saying what it is from. */
   from: string;
+  /** The chart's size in its own units (330 x 320 unless a page asks for a wider one). */
+  w?: number; h?: number;
 };
 export type Chart = { key: string; title: string; kick: string; sub: string; metrics: { key: string; word: string; views: Record<Mode, View> }[] };
 
 // The chart's own units: a 330 x 320 box, the bottom 22 for the across label and the left 18 for the up label.
-export const W = 330, H = 320;
-export const BL = 18, BB = 22, PH = H - BB;
+export const W0 = 330, H0 = 320;
+export const BL = 18, BB = 22;
 export const FONT = 10, CHAR = 6.6;
 
 /** The chart as SVG. `hi` names one team to stand out; `paint` gives each team's dot colour (CSS values). */
 export function scatterSvg(v: View, paint: (t: string) => string, hi: string | null = null, label = 'League chart') {
+  const W = v.w ?? W0, H = v.h ?? H0, PH = H - BB;
   // Corner names come as "first line|second line".
   const two = (s: string) => [...s.split('|'), ''].slice(0, 2);
   const corner = (x: number, y: number, a: string, s: string, up: boolean) => {
