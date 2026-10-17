@@ -134,7 +134,7 @@ const boot = { base, players: skaters.map((p) => [p.id, p.name, p.team, p.pos]),
     const e = est(p, src, k, m);
     if (!e) return m === 'season' ? 'Not rated this season' : 'Not rated: too little time';
     const group = peerOf(k, e.vs ?? p.group);
-    const stat = e.raw !== undefined ? t.short(e.index ?? 100) : t.short(e.v);
+    const stat = e.raw !== undefined ? t.short(e.index ?? e.v) : t.short(e.v);
     const cmp = src === 'edge' ? compared(e.pct, t.up ?? 'more than', t.down ?? 'less than', group, true) : compared(e.pct, 'better than', 'behind', group, true);
     return `${stat}, ${cmp}`;
   };
