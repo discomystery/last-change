@@ -393,10 +393,10 @@ def _fmt(text: str, **w) -> str:
 # (Sora chose "Context only", 2026-10-16). The ends are about the top and bottom seventh of matchups.
 PP_CHANCES = 0.15
 PEN_TAKES, PEN_DRAWS = 30, 70  # percentiles that count as a reason: takes a lot (fewer is better), draws a lot
-PEN_MORE = ["{Y} take a lot of penalties and {X} draw plenty of them, so {Xp} power play should get its chances.",
+PEN_MORE = ["{Y} take a lot of penalties and {X} draw plenty of them, so their power play should get its chances.",
             "{Y} take a lot of penalties, so {Xp} power play should get its chances.",
             "{X} draw a lot of penalties, so their power play should get its chances."]
-PEN_FEWER = ["{Y} rarely take penalties and {X} rarely draw them, so {Xp} power play may not get many chances.",
+PEN_FEWER = ["{Y} rarely take penalties and {X} rarely draw them, so their power play may not get many chances.",
              "{Y} rarely take penalties, so {Xp} power play may not get many chances.",
              "{X} rarely draw penalties, so their power play may not get many chances."]
 PEN_BOTH = {True: "These two hand each other plenty of power plays, so special teams should get a real say.",

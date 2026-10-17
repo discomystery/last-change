@@ -17,6 +17,19 @@ Kinds, most important first (`WEIGHT`):
                   during the season, or had a point ("made his Wild debut after four seasons with the Canucks"); never
                   "traded" or "signed", since no feed says how he moved
   club_goal       his first goal for a new club, for a player with NHL goals elsewhere
+  first_win       a goalie's first NHL win (with how long he waited: starts, seasons since his debut), and his first
+                  shutout with it when it was one
+  first_shutout   a goalie's first NHL shutout, when it wasn't also his first win
+  first_start     a goalie's first NHL start, after relief appearances only
+  win_since       a goalie's first win in 300+ days ("his first NHL win since Mar 3, 2025")
+
+Goalie decisions: the NHL gives the win to the goalie in net when his team scored the goal that put it ahead for good.
+Saved boxscores carry the decision only once refetched after the game, so it is worked out the same way from the
+play-by-play (`_wins`), the box's own "W" taking precedence (eye test, 2026-10-16: DiPietro's first NHL win, eight
+seasons after his debut, was the story in Boston and ours never said it).
+
+Skater first goals carry `undrafted` (the landing's draftDetails is empty) and `nth` (his NHL game tonight, counting
+this one) for "an undrafted rookie in his eighth NHL game" (Hughes, same night).
 
 A return's "since" date counts playoff games too (eye test on 2025-26: Tkachuk's "first NHL game since Feb 8, 2025"
 skipped his whole playoff run); a player back after the summer is told as his first game of the season.
@@ -29,7 +42,9 @@ import polars as pl
 
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, RAW, REGULAR, SITE_DATA, TABLES
 
-WEIGHT = {"first_goal": 90, "milestone": 85, "debut": 80, "return": 70, "first_point": 65, "club_debut": 62, "club_goal": 60}
+WEIGHT = {"first_goal": 90, "first_win": 88, "first_shutout": 86, "milestone": 85, "debut": 80, "first_start": 75, "win_since": 72,
+          "return": 70, "first_point": 65, "club_debut": 62, "club_goal": 60}
+WIN_SINCE_DAYS = 300  # a goalie's win after this long without one is told with the date of the last
 RETURN_GAMES = 5  # team games a regular missed before a mid-season return is told (10 until 2026-10-15; a regular rarely sits)
 SEASON_DEBUT_GAMES = 2  # ... and before a regular's first game of the season is told
 DEPTH_DEBUT_GAMES = 3  # a depth player's season debut: only when he scored, after this many team games
@@ -65,7 +80,14 @@ def prior_totals(season: int = CURRENT_SEASON) -> dict[int, dict]:
                                           "a": sum(s.get("assists") or 0 for s in rows), "clubs": {c for c in clubs if c},
                                           "seasons": {c: len(v) for c, v in seasons.items()},
                                           "last_club": max(rows, key=lambda s: s["season"]).get("teamName", {}).get("default") if rows else None,
-                                          "pos": land.get("position")}
+                                          "pos": land.get("position"),
+                                          # goalies: starts, wins, shutouts, his first NHL season and the last with a win
+                                          "gs": sum(s.get("gamesStarted") or 0 for s in rows), "w": sum(s.get("wins") or 0 for s in rows),
+                                          "so": sum(s.get("shutouts") or 0 for s in rows),
+                                          "first_season": min((s["season"] for s in rows if s.get("gamesPlayed")), default=None),
+                                          "last_win_season": max((s["season"] for s in rows if s.get("wins")), default=None),
+                                          # the key is there for every saved landing; empty means he was never drafted
+                                          "undrafted": "draftDetails" in land and not land["draftDetails"]}
     return out
 
 
@@ -121,6 +143,96 @@ def _goalie_games() -> dict[int, list[str]]:
     return {k: sorted(v) for k, v in out.items()}
 
 
+@lru_cache(maxsize=8)
+def _wins(season: int) -> dict[int, int]:
+    """game_id -> the winning goalie, for every finished regular-season game: the box's decision when saved, else the
+    goalie in net for the winners when they scored the goal that put them ahead for good (the last goal in a
+    shootout game goes to whoever finished it)."""
+    d = TABLES / str(season)
+    if not (d / "events.parquet").exists():
+        return {}
+    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+    ev = (pl.read_parquet(d / "events.parquet", columns=["game_id", "sort", "period_type", "type", "team_id", "home_goalie", "away_goalie"])
+          .filter(pl.col("period_type") != "SO").sort("game_id", "sort"))
+    by_game = ev.partition_by("game_id", as_dict=True)
+    out = {}
+    for g in games.iter_rows(named=True):
+        gid = g["game_id"]
+        box = RAW / str(season) / "box" / f"{gid}.json.gz"
+        if box.exists():
+            stats = json.loads(gzip.open(box).read()).get("playerByGameStats", {})
+            w = next((x["playerId"] for side in ("homeTeam", "awayTeam") for x in stats.get(side, {}).get("goalies", []) if x.get("decision") == "W"), None)
+            if w:
+                out[gid] = w
+                continue
+        e = by_game.get((gid,))
+        if e is None or g["home_score"] == g["away_score"]:
+            continue
+        home_won = g["home_score"] > g["away_score"]
+        wid = g["home_id"] if home_won else g["away_id"]
+        col = "home_goalie" if home_won else "away_goalie"
+        lose = min(g["home_score"], g["away_score"])
+        goals = e.filter((pl.col("type") == "goal") & (pl.col("team_id") == wid))
+        if g["last_period"] == "SO" or goals.height <= lose:
+            seen = e.filter(pl.col(col).is_not_null())
+            w = seen[col][-1] if seen.height else None
+        else:
+            w = goals[col][lose]
+        if w is None:  # the winners' net was empty for the goal (an extra attacker): their last goalie in before it
+            seen = e.filter(pl.col(col).is_not_null())
+            w = seen[col][-1] if seen.height else None
+        if w is not None:
+            out[gid] = int(w)
+    return out
+
+
+@lru_cache(maxsize=8)
+def _shutouts(season: int) -> dict[int, list[int]]:
+    """game_id -> goalies credited with a shutout: alone in net all game for a team that allowed no goal (shootouts
+    aside)."""
+    from pipeline.metrics import goalies
+    d = TABLES / str(season)
+    if not (d / "events.parquet").exists():
+        return {}
+    games = pl.read_parquet(d / "games.parquet").filter((pl.col("game_type") == REGULAR) & pl.col("state").is_in(["OFF", "FINAL"]))
+    ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "period_type", "type", "team_id"]).filter(
+        (pl.col("type") == "goal") & (pl.col("period_type") != "SO"))
+    allowed = {}  # (game, team) -> goals against
+    for gid, tid in ev.select("game_id", "team_id").iter_rows():
+        allowed[(gid, tid)] = allowed.get((gid, tid), 0) + 1
+    other = {r["game_id"]: {r["home_id"]: r["away_id"], r["away_id"]: r["home_id"]} for r in games.iter_rows(named=True)}
+    pg = goalies.per_game(season).filter(pl.col("sec") > 0)
+    n_in = {(a, b): c for a, b, c in pg.group_by("game_id", "team_id").len().iter_rows()}  # goalies who played
+    out = {}
+    for gid, pid, tid in pg.select("game_id", "goalie_id", "team_id").iter_rows():
+        if gid in other and n_in.get((gid, tid)) == 1 and not allowed.get((gid, other[gid].get(tid))):
+            out.setdefault(gid, []).append(pid)
+    return out
+
+
+def _goalie_record(pid: int, season: int, gid: int) -> dict:
+    """His starts, wins and shutouts this season before game `gid`, and the date of his last win since 2023-24."""
+    starts = sum(1 for k, v in _goalie_starts(season).items() if k < gid for x in v if x[0] == pid)
+    wins = sum(1 for k, w in _wins(season).items() if k < gid and w == pid)
+    sos = sum(1 for k, v in _shutouts(season).items() if k < gid and pid in v)
+    return {"gs": starts, "w": wins, "so": sos}
+
+
+@lru_cache(maxsize=1)
+def _win_dates() -> dict[int, list[str]]:
+    """Every goalie's win dates since 2023-24, oldest first."""
+    from pipeline.config import FULL_SEASONS
+    out = {}
+    for s in [*FULL_SEASONS, CURRENT_SEASON]:
+        d = TABLES / str(s) / "games.parquet"
+        if not d.exists():
+            continue
+        day = dict(pl.read_parquet(d, columns=["game_id", "date"]).iter_rows())
+        for k, w in _wins(s).items():
+            out.setdefault(w, []).append(day[k])
+    return {k: sorted(v) for k, v in out.items()}
+
+
 def _goalie_last(pid: int, day: str) -> str | None:
     past = [d for d in _goalie_games().get(pid, []) if d < day]
     return past[-1] if past else None
@@ -157,7 +269,7 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                 out.append({**item, "kind": "milestone", "what": what, "mark": mark, "have": have})
                 break
         if g == 0 and g_now:
-            out.append({**item, "kind": "first_goal", "debut": gp == 0})
+            out.append({**item, "kind": "first_goal", "debut": gp == 0, "nth": gp + 1, "undrafted": base["undrafted"]})
         elif gp == 0:
             out.append({**item, "kind": "debut", "points": pts_now})
         elif pts == 0 and pts_now:
@@ -204,21 +316,47 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                     out.append({**item, "kind": "return", "missed": missed, "since": None, "season_debut": True, "points": pts_now})
     starts = _goalie_starts(season).get(gid, [])
     team_of = {game["home_id"][0]: game["home"][0], game["away_id"][0]: game["away"][0]}
-    for pid, tid in starts:
+    win = _wins(season).get(gid)
+    shut = _shutouts(season).get(gid, [])
+    cands = [(pid, tid, True) for pid, tid in starts]
+    if win and win not in {p_ for p_, _ in starts}:  # a win in relief
+        hs, as_ = game["home_score"][0], game["away_score"][0]
+        cands.append((win, game["home_id"][0] if hs > as_ else game["away_id"][0], False))
+    opened = G.filter(pl.col("season") == season)["date"].min()
+    for pid, tid, started in cands:
         base = prior.get(pid)
         if base is None:
             continue
         t = team_of.get(tid)
-        if base["gp"] or any(x[0] == pid for k, v in _goalie_starts(season).items() if k < gid for x in v):
-            prev = _goalie_last(pid, day)  # a goalie back in net after a long time away
-            if prev:
-                missed = G.filter((pl.col("date") > prev) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
-                if missed >= GOALIE_RETURN_GAMES:  # backups sit for weeks, so a goalie's return needs a long gap
-                    out.append({"pid": pid, "team": t, "kind": "return", "goalie": True, "missed": missed, "since": prev})
+        rec = _goalie_record(pid, season, gid)
+        before = _goalie_last(pid, day)
+        played_here = before is not None and opened is not None and before >= opened  # an earlier game this season
+        won, so = win == pid, pid in shut
+        if started and not base["gp"] and not played_here:
+            out.append({"pid": pid, "team": t, "kind": "debut", "goalie": True, "won": won, "shutout": so})
             continue
-        earlier = [x for k, v in _goalie_starts(season).items() if k < gid for x in v if x[0] == pid]
-        if not earlier:
-            out.append({"pid": pid, "team": team_of.get(tid), "kind": "debut", "goalie": True})
+        n_starts, n_wins, n_so = base["gs"] + rec["gs"], base["w"] + rec["w"], base["so"] + rec["so"]
+        first_season = base["first_season"] or (_season_id(season) if played_here else None)
+        seasons = season - first_season // 10000 if first_season else 0
+        item = {"pid": pid, "team": t, "goalie": True, "won": won, "shutout": so, "started": started}
+        if won and not n_wins:
+            out.append({**item, "kind": "first_win", "start_n": n_starts + 1 if started else None, "seasons": seasons})
+        elif so and not n_so:
+            out.append({**item, "kind": "first_shutout"})
+        elif started and not n_starts:
+            out.append({**item, "kind": "first_start"})
+        elif won:
+            past = [d for d in _win_dates().get(pid, []) if d < day]
+            from datetime import date as Date
+            if past and (Date.fromisoformat(day) - Date.fromisoformat(past[-1])).days >= WIN_SINCE_DAYS:
+                out.append({**item, "kind": "win_since", "since": past[-1]})
+            elif not past and base["last_win_season"] and base["last_win_season"] < 20232024:  # before our game logs
+                out.append({**item, "kind": "win_since", "since": None, "season": base["last_win_season"]})
+        if started and before:  # a goalie back in net after a long time away
+            missed = G.filter((pl.col("date") > before) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
+            if missed >= GOALIE_RETURN_GAMES:  # backups sit for weeks, so a goalie's return needs a long gap
+                out[:] = [x for x in out if not (x["pid"] == pid and x["kind"] == "win_since")]  # "back ..., and won"
+                out.append({**item, "kind": "return", "missed": missed, "since": before})
     debuts = {x["pid"] for x in out if x["kind"] in ("club_debut", "debut")}  # a new club's debut says it already
     out = [x for x in out if not (x["kind"] == "return" and x["pid"] in debuts)]
     stars = {}

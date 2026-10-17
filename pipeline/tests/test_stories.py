@@ -177,3 +177,71 @@ def test_neutral_clock_for_an_exit():
     from pipeline.export import surprises
     assert surprises.clock_at(1200 + 620) == "10:20 of the second period"
     assert surprises.clock_at(1200) == "the first period"
+
+
+# --- the turn of the game (outside coverage of COL 5-2 PIT and BOS 4-2 ANA, 2026-10-16) ------------------------------
+
+class _W:
+    nick = {"BOS": "Bruins", "ANA": "Ducks", "COL": "Avalanche", "PIT": "Penguins"}
+
+    def the(self, t):
+        return f"the {self.nick[t]}"
+
+
+def _g(period, sec, home, p1, hs, as_, strength="ev"):
+    return {"period": period, "sec": sec, "home": home, "p1": p1, "hs": hs, "as": as_, "strength": strength, "p2": None}
+
+
+# BOS (away) at ANA: two Anaheim goals 21 seconds apart, then three Boston power-play goals and an insurance goal
+BOS_ANA = [_g(1, 1162, True, 1, 1, 0), _g(1, 1183, True, 2, 2, 0), _g(2, 195, False, 3, 2, 1, "pp"),
+           _g(3, 206, False, 4, 2, 2, "pp"), _g(3, 498, False, 5, 2, 3, "pp"), _g(3, 980, False, 6, 2, 4)]
+SIDE = lambda g: "ANA" if g["home"] else "BOS"
+
+
+def test_the_first_goal_back_sparks_a_comeback():
+    assert stories.spark(BOS_ANA, SIDE, "BOS", "ANA") == (3, 1)
+    # Lehkonen scored both goals that erased Pittsburgh's 2-0 lead
+    col = [_g(1, 508, False, 1, 0, 1), _g(1, 537, False, 2, 0, 2), _g(1, 661, True, 9, 1, 2), _g(2, 25, True, 9, 2, 2), _g(2, 264, True, 7, 3, 2)]
+    assert stories.spark(col, lambda g: "COL" if g["home"] else "PIT", "COL", "PIT") == (9, 2)
+
+
+def test_late_insurance_and_pouring_it_on():
+    assert stories.insurance(BOS_ANA, SIDE, "BOS")["p1"] == 6
+    assert stories.late_rush(BOS_ANA, SIDE, "BOS")
+    # a two-goal lead cut back to one is no insurance
+    assert stories.insurance(BOS_ANA + [_g(3, 1100, True, 8, 3, 4)], SIDE, "BOS") is None
+
+
+def test_slow_start_needs_the_shots_to_turn():
+    periods = [{"goals": {"PIT": 2, "COL": 1}, "shots": {"PIT": 14, "COL": 5}}, {"goals": {"PIT": 0, "COL": 3}, "shots": {"PIT": 10, "COL": 18}},
+               {"goals": {"PIT": 0, "COL": 1}, "shots": {"PIT": 7, "COL": 9}}]
+    assert stories.slow_start(periods, "COL", "PIT", _W()) == \
+        "The Avalanche had five shots in the first period and trailed 2-1, then outshot the Penguins 27-17 the rest of the way."
+    periods[1]["shots"] = {"PIT": 14, "COL": 15}
+    assert stories.slow_start(periods, "COL", "PIT", _W()) is None
+
+
+def test_power_plays_that_turned_the_game():
+    nums = {"BOS": {"pp_goals": 3, "pp_opps": 4}, "ANA": {"pp_goals": 0, "pp_opps": 5}}
+    names = {3: "Frédéric Brunet", 4: "David Pastrňák", 5: "Elias Lindholm"}
+    first, last = stories.special_teams(nums, BOS_ANA, SIDE, "BOS", "ANA", _W(), names.get, True)
+    assert "Frédéric Brunet, David Pastrňák and Elias Lindholm all scored on the power play as the Bruins turned a two-goal hole into the lead" in first[0]
+    assert first[0].endswith("and the Ducks went 0-for-5 on theirs.") and not last
+    # no comeback: the power play and the kill are told on their own
+    first, last = stories.special_teams(nums, BOS_ANA, SIDE, "BOS", "ANA", _W(), names.get, False)
+    assert first == ["Special teams did the work: the Bruins scored three power-play goals on four chances and killed all five Ducks power plays."] \
+        or first == ["Special teams did the work: the Bruins went 3-for-4 on the power play and killed all five Ducks power plays."]
+    quiet = {"BOS": {"pp_goals": 1, "pp_opps": 2}, "ANA": {"pp_goals": 0, "pp_opps": 3}}
+    assert stories.special_teams(quiet, BOS_ANA, SIDE, "BOS", "ANA", _W(), names.get, False) == ([], [])
+
+
+def test_first_goal_and_goalie_first_details():
+    pre, post = stories.first_goal_detail({"undrafted": True, "nth": 8, "debut": False}, {"shot": "wrist"}, "MacKinnon")
+    assert f"T.J. Hughes{pre} scored his first NHL goal{post}." == \
+        "T.J. Hughes, undrafted and in his eighth NHL game, scored his first NHL goal, set up by MacKinnon."
+    assert stories.first_goal_detail({"nth": 1, "debut": True}, {"shot": "tip-in"}, "McNabb") == ("", ", tipping in a feed from McNabb")
+    win = {"kind": "first_win", "start_n": 4, "seasons": 8, "started": True}
+    assert stories.goalie_first_text(win, "Michael DiPietro", 25) == \
+        "Michael DiPietro finally got his first NHL win, making 25 saves in his fourth start, eight seasons after his NHL debut."
+    assert stories.goalie_first_text({**win, "start_n": 1, "seasons": 0}, "A", 30) == "A got his first NHL win, making 30 saves in his first NHL start."
+    assert stories.goalie_first_text({"kind": "win_since", "since": "2025-03-03"}, "A", 20) == "It was A’s first NHL win since Mar 3, 2025."

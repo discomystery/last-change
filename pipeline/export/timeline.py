@@ -50,6 +50,15 @@ def ordinal(n: int) -> str:
             10: "tenth"}.get(n, f"{n}th")
 
 
+ORDINAL_WORDS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "11th", "12th",
+                 "13th", "14th", "15th", "16th", "17th", "18th", "19th", "20th"]
+
+
+def nth_word(n: int) -> str:
+    """"eighth" for small counts ("in his eighth NHL game"), "23rd" beyond."""
+    return ORDINAL_WORDS[n] if 0 < n <= 20 else th(n)
+
+
 def th(n: int) -> str:
     """1,000th, 302nd, 21st (never 11st)."""
     suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
@@ -248,6 +257,7 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     att = gm.attach.get(i) or {}
     pre = att.get("pre")  # "scored his first NHL goal": replaces the beat's verb, the beat follows as "to ..."
     team_needed = _team_needed(gm, t, prev_team)
+    tm_fin = tm  # the clock after the finite beat (blank when the beat carries it)
     T, Tp = W.the(t), W.the(t)
     only = len(goals) == 1 and g["period"] <= 3
     # the beat: as a finite verb phrase, and as an infinitive for "scored his first NHL goal ... to tie it"
@@ -269,7 +279,7 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         else:
             fin = f"added an empty-net goal{left} to make it {m}-{th_}"
         inf = f"into the empty net{left}"
-        tm = ""  # the "with x:xx left" is in the beat
+        tm_fin = ""  # the "with x:xx left" is in the beat
     elif m == th_:
         fin = gm.pk([f"tied it {m}-{m}", "tied it", f"made it {m}-{m}"], "tie", i) + how
         inf = f"to tie it {m}-{m}"
@@ -283,8 +293,13 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
             inf = f"to put {T} ahead {m}-{th_}"
     elif m > th_:
         for_ = f" for {T}" if team_needed else ""
-        fin = gm.pk([f"made it {m}-{th_}{for_}{how}", f"stretched the lead to {m}-{th_}{how}", f"made it {m}-{th_}{for_}{how}"], "more", i)
-        inf = f"to make it {m}-{th_}{for_}"
+        if _insurance(gm, i, m, th_):  # a one-goal lead made two late in the third that held (writers name the clincher, 2026-10-16)
+            left = clock(1200 - g["sec"])
+            fin = gm.pk([f"added insurance{how} with {left} left", f"made it {m}-{th_}{for_}{how} with {left} left, and that was that"], "ins", i)
+            inf, tm_fin = f"to make it {m}-{th_}{for_}", ""  # the clock is in the beat
+        else:
+            fin = gm.pk([f"made it {m}-{th_}{for_}{how}", f"stretched the lead to {m}-{th_}{how}", f"made it {m}-{th_}{for_}{how}"], "more", i)
+            inf = f"to make it {m}-{th_}{for_}"
     else:  # cutting into a lead
         if m == th_ - 1 and g["period"] >= 3:  # late, the gap matters more than the first goal
             fin = gm.pk([f"pulled {T} within one{how}", f"cut it to {th_}-{m}{how}", f"made it {th_}-{m}{how}"], "cut", i)
@@ -300,11 +315,13 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
             fin += " with the goalie pulled"
             inf += " with the goalie pulled"
     if pre:
+        if att.get("helper"):  # "scored his first NHL goal, set up by Nathan MacKinnon, on the power play ..."
+            pre = f"{pre}, set up by {gm.name(att['helper'])},"
         body = f"{who} {pre}{how} {tm} {inf}"
     elif again and i != 0 and g["period"] <= 3:  # "Caufield struck again 3:10 later to put the Canadiens up 2-0"
         body = f"{who} {again}{how} {tm} {inf}"
     else:  # "tied it 1-1, 1:27 later": a comma keeps the score and the clock apart
-        body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm[:1].isdigit() else ''} {tm}"
+        body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm_fin[:1].isdigit() else ''} {tm_fin}"
     body = " ".join(body.split())
     tail = []
     if (g["period"], g["sec"]) in stood:
@@ -323,6 +340,18 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     if tail:
         body += ", " + ", ".join(tail)
     return " ".join(_cap(body).replace(" ,", ",").split()) + "."
+
+
+INSURANCE_SEC = 900  # third-period seconds after which a goal that made a one-goal lead two reads as insurance
+
+
+def _insurance(gm: Game, i: int, m: int, th_: int) -> bool:
+    """The winners' goal late in the third that made a one-goal lead two, when the lead never got back to one."""
+    g = gm.goals[i]
+    if gm.end != "REG" or gm.side(g) != gm.winner or g["strength"] == "en" or g["period"] != 3 or g["sec"] < INSURANCE_SEC or m - th_ != 2 or i == 0:
+        return False
+    lead = lambda x: (x["hs"] - x["as"]) * (1 if g["home"] else -1)
+    return lead(gm.goals[i - 1]) == 1 and all(lead(x) >= 2 for x in gm.goals[i:])
 
 
 def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahead_i: int | None, margin: int, down_most: int) -> str:
@@ -422,8 +451,15 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
         pid, k = x["pid"], x["kind"]
         i = first_goal_of.get(pid)
         if k == "first_goal" and i is not None:
+            # "T.J. Hughes, undrafted and in his 8th NHL game, scored his first NHL goal ..., set up by Nathan MacKinnon"
+            # (outside coverage told all three, 2026-10-16)
             debut = " in his NHL debut" if x.get("debut") else ""
-            att.setdefault(i, {})["pre"] = f"scored his first NHL goal{debut}"
+            bits = (["undrafted"] if x.get("undrafted") else []) + ([f"in his {nth_word(x['nth'])} NHL game"] if not x.get("debut") and (x.get("nth") or 0) >= 2 else [])
+            lead_in = f", {' and '.join(bits)}, " if bits else ""
+            att.setdefault(i, {})["pre"] = f"{lead_in}scored his first NHL goal{debut}"
+            helper = goals[i].get("p2")
+            if helper and gm.N.get(helper):
+                att[i]["helper"] = helper  # named when the sentence is written, so his first mention is his full name
             told.add(pid)
         elif k == "club_goal" and i is not None:
             att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"

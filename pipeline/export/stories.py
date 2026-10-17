@@ -749,8 +749,11 @@ def _goals_of(gid: int, season: int, pid: int) -> list[int]:
     return ev.filter((pl.col("game_id") == gid) & (pl.col("type") == "goal") & (pl.col("p1") == pid) & (pl.col("period_type") != "SO"))["p1"].to_list()
 
 
-def _firsts_found(gid: int, season: int, G, P) -> list[dict]:
-    """export/firsts.py's firsts, debuts, returns and milestones for one game, most important first."""
+FINALLY_SEASONS, FINALLY_STARTS = 3, 5  # a goalie's first win "finally" came: this many seasons after his debut, or starts
+SET_UP = {"tip-in": "tipping in", "deflected": "deflecting"}  # how a first goal went in, when the shot type says
+
+
+def _found_firsts(gid: int, season: int, G, P) -> list[dict]:
     from pipeline.export import firsts
     try:
         return firsts.for_game(gid, season, G, P)
@@ -759,15 +762,61 @@ def _firsts_found(gid: int, season: int, G, P) -> list[dict]:
         return []
 
 
+def first_goal_detail(x: dict, goal: dict | None, helper: str | None) -> tuple[str, str]:
+    """(before, after) for a first NHL goal: "an undrafted rookie in his eighth NHL game" and "tipping in a feed from
+    MacKinnon" (outside coverage of Hughes's first, 2026-10-16, told all three; ours said only "his first NHL goal")."""
+    bits = []
+    if x.get("undrafted"):
+        bits.append("undrafted")
+    nth = x.get("nth") or 0
+    if not x.get("debut") and nth >= 2:
+        bits.append(f"in his {ORDINAL_N(nth)} NHL game")
+    before = f", {' and '.join(bits)}," if bits else ""
+    after = ""
+    if helper:
+        how = SET_UP.get((goal or {}).get("shot") or "")
+        after = f", {how} a feed from {helper}" if how else f", set up by {helper}"
+    return before, after
+
+
+def goalie_first_text(x: dict, who: str, saves: int | None) -> str | None:
+    """A goalie's first win, first shutout, first start, or first win in a long time."""
+    k = x["kind"]
+    made = f"{saves} saves" if saves else None
+    if k == "first_win":
+        n, yrs = x.get("start_n"), x.get("seasons") or 0
+        fin = "finally " if yrs >= FINALLY_SEASONS or (n or 0) >= FINALLY_STARTS else ""
+        if x.get("shutout") and made:
+            head = f"{who} {fin}got his first NHL win with a {saves}-save shutout"
+        else:
+            head = f"{who} {fin}got his first NHL win" + (f", making {made}" if made else "")
+        where = (" in relief" if not x.get("started") else
+                 " in his first NHL start" if n == 1 else f" in his {ORDINAL_N(n)} start" if n else "")
+        tail = f", {num(yrs)} seasons after his NHL debut" if yrs >= 2 else ""
+        return f"{head}{where}{tail}."
+    if k == "first_shutout":
+        return f"{who} made {made} for his first NHL shutout." if made else f"{who} got his first NHL shutout."
+    if k == "first_start":
+        return f"{who} made his first NHL start{' and got the win' if x.get('won') else ''}."
+    if k == "win_since":
+        if x.get("since"):
+            d = Date.fromisoformat(x["since"])
+            return f"It was {who}’s first NHL win since {MONTHS[d.month - 1]} {d.day}, {d.year}."
+        y = str(x["season"])
+        return f"It was {who}’s first NHL win since the {y[:4]}-{y[6:]} season."
+    return None
+
+
 def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str, loser: str, most: int = 2,
                  told: set | None = None, found: list[dict] | None = None, kinds: tuple | None = None, skip: set = frozenset(),
-                 goals_told: bool = False) -> list[str]:
+                 goals_told: bool = False, saves: dict[int, int] | None = None, in_net: list[str] | None = None) -> list[str]:
     """Up to `most` sentences on firsts, debuts and returns (export/firsts.py), most important first. A loser's player
     is named with his team. `kinds` picks which kinds to tell (a games-played milestone counts as "milestone"; goal,
     point and assist marks ride on the goal in the chronology instead); `goals_told` leaves off "and scored", since
-    the chronology tells the goal."""
+    the chronology tells the goal. A goalie's first win, shutout or start goes to `in_net` when given (the
+    story's goalie paragraph) instead of among the goals."""
     if found is None:
-        found = _firsts_found(gid, season, G, P)
+        found = _found_firsts(gid, season, G, P)
     out, returns = [], 0
     debuts = [x for x in found if x["kind"] == "debut" and not x.get("goalie") and x["pid"] in N and x["pid"] not in skip
               and (kinds is None or "debut" in kinds)]
@@ -793,11 +842,22 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
         if k == "first_goal":
             debut = ", in his NHL debut" if x.get("debut") else ""
             two = "" if x["goals"] == 1 else f", then added {'another' if x['goals'] == 2 else num(x['goals'] - 1) + ' more'}"
-            out.append(f"It was {_short(pid, P, N, season)}’s first NHL goal{debut}." if known and not two
-                       else f"{_cap(who)} scored his first NHL goal{debut}{two}.")
+            g1 = next((g for g in goals or [] if g["p1"] == pid), None)
+            helper = name(g1["p2"]) if g1 and g1.get("p2") and N.get(g1["p2"]) else None
+            pre, post = first_goal_detail(x, g1, helper)
+            if two:  # "..., set up by X, then added another" reads as X's
+                post = ""
+            out.append(f"It was {_short(pid, P, N, season)}’s first NHL goal{debut}{post}." if known and not two
+                       else f"{_cap(who)}{pre} scored his first NHL goal{debut}{post}{two}.")
+        elif k in ("first_win", "first_shutout", "first_start", "win_since"):
+            text = goalie_first_text(x, _cap(who) if k != "win_since" else plain, (saves or {}).get(pid))
+            if text:
+                (in_net if in_net is not None else out).append(text)
+                if in_net is not None:
+                    most -= 1
         elif k == "debut":
             if x.get("goalie"):
-                won = " and got the win" if x["team"] == winner else ""
+                won = (" with a shutout" if x.get("shutout") else " and got the win") if x["team"] == winner else ""
                 out.append(f"{_cap(who)} made his NHL debut in net{won}.")
             else:
                 pts = x.get("points") or 0
@@ -810,7 +870,8 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
             if x.get("since"):
                 d = Date.fromisoformat(x["since"])
                 what = "was back in an NHL net for the first time since" if x.get("goalie") else "played his first NHL game since"
-                out.append(f"{_cap(who)} {what} {MONTHS[d.month - 1]} {d.day}, {d.year}.")
+                won = ", and got the win" if x.get("goalie") and x.get("won") else ""
+                out.append(f"{_cap(who)} {what} {MONTHS[d.month - 1]} {d.day}, {d.year}{won}.")
             else:
                 pts, gs = x.get("points") or 0, x.get("goals") or 0
                 tail = (("" if goals_told else f" and scored{' twice' if gs == 2 else ' ' + num(gs) + ' times' if gs > 2 else ''}") if gs else
@@ -1281,7 +1342,7 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
                     # the other side had pulled its goalie for an extra attacker (more skaters than the scorers), not
                     # just left the net during a delayed penalty
                     "extra": empty and theirs > mine,
-                    "goalie": r["p1"] in (r["home_goalie"], r["away_goalie"]), "zone": r["zone"],
+                    "goalie": r["p1"] in (r["home_goalie"], r["away_goalie"]), "zone": r["zone"], "shot": r["shot_type"],
                     # the scorers' own goalie pulled for an extra attacker: third period or later, and no penalty
                     # against the other side at that moment (a delayed penalty also puts six skaters out; 2026-10-17,
                     # Sora's review: a second-period goal read "with the goalie pulled")
@@ -1551,12 +1612,156 @@ BIG_SAVES, ROUGH_GOALS = 35, 5  # a goalie's night told in the story (eye test, 
 # Montréal's coverage, Luukkonen's 35 saves Buffalo's; neither was on our page)
 
 
-def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: str, pk=None) -> list[str]:
+# --- the turn of the game (outside coverage, Oct 16: COL 5-2 PIT and BOS 4-2 ANA) ----------------------------------
+# Writers name the player who lit the comeback ("Lehkonen's spark"), say when the game turned in plain shot counts
+# ("the Avalanche had just two shots when the Penguins were up two"), tell a power play that won the night ("3
+# power-play goals", "killed all four"), name the late insurance goal, and close on each team's record.
+
+SLOW_GAP = 6  # first-period shots a trailing winner was outshot by (and by 2 to 1) to read as a slow start ...
+SLOW_TURN = 5  # ... and then outshot the other team by, the rest of the way
+INSURANCE_SEC = 900  # third-period seconds after which a goal that made a one-goal lead two is told as insurance
+LATE_RUSH = 3  # the winners' third-period goals (not into an empty net), from within one, that read "pour it on late"
+SHAKY_SHOTS = 10  # a goalie who allowed 2+ goals within his first this-many shots, then stopped the rest ...
+SETTLED_SAVES = 15  # ... of at least this many, "settled in after a shaky start"
+PP_STORY = 3  # power-play goals that make the power play part of the story
+KILL_STORY = 4  # penalties killed without a goal against that do
+
+
+def deficit_at(goals: list[dict], side, loser: str) -> int | None:
+    """Index of the goal that gave the losing team its biggest lead (the first time it got there)."""
+    best, at = 0, None
+    for i, g in enumerate(goals):
+        d = (g["hs"] - g["as"]) * (1 if side({"home": True}) == loser else -1)
+        if d > best:
+            best, at = d, i
+    return at
+
+
+def spark(goals: list[dict], side, winner: str, loser: str) -> tuple[int, int] | None:
+    """The comeback's spark: a winner who scored 2+ of the goals that erased the deficit, else whoever scored the first
+    goal back. (pid, his goals in the comeback)."""
+    at = deficit_at(goals, side, loser)
+    if at is None:
+        return None
+    back = []
+    for g in goals[at + 1:]:
+        if side(g) == winner and g["strength"] != "en":
+            back.append(g)
+        if g["hs"] == g["as"]:
+            break
+    if not back:
+        return None
+    count = {}
+    for g in back:
+        count[g["p1"]] = count.get(g["p1"], 0) + 1
+    two = max(count, key=count.get)
+    return (two, count[two]) if count[two] >= 2 else (back[0]["p1"], 1)
+
+
+def slow_start(periods: list[dict], winner: str, loser: str, W) -> str | None:
+    """"The Avalanche had five shots in the first period and trailed 2-1, then outshot the Penguins 27-17 the rest of
+    the way": a winner behind after the first and outshot 2 to 1 in it, who then had more of the shots."""
+    if not periods or not periods[0].get("shots") or not periods[0].get("goals"):
+        return None
+    p1 = periods[0]
+    sw, sl = p1["shots"].get(winner, 0), p1["shots"].get(loser, 0)
+    gw, gl = p1["goals"].get(winner, 0), p1["goals"].get(loser, 0)
+    rw = sum((p.get("shots") or {}).get(winner, 0) for p in periods[1:])
+    rl = sum((p.get("shots") or {}).get(loser, 0) for p in periods[1:])
+    if gw >= gl or sl - sw < SLOW_GAP or sw * 2 > sl or rw - rl < SLOW_TURN:
+        return None
+    shots = "one shot" if sw == 1 else f"{num(sw)} shots"
+    return f"{_cap(W.the(winner))} had {shots} in the first period and trailed {gl}-{gw}, then outshot {W.the(loser)} {rw}-{rl} the rest of the way."
+
+
+def insurance(goals: list[dict], side, winner: str) -> dict | None:
+    """A winners' goal late in the third that made a one-goal lead two, when the lead never got back to one."""
+    for i, g in enumerate(goals):
+        if side(g) != winner or g["strength"] == "en" or g["period"] != 3 or g["sec"] < INSURANCE_SEC:
+            continue
+        lead = lambda x: (x["hs"] - x["as"]) * (1 if g["home"] else -1)
+        if lead(g) == 2 and i and lead(goals[i - 1]) == 1 and all(lead(x) >= 2 for x in goals[i:]):
+            return g
+    return None
+
+
+def late_rush(goals: list[dict], side, winner: str) -> bool:
+    """The winners scored LATE_RUSH+ third-period goals (empty nets aside) from within one goal entering the third."""
+    before = [g for g in goals if g["period"] < 3]
+    lead = (before[-1]["hs"] - before[-1]["as"]) * (1 if side({"home": True}) == winner else -1) if before else 0
+    third = [g for g in goals if g["period"] == 3 and side(g) == winner and g["strength"] != "en"]
+    return lead <= 1 and len(third) >= LATE_RUSH
+
+
+def special_teams(nums: dict, goals: list[dict], side, winner: str, loser: str, W, name, comeback: bool) -> tuple[list[str], list[str]]:
+    """(lines to open the penalty paragraph, lines to close it). A power play of PP_STORY+ goals or a perfect kill of
+    KILL_STORY+ is told; when the winners' power-play goals erased a deficit while the other side's power play got
+    nothing, it is told as the night's turn ("special teams reversal", outside coverage of BOS at ANA)."""
+    a, b = nums.get(winner) or {}, nums.get(loser) or {}
+    if a.get("pp_goals") is None or b.get("pp_goals") is None:
+        return [], []
+    wp, wo, lp, lo = a["pp_goals"], a.get("pp_opps") or 0, b["pp_goals"], b.get("pp_opps") or 0
+    Wt, Lt, Ln = W.the(winner), W.the(loser), W.nick.get(loser, loser)
+    pick = lambda pool, *k: _pick(pool, "st", winner, loser, wp, wo, lp, lo, *k)
+    at = deficit_at(goals, side, loser) if comeback else None
+    if at is not None and lp == 0 and lo >= 3:
+        pp = [g for g in goals[at + 1:] if side(g) == winner and g["strength"] == "pp"]
+        if len(pp) >= 2:
+            who = list(dict.fromkeys(g["p1"] for g in pp))
+            names = _and([name(p) for p in who])
+            did = (" all scored" if len(who) >= 3 else " both scored") if len(who) > 1 else f" scored {num(len(pp)) if len(pp) > 2 else 'twice'}"
+            ahead = any((g["hs"] - g["as"]) * (1 if g["home"] else -1) > 0 for g in pp)
+            hole = abs(goals[at]["hs"] - goals[at]["as"])
+            turned = f"turned a {num(hole)}-goal hole into the lead" if ahead else f"erased a {num(hole)}-goal hole"
+            start = pick(["Special teams flipped this one:", "The power plays decided it:"], "flip")
+            return [f"{start} {names}{did} on the power play as {Wt} {turned}, and {Lt} went 0-for-{lo} on theirs."], []
+    first, last_ = [], []
+    perfect = lo >= KILL_STORY and lp == 0
+    if wp >= PP_STORY:
+        ratio = pick([f"scored {num(wp)} power-play goals on {num(wo)} chances", f"went {wp}-for-{wo} on the power play"], "pp") \
+            if wo > wp else f"went {wp}-for-{wo} on the power play"
+        mine = sum(1 for g in goals if side(g) == winner)
+        if perfect and wp * 2 >= mine:
+            first.append(f"Special teams did the work: {Wt} {ratio} and killed all {num(lo)} {Ln} power plays.")
+            perfect = False
+        else:
+            first.append(f"{_cap(Wt)} {ratio}.")
+    if lp >= PP_STORY:
+        first.append(f"{_cap(Lt)} scored {num(lp)} power-play goals and still lost.")
+    if perfect:
+        last_.append(f"{_cap(Wt)} killed all {num(lo)} {Ln} power plays.")
+    return first, last_
+
+
+def settled_in(gid: int, season: int, pid: int) -> tuple[int, int, int] | None:
+    """(goals, shots by the last of them, saves after) for a goalie who allowed 2+ goals early and then stopped the rest."""
+    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "sort", "type", "goalie_id", "period_type"])
+    shots = ev.filter((pl.col("game_id") == gid) & (pl.col("goalie_id") == pid) & pl.col("type").is_in(["shot-on-goal", "goal"])
+                      & (pl.col("period_type") != "SO")).sort("sort")["type"].to_list()
+    hits = [i for i, t in enumerate(shots) if t == "goal"]
+    if len(hits) < 2 or hits[-1] >= SHAKY_SHOTS:
+        return None
+    after = len(shots) - hits[-1] - 1
+    return (len(hits), hits[-1] + 1, after) if after >= SETTLED_SAVES else None
+
+
+def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: int, gid, skip: set) -> str | None:
+    """"The Bruins improved to 6-2-0, and the Ducks fell to 4-3-0." Teams in `skip` already had their record told."""
+    played = G.filter(pl.col("date") <= day)
+    parts = []
+    for t, pool in ((winner, ["improved to", "moved to"]), (loser, ["fell to", "dropped to"])):
+        if t not in skip:
+            parts.append(f"{W.the(t)} {_pick(pool, gid, 'rec', t)} {record(results(played, t, season))}")
+    return f"{_cap(' and '.join(parts) if len(parts) == 1 else parts[0] + ', and ' + parts[1])}." if parts else None
+
+
+def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: str, pk=None, season: int | None = None) -> list[str]:
     """Both starters' nights in one sentence, in every story (Sora's review of 2025-26 against NHL.com and AP,
     2026-10-17: the goalies were the most-missed fact, 530 games). The winner's goalie "made 30 saves"; a shutout
     "stopped all 31 shots"; the loser's "stopped 27 of 30", or "made 38 saves in a losing effort" (35+ and 1.5+ goals
     saved above expected), or "allowed five goals on 24 shots" (5+ and 1+ below expected). A goalie the first
-    paragraph already named (pulled, or "the difference") is left out, so nothing is told twice."""
+    paragraph already named (pulled, or "the difference") is left out, so nothing is told twice. A winner's goalie who
+    allowed 2+ goals within his first 10 shots and then stopped 15+ "settled in after a shaky start" (Blackwood, 2026-10-16)."""
     gl = {x["team"]: x for x in r.get("goalies", []) if x.get("started")}
     pk = pk or (lambda pool, *k: pool[0])
     parts = []
@@ -1567,9 +1772,14 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
         return name(g["id"]) or g["name"]
     if wg and wg.get("id") not in said and (wg.get("shots") or 0) > 0:
         saves = wg.get("saves") or 0
+        early = settled_in(r["game_id"], season, wg["id"]) if season and _secs(wg.get("toi")) >= 3000 else None
         if ls == 0 and (wg.get("ga") or 0) == 0:
             parts.append(pk([f"{nm(wg)} stopped all {saves} shots for {W.the(winner)}", f"{nm(wg)} turned aside all {saves} shots for {W.the(winner)}",
                              f"{nm(wg)} was perfect for {W.the(winner)}, {saves} saves on {saves} shots"], "so-saves"))
+        elif early:
+            n_, at_, after_ = early
+            parts.append(pk([f"{nm(wg)} settled in after a shaky start for {W.the(winner)}: he gave up {num(n_)} goals on the first {num(at_)} shots, then stopped the last {after_}",
+                             f"{nm(wg)} shook off a shaky start for {W.the(winner)}, allowing {num(n_)} goals on the first {num(at_)} shots and none on the last {after_}"], "settled"))
         else:
             parts.append(f"{nm(wg)} made {saves} saves for {W.the(winner)}")
     if lg and lg.get("id") not in said and (lg.get("shots") or 0) > 0:
@@ -1718,7 +1928,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     heads = []
     pk = lambda pool, *k: _pick(pool, gid, "head", *k)
     W_, L_ = _cap(W.the(winner)), W.the(loser)
-    found = _firsts_found(gid, season, G, P)
+    found = _found_firsts(gid, season, G, P)
     res_w = results(G.filter(pl.col("date") <= r["date"]), winner, season)
     res_l = results(G.filter(pl.col("date") <= r["date"]), loser, season)
     heads += _fact_heads(found, night, res_w, res_l, winner, loser, W, W_, L_, last, N)
@@ -1759,10 +1969,36 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         heads.append((90, f"Highway robbery{where}" if share <= 0.25 else
                       pk([f"{thief} steals one{where}", f"{thief} robs {L_}{where}"], "steal") if thief else
                       pk([f"{W_} steal one{where}", f"{W_} get away with one{where}"], "steal")))
+    nums_ = r.get("numbers") or {}
+    slow = slow_start(r.get("periods") or [], winner, loser, W)
+    fw = next((x for x in found if x["kind"] == "first_win" and x["team"] == winner), None)
+    if fw and N.get(fw["pid"]):  # a goalie's first NHL win (DiPietro's, eight seasons after his debut, 2026-10-16)
+        G_ = last(fw["pid"])
+        wait = (fw.get("seasons") or 0) >= FINALLY_SEASONS or (fw.get("start_n") or 0) >= FINALLY_STARTS
+        wpp = (nums_.get(winner) or {}).get("pp_goals") or 0
+        pool = ([f"{_cap(num(wpp))} power-play goals get {G_} his first NHL win"] if wpp >= PP_STORY else
+                [f"{G_} finally gets one", f"{G_} finally gets his first NHL win"] if wait else
+                [f"{G_} gets his first NHL win", f"A first NHL win for {G_}"])
+        heads.append((89 if wait or wpp >= PP_STORY else 84, pk(pool, "fw")))
     if comeback:
+        # the player who lit it carries the headline, as writers do ("Lehkonen's spark", 2026-10-16), over the team
         d = num(lead_max[loser])
-        heads.append((88, pk([f"{W_} storm back from {d} down", f"{W_} erase a {d}-goal hole", f"{W_} come back from {d} down"], "cb")
-                      if lead_max[loser] >= 3 else pk([f"{W_} come back from {d} down", f"{W_} rally from {d} down"], "cb")))
+        sp = spark(goals, side, winner, loser)
+        if sp and N.get(sp[0]):
+            who_, n_, nk = last(sp[0]), sp[1], W.nick.get(winner, winner)
+            pool = ([f"{who_}’s {num(n_)} goals spark {W.the(winner)}", f"{who_} scores {num(n_)} as {W.the(winner)} rally from {d} down"] if n_ >= 2 else
+                    [f"{who_}’s first NHL goal sparks a {nk} comeback"] if any(x["kind"] == "first_goal" and x["pid"] == sp[0] for x in found) else
+                    [f"{who_} sparks a {nk} comeback", f"{who_} sparks {W.the(winner)} back from {d} down"])
+        elif lead_max[loser] >= 3:
+            pool = [f"{W_} storm back from {d} down", f"{W_} erase a {d}-goal hole", f"{W_} come back from {d} down"]
+        else:
+            pool = [f"{W_} come back from {d} down", f"{W_} rally from {d} down", f"{W_} erase a {d}-goal deficit"]
+            pool += [f"{W_} shake off a slow start"] if slow else []
+        heads.append((88, pk(pool, "cb")))
+    elif slow:  # trailing after the first and outshot 2 to 1 in it, then the better team
+        heads.append((84, pk([f"{W_} shake off a slow start", f"{W_} shake off a slow start against {L_}"], "slow")))
+    if end == "REG" and ws - ls >= 2 and late_rush(goals, side, winner):
+        heads.append((74, pk([f"{W_} pour it on late", f"{W_} pour it on late against {L_}"], "rush")))
     if end in ("OT", "SO"):
         ot = next((g for g in goals if g["period"] > 3), None)
         if ot and end == "OT":
@@ -1824,8 +2060,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if N.get(pid):
             s1.append(f"{name(pid)} had a Gordie Howe hat trick: a goal, an assist and a fight.")
     # debuts, returns and games played lead too; goals and points attach to the goal they came on
+    net_firsts: list[str] = []  # a goalie's first win or shutout, told with the goaltending
+    saves_ = {x["id"]: x.get("saves") for x in r.get("goalies", [])}
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=found,
-                       kinds=("debut", "return", "club_debut", "first_point", "milestone"), goals_told=True)
+                       kinds=("debut", "return", "club_debut", "first_point", "milestone", "first_win", "first_shutout", "first_start", "win_since"),
+                       goals_told=True, saves=saves_, in_net=net_firsts)
     # goalie changes: "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as
     # "pulled" only after 3+ goals, or 2+ at an intermission (NHL.com's own bar, 2026-10-17). A change in the middle
     # of play is more often an injury (Sora, 2026-10-12: an injured goalie comes out at once), so it is told without
@@ -1931,7 +2170,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         else:
             s2.append(pk(["The chances were close to even, so this one could have gone either way.",
                           "Nothing much separated these two on the chances. This one could have gone either way."], "even"))
-    s2 += _goalie_lines(r, winner, loser, W, name, said, head, pk)
+    if slow:  # the plain shot counts behind "shake off a slow start"
+        s2.append(slow)
+    s2 += net_firsts
+    s2 += _goalie_lines(r, winner, loser, W, name, said, head, pk, season)
     swing = _swing(gid)
     if swing:
         top = swing[0]
@@ -1963,12 +2205,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 s2.append(f"{_cap(W.the(team))} tried a line they hadn’t used before: {_and(trio)}{tail}.")
             break
     # paragraph three: the penalty sheet, only when something stood out (a fight, a brawl, an ejection, a strange count)
+    st_first, st_last = special_teams(nums_, goals, side, winner, loser, W, name, comeback)
     s3 = penalties.recap_notes(gid, season, {home_id: home, row["away_id"][0]: away}, W, name)
     if s3:  # a star who almost never fights is news on its own (Sora: MacKinnon and Hintz, 2026-10-13)
         for x in storylines.star_fights(gid, season, r["date"])[:2]:
             words = storylines.rare_fight_words(x["record"])
             if words and N.get(x["pid"]):
                 s3.append(f"For {name(x['pid'])}, it was {words}.")
+    s3 = st_first + s3 + st_last
     # what it means
     items = []
     for t in (winner, loser):
@@ -2089,7 +2333,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             runs_told.add(team)
         per[i["tag"]] = per.get(i["tag"], 0) + 1
         picked.append({"tag": i["tag"], "text": i["text"]})
-    if len(picked) < MIN_ITEMS:
+    # each team's record after the game closes the story, as wire recaps do, unless an item already says it
+    told_rec = {t for t in (winner, loser) for i in picked if i["tag"] == "Start" and i["text"].startswith(_cap(W.the(t)))}
+    rec = record_line(G, r["date"], winner, loser, W, season, gid, told_rec)
+    if rec:
+        last_para = s3 if s3 else s2 if s2 else s1
+        last_para.append(rec)
+    if len(picked) < MIN_ITEMS and not rec:
         res = results(G.filter(pl.col("date") <= r["date"]), winner, season)
         picked.append({"tag": "Record", "text": f"{_cap(W.the(winner))} are now {record(res)}."})
     return {"kicker": "What happened", "head": head, "paras": W.nicknames([p for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p], r.get("game_id")),

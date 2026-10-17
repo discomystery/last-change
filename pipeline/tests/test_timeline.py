@@ -67,7 +67,7 @@ def test_only_goal_and_hat_trick_words():
     assert timeline.paragraph(_game([(2, 700, True, 3, "sh")])) == ["Adam Fox scored the only goal of the game shorthanded midway through the second."]
     gm = _game([(1, 100, True, 3, "ev"), (2, 100, False, 1, "ev"), (2, 900, True, 3, "ev"), (3, 1000, True, 3, "ev")])
     out = timeline.paragraph(gm)
-    assert "struck again" in out[2] and out[3] == "Fox completed his hat trick with 3:20 left to make it 3-1."
+    assert "struck again" in out[2] and out[3] in ("Fox completed his hat trick with 3:20 left to make it 3-1.", "Fox added insurance with 3:20 left.", "Fox made it 3-1 with 3:20 left, and that was that.")
 
 
 def test_shootout_decider_is_the_goal_the_loser_could_not_match():

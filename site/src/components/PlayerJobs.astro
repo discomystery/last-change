@@ -10,8 +10,9 @@ import { peerOf } from '../lib/players';
 import { jobsFor } from '../lib/gameFiles';
 import { signed } from '../lib/format';
 
-type Job = { key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
-type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill };
+type Opp = { note: string; f: number; rec: { verdict: Job['verdict']; usual: string; bench: string; text: string } };
+type Job = { opp?: Opp; key: string; label: string; why: 'role' | 'strength' | 'core'; pct: number | null; vs?: string; per_game?: string; verdict: 'held' | 'partly' | 'missed' | 'na'; text: string; unit: string; tonight?: string; usual?: string; bench?: string; bench_is?: string };
+type Card = { id: number; name: string; team: string; pos: string; toi: string; toi5: string; toi_pp: string; toi_pk: string; box: { g: number; a: number; pm: number; sog: number; hits: number; blocks: number; xgf: number; xga: number; sa: number; ga: number; sv: number | null; gsax: number; high: string }; jobs: Job[]; summary: 'did' | 'mixed' | 'didnt' | null; night: 'huge' | 'big' | 'good' | 'rough' | null; night_why: string | null; pill: Pill; pill_rec?: Pill };
 type Pill = 'huge' | 'big' | 'did' | 'mixed' | 'didnt' | 'rough';
 type Note = { id: number; name: string; team: string; key: string; label: string; text: string };
 type Jobs = { game_id: number; away: string; home: string; players: Card[]; stood_out: Note[] };
@@ -53,10 +54,12 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
 ---
 {d && (() => {
   const card = (c: Card) => (
-    <li class:list={['card', 'pc', `t-${side(c.team)}`, !c.jobs.length && 'bare']}>
+    <li class:list={['card', 'pc', `t-${side(c.team)}`, !c.jobs.length && 'bare']} data-adj={c.jobs.some((j) => j.opp) ? 'competition' : undefined}>
       <div class="pc-top">
         <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
-        <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>
+        {c.pill_rec && c.pill_rec !== c.pill
+          ? <><span class:list={['pc-sum', 'a-adj', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span><span class:list={['pc-sum', 'a-raw', pillClass[c.pill_rec]]}>{c.pill_rec === 'huge' && '★ '}{pillWord[c.pill_rec]}</span></>
+          : <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>}
         <button type="button" class="share-btn icon" data-share="night" data-id={c.id} aria-label={`Share ${c.name}’s night`} data-tip="Share his night"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg></button>
       </div>
       {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
@@ -82,9 +85,13 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
       <ul class="pc-jobs">
         {c.jobs.map((j) => (
           <li class:list={['job', j.verdict]} tabindex="0" data-tip={j.text}>
-            <span class="job-v" role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>
+            {j.opp && j.opp.rec.verdict !== j.verdict
+              ? <><span class:list={['job-v', 'a-adj', `v-${j.verdict}`]} role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span><span class:list={['job-v', 'a-raw', `v-${j.opp.rec.verdict}`]} role="img" aria-label={verdictWord[j.opp.rec.verdict]}>{mark[j.opp.rec.verdict]}</span></>
+              : <span class:list={['job-v', `v-${j.verdict}`]} role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>}
             <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
-            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong><span>{j.key === 'high' || j.key === 'routine' ? 'expected to save' : 'expected'} {j.usual}</span></span>}
+            {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong>{j.opp
+              ? <><span class="a-adj">expected {j.opp.rec.usual} · <span class="term job-adj" tabindex="0" data-tip={`Adjusted for tonight’s opponent. ${j.opp.note} Against an average team: ${j.opp.rec.usual}.`}>adj. {j.usual}</span></span><span class="a-raw">expected {j.opp.rec.usual}</span></>
+              : <span>{j.key === 'high' || j.key === 'routine' ? 'expected to save' : 'expected'} {j.usual}</span>}</span>}
           </li>
         ))}
       </ul>
@@ -209,9 +216,15 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .job-n { display: grid; justify-items: end; font: 400 12px var(--ui); color: var(--ink-3); white-space: nowrap; }
   .job-n strong { font: 700 20px/1.1 var(--ui); color: var(--ink); }
   .job-v { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font: 700 12px var(--ui); }
-  .job.held .job-v { background: var(--ink); color: var(--sheet); }
-  .job.missed .job-v, .job.na .job-v { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
-  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; }
+  .job-v.v-held { background: var(--ink); color: var(--sheet); }
+  .job-v.v-missed, .job-v.v-na { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+  /* Tonight's opponent (the Competition switch): the note under the job, and the recorded mark, pill and expected
+     number that replace the adjusted ones when it is off. Base shows .a-raw inline, so these get their own display. */
+  .job-adj { color: var(--ink-2); font-weight: 600; }
+  .job-v.a-raw, .pc-sum.a-raw { display: none; }
+  :global(html[data-raw-competition]) .pc[data-adj='competition'] .job-v.a-raw, :global(html[data-arena='raw']) .pc[data-adj='competition'] .job-v.a-raw { display: inline-grid; }
+  :global(html[data-raw-competition]) .pc[data-adj='competition'] .pc-sum.a-raw, :global(html[data-arena='raw']) .pc[data-adj='competition'] .pc-sum.a-raw { display: inline-flex; }
+  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; white-space: nowrap; }
   .job.na .job-l { color: var(--ink-2); }
   .more-cards .hide, .more-cards[open] .show, .how .hide, .how[open] .show { display: none; }
   .more-cards[open] .hide, .how[open] .hide { display: inline; }
