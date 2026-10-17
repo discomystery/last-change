@@ -407,13 +407,20 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
                 exp = f", where their blended level would mean about {round(base * sec / 3600)}"
             out["saw"] = lead + exp + (f" · {sog_txt}" if sog_txt else "")
     if title and m in ("pp", "pk") and kind in ("clash", "duel", "edge", "contrast"):
-        title, plain = _pp_goals(S, gid, claim, chk, verdict, title, plain, w, places)
+        title, plain, verdict = _pp_goals(S, gid, claim, chk, verdict, title, plain, w, places)
+        out["verdict"] = verdict
+    if verdict == "missed" and title and isinstance(base, (int, float)) and base and v is not None and abs(v - base) <= NEAR_MISS * abs(base) and kind in ("clash", "duel", "changed", "pace", "physical", "rest"):
+        title = "Close, but not quite"  # a hair off the bar is told as a near miss, not a flat no (Sora's review, 2026-10-17)
+        plain = (plain if isinstance(plain, str) else _fmt(plain, **w)) + " It was close, though: a hair off the mark."
     if title:
         if isinstance(title, list):  # a pool, picked the same way every run for this call, varied across games
             title = previews._pick(title, claim.get("id"), verdict)
         out["title"] = _fmt(title, **w).rstrip(".")
         out["plain"] = _fmt(plain, **w)
     return out
+
+
+NEAR_MISS = 0.03  # within 3% of the bar: "close, but not quite"
 
 
 def _record(team: str, g: int, n: int, places: dict) -> str:
@@ -423,7 +430,9 @@ def _record(team: str, g: int, n: int, places: dict) -> str:
 def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: str, w: dict, places: dict):
     """Special-teams calls are graded on chances, the fair test, but the goals are what a fan saw (eye test,
     2026-10-13: "shut down" a power play that scored twice, "got theirs" after 0-for-3). Adds the goals to the plain
-    sentence, and when they point the other way from the grade, says so and swaps a title that would deny them."""
+    sentence, and when they point the other way from the grade, says so and swaps a title that would deny them. Since
+    2026-10-17 (Sora's review of 2025-26: "shut down" a power play that went 2 for 3) the grade itself is capped at
+    "partly" when the goals contradict it, both ways. Returns (title, plain, verdict)."""
     kind, m = claim["kind"], claim["metric"]
     if kind in ("edge", "contrast"):
         top, bot = chk["team"], chk["opp"]
@@ -445,13 +454,13 @@ def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: s
             won, lost = ("{top}", "{bot}") if favoured_top else ("{bot}", "{top}")
             plain = (f"{won} made the better chances on the {what}, but {lost} came out ahead where it counts." if m == "pp" else
                      f"{won} gave up less on the {what}, but {lost} allowed fewer goals.")
-            return title, _fmt(plain, **w) + " " + facts
+            return title, _fmt(plain, **w) + " " + facts, "partly"
         elif favoured_top and not better_top and (nt or nb):  # ahead on chances, level on goals
             title = "{topc} had the better chances" if m == "pp" else "{topc} gave up less"
             plain = (f"{{top}} made the better chances on the power play, as the gap between these two suggested, but the goals came out even."
                      if m == "pp" else f"{{top}} gave up less on the penalty kill, as the gap between these two suggested, but the goals came out even.")
-            return title, _fmt(plain, **w) + " " + facts
-        return title, (plain + " " + facts).strip()
+            return title, _fmt(plain, **w) + " " + facts, verdict
+        return title, (plain + " " + facts).strip(), verdict
     # clash, duel: one power play against one kill; does the verdict say the power play did well?
     pp_team = claim["team"]
     g, n = S.pp_record(gid, pp_team)
@@ -461,13 +470,17 @@ def _pp_goals(S, gid: int, claim: dict, chk: dict, verdict: str, title, plain: s
     if pp_did_well and g == 0 and n:
         title = "Some chances, no goal" if verdict == "partly" else "The chances came, the goals didn’t"
         plain += f" They didn’t score on it, though: 0 for {n}."
+        if verdict == "held":
+            verdict = "partly"
     elif not pp_did_well and g:
         times = {1: "once", 2: "twice"}.get(g, f"{g} times")
         title = f"Not much of a power play, but it scored {times}"
         plain += f" {T} still went {g} for {n} on the power play."
+        if g >= 2 or (n and g / n >= 0.5):  # the goals say the power play did fine
+            verdict = "partly"
     elif n:
         plain += f" {T} went {g} for {n} on the power play."
-    return title, plain
+    return title, plain, verdict
 
 
 def _clock(sec: float) -> str:

@@ -219,7 +219,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if m == "volume":
             v = r["cf_adj"] / r["sec5"] * 3600
             txt = f"{team} took {v:.1f} shot attempts per 60 at 5-on-5 (adjusted for score and venue), against their usual {base:.1f}."
-            fmt = lambda x: f"{x:.1f} per 60"
+            fmt = lambda x: f"{x:.1f} attempts per 60"
         elif m == "quality":
             v = r["xgf_adj"] / r["ff_adj"] if r["ff_adj"] else 0.0
             txt = f"{team}’s average shot had {previews.a_pct(v)} chance of going in, against their usual {100 * base:.1f}%." if v else f"{team} barely got a shot away at 5-on-5."
@@ -236,7 +236,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             g = S.pp_record(gid, chk["team"])[0]
             txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r.get('pp_clock', r['pp_sec']))} of power-play time, against their usual {base:.1f}, "
                    f"and scored {g} {'goal' if g == 1 else 'goals'}.")
-            fmt = lambda x: f"{x:.1f} per 60"
+            fmt = lambda x: f"{x:.1f} expected goals per 60"
         if claim["kind"] == "duel":  # graded against the league average alone: which side of it the attack landed on
             usual = chk.get("usual", base)
             what = {"volume": "5-on-5 shot attempts", "quality": "chance quality", "pp": "the power play", "turnover": "chances off turnovers"}[m]

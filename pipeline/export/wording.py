@@ -20,7 +20,8 @@ def place(p: str) -> str:
 
 # Where a club plays, for "in ..." sentences. "NY Rangers" is a team, not a place, so "5-1 in the Rangers" and "Round two
 # in the Rangers" were wrong (Sora, 2026-10-13). The Rangers play in New York; the Islanders on Long Island ("on", not "in").
-TOWNS = {"NY Rangers": ("in", "New York"), "NY Islanders": ("on", "Long Island")}
+TOWNS = {"NY Rangers": ("in", "New York"), "NY Islanders": ("on", "Long Island"),
+         "the Rangers": ("in", "New York"), "the Islanders": ("on", "Long Island")}  # after `place()` too
 
 
 def town(p: str) -> str:
