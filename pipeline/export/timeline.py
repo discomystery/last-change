@@ -261,7 +261,7 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         fin, inf = f"scored the only goal of the game{how}", "for the only goal of the game"
     elif i == 0:
         opened = gm.pk(["opened the scoring", "struck first", "got the scoring started"], "open")
-        fin, inf = f"{opened} for {T}{how}", f"to open the scoring for {T}"
+        fin, inf = f"{opened} for {T}{how}", "to open the scoring" if pre and " for " in pre else f"to open the scoring for {T}"
     elif g["strength"] == "en":
         left = f" with {clock(1200 - g['sec'])} left" if g["period"] == 3 else ""
         if m - th_ == 2:
@@ -303,8 +303,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         body = f"{who} {pre}{how} {tm} {inf}"
     elif again and i != 0 and g["period"] <= 3:  # "Caufield struck again 3:10 later to put the Canadiens up 2-0"
         body = f"{who} {again}{how} {tm} {inf}"
-    else:
-        body = f"{who} {fin} {tm}"
+    else:  # "tied it 1-1, 1:27 later": a comma keeps the score and the clock apart
+        body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm[:1].isdigit() else ''} {tm}"
     body = " ".join(body.split())
     tail = []
     if (g["period"], g["sec"]) in stood:
@@ -322,7 +322,7 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         tail.append(f"and {W.the(gm.winner)} had to hang on")
     if tail:
         body += ", " + ", ".join(tail)
-    return _cap(body).replace(" ,", ",") + "."
+    return " ".join(_cap(body).replace(" ,", ",").split()) + "."
 
 
 def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahead_i: int | None, margin: int, down_most: int) -> str:
@@ -405,8 +405,8 @@ def _exit(gm: Game, x: dict) -> str:
     W = gm.W
     who_ = f"{_cap(W.poss(x['team']))} {gm.name(x['id'])}" if x["id"] not in gm.said else gm.name(x["id"])
     if x.get("confirmed", True):
-        return f"{who_} left {surprises.when_left(x['sec'])} and didn’t return."
-    return f"{who_} didn’t play after {surprises.clock_at(x['sec'])}."
+        return " ".join(f"{who_} left {surprises.when_left(x['sec'])} and didn’t return.".split())
+    return " ".join(f"{who_} didn’t play after {surprises.clock_at(x['sec'])}.".split())
 
 
 def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tuple[dict, set]:

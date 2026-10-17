@@ -769,6 +769,12 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
     if found is None:
         found = _firsts_found(gid, season, G, P)
     out, returns = [], 0
+    debuts = [x for x in found if x["kind"] == "debut" and not x.get("goalie") and x["pid"] in N and x["pid"] not in skip
+              and (kinds is None or "debut" in kinds)]
+    if len(debuts) >= 2:  # "The Rangers’ Noah Laba and the Penguins’ Ben Kindel both played their first NHL game."
+        who_ = [f"{W.poss(x['team'])} {name(x['pid'])}" for x in debuts[:3]]
+        out.append(f"{_cap(_and(who_))} {'both' if len(who_) == 2 else 'all'} played their first NHL game.")
+        found = [x for x in found if x not in debuts[:3]]
     for x in found:
         if len(out) >= most:
             break
