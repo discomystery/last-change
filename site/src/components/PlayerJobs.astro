@@ -90,9 +90,8 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
               : <span class:list={['job-v', `v-${j.verdict}`]} role="img" aria-label={verdictWord[j.verdict]}>{mark[j.verdict]}</span>}
             <span class="job-l">{j.label} {j.why !== 'core' && <span class="job-why term" tabindex="0" data-tip={whyTip(j)}>{whyTag(j)}</span>}<span class="job-u">{j.verdict === 'na' ? (j.why === 'core' ? 'Too few shots to judge' : 'Too little time to judge') : j.unit}</span></span>
             {j.verdict !== 'na' && <span class="job-n"><strong>{j.tonight}</strong>{j.opp
-              ? <><span class="a-adj">expected {j.usual}</span><span class="a-raw">expected {j.opp.rec.usual}</span></>
+              ? <><span class="a-adj">expected {j.opp.rec.usual} · <span class="term job-adj" tabindex="0" data-tip={`Adjusted for tonight’s opponent. ${j.opp.note} Against an average team: ${j.opp.rec.usual}.`}>adj. {j.usual}</span></span><span class="a-raw">expected {j.opp.rec.usual}</span></>
               : <span>{j.key === 'high' || j.key === 'routine' ? 'expected to save' : 'expected'} {j.usual}</span>}</span>}
-            {j.opp && <span class="job-opp a-adj">{j.opp.note} Expected {j.opp.rec.usual} against an average team.</span>}
           </li>
         ))}
       </ul>
@@ -221,11 +220,11 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .job-v.v-missed, .job-v.v-na { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
   /* Tonight's opponent (the Competition switch): the note under the job, and the recorded mark, pill and expected
      number that replace the adjusted ones when it is off. Base shows .a-raw inline, so these get their own display. */
-  .job-opp { grid-column: 2 / -1; font: 400 13px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
+  .job-adj { color: var(--ink-2); font-weight: 600; }
   .job-v.a-raw, .pc-sum.a-raw { display: none; }
   :global(html[data-raw-competition]) .pc[data-adj='competition'] .job-v.a-raw, :global(html[data-arena='raw']) .pc[data-adj='competition'] .job-v.a-raw { display: inline-grid; }
   :global(html[data-raw-competition]) .pc[data-adj='competition'] .pc-sum.a-raw, :global(html[data-arena='raw']) .pc[data-adj='competition'] .pc-sum.a-raw { display: inline-flex; }
-  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; }
+  .job-why { font: 400 12px var(--ui); color: var(--ink-3); margin-left: 4px; white-space: nowrap; }
   .job.na .job-l { color: var(--ink-2); }
   .more-cards .hide, .more-cards[open] .show, .how .hide, .how[open] .show { display: none; }
   .more-cards[open] .hide, .how[open] .hide { display: inline; }
