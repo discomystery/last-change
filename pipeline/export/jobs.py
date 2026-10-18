@@ -457,6 +457,16 @@ def opp_note(job: str, o: dict, place: str) -> str:
     return f"{head}: {place} gives up about {pct}% {'fewer' if o['f'] < 1 else 'more'} {what} than an average team."
 
 
+def full_names(rows) -> dict:
+    """{(game_id, player_id): "First Last"} for the cards; "Elias Pettersson (#40)" when two players in one game share
+    a full name."""
+    by = defaultdict(dict)
+    for r in rows:
+        by[(r["game_id"], wording.full(r))][r["player_id"]] = r
+    return {(gid, r["player_id"]): f"{name} (#{r['number']})" if len(rs) > 1 and r.get("number") is not None else name
+            for (gid, name), rs in by.items() for r in rs.values()}
+
+
 def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     """Report cards for every finished game, or only for the games in `only` (the quick game-night pass: cards are
     judged from earlier games alone, so one game's cards come out the same either way). Games whose shift chart the
@@ -468,7 +478,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     tj = SITE_DATA / "teams.json"
     places = wording.places({t["abbr"]: t["place"] for t in json.loads(tj.read_text())}) if tj.exists() else {}
-    names = wording.short_names(pl.read_parquet(d / "players.parquet").iter_rows(named=True), key=lambda r: r["game_id"])  # "Aho"; "M. Tkachuk" for namesakes
+    names = full_names(pl.read_parquet(d / "players.parquet").iter_rows(named=True))  # "Sebastian Aho"; numbers for namesakes
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
     now = _table(season).join(games.select("game_id", "date", "home_id"), on="game_id").sort("player_id", "date", "game_id")
 
