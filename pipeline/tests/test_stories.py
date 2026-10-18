@@ -245,3 +245,23 @@ def test_first_goal_and_goalie_first_details():
         "Michael DiPietro finally got his first NHL win, making 25 saves in his fourth start, eight seasons after his NHL debut."
     assert stories.goalie_first_text({**win, "start_n": 1, "seasons": 0}, "A", 30) == "A got his first NHL win, making 30 saves in his first NHL start."
     assert stories.goalie_first_text({"kind": "win_since", "since": "2025-03-03"}, "A", 20) == "It was A’s first NHL win since Mar 3, 2025."
+
+
+def test_season_defining_runs_lead_the_story():
+    """Sora, 2026-10-18: the Flyers' first win after a 0-6-3 start was missing from the headline and the story."""
+    W = stories.Words({"PHI": "Philadelphia", "OTT": "Ottawa"})
+    P, O = stories._cap(W.the("PHI")), stories._cap(W.the("OTT"))  # "The Flyers", unless another test changed the names
+    pk = lambda pool, *k: pool[0]
+    loss = lambda end="REG": {"win": False, "end": end}
+    win = {"win": True, "end": "REG"}
+    phi = [loss()] * 6 + [loss("OT")] * 3 + [win]
+    heads, lead, told = stories._run_story(phi, [win] * 6 + [loss()] * 3, "PHI", "OTT", W, pk)
+    assert max(h[0] for h in heads) >= 95 and heads[0][1] == f"{P} finally win one"
+    assert lead == [f"{P} won for the first time this season, at the tenth try, after starting 0-6-3."]
+    assert told == {"PHI"}
+    # the loser's winless start: told at the close, and the headline still carries the result
+    heads, lead, told = stories._run_story([win] * 5, phi[:-1], "OTT", "PHI", W, pk)
+    assert heads[0][1] == f"{O} keep {W.the('PHI')} winless" and lead[0].startswith(f"{P} are still looking")
+    # a short run is not the story
+    assert stories._run_story([loss(), loss(), win], [win, win, loss()], "PHI", "OTT", W, pk) == ([], [], set())
+    assert stories.defining_run(phi[:-1]) and not stories.defining_run([win, loss(), loss()])
