@@ -37,21 +37,17 @@ from functools import lru_cache
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import penalties, storylines, wording
 from pipeline.export import surprises as surprise_rules
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
-WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 PERIODS = {1: "first", 2: "second", 3: "third"}
 ORDINAL = {4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}
 LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
 HEAD_FACT = 50  # a preview fact headline needs this score to beat the top call's headline
-
-
-def num(n: int) -> str:
-    return WORDS[n] if 0 <= n < len(WORDS) else str(n)
 
 
 def a_num(n: int) -> str:
@@ -98,14 +94,6 @@ def _secs(toi: str | None) -> int:
         return 0
     m, _, sec = toi.partition(":")
     return int(m) * 60 + int(sec or 0)
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:]
-
-
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
 def weekday(d: str) -> str:

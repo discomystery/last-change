@@ -20,8 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+from pipeline.export import grammar
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
+
 PERIODS = {1: "first", 2: "second", 3: "third"}
-WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 RUN_GAP = 300  # seconds between two goals by one team that read as one sentence
 RELATIVE = 300  # a goal this soon after the last one told is "x:xx later"
 LATE = 300  # the last five minutes of the third read "with x:xx left"
@@ -29,40 +31,17 @@ HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty sh
 SEASON_MARKS = (20, 30, 40, 50, 60, 70)  # a scorer's nth goal of the season worth a clause
 
 
-def num(n: int) -> str:
-    return WORDS[n] if 0 <= n < len(WORDS) else str(n)
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:] if t else t
-
-
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
-
-
-def clock(s: int) -> str:
-    return ("1 second" if s == 1 else f"{s} seconds") if s < 60 else f"{s // 60}:{s % 60:02d}"
+clock = grammar.seconds_left  # "48 seconds", "2:13"
+th = grammar.ordinal  # "1,000th", "302nd", "21st"
 
 
 def ordinal(n: int) -> str:
-    return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth",
-            10: "tenth"}.get(n, f"{n}th")
-
-
-ORDINAL_WORDS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "11th", "12th",
-                 "13th", "14th", "15th", "16th", "17th", "18th", "19th", "20th"]
+    return grammar.ordinal_word(n)
 
 
 def nth_word(n: int) -> str:
     """"eighth" for small counts ("in his eighth NHL game"), "23rd" beyond."""
-    return ORDINAL_WORDS[n] if 0 < n <= 20 else th(n)
-
-
-def th(n: int) -> str:
-    """1,000th, 302nd, 21st (never 11st)."""
-    suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n:,}{suf}"
+    return grammar.ordinal_word(n)
 
 
 def at(g: dict) -> int:

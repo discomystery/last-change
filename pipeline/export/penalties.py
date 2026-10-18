@@ -29,6 +29,7 @@ from functools import lru_cache
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.config import FULL_SEASONS, REGULAR, TABLES
 
 CALLED = ["MIN", "MAJ", "BEN", "MAT"]
@@ -38,15 +39,6 @@ FEW_SHARE, MANY_SHARE = 0.05, 0.03
 LINE_BRAWL, BRAWL_PLAYERS, BRAWL_ROUGHING = 3, 6, 4
 BUSY_PLAYER, QUIET_GAME = 3, 3
 PERIODS = {1: "first", 2: "second", 3: "third"}
-WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
-
-
-def num(n: int) -> str:
-    return WORDS[n] if 0 <= n < len(WORDS) else str(n)
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:]
 
 
 @lru_cache(maxsize=None)
@@ -257,8 +249,6 @@ def _tangled(w: dict, name) -> str:
     return f"{_and([name(p) for p in _fighters(w)])} all got five for fighting"
 
 
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
 def bad_blood(gid: int, season: int, N: dict[int, str]) -> dict | None:

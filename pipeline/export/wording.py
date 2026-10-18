@@ -7,6 +7,8 @@ stat lines ("NY Rangers 5th for power play") keep the place.
 import re
 import zlib
 
+from pipeline.export.grammar import article, ordinal  # noqa: F401  (kept here for older callers)
+
 PLURAL = {"has": "have", "is": "are", "was": "were", "does": "do", "wins": "win", "faces": "face", "starts": "start", "plays": "play",
           "gets": "get", "gives": "give", "takes": "take", "throws": "throw", "allows": "allow", "leans": "lean", "rides": "ride",
           "uses": "use", "hits": "hit", "shoots": "shoot", "kills": "kill", "controls": "control", "makes": "make", "turns": "turn"}
@@ -178,34 +180,3 @@ def initials(r: dict) -> str:
 def full(r: dict) -> str:
     return f"{r['first']} {r['last']}"
 
-
-_AN_WORDS = ("hour", "honest", "honor")
-
-
-def article(text: str) -> str:
-    """The text with the article it takes when spoken: "an 8-3 rout", "an 11-game streak", "a 1-0 win", "an 18%",
-    "an extra", "a one-timer", "a Utah"."""
-    t = text.lstrip()
-    lead = t.split()[0] if t else ""
-    if lead[:1].isdigit():
-        digits = ""
-        for ch in lead:
-            if not ch.isdigit():
-                break
-            digits += ch
-        # spoken "eight", "eighteen", "eighty...", "eleven", "eleven hundred": the numbers that start with a vowel sound
-        n = int(digits)
-        an = digits[0] == "8" or n in (11, 18) or (len(digits) in (4, 7) and digits[:2] in ("11", "18"))
-        return ("an " if an else "a ") + t
-    low = lead.lower()
-    if low.startswith(_AN_WORDS):
-        return "an " + t
-    if low.startswith(("one", "once", "uni", "use", "usu", "eu", "ut")):  # "a one-goal game", "a Utah", "a usual"
-        return "a " + t
-    return ("an " if low[:1] in "aeiou" else "a ") + t
-
-
-def ordinal(n: int) -> str:
-    """ "21st", "22nd", "113th"."""
-    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{suffix}"
