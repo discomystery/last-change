@@ -28,3 +28,11 @@ export function result(g: Game) {
 
 /** "2026-27", or "2025-26 playoffs". */
 export const seasonLabel = (yr: number, gt: number) => `${yr}-${String((yr + 1) % 100).padStart(2, '0')}${gt === 3 ? ' playoffs' : ''}`;
+
+// Who has been in net for each club this season, newest game first (gamelog/teams.json).
+type NetRow = [number, string, string, number, number, number, string, number | null, number[]];
+const netFile = Object.values(import.meta.glob('../../public/data/gamelog/teams.json', { eager: true, import: 'default' }))[0] as Record<string, NetRow[]> | undefined;
+export type NetGame = { gid: number; date: string; opp: string; home: number; us: number; them: number; end: string; starter: number | null; relief: number[] };
+export const netOf = (team: string, before?: string): NetGame[] => (netFile?.[team] ?? [])
+  .map(([gid, date, opp, home, us, them, end, starter, relief]) => ({ gid, date, opp, home, us, them, end, starter, relief }))
+  .filter((g) => !before || g.date < before);

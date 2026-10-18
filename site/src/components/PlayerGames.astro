@@ -1,22 +1,19 @@
 ---
-// "Recent games" (Sora, 2026-10-18): his last ten games, newest first, as the league's box score lines, so every
-// number matches NHL.com. Skaters with post-game report cards can switch the list to their report card and Swing for
-// each game ("Show [the box score / his report cards]"). Last season's games fill in below a season line when he has
-// played fewer than ten this season. Each game links to its post-game page when there is one.
-import Section from './Section.astro';
-import { clock, signed } from '../lib/format';
+// His last ten games (Sora, 2026-10-18): what she wanted was to see at a glance when a player last played, and
+// then not have to leave the site for his recent box scores. So the name card ends with a strip that says when he
+// last played, and opens on the league's own box score line for each of his last ten games (newest first, last
+// season's under a season line when he has played fewer than ten this season, linking to post-game pages).
+import { clock } from '../lib/format';
 import { SKATER, GOALIE } from '../lib/statDefs';
 import { gamesOf, result, seasonLabel, type Game } from '../lib/gamelog';
 import { seasons } from '../lib/stats';
-import type { CardRow } from '../lib/reportCards';
 import { teamPaint } from '../lib/teams';
 
-interface Props { p: any; goalie?: boolean; cards?: CardRow[] }
-const { p, goalie = false, cards = [] } = Astro.props;
+interface Props { p: any; goalie?: boolean }
+const { p, goalie = false } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const games = gamesOf(p.id);
 const cur = seasons(goalie ? 'goalies' : 'skaters')[0] ?? games[0]?.yr;
-const RECENT = 10;
 const S = goalie ? GOALIE : SKATER;
 // Hits, blocks and penalty minutes step aside on phones so the line fits.
 const keys = goalie ? ['dec', 'sa', 'sv', 'ga', 'svpct', 'toi'] : ['g', 'a', 'p', 'pm', 's', 'hit', 'blk', 'pim', 'toi'];
@@ -49,26 +46,14 @@ const total = (() => {
 })();
 const moved = games.some((g) => g.team !== p.team);
 const n = games.length;
-
-// The report-card list: one row per game with the result, each mark, and his Swing.
-const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
-const word = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
-const pillWord = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
-const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
-const peer: Record<string, string> = { F: 'forwards', D: 'defensemen' };
-const duties = (cards[0]?.card?.jobs ?? []) as any[];
-const cardDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-const SW = 1.2; // Swing bar half-width, in Swing points
+const last = games[0];
+// "Last played Sat, Oct 17 at Winnipeg": a goalie's line says whether he started or came on in relief.
+const lastWords = last && `${goalie ? (last.gs ? 'Last started' : 'Last played, in relief,') : 'Last played'} ${fmtDate(last)} ${last.home ? 'vs' : 'at'} ${last.opp}`;
 ---
 {n > 0 && (
-<Section id="recent" title="Recent games" placeholder={false} takeaway={`His last ${n === 1 ? 'game' : `${n} games`}, newest first.`}>
-  <div class="card pg-card">
-    {cards.length > 0 && (
-      <p class="pick pg-pick"><span>Show</span>
-        <select aria-label="What to show for each game"><option value="box">the box score</option><option value="cards">his report cards</option></select>
-      </p>
-    )}
-    <div class="pg-view" data-v="box">
+  <details class="fold phfold pg-fold" id="games">
+    <summary><span class="pg-last">{lastWords}</span><span class="pg-sep" aria-hidden="true">·</span><span class="closed">Show his last {n === 1 ? 'game' : `${n} games`}</span><span class="opened">Hide his last {n === 1 ? 'game' : `${n} games`}</span></summary>
+    <div class="pg-card">
       <div class="pg-wrap">
         <table class="stbl pg">
           <thead><tr>
@@ -94,49 +79,31 @@ const SW = 1.2; // Swing bar half-width, in Swing points
           )}
         </table>
       </div>
-      <p class="note pg-note">From the NHL’s box scores.{games.some((g) => g.recap) && ' Tap an opponent for the post-game page.'}</p>
+      <p class="note pg-note">From the NHL’s box scores, newest first.{games.some((g) => g.recap) && ' Tap an opponent for the post-game page.'}</p>
     </div>
-
-    {cards.length > 0 && (
-      <div class="pg-view" data-v="cards" hidden>
-        <div class="rp-head" aria-hidden="true"><span>Game</span><span>Report card <em class="rp-keys">{duties.map((j) => j.label.replace(' at 5-on-5', '').toLowerCase()).join(' · ')}</em></span><span>Swing</span></div>
-        <ul class="rp-list">
-          {cards.slice(0, RECENT).map((r) => { const s = r.swing; const w = s ? Math.min(1, Math.abs(s.score) / SW) * 50 : 0; return (
-            <li>
-              <a class="rp-game" href={`${base}recap/${r.id}/`}>
-                <span class="rp-d">{cardDate(r.date)}</span>
-                <span class="rp-o">{r.home ? 'vs' : 'at'} {r.opp}</span>
-                <span class="rp-res">{r.us > r.them ? 'W' : r.end === 'REG' ? 'L' : 'OTL'} {r.us}–{r.them}{r.end !== 'REG' ? ` ${r.end}` : ''}</span>
-              </a>
-              <span class="rp-card">
-                <span class:list={['pc-sum', pillClass[r.card.pill as keyof typeof pillClass]]}>{pillWord[r.card.pill as keyof typeof pillWord]}</span>
-                <span class="rp-marks">{r.card.jobs.map((j: any) => <span class:list={['rp-m', j.verdict]} tabindex="0" data-tip={`${j.label}: ${word[j.verdict as keyof typeof word]}. ${j.text}`}>{mark[j.verdict as keyof typeof mark]}</span>)}</span>
-                <span class="rp-box">{r.card.box.g} G · {r.card.box.a} A · {r.card.toi}</span>
-              </span>
-              {s ? <span class="rp-sw" tabindex="0" data-tip={`Swing ${signed(s.score)}: better than ${s.pct}% of nights by ${peer[p.group]} last season.`}>
-                <span class="rp-track"><i class:list={{ neg: s.score < 0 }} style={s.score >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}></i></span>
-                <strong>{signed(s.score)}</strong>
-              </span> : <span class="rp-sw n">–</span>}
-            </li>
-          ); })}
-        </ul>
-        <p class="note pg-note">His report card and Swing from his last {Math.min(RECENT, cards.length)} {cards.length === 1 ? 'game' : 'games'} this season. Swing is how much his night moved the game, from the post-game page. Tap a game for the full report.</p>
-      </div>
-    )}
-  </div>
-</Section>
+  </details>
 )}
 
 <script is:inline>
-  document.querySelectorAll('.pg-card').forEach((card) => {
-    const pick = card.querySelector('.pg-pick select');
-    pick?.addEventListener('change', () => card.querySelectorAll('.pg-view').forEach((v) => { v.hidden = v.dataset.v !== pick.value; }));
-  });
+  // #games opens the fold, like #stats opens the career ledger.
+  (() => {
+    const open = () => { if (location.hash === '#games') document.getElementById('games')?.setAttribute('open', ''); };
+    open(); addEventListener('hashchange', open);
+  })();
 </script>
 
 <style>
-  .pg-card { margin-top: 18px; padding: 16px 28px 20px; }
-  .pg-pick { margin: 0 0 12px; }
+  /* Like the career fold: a strip across the bottom of the name card. */
+  .phfold { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; }
+  .phfold > summary { border-radius: 0 0 17px 17px; background: color-mix(in oklab, var(--track) 70%, var(--sheet)); border-top: 1px solid var(--rule); cursor: pointer; }
+  .phfold[open] > summary { border-radius: 0; margin-bottom: 0; }
+  /* Stacked above the career fold, it gives that fold the card's rounded bottom. */
+  .pg-fold:has(+ :global(.phfold)) { border-radius: 0; }
+  .pg-fold:has(+ :global(.phfold)) > summary { border-radius: 0; }
+  .pg-fold > summary { flex-wrap: wrap; row-gap: 2px; }
+  .pg-last { font-weight: 600; }
+  .pg-sep { color: var(--ink-3); }
+  .pg-card { padding: 16px 28px 20px; }
   .pg-wrap { overflow-x: auto; }
   .pg { width: 100%; }
   .pg .pg-d, .pg .pg-o, .pg .pg-r { text-align: left; }
@@ -157,49 +124,14 @@ const SW = 1.2; // Swing bar half-width, in Swing points
   .pg tfoot :is(th, td) { font-weight: 600; }
   .pg-avg { display: block; font: 400 12px var(--ui); color: var(--ink-3); }
   .pg-note { margin: 12px 0 0; }
-  @media (max-width: 719px) {
-    .pg-card { padding: 14px 16px 16px; }
-    .pg-o .pg-tm { margin-left: 4px; }
-  }
+  @media (max-width: 719px) { .pg-card { padding: 14px 16px 16px; } .pg-o .pg-tm { margin-left: 4px; } }
   /* Phones: the date goes under the opponent, overtime under the score, and the less-used columns step aside. */
   @media (max-width: 560px) {
+    .pg-sep { display: none; }
+    .pg-last { flex-basis: 100%; text-align: center; }
     .pg-wide, .pg .pg-d, .pg .pg-tl:not(.pg-ph) { display: none; }
     .pg .pg-tl.pg-ph { display: table-cell; }
     .pg-dd { display: block; font: 400 12px var(--ui); color: var(--ink-3); margin-bottom: 1px; }
     .pg-end { display: block; font-size: 12px; color: var(--ink-3); }
-  }
-
-  .rp-head, .rp-list li { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.6fr) minmax(150px, 0.9fr); gap: 6px 18px; align-items: center; }
-  .rp-head { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding-bottom: 6px; }
-  .rp-keys { font: 400 11px var(--ui); font-style: normal; text-transform: none; letter-spacing: 0; color: var(--ink-3); margin-left: 6px; }
-  .rp-list li { padding: 10px 0; border-top: 1px solid var(--rule); }
-  .rp-game { display: flex; flex-wrap: wrap; gap: 2px 10px; color: inherit; text-decoration: none; font: 400 15px var(--ui); }
-  .rp-game:hover .rp-o { text-decoration: underline; }
-  .rp-d { color: var(--ink-3); min-width: 48px; }
-  .rp-o { font-weight: 600; }
-  .rp-res { color: var(--ink-2); }
-  .rp-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-  .pc-sum { min-width: 92px; }
-  .rp-marks { display: inline-flex; gap: 4px; }
-  .rp-m { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink); font: 700 11px var(--ui); cursor: help; }
-  .rp-m.held { background: var(--ink); color: var(--sheet); }
-  .rp-m.missed, .rp-m.na { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
-  .rp-box { font: 400 13px var(--ui); color: var(--ink-3); }
-  .rp-sw { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 10px; cursor: help; }
-  .rp-track { position: relative; height: 12px; border-radius: 3px; background: var(--track); }
-  .rp-track::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
-  .rp-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--team); }
-  .rp-track i.neg { opacity: 0.45; }
-  .rp-sw strong { font: 700 15px var(--ui); text-align: right; }
-  @media (max-width: 719px) {
-    .rp-head { display: none; }
-    .rp-list li { grid-template-columns: minmax(0, 1fr) 96px; gap: 8px 12px; }
-    .rp-game { flex-wrap: nowrap; gap: 8px; font-size: 14px; white-space: nowrap; }
-    .rp-d { min-width: 0; }
-    .rp-card { grid-column: 1 / -1; grid-row: 2; gap: 6px 8px; }
-    .rp-card .pc-sum { min-width: 0; }
-    .rp-box { margin-left: auto; }
-    .rp-sw { grid-template-columns: 1fr 34px; gap: 6px; }
-    .rp-sw strong { font-size: 14px; }
   }
 </style>

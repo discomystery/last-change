@@ -18,6 +18,7 @@ import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
 import { clashes, fullName, unitShort } from '../../lib/playerLinks';
+import NetUsage from '../../components/NetUsage.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -73,6 +74,7 @@ const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T
 const colours = matchupPaint(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
+const isoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start);
 
 // Style fingerprints
@@ -407,6 +409,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
         ))}
       </p>
     )}
+    <div class="nu2">{order.map((a) => <NetUsage team={a} before={isoDay} side={side(a)} title />)}</div>
     {gModes.map(([mode, words]) => (
       <div class={`gmode m-${mode}`}>
         <div class="g3">
@@ -553,6 +556,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .proj-rows li > span { display: flex; flex-wrap: wrap; gap: 4px 14px; }
   .proj-rows b { font: 700 12.5px var(--ui); letter-spacing: 0.05em; color: var(--ink-3); }
   .stpick { margin-top: 22px; }
+  .nu2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; margin: 14px 0 18px; }
   .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
   .projected .lbl { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 10px; }
   .projected i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 6px; }

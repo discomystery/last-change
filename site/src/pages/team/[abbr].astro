@@ -19,6 +19,7 @@ import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
 import { clashes, fullName, unitShort } from '../../lib/playerLinks';
+import NetUsage from '../../components/NetUsage.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import TeamStats from '../../components/TeamStats.astro';
@@ -409,6 +410,7 @@ const coachSince = coach && (team as any).coach_since
     </Fragment>
     {goalies.length > 0 && (
       <>
+        <NetUsage team={abbr!} />
         <div class="pick"><span>Show</span>
           <select id="g-pick" aria-label="Goalie">{goalies.map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
           <ShareButton kind="goalie" label="Share this goalie" class="gshare" />

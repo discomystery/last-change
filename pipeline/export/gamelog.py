@@ -7,6 +7,9 @@ counts only if he played (the boxscore also lists the backup with 0:00).
 
 Written to site/public/data/gamelog/{id}.json for every player with a page (players/index.json):
 {"cols": [...], "rows": [[...], ...]}
+Also gamelog/teams.json, who has been in net (Sora, 2026-10-18: she wanted to see quickly which of a club's goalies
+had been starting and who played last): {team: [[gid, date, opp, home, us, them, end, starter id, [relief ids]], ...]}
+for every game this season, newest first.
 Every row starts with game id, date, season, game type (2 regular, 3 playoffs), his club, the opponent, home (1/0),
 goals for, goals against, and how it ended (REG, OT, SO). Skaters then: G, A, P, +/-, shots on goal, hits, blocks,
 PIM, power-play goals, ice time (seconds). Goalies: decision (W, L, O or null), started (1/0), shots against, saves,
@@ -58,6 +61,10 @@ def lines(seasons: list[int]) -> dict[int, list[list]]:
                     out.setdefault(pl["playerId"], []).append(game + [
                         pl.get("goals", 0), pl.get("assists", 0), pl.get("points", 0), pl.get("plusMinus", 0), pl.get("sog", 0),
                         pl.get("hits", 0), pl.get("blockedShots", 0), pl.get("pim", 0), pl.get("powerPlayGoals", 0), _secs(pl.get("toi"))])
+                played = [pl for pl in groups.get("goalies", []) if _secs(pl.get("toi"))]
+                # A box saved as FINAL, before the NHL marks it OFF, has no starter flags: the busiest goalie started.
+                flagged = any(pl.get("starter") is not None for pl in played)
+                first = max(played, key=lambda pl: _secs(pl.get("toi")), default=None)
                 for pl in groups.get("goalies", []):
                     toi = _secs(pl.get("toi"))
                     if not toi:
@@ -65,9 +72,31 @@ def lines(seasons: list[int]) -> dict[int, list[list]]:
                     sa = pl.get("shotsAgainst", 0)
                     ga = pl.get("goalsAgainst", 0)
                     out.setdefault(pl["playerId"], []).append(game + [
-                        pl.get("decision"), int(bool(pl.get("starter"))), sa, pl.get("saves", sa - ga), ga, toi])
+                        pl.get("decision"), int(bool(pl.get("starter")) if flagged else pl is first), sa, pl.get("saves", sa - ga), ga, toi])
     for rows in out.values():
         rows.sort(key=lambda r: (r[1], r[0]))
+    return out
+
+
+def net(season: int) -> dict[str, list[list]]:
+    """team -> every game this season, newest first, with who started in net and who came on in relief."""
+    out: dict[str, list[list]] = {}
+    for box in _boxes(season):
+        if box["gameType"] != 2:
+            continue
+        end = (box.get("gameOutcome") or {}).get("lastPeriodType") or "REG"
+        for side, other in (("homeTeam", "awayTeam"), ("awayTeam", "homeTeam")):
+            played = [pl for pl in box["playerByGameStats"].get(side, {}).get("goalies", []) if _secs(pl.get("toi"))]
+            if not played:
+                continue
+            flagged = any(pl.get("starter") is not None for pl in played)
+            starter = next((pl for pl in played if pl.get("starter")), None) if flagged else max(played, key=lambda pl: _secs(pl.get("toi")))
+            us, them = box[side], box[other]
+            out.setdefault(us["abbrev"], []).append([
+                box["id"], box["gameDate"], them["abbrev"], int(side == "homeTeam"), us.get("score", 0), them.get("score", 0), end,
+                starter["playerId"] if starter else None, [pl["playerId"] for pl in played if pl is not starter]])
+    for rows in out.values():
+        rows.sort(key=lambda r: (r[1], r[0]), reverse=True)
     return out
 
 
@@ -87,6 +116,8 @@ def run(season: int = CURRENT_SEASON) -> dict:
             continue
         (OUT / f"{pid}.json").write_text(json.dumps({"cols": cols, "rows": rows}, separators=(",", ":"), ensure_ascii=False))
         keep.add(f"{pid}.json")
+    (OUT / "teams.json").write_text(json.dumps(net(season), separators=(",", ":")))
+    keep.add("teams.json")
     for f in OUT.glob("*.json"):  # players who no longer have a page
         if f.name not in keep:
             f.unlink()
