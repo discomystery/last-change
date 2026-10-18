@@ -11,9 +11,9 @@ are worked out here (0 to 100, the better end on the right) so the page only pla
 from pipeline.export import previews
 
 LEVEL = {  # level calls (a strength meeting a soft spot): metric -> verdict -> (title, plain sentence)
-    "volume": {"held": (["{Xc} piled up the shots", "{Xc} kept the shots coming", "Shots, as promised"], "{X} got to their usual volume of shots, as the call said."),
-               "partly": ("More shots than most teams, but not {Xp} usual", "{X} outshot an average team’s pace, but not their own usual."),
-               "missed": ("{Xc} never got the shots going", "{X} took fewer shots than an average NHL team would have.")},
+    "volume": {"held": (["{Xc} piled up the shots", "{Xc} kept the shots coming", "Shots, as promised"], "At 5-on-5, {X} got to their usual volume of shots, as the call said."),
+               "partly": ("More shots than most teams, but not {Xp} usual", "At 5-on-5, {X} outshot an average team’s pace, but not their own usual."),
+               "missed": ("{Xc} never got the shots going at 5-on-5", "At 5-on-5, {X} took fewer shots than an average NHL team would have.")},
     "quality": {"held": ("{Xc} got their looks", "{Xp} shots were at least as dangerous as usual."),
                 "partly": ("Decent looks, not their best", "{Xp} shots were more dangerous than an average team’s, but not up to their usual."),
                 "missed": (["{Yc} took away the best looks", "Fewer good looks than usual for {X}", "{Yc} kept {X} to lesser chances"], "{Xp} shots were less dangerous than an average team’s.")},

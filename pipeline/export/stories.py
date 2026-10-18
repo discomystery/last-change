@@ -172,7 +172,7 @@ def slump(t: str, res: list[dict], n: int, W) -> str:
 
 
 def ORDINAL_N(n: int) -> str:
-    return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}.get(n, f"{n}th")
+    return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}.get(n) or wording.ordinal(n)
 
 
 def record(res: list[dict]) -> str:
@@ -809,7 +809,8 @@ def goalie_first_text(x: dict, who: str, saves: int | None) -> str | None:
 
 def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str, loser: str, most: int = 2,
                  told: set | None = None, found: list[dict] | None = None, kinds: tuple | None = None, skip: set = frozenset(),
-                 goals_told: bool = False, saves: dict[int, int] | None = None, in_net: list[str] | None = None) -> list[str]:
+                 goals_told: bool = False, saves: dict[int, int] | None = None, in_net: list[str] | None = None,
+                 goals: list[dict] | None = None) -> list[str]:
     """Up to `most` sentences on firsts, debuts and returns (export/firsts.py), most important first. A loser's player
     is named with his team. `kinds` picks which kinds to tell (a games-played milestone counts as "milestone"; goal,
     point and assist marks ride on the goal in the chronology instead); `goals_told` leaves off "and scored", since
@@ -1037,7 +1038,7 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
         return None
     lastg = res[-1]
     rout = lastg["win"] and lastg["us"] - lastg["them"] >= 4
-    tail = f", the last a {score_text(lastg)} rout of {W.place(lastg['opp'])}" if rout else ""
+    tail = f", the last {wording.article(score_text(lastg))} rout of {W.place(lastg['opp'])}" if rout else ""
     if kind == "won" and n >= 5:
         return _pick([f"{_cap(W.the(t))} are on a tear, {num(n)} straight wins{tail}.", f"{_cap(W.the(t))} have won {num(n)} straight{tail}, and they’re rolling."], t, n, "form")
     if kind == "won" and n >= 3:
@@ -1205,7 +1206,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         winner = home if r["win"] else away
         at = W.at(home) if r["home"] else W.at(away)
         if winner == away and r["home"]:
-            sents.append(f"{_cap(W.the(away))} already played {at} once this season and left with a {score_text(r, win=True)}.")
+            sents.append(f"{_cap(W.the(away))} already played {at} once this season and left with {wording.article(score_text(r, win=True))}.")
         else:
             sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} {at}.")
         if r["home"]:  # a plain fact: it leads only when nothing livelier does (Sora's review of 2025-26, 2026-10-17)
@@ -2093,7 +2094,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     s1 += timeline.paragraph(gm)
     # a first goal the chronology could not place (no goal of his on the sheet, say) is told the old way
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=found,
-                       kinds=("first_goal", "club_goal"), skip=attached)
+                       kinds=("first_goal", "club_goal"), skip=attached, goals=goals)
     # how the goals taken off played out, looking back (a one-goal loss, as many goals as came off, won anyway)
     for t in (away, home):
         mine = [x for x in gone if (home if x["home"] else away) == t]
@@ -2125,6 +2126,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         nums = r.get("numbers") or {}
         sw, sl = (nums.get(winner) or {}).get("shots"), (nums.get(loser) or {}).get("shots")
         outshot = f", outshooting {W.the(loser)} {sw}-{sl}" if sw and sl and sw - sl >= 5 else ""
+        # The chances line must not contradict the shot count beside it (VAN at FLA, 2026-10-15: "nothing much separated
+        # these two" when Florida outshot them 39-17; CGY at VGK: "the Golden Knights drove the play" when Calgary had
+        # more of the shots). `outshot_by` is set when the loser had 5+ more shots, `lopsided` when either side had
+        # 10+ more and 40% more.
+        outshot_by = sw is not None and sl is not None and sl - sw >= 5
+        lopsided = bool(sw and sl) and abs(sw - sl) >= 10 and max(sw, sl) >= 1.4 * min(sw, sl)
+        more, fewer = (winner, loser) if (sw or 0) > (sl or 0) else (loser, winner)
+        hi, lo = max(sw or 0, sl or 0), min(sw or 0, sl or 0)
         extra = {"OT": "overtime", "SO": "a shootout"}.get(end)
         # Bands on the calibrated replay share (eye test, 2026-10-13: 60-70% used to read "close to even", so Columbus
         # outshooting Pittsburgh 45-22 was "could have gone either way"). 45-55% is close, as in the win-chance reveal.
@@ -2143,6 +2152,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         elif share >= 0.7:
             s2.append(pk([f"The score was fair. Replay this game’s chances a hundred times and {Wn} win {tenths(share)}.",
                           f"{_cap(Wn)} earned this one. Replay the chances a hundred times and they win {tenths(share)}."], "fair"))
+        elif share >= 0.55 and outshot_by:
+            s2.append(pk([f"{_cap(Ln)} had more of the shots, {sl}-{sw}, but {Wn} had the better ones.",
+                          f"{_cap(Ln)} outshot {Wn} {sl}-{sw}, but {W.poss(winner)} chances were the more dangerous ones."], "fair-shots"))
         elif share >= 0.6:
             s2.append(pk([f"{_cap(Wn)} carried the play{outshot}, and got the result to match.",
                           f"{_cap(Wn)} drove the play{outshot}, and the scoreboard caught up."], "fair6"))
@@ -2150,7 +2162,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             s2.append(pk([f"{_cap(Wn)} had the better of the chances{outshot}.", f"{_cap(Wn)} had a bit more of the good stuff{outshot}."], "fair55"))
         elif share <= 0.4:
             g = gl.get(winner)
-            if ws - ls >= 3:
+            if sw and sl and sw - sl >= 5:  # the winner outshot them: say whose chances were better, not "the play"
+                lead = f"{_cap(Wn)} outshot {Ln} {sw}-{sl}, but {W.poss(loser)} chances were the better ones."
+            elif ws - ls >= 3:
                 lead = f"The score flatters {Wn}: {Ln} had the better of the play."
             elif share <= 0.3:
                 lead = pk([f"{_cap(Wn)} got away with one. {_cap(Ln)} had the better of the play.",
@@ -2162,6 +2176,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 gn = name(g['id']) if g.get('id') in N else g['name']
                 s2.append(pk([f"{gn} made the difference in net, stopping {g['saves']} of {g['shots']}.",
                               f"{gn} was the difference, stopping {g['saves']} of {g['shots']}."], "thief"))
+        elif lopsided:  # close on the chances, far apart on the shots
+            s2.append(pk([f"{_cap(W.the(more))} outshot {W.the(fewer)} {hi}-{lo}, but {W.poss(fewer)} looks were better, so the chances came out about even.",
+                          f"{_cap(W.the(fewer))} were outshot {hi}-{lo}, but their looks were better, and the chances came out about even."], "even-shots"))
         elif share <= 0.45:
             s2.append(pk([f"{_cap(Ln)} had a little more of the play, but {Wn} made their chances count.",
                           f"{_cap(Ln)} had a little more of the play. {_cap(Wn)} had the finish."], "fair45"))
@@ -2179,13 +2196,15 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         top = swing[0]
         if top["id"] not in said and top.get("pos") != "G":
             pts = sum(top["id"] in (g["p1"], g["p2"], g["p3"]) for g in goals)
-            tail = ", even in a loss" if top.get("team") == loser else ", without a point" if not pts else ""
+            # one "even" for everything that makes it unlikely ("even in a loss, even with Hagel's hat trick" read badly)
+            parts = ["in a loss"] if top.get("team") == loser else ["without a point"] if not pts else []
             tn = name(top["id"])
             # The night's headline player ranked lower: say so rather than leave the sentence beside a hat trick or an
             # overtime winner unexplained (Sora, 2026-10-16: Ekblad over Tkachuk's natural hat trick).
             star = max(hat, key=lambda x: len(x[1]))[0] if hat else next((g["p1"] for g in goals if g["period"] > 3), None) if end == "OT" else None
             if star and star != top["id"] and N.get(star):
-                tail += f", even with {name(star)}’s {'hat trick' if hat else 'overtime winner'} in the game"
+                parts.append(f"with {name(star)}’s {'hat trick' if hat else 'overtime winner'} in the game")
+            tail = f", even {' and '.join(parts)}" if parts else ""
             s2.append(pk([f"By our Swing measure, {tn} had the best night of anyone{tail}.",
                           f"Nobody on the ice had a bigger night than {tn}{tail}, by our Swing measure."], "swing"))
     for sp in r.get("surprises", []):
@@ -2327,7 +2346,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if per.get(i["tag"], 0) >= (1 if i["tag"] in ("Finally", "Drought over") else MAX_PER_TAG) or len(picked) >= MAX_ITEMS:
             continue
         if i["tag"] in RUN_TAGS:
-            team = next((t for t in (winner, loser) if W.the(t) in i["text"].lower() or W.poss(t) in i["text"].lower()), None)
+            low = i["text"].lower()
+            # the club the item is about, by "the Hurricanes" first, its place only if neither club is named that way
+            team = next((t for t in (winner, loser) if W.the(t).lower() in low or W.poss(t).lower() in low), None) \
+                or next((t for t in (winner, loser) if W.place(t).lower() in low), None)
             if team in runs_told:
                 continue
             runs_told.add(team)
