@@ -171,6 +171,12 @@ def slump(t: str, res: list[dict], n: int, W) -> str:
     return f"{_cap(W.the(t))} are on {a_num(n)}-game losing streak."
 
 
+def defining_run(res: list[dict]) -> bool:
+    """A run that is the story of a team's season: no win yet (4+ games), perfect so far (4+), or a streak of 6+."""
+    k, n = streak(res)
+    return (n >= 4 and n == len(res)) or n >= 6
+
+
 def ORDINAL_N(n: int) -> str:
     return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}.get(n) or wording.ordinal(n)
 
@@ -1039,6 +1045,10 @@ def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
     lastg = res[-1]
     rout = lastg["win"] and lastg["us"] - lastg["them"] >= 4
     tail = f", the last {wording.article(score_text(lastg))} rout of {W.place(lastg['opp'])}" if rout else ""
+    if kind == "winless" and n >= 3 and n == len(res):  # the whole season so far (Sora, 2026-10-18: the Flyers' 0-6-3)
+        return f"{_cap(W.the(t))} are still looking for their first win of the season, {record(res)} through {num(n)} games."
+    if kind == "won" and n >= 3 and n == len(res):
+        return f"{_cap(W.the(t))} are perfect so far, {record(res)}."
     if kind == "won" and n >= 5:
         return _pick([f"{_cap(W.the(t))} are on a tear, {num(n)} straight wins{tail}.", f"{_cap(W.the(t))} have won {num(n)} straight{tail}, and they’re rolling."], t, n, "form")
     if kind == "won" and n >= 3:
@@ -1226,14 +1236,15 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     # form
     form = {t: _form_sentence(t, facts["form"][t], W, bool(m)) for t in (home, away)}
     sh, sa = facts["form"][home]["streak"], facts["form"][away]["streak"]
+    order = sorted((home, away), key=lambda t: not defining_run(facts["form"][t]["res"]))  # the bigger run first
     if form[home] and form[away] and sh == sa and sh[0] == "won":  # "The X have won three straight. The Y have won three straight."
         sents.append(f"Both teams come in on {a_num(sh[1])}-game winning streak." if sh[1] >= 3 else "Both teams have won two in a row.")
     elif form[home] and form[away] and sh == sa and all(x["end"] == "REG" for t in (home, away) for x in facts["form"][t]["res"][-sh[1]:]):
         sents.append(f"Both teams come in on {a_num(sh[1])}-game losing streak.")
     elif form[home] and form[away]:  # two streaks: separate sentences, since "but" only fits a real contrast (Sora, 2026-10-12)
-        sents += [form[home], form[away]]
+        sents += [form[t] for t in order]
     elif any(form.values()):
-        for t in (home, away):
+        for t in order:
             if form[t]:
                 sents.append(form[t])
             elif facts["form"][t]["res"]:
@@ -1242,13 +1253,23 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         fa, fh = facts["form"][away], facts["form"][home]
         if fa["res"] and fh["res"]:
             sents.append(f"{_cap(W.the(away))} come in at {fa['record']}, {W.the(home)} at {fh['record']}.")
+    if m and any(defining_run(facts["form"][t]["res"]) for t in (home, away)):
+        # a season-defining run leads, ahead of the last meeting (Sora, 2026-10-18: "winless in nine" came second)
+        sents = sents[1:] + sents[:1]  # the meetings sentence is always the first one
     for t, f in facts["form"].items():
         k, n = f["streak"]
+        if k == "winless" and n >= 4 and n == len(f["res"]):  # no win yet: the story of their season
+            facts["heads"].append((76 + 2 * n, _pick([f"{_cap(W.the(t))} are still looking for their first win", f"Still no win for {W.the(t)}",
+                                                      f"{_cap(W.the(t))} try again for a first win"], gid, t, "nowin")))
+            continue
+        if k == "won" and n >= 4 and n == len(f["res"]):
+            facts["heads"].append((66 + 2 * n, _pick([f"{_cap(W.the(t))} are still perfect", f"Can anyone beat {W.the(t)}?"], gid, t, "perfect")))
+            continue
         if k == "won" and n >= 4:
             facts["heads"].append((60 + n, _pick([f"{_cap(W.the(t))} come in hot", f"{_cap(W.the(t))} are rolling", f"Can anyone stop {W.the(t)}?"]
                                                  if n >= 6 else [f"{_cap(W.the(t))} come in hot", f"{_cap(W.the(t))} are rolling"], gid, t, "hot")))
         if k == "winless" and n >= 4:
-            facts["heads"].append((58 + n, _pick([f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are desperate for a win", f"Something has to change for {W.the(t)}"]
+            facts["heads"].append((58 + n + max(0, n - 5), _pick([f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are desperate for a win", f"Something has to change for {W.the(t)}"]
                                                  if n >= 6 else [f"{_cap(W.the(t))} need a win", f"{_cap(W.the(t))} are searching for answers"], gid, t, "cold")))
     if facts.get("basement"):
         sents.append(facts["basement"])
@@ -1933,6 +1954,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     res_w = results(G.filter(pl.col("date") <= r["date"]), winner, season)
     res_l = results(G.filter(pl.col("date") <= r["date"]), loser, season)
     heads += _fact_heads(found, night, res_w, res_l, winner, loser, W, W_, L_, last, N)
+    run_heads, run_lead, run_told = _run_story(res_w, res_l, winner, loser, W, pk)
+    heads += run_heads
     if keeper_goals:
         heads.append((98, pk([f"Goalie {last(keeper_goals[0]['p1'])} scores", f"{last(keeper_goals[0]['p1'])} scores. Yes, the goalie"], "g")))
     if hat:
@@ -2107,6 +2130,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     s1 += _big_nights(night, winner, loser, W, name, said, last, big_told | hat_ids, verb="finished with")
     # A hot opening line for the nights fans talk about the next morning, each earned by the goals themselves
     # (Sora, 2026-10-14): a three-goal comeback, a tie with the goalie pulled that went on to win, a six-goal rout.
+    s1[0:0] = [x for x in run_lead if not x.startswith(_cap(W.the(loser)))]
     pulled_tie = any(g["own_extra"] and g["hs"] == g["as"] and g["period"] == 3 and side(g) == winner for g in goals)
     if comeback and lead_max[loser] >= 3:
         s1.insert(0, pk([f"Never count {W.the(winner)} out.", "What a comeback."], "hot"))
@@ -2341,7 +2365,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         items.append({"tag": "The preview", "text": text, "score": 20})
     items.sort(key=lambda i: -i["score"])
     picked, per = [], {}
-    runs_told: set[str] = set()  # one run (streak, slump, snapped, start, last ten) per team
+    runs_told: set[str] = set(run_told)  # one run (streak, slump, snapped, start, last ten) per team; the lead's counts
     for i in items:
         if per.get(i["tag"], 0) >= (1 if i["tag"] in ("Finally", "Drought over") else MAX_PER_TAG) or len(picked) >= MAX_ITEMS:
             continue
@@ -2357,10 +2381,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         picked.append({"tag": i["tag"], "text": i["text"]})
     # each team's record after the game closes the story, as wire recaps do, unless an item already says it
     told_rec = {t for t in (winner, loser) for i in picked if i["tag"] == "Start" and i["text"].startswith(_cap(W.the(t)))}
-    rec = record_line(G, r["date"], winner, loser, W, season, gid, told_rec)
-    if rec:
+    rec = record_line(G, r["date"], winner, loser, W, season, gid, told_rec | (run_told - {winner}))
+    tail = ([rec] if rec else []) + [x for x in run_lead if x.startswith(_cap(W.the(loser)))]
+    if tail:
         last_para = s3 if s3 else s2 if s2 else s1
-        last_para.append(rec)
+        last_para += tail
     if len(picked) < MIN_ITEMS and not rec:
         res = results(G.filter(pl.col("date") <= r["date"]), winner, season)
         picked.append({"tag": "Record", "text": f"{_cap(W.the(winner))} are now {record(res)}."})
@@ -2470,6 +2495,48 @@ def _drought_over(P: pl.DataFrame, pid: int, gid: int, day: str, season: int) ->
         return 0
     played = before.filter(pl.col("date") > scored["date"][-1]).height
     return played if played >= DROUGHT_OVER else 0
+
+
+def _run_story(res_w: list[dict], res_l: list[dict], winner: str, loser: str, W: Words, pk) -> tuple[list, list[str], set[str]]:
+    """Season-defining runs that tonight ended or stretched, told first (Sora, 2026-10-18: the Flyers' first win, after
+    a 0-6-3 start, was missing from the headline and the story). Returns headlines, sentences (the winner's open
+    paragraph one, the loser's close the story in place of its record) and the teams whose run they told (their run
+    items and record are not told again)."""
+    heads, lead, told = [], [], set()
+    W_, L_ = _cap(W.the(winner)), _cap(W.the(loser))
+    prev_w = res_w[:-1]
+    k, n = streak(prev_w)
+    if k == "winless" and n >= 4 and n == len(prev_w):  # a first win of the season
+        heads.append((min(99, 80 + 2 * n), pk([f"{W_} finally win one", f"{W_} get their first win at last", f"At last, a first win for {W.the(winner)}"], "firstwin")))
+        lead.append(f"{W_} won for the first time this season, at the {ORDINAL_N(len(res_w))} try, after starting {record(prev_w)}.")
+        told.add(winner)
+    elif k == "winless" and n >= 6:
+        run = prev_w[-n:]
+        losing = all(x["end"] == "REG" for x in run)
+        heads.append((min(96, 72 + 2 * n), pk([f"{W_} snap a {num(n)}-game losing streak", f"{W_} finally end the skid"] if losing else
+                                               [f"{W_} end a {num(n)}-game winless run", f"{W_} finally end the skid"], "skid")))
+        lead.append(f"{W_} snapped a {num(n)}-game losing streak." if losing else
+                    f"{W_} won for the first time in {num(n + 1)} games, after going {record(run)}.")
+        told.add(winner)
+    prev_l = res_l[:-1]
+    k, n = streak(prev_l)
+    lk, ln = streak(res_l)
+    if k == "won" and n >= 5 and n == len(prev_l):  # a perfect start is over
+        heads.append((80 + n, pk([f"{W_} hand {W.the(loser)} their first loss", f"{L_}’ perfect start is over"], "perfect")))
+        lead.append(f"{L_} lost for the first time this season, after starting {record(prev_l)}.")
+        told.add(loser)
+    elif lk == "winless" and ln >= 5 and ln == len(res_l):  # still no win
+        heads.append((70 + 2 * ln, pk([f"{W_} keep {W.the(loser)} winless", f"Still no win for {W.the(loser)}"], "nowin")))
+        lead.append(f"{L_} are still looking for their first win of the season, now {record(res_l)}.")
+        told.add(loser)
+    elif lk == "winless" and ln >= 8:
+        run = res_l[-ln:]
+        losing = all(x["end"] == "REG" for x in run)
+        heads.append((62 + 2 * ln, pk([f"{W_} hand {W.the(loser)} a {ORDINAL_N(ln)} straight loss"] if losing else [f"{W_} keep {W.the(loser)} winless in {num(ln)}"], "slide")))
+        lead.append(f"{L_} have lost {num(ln)} straight." if losing else f"{L_} are winless in {num(ln)} ({record(run)}).")
+        told.add(loser)
+    return heads, lead, told
+
 
 
 def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], winner: str, loser: str, W: Words, W_: str, L_: str, last, N) -> list[tuple[int, str]]:
