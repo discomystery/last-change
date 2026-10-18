@@ -101,6 +101,19 @@ def _rivals(a: str, b: str, season: int, div: dict[str, str]) -> list[tuple[floa
 
 # --- finished games ----------------------------------------------------------------------------------------------------
 
+def _blown(goals: list[dict], winner_home: bool) -> str | None:
+    """"5-2" when the winner led by two or more and the other team then drew level or went ahead (eye test, 2026-10-13:
+    Vancouver's 5-2 lead at Edmonton read "The game was tied twice"). Kept here since #202 took it out of stories."""
+    best, at = 0, None
+    for g in goals:
+        mine, theirs = (g["hs"], g["as"]) if winner_home else (g["as"], g["hs"])
+        if mine - theirs > best:
+            best, at = mine - theirs, f"{mine}-{theirs}"
+        if best >= 2 and mine <= theirs:
+            return at
+    return None
+
+
 def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dict:
     gid, away, home = r["game_id"], r["away"], r["home"]
     row = nm.G.filter(pl.col("game_id") == gid)
@@ -130,7 +143,7 @@ def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dic
     lead = {home: 0, away: 0}
     for g in goals:
         lead[home], lead[away] = max(lead[home], g["hs"] - g["as"]), max(lead[away], g["as"] - g["hs"])
-    blown = stories._blown(goals, winner == home)
+    blown = _blown(goals, winner == home)
     if lead[loser] >= 2:
         parts.append((14, f"Came back from {_num(lead[loser])} down", f"Came back from {_num(lead[loser])} down"))
     elif blown:
