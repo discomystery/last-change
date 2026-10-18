@@ -36,6 +36,7 @@ skipped his whole playoff run); a player back after the summer is told as his fi
 """
 import gzip
 import json
+import re
 from functools import lru_cache
 
 import polars as pl
@@ -105,6 +106,28 @@ def _playoff_dates() -> dict[int, list[str]]:
         for pid, day in p.select("player_id", "date").iter_rows():
             out.setdefault(pid, []).append(day)
     return {k: sorted(v) for k, v in out.items()}
+
+
+@lru_cache(maxsize=4)
+def _recalls(season: int) -> dict[int, list[tuple[str, str, str]]]:
+    """Each player's recalls and assignments this season from the transactions table: [(date, status, note)], oldest first."""
+    f = TABLES / str(season) / "transactions.parquet"
+    if not f.exists():
+        return {}
+    out: dict[int, list] = {}
+    for r in pl.read_parquet(f).filter(pl.col("status").is_in(["recalled", "assigned"])).sort("date").iter_rows(named=True):
+        out.setdefault(r["player_id"], []).append((r["date"], r["status"], r.get("note") or ""))
+    return out
+
+
+def recalled_from(pid: int, season: int, day: str) -> str | None:
+    """"" when his latest move before `day` was a recall (to name the minor-league club when the note gives it for him
+    alone), None when no source says he was in the minors."""
+    last = [x for x in _recalls(season).get(pid, []) if x[0] <= day]
+    if not last or last[-1][1] != "recalled":
+        return None
+    m = re.search(r"\bfrom ([^.,]+?)\.?$", last[-1][2])
+    return m.group(1) if m and "," not in last[-1][2] and " and " not in last[-1][2] else ""
 
 
 def _last_any(pid: int, last_regular: str | None, day: str) -> str | None:
@@ -308,12 +331,13 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                     from datetime import date as Date
                     days = (Date.fromisoformat(day) - Date.fromisoformat(last_day)).days
                     out.append({**item, "kind": "return", "missed": missed, "since": last_day if days >= LONG_AWAY_DAYS else None,
-                                "season_debut": fresh, "points": pts_now})
-            elif prev.height and g_now and mine.is_empty():  # a depth player's season debut, told when he scored
+                                "season_debut": fresh, "points": pts_now, "recalled": recalled_from(pid, season, day) if fresh else None})
+            elif prev.height and mine.is_empty():  # a depth player's season debut (Miroshnichenko, 2026-10-14; Nadeau, 2026-10-17)
                 opened = G.filter(pl.col("season") == season)["date"].min()  # (Miroshnichenko, 2026-10-14)
                 missed = G.filter((pl.col("season") == season) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
                 if opened is not None and missed >= DEPTH_DEBUT_GAMES:
-                    out.append({**item, "kind": "return", "missed": missed, "since": None, "season_debut": True, "points": pts_now})
+                    out.append({**item, "kind": "return", "missed": missed, "since": None, "season_debut": True, "points": pts_now,
+                                "recalled": recalled_from(pid, season, day)})
     starts = _goalie_starts(season).get(gid, [])
     team_of = {game["home_id"][0]: game["home"][0], game["away_id"][0]: game["away"][0]}
     win = _wins(season).get(gid)

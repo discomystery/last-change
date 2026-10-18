@@ -245,3 +245,39 @@ def test_first_goal_and_goalie_first_details():
         "Michael DiPietro finally got his first NHL win, making 25 saves in his fourth start, eight seasons after his NHL debut."
     assert stories.goalie_first_text({**win, "start_n": 1, "seasons": 0}, "A", 30) == "A got his first NHL win, making 30 saves in his first NHL start."
     assert stories.goalie_first_text({"kind": "win_since", "since": "2025-03-03"}, "A", 20) == "It was A’s first NHL win since Mar 3, 2025."
+
+
+def test_season_debuts_merge_and_name_a_recall():
+    from pipeline.export import firsts
+
+    class W:  # the bits of the wording helper the first-lines code touches
+        nick = {"CAR": "Hurricanes"}
+
+        @staticmethod
+        def poss(t): return t
+
+    def debut(pid, recalled):
+        return {"kind": "return", "pid": pid, "team": "CAR", "season_debut": True, "since": None, "missed": 8,
+                "points": 0, "recalled": recalled}
+    N = {1: "Felix Unger Sörum", 2: "Bradly Nadeau"}
+    kw = dict(gid=0, season=2026, G=None, P=None, N=N, W=W, name=lambda p: N[p], said=set(), winner="CAR", loser="WPG")
+    both = stories._first_lines(found=[debut(2, None), debut(1, "Chicago (AHL)")], **kw)
+    assert both == ["Bradly Nadeau and Felix Unger Sörum both played their first games of the season, "
+                    "with Felix Unger Sörum recalled from Chicago (AHL)."]
+    one = stories._first_lines(found=[debut(1, "Chicago (AHL)")], **kw)
+    assert one == ["Felix Unger Sörum made his season debut after being recalled from Chicago (AHL)."]
+    assert stories._first_lines(found=[debut(2, None)], **kw) == ["Bradly Nadeau played his first game of the season."]
+    assert not any("missing" in s for s in both + one)
+
+
+def test_recalled_from_reads_the_transactions_note(monkeypatch):
+    from pipeline.export import firsts
+    rows = {1: [("2026-10-15", "recalled", "Recalled F Felix Unger Sörum from Chicago (AHL)")],
+            2: [("2026-10-10", "recalled", "Recalled D A, D B and D C from San Diego")],
+            3: [("2026-10-10", "recalled", "Recalled F X from Y"), ("2026-10-12", "assigned", "Assigned F X to Y")]}
+    monkeypatch.setattr(firsts, "_recalls", lambda season: rows)
+    assert firsts.recalled_from(1, 2026, "2026-10-17") == "Chicago (AHL)"
+    assert firsts.recalled_from(1, 2026, "2026-10-14") is None
+    assert firsts.recalled_from(2, 2026, "2026-10-17") == ""  # several players on the note: no club named
+    assert firsts.recalled_from(3, 2026, "2026-10-17") is None
+    assert firsts.recalled_from(9, 2026, "2026-10-17") is None

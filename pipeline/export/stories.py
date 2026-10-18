@@ -824,6 +824,19 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
         who_ = [f"{W.poss(x['team'])} {name(x['pid'])}" for x in debuts[:3]]
         out.append(f"{_cap(_and(who_))} {'both' if len(who_) == 2 else 'all'} played their first NHL game.")
         found = [x for x in found if x not in debuts[:3]]
+    # season debuts have no cap of their own to share with other returns; two or more with nothing else to tell merge
+    # into one sentence (Nadeau and Unger Sörum, CAR at WPG 2026-10-17), recalled players naming the club they came from
+    sd = [x for x in found if x["kind"] == "return" and x.get("season_debut") and not x.get("since") and not x.get("goalie")
+          and not x.get("points") and x["pid"] in N and x["pid"] not in skip and (kinds is None or "return" in kinds)]
+    if len(sd) >= 2 and most > len(out):
+        sd = sd[:4]
+        names_ = [name(x["pid"]) for x in sd]
+        recs = [(n_, x["recalled"]) for n_, x in zip(names_, sd) if x.get("recalled")]
+        tail = ""
+        if recs:
+            tail = f", with {_and([f'{n_} recalled from {c}' if c else f'{n_} recalled' for n_, c in recs])}"
+        out.append(f"{_cap(_and(names_))} {'both' if len(sd) == 2 else 'all'} played their first games of the season{tail}.")
+        found = [x for x in found if x not in sd]
     for x in found:
         if len(out) >= most:
             break
@@ -864,9 +877,10 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
                 tail = f" and picked up {'a point' if pts == 1 else num(pts) + ' points'}" if pts else ""
                 out.append(f"{_cap(who)} played his first NHL game{tail}.")
         elif k == "return":
-            if returns:
+            sdebut = x.get("season_debut") and not x.get("since") and not x.get("goalie")
+            if returns and not sdebut:
                 continue
-            returns += 1
+            returns += not sdebut
             if x.get("since"):
                 d = Date.fromisoformat(x["since"])
                 what = "was back in an NHL net for the first time since" if x.get("goalie") else "played his first NHL game since"
@@ -876,8 +890,11 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
                 pts, gs = x.get("points") or 0, x.get("goals") or 0
                 tail = (("" if goals_told else f" and scored{' twice' if gs == 2 else ' ' + num(gs) + ' times' if gs > 2 else ''}") if gs else
                         f" and picked up {'an assist' if pts == 1 else num(pts) + ' assists'}" if pts else "")
-                if x.get("season_debut"):
-                    out.append(f"{_cap(who)} played his first game of the season, after missing the first {num(x['missed'])}{',' if tail else ''}{tail}.")
+                if x.get("recalled") is not None:  # a source has him in the minors: a debut, not a wait (never "missing")
+                    src = f" after being recalled from {x['recalled']}" if x["recalled"] else " after being recalled"
+                    out.append(f"{_cap(who)} made his season debut{src}{',' if tail else ''}{tail}.")
+                elif x.get("season_debut"):
+                    out.append(f"{_cap(who)} played his first game of the season{',' if tail else ''}{tail}.")
                 else:
                     out.append(f"{_cap(who)} was back in the lineup after missing {num(x['missed'])} games{',' if tail else ''}{tail}.")
         elif k == "milestone":
