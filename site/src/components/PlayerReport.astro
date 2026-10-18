@@ -1,10 +1,10 @@
 ---
 // Ties a skater's page to his post-game report cards and Swing. "What [team] count on him for": what his report
 // cards grade him on, why, and how often he has done it; then where he stands on what he isn't graded on, against
-// the same bars. "Recent games": one row per game with the report-card result, each mark, and his Swing.
+// the same bars. The game-by-game report cards and Swing are in "Recent games" (PlayerGames.astro).
 import Section from './Section.astro';
 import Pips from './Pips.astro';
-import { clock, signed } from '../lib/format';
+import { clock } from '../lib/format';
 import { cardsFor } from '../lib/reportCards';
 import { peerOf } from '../lib/players';
 
@@ -17,8 +17,6 @@ const latest = rows[0]?.card;
 const duties = (latest?.jobs ?? []) as any[];
 const mark = { held: '✓', partly: '≈', missed: '✕', na: '–' } as const;
 const word = { held: 'Did it', partly: 'Partly', missed: 'Didn’t', na: 'Can’t judge' } as const;
-const pillWord = { huge: '★ Huge night', big: 'Big night', did: 'Did his job', mixed: 'Mixed night', didnt: 'Off night', rough: 'Rough night' } as const;
-const pillClass = { huge: 'huge', big: 'did', did: 'did', mixed: 'mixed', didnt: 'didnt', rough: 'rough' } as const;
 const peer: Record<string, string> = { F: 'forwards', D: 'defensemen', C: 'centers', W: 'wingers' };
 const why = (j: any) => (j.key === 'pp' ? `Relied on for ${j.per_game} a game on the power play` : j.key === 'pk' ? `Relied on for ${j.per_game} a game killing penalties` : j.why === 'role' ? 'Relied on to take plenty of faceoffs' : `Better than ${j.pct}% of ${peerOf(j.key, j.vs ?? 'F')}`);
 const record = (key: string) => rows.slice().reverse().map((r) => ({ v: (r.card.jobs.find((j: any) => j.key === key)?.verdict ?? 'na') as keyof typeof mark, date: r.date }));
@@ -39,7 +37,6 @@ const others = ([
   ['blocks', 'Shot blocking', null, 'blocks'],
 ] as [string, string, string | null, string | null][]).filter(([k, , text, trait]) => !duties.some((j) => j.key === k) && (text || (trait && traits[trait]?.blend)));
 const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-const SW = 1.2; // Swing bar half-width, in Swing points
 ---
 {rows.length > 0 && (<>
 <Section id="counted" title={`What ${place} count on him for`} placeholder={false} takeaway="What his post-game report cards judge him on, why, and how often he has done it.">
@@ -73,34 +70,6 @@ const SW = 1.2; // Swing bar half-width, in Swing points
   </div>
 </Section>
 
-<Section id="recent" title="Recent games" placeholder={false} takeaway={`His report card and Swing from his last ${Math.min(RECENT, rows.length)} ${rows.length === 1 ? 'game' : 'games'}, newest first.`}>
-  <Fragment slot="explain">
-    <p class="note">Swing is how much his night moved the game, from the post-game page. Tap a game for the full report.</p>
-  </Fragment>
-  <div class="card rp-games">
-    <div class="rp-head" aria-hidden="true"><span>Game</span><span>Report card <em class="rp-keys">{duties.map((j) => j.label.replace(' at 5-on-5', '').toLowerCase()).join(' · ')}</em></span><span>Swing</span></div>
-    <ul>
-      {rows.slice(0, RECENT).map((r) => { const s = r.swing; const w = s ? Math.min(1, Math.abs(s.score) / SW) * 50 : 0; return (
-        <li>
-          <a class="rp-game" href={`${base}recap/${r.id}/`}>
-            <span class="rp-d">{fmtDate(r.date)}</span>
-            <span class="rp-o">{r.home ? 'vs' : 'at'} {r.opp}</span>
-            <span class="rp-res">{r.us > r.them ? 'W' : r.end === 'REG' ? 'L' : 'OTL'} {r.us}–{r.them}{r.end !== 'REG' ? ` ${r.end}` : ''}</span>
-          </a>
-          <span class="rp-card">
-            <span class:list={['pc-sum', pillClass[r.card.pill as keyof typeof pillClass]]}>{pillWord[r.card.pill as keyof typeof pillWord]}</span>
-            <span class="rp-marks">{r.card.jobs.map((j: any) => <span class:list={['rp-m', j.verdict]} tabindex="0" data-tip={`${j.label}: ${word[j.verdict as keyof typeof word]}. ${j.text}`}>{mark[j.verdict as keyof typeof mark]}</span>)}</span>
-            <span class="rp-box">{r.card.box.g} G · {r.card.box.a} A · {r.card.toi}</span>
-          </span>
-          {s ? <span class="rp-sw" tabindex="0" data-tip={`Swing ${signed(s.score)}: better than ${s.pct}% of nights by ${peer[p.group]} last season.`}>
-            <span class="rp-track"><i class:list={{ neg: s.score < 0 }} style={s.score >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}></i></span>
-            <strong>{signed(s.score)}</strong>
-          </span> : <span class="rp-sw n">–</span>}
-        </li>
-      ); })}
-    </ul>
-  </div>
-</Section>
 </>)}
 
 <style>
@@ -132,34 +101,5 @@ const SW = 1.2; // Swing bar half-width, in Swing points
     .rp-ov { justify-content: flex-end; text-align: right; }
     .rp-ov > span:not(:first-child) { display: none; }
     .rp-ov > span:only-child { display: inline; font-size: 13px; }
-  }
-  .rp-games { margin-top: 18px; }
-  .rp-head, .rp-games li { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.6fr) minmax(150px, 0.9fr); gap: 6px 18px; align-items: center; }
-  .rp-head { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding-bottom: 6px; }
-  .rp-games li { padding: 10px 0; border-top: 1px solid var(--rule); }
-  .rp-game { display: flex; flex-wrap: wrap; gap: 2px 10px; color: inherit; text-decoration: none; font: 400 15px var(--ui); }
-  .rp-game:hover .rp-o { text-decoration: underline; }
-  .rp-d { color: var(--ink-3); min-width: 48px; }
-  .rp-o { font-weight: 600; }
-  .rp-res { color: var(--ink-2); }
-  .rp-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-  .pc-sum { min-width: 92px; }
-  .rp-box { font: 400 13px var(--ui); color: var(--ink-3); }
-  .rp-sw { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 10px; cursor: help; }
-  .rp-track { position: relative; height: 12px; border-radius: 3px; background: var(--track); }
-  .rp-track::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
-  .rp-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--team); }
-  .rp-track i.neg { opacity: 0.45; }
-  .rp-sw strong { font: 700 15px var(--ui); text-align: right; }
-  @media (max-width: 719px) {
-    .rp-head { display: none; }
-    .rp-games li { grid-template-columns: minmax(0, 1fr) 96px; gap: 8px 12px; }
-    .rp-game { flex-wrap: nowrap; gap: 8px; font-size: 14px; white-space: nowrap; }
-    .rp-d { min-width: 0; }
-    .rp-card { grid-column: 1 / -1; grid-row: 2; gap: 6px 8px; }
-    .rp-card .pc-sum { min-width: 0; }
-    .rp-box { margin-left: auto; }
-    .rp-sw { grid-template-columns: 1fr 34px; gap: 6px; }
-    .rp-sw strong { font-size: 14px; }
   }
 </style>

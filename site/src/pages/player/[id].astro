@@ -15,6 +15,8 @@ import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import PlayerGames from '../../components/PlayerGames.astro';
+import { gamesOf } from '../../lib/gamelog';
 import PlayerStats from '../../components/PlayerStats.astro';
 import RecordBook from '../../components/RecordBook.astro';
 import { ledgerOf } from '../../lib/ledger';
@@ -122,7 +124,8 @@ const shadeBy = (areas: Record<string, Area>) => {
   return (a: Area) => Math.sqrt(a.share / top);
 };
 const hasLine = !!ledgerOf(p.id)?.rows.length;
-const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const recent = gamesOf(p.id).length ? [['recent', 'Recent games']] : [];
+const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ...recent, ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on']] : []), ...recent, ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -259,6 +262,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
 
         <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
         <PlayerReport p={p} place={team?.place ?? p.team} />
+        <PlayerGames p={p} cards={cardsFor(p.id, p.team)} />
 
         <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           <Fragment slot="explain">{modes.map(([m, mw]) => <p class={`note m-${m}`}>Listed only when we can be confident he is above or below average. Numbers {m === 'blend' ? 'blended with last season' : 'from this season'}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>)}</Fragment>
@@ -485,6 +489,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
             );
           })}
         </Section>
+        <PlayerGames p={p} goalie />
         <Section id="faced" title="Shots he faces" placeholder={false} takeaway="Where the shots on goal against him come from, seen from the shooter’s side.">
           <div class="st2">
             {modes.map(([m, mw]) => {
