@@ -314,9 +314,9 @@ const base = import.meta.env.BASE_URL;
       const L = home?.leaders;
       if (!L) return;
       document.getElementById('leaders').hidden = false;
-      const lastDay = (home.results ?? []).filter((b) => b.rows.length).at(-1)?.date;
+      const lastDay = (home.results ?? []).filter((b) => b.rows.length).at(-1)?.date ?? home.results?.at(-1)?.date;
       const yest = window.lcDay(-1), today = window.lcDay();
-      const when = lastDay === today ? 'tonight' : lastDay === yest ? 'last night' : `on ${day.format(dateOf(lastDay))}`;
+      const when = !lastDay ? '' : lastDay === today ? 'tonight' : lastDay === yest ? 'last night' : `on ${day.format(dateOf(lastDay))}`;
       document.getElementById('lead-sub').textContent = lastDay ? `This season · grey figures are what each player added ${when}` : 'This season';
       const sel = document.getElementById('stat');
       const draw = () => {
