@@ -57,10 +57,10 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
     <li class:list={['card', 'pc', `t-${side(c.team)}`, !c.jobs.length && 'bare']} data-adj={c.jobs.some((j) => j.opp) ? 'competition' : undefined}>
       <div class="pc-top">
         <span class="pc-name"><i></i><PLink id={c.id} name={c.name} /></span>
-        {c.pill_rec && c.pill_rec !== c.pill
+        <span class="pc-end">{c.pill_rec && c.pill_rec !== c.pill
           ? <><span class:list={['pc-sum', 'a-adj', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span><span class:list={['pc-sum', 'a-raw', pillClass[c.pill_rec]]}>{c.pill_rec === 'huge' && '★ '}{pillWord[c.pill_rec]}</span></>
           : <span class:list={['pc-sum', pillClass[c.pill]]}>{c.pill === 'huge' && '★ '}{pillWord[c.pill]}</span>}
-        <button type="button" class="share-btn icon" data-share="night" data-id={c.id} aria-label={`Share ${c.name}’s night`} data-tip="Share his night"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg></button>
+        <button type="button" class="share-btn icon" data-share="night" data-id={c.id} aria-label={`Share ${c.name}’s night`} data-tip="Share his night"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg></button></span>
       </div>
       {c.night && <p class="pc-night">{c.night_why![0].toUpperCase() + c.night_why!.slice(1)}{nightNote(c)}</p>}
       <dl class="pc-box">
@@ -199,7 +199,7 @@ const share = (v: string) => graded.filter((j) => j.verdict === v).length;
   .pc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   .pc-name { font: 700 20px/1.1 var(--display); display: inline-flex; align-items: center; gap: 8px; }
   .pc-name i { width: 11px; height: 11px; border-radius: 50%; background: var(--team); flex: none; }
-  .pc-sum { margin-left: auto; }
+  .pc-end { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; } /* pill and share stay together when a long name pushes them down */
   .how { margin-top: 16px; }
   .how-body { display: grid; gap: 8px; padding-top: 12px; }
   .pc-night { font: 500 14px/1.4 var(--ui); color: var(--ink-2); margin-top: -4px; }
