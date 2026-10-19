@@ -27,7 +27,7 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _o
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 22  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 23  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -52,6 +52,8 @@ RULES_VERSION = 22  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 21: a matchup call never makes the headline, "Round two" rarely does, big milestones outrank Out notes, nothing about a player
 #     listed as out, penalty context only when it points the call's way (Sora's review of 2025-26, 2026-10-17)
 # 22: a winless or perfect start, or a 6+ game run, leads the story and the headline (Sora, 2026-10-18: the Flyers' 0-6-3)
+# 23: Out items add the league rank of games the club's regulars have missed (starting goalies count), and a "Filling in"
+#     item tells a forward who rarely takes faceoffs taking a missing center's draws (absences.py; Sora, 2026-10-19)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)

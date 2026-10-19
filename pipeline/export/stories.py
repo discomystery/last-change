@@ -40,7 +40,7 @@ import polars as pl
 
 from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
-from pipeline.export import grammar, penalties, storylines, wording
+from pipeline.export import absences, grammar, penalties, storylines, wording
 from pipeline.export import surprises as surprise_rules
 
 SEASONS = [*FULL_SEASONS, CURRENT_SEASON]
@@ -548,7 +548,16 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                              "missed": r["games_missed"] or 0, "last_played": r["last_played"],
                              "start": N[nxt[0]] if nxt and nxt[1] >= LIKELY and N.get(nxt[0]) else None})
         if team_out:
-            items.append(_merge_out(team_out, _cap(W.the(t)), n_games))
+            item = _merge_out(team_out, _cap(W.the(t)), n_games)
+            league = absences.sentence(absences.table(season, day).get(t), W.the)  # how unusual it is (Sora, 2026-10-19)
+            if league:
+                item["text"] += " " + league
+            items.append(item)
+        fill = absences.filling_in(season, day, t)
+        if fill:
+            text = absences.filling_text(fill, W.the(t), N)
+            if text:
+                items.append({"tag": "Filling in", "text": text, "score": 72, "pid": fill["pid"]})
         roster = [p for p, team in cur.items() if team == t and p not in skip]
         mine = P.filter(pl.col("player_id").is_in(roster))
         this = mine.filter((pl.col("season") == season) & (pl.col("team") == t))
