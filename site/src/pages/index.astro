@@ -22,25 +22,25 @@ const base = import.meta.env.BASE_URL;
     </section>
 
     <section id="onnow" class="band-sec" hidden>
-      <h2 class="band">On now around the league</h2>
+      <div class="sec-head band"><h2>On now around the league</h2></div>
       <p class="band-sub" id="onnow-sub"></p>
       <div class="lv-tiles" id="onnow-tiles"></div>
     </section>
 
     <section id="night" class="band-sec">
-      <h2 class="band" id="night-h">Last night</h2>
+      <div class="sec-head band"><h2 id="night-h">Last night</h2></div>
       <p class="band-sub" id="night-sub"></p>
       <div class="split" id="night-split"><div class="skel skel-row" aria-hidden="true"></div><div class="skel skel-row" aria-hidden="true"></div></div>
     </section>
 
     <section id="today" class="band-sec">
-      <h2 class="band" id="today-h">Today around the league</h2>
+      <div class="sec-head band"><h2 id="today-h">Today around the league</h2></div>
       <p class="band-sub" id="today-sub"></p>
       <div class="split" id="today-split"><div class="skel skel-row" aria-hidden="true"></div><div class="skel skel-row" aria-hidden="true"></div></div>
     </section>
 
     <section id="leaders" class="band-sec" hidden>
-      <h2 class="band">League leaders</h2>
+      <div class="sec-head band"><h2>League leaders</h2></div>
       <p class="band-sub" id="lead-sub">This season</p>
       <div class="lead-grid">
         <div class="card lead-main">
@@ -424,9 +424,10 @@ const base = import.meta.env.BASE_URL;
   .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
   .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
 
-  #home h2.band { font: 700 34px/1.05 var(--display); letter-spacing: -0.01em; border-bottom: 5px solid var(--line-blue); padding-bottom: 10px; margin: 52px 0 6px; text-wrap: balance; }
+  /* Section titles use the site's label heading (Base.astro .sec-head); only the spacing is the home page's own. */
+  #home .sec-head.band { margin: 52px 0 6px; }
   #home .band-sub { font: 400 14px var(--ui); color: var(--ink-3); margin-bottom: 18px; }
-  @media (max-width: 719px) { #home h2.band { font-size: 28px; margin-top: 40px; } }
+  @media (max-width: 719px) { #home .sec-head.band { margin-top: 40px; } }
   #home .ab { font: 700 1em/1 var(--ui); letter-spacing: -0.03em; color: var(--t, var(--ink)); }
 
   /* A featured game beside a condensed list */
