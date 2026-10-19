@@ -4,30 +4,31 @@ the = lambda t: f"the {t}"
 
 
 def row(**k):
-    base = {"team": "CAR", "games": 10, "missed": 25, "rank": 1, "tied": [], "ahead": [], "median": 8.0,
+    base = {"team": "CAR", "games": 10, "missed": 25, "rank": 1, "tied": [], "ahead": [], "median": 8.0, "lost": 1.6, "lost_median": 0.6,
             "now": 4, "now_rank": 3, "now_tied": 0, "names": [(1, "Seth Jarvis"), (2, "Taylor Hall"), (3, "Jordan Staal"), (4, "Alexander Nikishin")]}
     return {**base, **k}
 
 
 def test_rank_words():
-    assert A.sentence(row(), the) == "Their regulars have missed 25 games this season, the most in the league."
-    assert A.rank_clause(row(rank=1, tied=["Oilers"]), the) == "tied with the Oilers for the most in the league"
-    assert A.rank_clause(row(rank=2, ahead=["Wild"]), the) == "second only to the Wild"
-    assert A.rank_clause(row(rank=3, ahead=["Wild", "Flyers"]), the) == "the third-most in the league"
+    assert A.sentence(row(), the) == "Their regulars have missed 25 games this season, and no team has been hit harder by absences."
+    assert A.sentence(row(rank=3, ahead=["Islanders", "Senators"]), the) == (
+        "Their regulars have missed 25 games this season, and only the Islanders and the Senators have been hit harder by absences.")
+    assert A.than_whom(row(rank=2, ahead=["Islanders"]), the) == "than anyone but the Islanders"
 
 
 def test_only_when_it_stands_out():
     assert A.stands_out(row(rank=4)) is None
     assert A.stands_out(row(games=5)) is None
-    assert A.stands_out(row(missed=14, median=8.0)) is None  # under twice the usual club
+    assert A.stands_out(row(lost=1.0)) is None  # under twice what the usual club has lost
+    assert A.stands_out(row(missed=5)) is None
     assert A.stands_out(row(rank=9, now=6, now_rank=1)) == "now"
     assert A.sentence(row(rank=9, now=6, now_rank=1), the) == "No team has more regulars out right now."
     assert A.stands_out(row(rank=9, now=6, now_rank=1, now_tied=1)) is None
 
 
 def test_intro_names_three():
-    assert A.intro_line(row(), "the Hurricanes", the) == ("They’ve also been missing a lot of regulars: 25 games so far, the most in the league, "
-                                                          "with Seth Jarvis, Taylor Hall and Jordan Staal still out.")
+    assert A.intro_line(row(), "the Hurricanes", the) == ("They’ve also been hit harder by absences than any other team: their regulars have "
+                                                          "missed 25 games so far, with Seth Jarvis, Taylor Hall and Jordan Staal still out.")
     assert A.intro_line(None, "the Hurricanes", the) is None
 
 

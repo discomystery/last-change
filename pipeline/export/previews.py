@@ -52,7 +52,7 @@ RULES_VERSION = 23  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 # 21: a matchup call never makes the headline, "Round two" rarely does, big milestones outrank Out notes, nothing about a player
 #     listed as out, penalty context only when it points the call's way (Sora's review of 2025-26, 2026-10-17)
 # 22: a winless or perfect start, or a 6+ game run, leads the story and the headline (Sora, 2026-10-18: the Flyers' 0-6-3)
-# 23: Out items add the league rank of games the club's regulars have missed (starting goalies count), and a "Filling in"
+# 23: Out items say when a club has been hit hardest by absences (games missed weighed by chances and GSAx), and a "Filling in"
 #     item tells a forward who rarely takes faceoffs taking a missing center's draws (absences.py; Sora, 2026-10-19)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones

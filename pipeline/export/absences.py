@@ -12,6 +12,13 @@ this season (Sora: Shesterkin being out is a massive blow). A MISSED GAME is a c
 league listed him as injured, suspended, out for personal reasons or off the roster, or while unsigned. Healthy scratches,
 players sent to the minors with nothing reported, and players with no club (retired, unsigned free agents) don't count.
 Never says why a player is out.
+
+The RANK is by what the absences cost, not the plain count (Sora, same day: weigh skaters by chances and goalies by GSAx,
+with a goalie limited by how often he starts): a skater's game is worth his 5-on-5 impact rating (creating plus preventing,
+the two seasons before, as the win model's lineups) above a replacement-level regular, times his usual 5-on-5 ice time; a
+goalie's is his goals saved above expected a start (two seasons, pulled toward zero by 3,000 shots) above replacement, times
+his share of his club's starts last season. Both are expected goals a game, so a starting goalie and a first-line forward
+sit on one scale (the best of each are worth about 0.2-0.3 a game). The sentences still quote the games missed.
 """
 from __future__ import annotations
 
@@ -25,8 +32,11 @@ OUT = ("injured", "suspended", "personal", "off_roster")
 F_TOP, D_TOP = 9, 4
 LAST_GP, NOW_GP = 30, 3
 STARTER = 0.4  # share of the club's starts that makes a goalie its starter
-# A rank is told only when it stands apart: one of the top three, enough games played, and well above the usual club.
-RANK_TOP, MIN_GAMES, MIN_MISSED, OVER_MEDIAN = 3, 6, 12, 2.0
+# A rank is told only when it stands apart: one of the top three, enough games played and missed, and twice what the
+# usual club has lost.
+RANK_TOP, MIN_GAMES, MIN_MISSED, OVER_MEDIAN = 3, 6, 6, 2.0
+REPLACEMENT = 0.2  # replacement level: this quantile of rated regulars (skaters 20+ games, goalies 10+ starts)
+VALUE_LAMBDA = 15000.0  # ratings as the win model's lineups
 NOW_MIN = 4  # regulars out at once that make "no team has more out right now" worth saying
 # Filling in on faceoffs: a forward who had been taking fewer than RARE_DRAWS a game (over GP_BEFORE+ games) took
 # FILL_DRAWS+ in the club's last game while a player who takes CENTER_DRAWS+ a game was out.
@@ -92,6 +102,41 @@ def regulars(season: int, day: str) -> pl.DataFrame:
     return pl.concat(rows).group_by("team", "player_id").agg(pl.col("weight").max())
 
 
+@lru_cache(maxsize=16)
+def values(season: int, day: str) -> dict[int, float]:
+    """Expected goals a game each player is worth above replacement (see the module note); empty without ratings."""
+    from pipeline.metrics import goalies, rapm
+    have = [s for s in (season - 2, season - 1) if (TABLES / str(s) / "player_game.parquet").exists()]
+    if not have:
+        return {}
+    r = rapm.run(have, VALUE_LAMBDA).select("player_id", per60=pl.col("off") + pl.col("def"))
+    pg = pl.concat([_skaters(s).filter(pl.col("date") < day).select("player_id", "sec5")
+                    for s in (season - 1, season) if (TABLES / str(s) / "player_game.parquet").exists()])
+    toi = pg.group_by("player_id").agg(m5=pl.col("sec5").mean() / 60, gp=pl.len())
+    v = r.join(toi, on="player_id").filter(pl.col("gp") >= 20)
+    if v.is_empty():
+        return {}
+    repl = v["per60"].quantile(REPLACEMENT)
+    v = v.with_columns(val=(pl.col("per60") - repl).clip(0) * pl.col("m5") / 60)
+    out = dict(zip(v["player_id"].to_list(), v["val"].to_list()))
+    g = [goalies.per_game(s).filter(pl.col("date").cast(pl.Utf8) < day).with_columns(s=pl.lit(s))
+         for s in (season - 1, season) if (TABLES / str(s) / "events.parquet").exists()]
+    if g:
+        g = pl.concat([x.select("goalie_id", "team_id", "started", "sa", "ga", "xga", "s") for x in g])
+        tot = (g.group_by("goalie_id").agg(gsax=(pl.col("xga") - pl.col("ga")).sum(), sa=pl.col("sa").sum(), starts=pl.col("started").sum())
+               .filter(pl.col("starts") >= 10)
+               .with_columns(per=pl.col("gsax") / pl.col("starts") * pl.col("sa") / (pl.col("sa") + goalies.SHRINK_SHOTS)))
+        if tot.height:
+            grepl = tot["per"].quantile(REPLACEMENT)
+            last = g.filter((pl.col("s") == season - 1) & pl.col("started"))
+            share = (last.group_by("goalie_id", "team_id").len().join(last.group_by("team_id").agg(n=pl.len()), on="team_id")
+                     .with_columns(share=pl.col("len") / pl.col("n")).group_by("goalie_id").agg(pl.col("share").max()))
+            tot = (tot.join(share, on="goalie_id", how="left").with_columns(pl.col("share").fill_null(0.5))
+                   .with_columns(val=(pl.col("per") - grepl).clip(0) * pl.col("share")))
+            out.update(zip(tot["goalie_id"].to_list(), tot["val"].to_list()))
+    return out
+
+
 def _is_regular(av: pl.DataFrame, reg: pl.DataFrame) -> pl.DataFrame:
     club = av.join(reg.filter(pl.col("team") != "*"), on=["team", "player_id"], how="left")
     anywhere = reg.filter(pl.col("team") == "*").select("player_id", w_any="weight")
@@ -113,8 +158,8 @@ def _availability(season: int) -> pl.DataFrame:
 
 @lru_cache(maxsize=64)
 def table(season: int, day: str) -> dict[str, dict]:
-    """Per club, from games before `day`: games, regular games missed, rank (1 = most; ties share a rank), the clubs
-    tied with it, regulars out on `day` and that count's rank. Empty when the tables aren't there."""
+    """Per club, from games before `day`: games, regular games missed, `lost` (expected goals those games were worth),
+    rank by `lost` (1 = hit hardest), the clubs ahead of it, regulars out on `day` (names by worth) and that count's rank. Empty when the tables aren't there."""
     av = _availability(season)
     if av.is_empty() or not (TABLES / str(season) / "player_game.parquet").exists():
         return {}
@@ -124,23 +169,27 @@ def table(season: int, day: str) -> dict[str, dict]:
     if games.is_empty():
         return {}
     reg = regulars(season, day)
+    vals = values(season, day)
+    typical = sorted(vals.values())[len(vals) // 2] if vals else 1.0  # a regular we can't rate counts as the middle player
+    worth = lambda df: df.with_columns(val=pl.col("player_id").replace_strict(vals, default=typical, return_dtype=pl.Float64))
     played = av.join(games, on=["date", "team"])
     missed = _is_regular(played.filter((pl.col("lineup").is_null() | (pl.col("lineup") != "dressed")) & _out(played)), reg)
-    per = games.group_by("team").agg(games=pl.len()).join(missed.group_by("team").agg(missed=pl.len()), on="team", how="left")
-    per = per.with_columns(pl.col("missed").fill_null(0))
+    missed = worth(missed)
+    per = games.group_by("team").agg(games=pl.len()).join(missed.group_by("team").agg(missed=pl.len(), lost=pl.col("val").sum()), on="team", how="left")
+    per = per.with_columns(pl.col("missed").fill_null(0), pl.col("lost").fill_null(0.0))
     today = av.filter(pl.col("date") == av.filter(pl.col("date") <= day)["date"].max())
-    now = _is_regular(today.filter(_out(today)), reg).sort("weight", descending=True)
+    now = worth(_is_regular(today.filter(_out(today)), reg)).sort("val", "weight", descending=True)
     names = {t: [(r["player_id"], f"{r['first']} {r['last']}") for r in d.iter_rows(named=True)]
              for (t,), d in now.group_by("team", maintain_order=True)}
     per = per.with_columns(now=pl.col("team").map_elements(lambda t: len(names.get(t, [])), return_dtype=pl.Int64))
-    per = per.with_columns(rank=pl.col("missed").rank("min", descending=True).cast(pl.Int64),
+    per = per.with_columns(rank=pl.col("lost").rank("min", descending=True).cast(pl.Int64),
                            now_rank=pl.col("now").rank("min", descending=True).cast(pl.Int64))
     median = float(per["missed"].median())
+    lost_median = float(per["lost"].median())
     out = {}
-    for r in per.iter_rows(named=True):
-        out[r["team"]] = {**r, "median": median, "names": names.get(r["team"], []),
-                          "tied": sorted(t for t, m in zip(per["team"], per["missed"]) if m == r["missed"] and t != r["team"]),
-                          "ahead": sorted(t for t, m in zip(per["team"], per["missed"]) if m > r["missed"]),
+    for r in per.sort("lost", descending=True).iter_rows(named=True):
+        out[r["team"]] = {**r, "median": median, "lost_median": lost_median, "names": names.get(r["team"], []),
+                          "ahead": [t for t, m in zip(per.sort("lost", descending=True)["team"], per.sort("lost", descending=True)["lost"]) if m > r["lost"]],
                           "now_tied": int((per["now"] == r["now"]).sum()) - 1}
     return out
 
@@ -150,31 +199,27 @@ def stands_out(r: dict | None) -> str | None:
     if not r:
         return None
     if (r["rank"] <= RANK_TOP and r["games"] >= MIN_GAMES and r["missed"] >= MIN_MISSED
-            and r["missed"] >= OVER_MEDIAN * max(r["median"], 1)):
+            and r["lost"] >= OVER_MEDIAN * r["lost_median"]):
         return "season"
     if r["now"] >= NOW_MIN and r["now_rank"] == 1 and not r["now_tied"]:
         return "now"
     return None
 
 
-def rank_clause(r: dict, the) -> str:
-    """"the most in the league", "tied with the Oilers for the most in the league", "second only to the Senators",
-    "the third-most in the league". `the` names a club ("the Oilers")."""
+def than_whom(r: dict, the) -> str:
+    """"than any other team" or "than anyone but the Islanders". `the` names a club ("the Oilers")."""
     from pipeline.export.grammar import and_list
-    tied, ahead = [the(t) for t in r["tied"]], [the(t) for t in r["ahead"]]
-    if r["rank"] == 1:
-        return "the most in the league" if not tied else f"tied with {and_list(tied)} for the most in the league"
-    if r["rank"] == 2 and len(ahead) == 1 and not tied:
-        return f"second only to {ahead[0]}"
-    nth = {2: "second", 3: "third"}[r["rank"]]
-    return f"the {nth}-most in the league" if not tied else f"tied for the {nth}-most in the league"
+    return "than any other team" if r["rank"] == 1 else f"than anyone but {and_list([the(t) for t in r['ahead']])}"
 
 
-def sentence(r: dict, the, lead: str = "Their regulars have missed") -> str | None:
-    """The rank in one sentence, or None. `lead` starts it; previews and intros word the opening their own way."""
+def sentence(r: dict, the) -> str | None:
+    """"Their regulars have missed 25 games this season, and only the Islanders have been hit harder by absences." or None."""
+    from pipeline.export.grammar import and_list
     kind = stands_out(r)
     if kind == "season":
-        return f"{lead} {r['missed']} games this season, {rank_clause(r, the)}."
+        tail = ("no team has been hit harder by absences" if r["rank"] == 1
+                else f"only {and_list([the(t) for t in r['ahead']])} have been hit harder by absences")
+        return f"Their regulars have missed {r['missed']} games this season, and {tail}."
     if kind == "now":
         return "No team has more regulars out right now."
     return None
@@ -230,14 +275,14 @@ def filling_text(x: dict, team_the: str, N: dict[int, str], fallback: dict[int, 
 
 
 def intro_line(r: dict | None, team_the: str, the) -> str | None:
-    """Team intro: "They’ve also been missing a lot of regulars: 25 games so far, the most in the league, with Seth
-    Jarvis, Taylor Hall and Jordan Staal still out." Names only, at most three."""
+    """Team intro: "They’ve also been hit harder by absences than any other team: their regulars have missed 25 games so
+    far, with Seth Jarvis, Taylor Hall and Jordan Staal still out." Names only, at most three, the costliest first."""
     from pipeline.export.grammar import and_list
     kind = stands_out(r)
     names = and_list([n for _, n in r["names"][:3]]) if kind else ""
     if kind == "season":
         tail = f", with {names} still out." if names else "."
-        return f"They’ve also been missing a lot of regulars: {r['missed']} games so far, {rank_clause(r, the)}{tail}"
+        return f"They’ve also been hit harder by absences {than_whom(r, the)}: their regulars have missed {r['missed']} games so far{tail}"
     if kind == "now":
         return f"No team has more regulars out right now than {team_the}, with {names} among them."
     return None
