@@ -88,6 +88,38 @@ def clock(seconds: int) -> str:
     return f"{seconds // 60}:{seconds % 60:02d}"
 
 
+def span(s: int) -> str:
+    """A stretch of game time the way a fan says it (Sora's review, 2026-10-19: "less than two minutes apart", "more
+    than five minutes", "just under a minute left"): seconds stay exact under a minute ("just 17 seconds", "43
+    seconds"); longer stretches round to words ("just over a minute", "a minute and a half", "less than three minutes",
+    "just under six minutes")."""
+    if s < 60:
+        return f"just {s} second{'' if s == 1 else 's'}" if s <= 20 else f"{s} seconds"
+    m, r = divmod(s, 60)
+    mins = lambda k: "a minute" if k == 1 else f"{num(k)} minutes"
+    if r == 0:
+        return mins(m)
+    if r <= 10:
+        return f"just over {mins(m)}"
+    if r >= 50:
+        return f"just under {mins(m + 1)}"
+    if 25 <= r <= 35 and m <= 4:
+        return "a minute and a half" if m == 1 else f"{num(m)} and a half minutes"
+    if r < 20:
+        return f"a little over {mins(m)}"
+    return f"less than {mins(m + 1)}"
+
+
+def time_left(s: int) -> str:
+    """What was left on the clock, in words: "just 4 seconds", "39 seconds", "just under a minute", "a minute and a
+    half", "less than three minutes"."""
+    if s <= 0:
+        return "less than a second"
+    if s < 60:
+        return ("just one second" if s == 1 else f"just {s} seconds") if s <= 10 else "just under a minute" if s >= 50 else f"{s} seconds"
+    return span(s)
+
+
 def seconds_left(s: int) -> str:
     """Time left on a clock, the way it is said: "less than a second", "1 second", "48 seconds", "2:13"."""
     if s <= 0:

@@ -138,9 +138,10 @@ def fight_events(gid: int, season: int, name) -> list[tuple[int, list[int], obje
         when = _when(w["period"], w["sec"])
         if pair:
             verb = ["dropped the gloves", "squared off", "fought"][(zlib.crc32(str(gid).encode()) + n) % 3]
-            say = (lambda a=pair[0], b=pair[1], v=verb, t=when: f"{name(a)} and {name(b)} {v} {t}.")
+            say = (lambda opened=None, a=pair[0], b=pair[1], v=verb, t=when:
+                   f"{name(a)} and {name(b)} opened {opened} with a fight." if opened else f"{name(a)} and {name(b)} {v} {t}.")
         else:
-            say = (lambda w=w, t=when: f"{_cap(num(w['fights']))} fights broke out at once {t}, and {_and([name(x) for x in _fighters(w)])} all got five for fighting.")
+            say = (lambda opened=None, w=w, t=when: f"{_cap(num(w['fights']))} fights broke out at once {t}, and {_and([name(x) for x in _fighters(w)])} all got five for fighting.")
         out.append((w["sec"], _fighters(w), say))
     return out
 
