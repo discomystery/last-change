@@ -58,7 +58,7 @@ def test_first_goal_rides_on_the_goal_and_a_late_cut_says_held_on():
 
 def test_empty_net_and_overtime_beats():
     gm = _game([(1, 500, False, 1, "ev"), (3, 1150, False, 2, "en")])
-    assert timeline.paragraph(gm)[1] == "Cole Caufield sealed it into the empty net with 50 seconds left."
+    assert timeline.paragraph(gm)[-1].endswith("Cole Caufield sealed it into the empty net with 50 seconds left.")
     ot = _game([(2, 100, True, 3, "ev"), (3, 400, False, 1, "ev"), (4, 75, True, 4, "ev")], end="OT")
     assert timeline.paragraph(ot)[-1] == "Will Cuylle won it 1:15 into overtime."
 
@@ -66,8 +66,8 @@ def test_empty_net_and_overtime_beats():
 def test_only_goal_and_hat_trick_words():
     assert timeline.paragraph(_game([(2, 700, True, 3, "sh")])) == ["Adam Fox scored the only goal of the game shorthanded midway through the second."]
     gm = _game([(1, 100, True, 3, "ev"), (2, 100, False, 1, "ev"), (2, 900, True, 3, "ev"), (3, 1000, True, 3, "ev")])
-    out = timeline.paragraph(gm)
-    assert "struck again" in out[2] and out[3] in ("Fox completed his hat trick with 3:20 left to make it 3-1.", "Fox added insurance with 3:20 left.", "Fox made it 3-1 with 3:20 left, and that was that.")
+    text = " ".join(timeline.paragraph(gm))
+    assert "struck again" in text and any(x in text for x in ("completed his hat trick with 3:20 left to make it 3-1.", "added insurance with 3:20 left.", "made it 3-1 with 3:20 left, and that was that."))
 
 
 def test_shootout_decider_is_the_goal_the_loser_could_not_match():
@@ -88,3 +88,18 @@ def test_shootout_decider_is_the_goal_the_loser_could_not_match():
 
 def test_ordinals():
     assert [timeline.th(n) for n in (1, 2, 3, 11, 12, 21, 102, 1000)] == ["1st", "2nd", "3rd", "11th", "12th", "21st", "102nd", "1,000th"]
+
+
+def test_short_sentences_join_in_pairs_and_periods_are_not_repeated():
+    # Sora's review, 2026-10-19: clipped one-goal sentences in a row read choppy; join pairs, never two joins in a row
+    gm = _game([(1, 300, False, 1, "ev"), (1, 700, True, 3, "ev"), (2, 500, True, 4, "ev"), (2, 900, False, 2, "ev")])
+    out = timeline.paragraph(gm)
+    assert out[0] == "Alex Newhook opened the scoring for the Canadiens early in the first, but Adam Fox tied it 1-1 for the Rangers midway through the period."
+    assert len(out) == 3 and "the period" in out[0]
+
+
+def test_runs_stay_inside_one_period():
+    # CAR at CHI: a goal late in the first and two early in the second were told as "three goals in 4:25 late in the first"
+    gm = _game([(1, 1150, True, 3, "ev"), (2, 60, True, 4, "ev"), (2, 140, True, 5, "ev")])
+    out = " ".join(timeline.paragraph(gm))
+    assert "three goals" not in out and "late in the first" in out

@@ -87,7 +87,8 @@ def prior_totals(season: int = CURRENT_SEASON) -> dict[int, dict]:
                                           "first_season": min((s["season"] for s in rows if s.get("gamesPlayed")), default=None),
                                           "last_win_season": max((s["season"] for s in rows if s.get("wins")), default=None),
                                           # the key is there for every saved landing; empty means he was never drafted
-                                          "undrafted": "draftDetails" in land and not land["draftDetails"]}
+                                          "undrafted": "draftDetails" in land and not land["draftDetails"],
+                                          "round": (land.get("draftDetails") or {}).get("round")}
     return out
 
 
@@ -271,7 +272,7 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         if g == 0 and g_now:
             out.append({**item, "kind": "first_goal", "debut": gp == 0, "nth": gp + 1, "undrafted": base["undrafted"]})
         elif gp == 0:
-            out.append({**item, "kind": "debut", "points": pts_now})
+            out.append({**item, "kind": "debut", "points": pts_now, "first_round": base.get("round") == 1})
         elif pts == 0 and pts_now:
             out.append({**item, "kind": "first_point"})
         elif g_now and base["g"] + int(mine["g"].sum()) > 0:
