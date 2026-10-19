@@ -5,10 +5,11 @@ took the draws, with their best winger on IR and a defenseman unsigned. Previews
 how unusual that was, so the Out item and the team intro add a league rank, and previews tell a forward who rarely takes
 faceoffs taking a center's draws.
 
-A REGULAR is a top-nine forward or top-four defenseman by 5-on-5 plus power-play ice time (how lines are numbered) for
+A REGULAR is one of the top twelve forwards or six defensemen by 5-on-5 plus power-play ice time (how lines are numbered) for
 his club last season (30+ games), or a regular anywhere last season, or one for his current club this season (3+ games,
-by ice time a game so a player hurt early still counts), or a goalie who started 40%+ of his club's games last season or
-this season (Sora: Shesterkin being out is a massive blow). A MISSED GAME is a club game he didn't dress for while the
+by ice time a game so a player hurt early still counts), or a goalie who started 20%+ of his club's games last season or
+this season (Sora: Shesterkin being out is a massive blow). Sora widened it from the top nine and four the same day, since
+counting only top players favors thin teams; the value weighting keeps depth players from counting much. A MISSED GAME is a club game he didn't dress for while the
 league listed him as injured, suspended, out for personal reasons or off the roster, or while unsigned. Healthy scratches,
 players sent to the minors with nothing reported, and players with no club (retired, unsigned free agents) don't count.
 Never says why a player is out.
@@ -29,9 +30,9 @@ import polars as pl
 from pipeline.config import TABLES
 
 OUT = ("injured", "suspended", "personal", "off_roster")
-F_TOP, D_TOP = 9, 4
+F_TOP, D_TOP = 12, 6  # a full lineup (Sora, 2026-10-19: counting only the top nine and four favors thin teams)
 LAST_GP, NOW_GP = 30, 3
-STARTER = 0.4  # share of the club's starts that makes a goalie its starter
+STARTER = 0.2  # share of the club's starts that makes a goalie a regular (the backup too)
 # A rank is told only when it stands apart: one of the top three, enough games played and missed, and twice what the
 # usual club has lost.
 RANK_TOP, MIN_GAMES, MIN_MISSED, OVER_MEDIAN = 3, 6, 6, 2.0
