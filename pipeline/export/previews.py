@@ -23,6 +23,7 @@ import zlib
 from functools import lru_cache
 from datetime import date, datetime, timedelta, timezone
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _ordinal, possessive as _poss
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
@@ -310,10 +311,6 @@ ORD = ["first", "second", "third", "fourth"]
 NICKS: dict[str, str] = {}  # team -> nickname, from teams.json (filled by `names`)
 
 
-def _ordinal(n: int) -> str:
-    return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
-
-
 def _last(name: str) -> str:
     return name.split(" ", 1)[-1]
 
@@ -324,21 +321,9 @@ def _lasts(names: list[str]) -> list[str]:
     return [f"{n[0]}. {l}" if lasts.count(l) > 1 else l for n, l in zip(names, lasts)]
 
 
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
-
-
 def _games(a: int, b: int) -> str:
     """How many games this season each side's figures include, for a call's citation."""
     return "no games yet this season" if a == b == 0 else f"{a} and {b} games this season"
-
-
-def _cap(t: str) -> str:
-    return t[0].upper() + t[1:]
-
-
-def _poss(name: str) -> str:
-    return name + ("’" if name.endswith("s") else "’s")
 
 
 def names(places: dict) -> dict[str, str]:

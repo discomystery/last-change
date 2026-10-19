@@ -512,7 +512,7 @@ def pp_goals(t: str, o: str, g: int, n: int, fp: dict, places: dict, season: int
     head = {"break": "{T}’s power play came alive", "worse": "{T}’s power play feasted on {O}’s kill"}.get(cls, "{T}’s power play did damage")
     fig = f"{g} power-play goals on {n} {'chance' if n == 1 else 'chances'}."
     short = fig
-    rare = f"A power play like theirs against a kill like {places[o]}’s scores {g} or more about once every {_friendly(1 / max(p, 1e-3))} games."
+    rare = f"A power play like theirs against a kill like {places[o]}’s scores {g} or more about once every {_friendly(1 / max(p, 1e-3)):,} games."
     return _item("special", z, cls, head.format(T=places[t], O=places[o]), compose(cls, why, fig, short, rare, "a big night", who=places[t]), ("pp", t, True))
 
 
@@ -594,7 +594,7 @@ def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
         head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
         body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
     n = every("gsax", gl["gsax"])
-    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n} starts."
+    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n:,} starts."
     if n >= 100:  # a busy starter makes about 60 starts: at 1 in 100 a start, fewer than half see one in a season
         body += " Most starters don’t get one a season."
     score_ = max(abs(z), SMALL) if blank else abs(z)  # a shutout is always worth a mention when nothing bigger happened

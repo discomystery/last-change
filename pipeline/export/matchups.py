@@ -27,6 +27,7 @@ from collections import Counter, defaultdict
 
 import polars as pl
 
+from pipeline.export.grammar import and_list
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.export import pending, wording
 from pipeline.metrics import units as U
@@ -52,10 +53,6 @@ INTENSITY_GAMES = 3                                 # earlier home games under t
 def clock(sec: float) -> str:
     s = int(round(sec))
     return f"{s // 60}:{s % 60:02d}"
-
-
-def and_list(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
 def label(sets: dict[str, set], players: list[int], kind: str) -> str | None:

@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 import numpy as np
 import polars as pl
 
+from pipeline.export.grammar import ordinal as _ordinal
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
 from pipeline.export.intros import _and, _cap, _num, _pick, _poss, _teams, _the
 from pipeline.ingest import history
@@ -254,10 +255,6 @@ def _last_spring(full: list[dict]) -> dict | None:
     streak = (f"{_ordinal(dry)} straight year out" if dry >= 2 else None) if not last["playoffs"] else \
         (f"{_ordinal(run)} straight spring in" if run >= 3 else None)
     return {"result": words, "streak": streak}
-
-
-def _ordinal(n: int) -> str:
-    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
 def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[dict], full: list[dict]) -> dict:

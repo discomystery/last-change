@@ -52,3 +52,18 @@ def test_nickname_once_is_sparing():
     # a club with no common nickname keeps its name
     assert wording.nickname_para("The Kings won. The Kings scored.", "k") == "The Kings won. The Kings scored."
     assert wording.nickname_para("The Rangers won. The Rangers scored.", "k") == "The Rangers won. The Rangers scored."
+
+
+def test_article_follows_the_spoken_number_or_word():
+    assert wording.article("8-3 rout") == "an 8-3 rout"
+    assert wording.article("11-game streak") == "an 11-game streak"
+    assert wording.article("18%") == "an 18%"
+    assert wording.article("1-0 win") == "a 1-0 win"
+    assert wording.article("Oilers lead") == "an Oilers lead"
+    assert wording.article("one-goal game") == "a one-goal game"
+    assert wording.article("Utah win") == "a Utah win"
+
+
+def test_ordinal_suffixes():
+    assert [wording.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111)] == \
+        ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st", "111th"]

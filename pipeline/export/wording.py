@@ -7,6 +7,8 @@ stat lines ("NY Rangers 5th for power play") keep the place.
 import re
 import zlib
 
+from pipeline.export.grammar import article, ordinal  # noqa: F401  (kept here for older callers)
+
 PLURAL = {"has": "have", "is": "are", "was": "were", "does": "do", "wins": "win", "faces": "face", "starts": "start", "plays": "play",
           "gets": "get", "gives": "give", "takes": "take", "throws": "throw", "allows": "allow", "leans": "lean", "rides": "ride",
           "uses": "use", "hits": "hit", "shoots": "shoot", "kills": "kill", "controls": "control", "makes": "make", "turns": "turn"}
@@ -177,3 +179,4 @@ def initials(r: dict) -> str:
 
 def full(r: dict) -> str:
     return f"{r['first']} {r['last']}"
+

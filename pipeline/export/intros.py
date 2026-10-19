@@ -15,6 +15,7 @@ from datetime import date
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _ordinal
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, REGULAR, SITE_DATA, TABLES
 from pipeline.ingest import history
 from pipeline.export import wording
@@ -28,20 +29,6 @@ HISTORY = 4  # seasons of team history to describe (we hold full tables from 202
 def _pick(pool: list[str], *key) -> str:
     """Stable choice from a wording pool (same text every run, varied across teams and players)."""
     return pool[zlib.crc32("|".join(map(str, key)).encode()) % len(pool)]
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:] if t else t
-
-
-def _and(xs: list[str]) -> str:
-    xs = [x for x in xs if x]
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1] if xs else ""
-
-
-def _ordinal(n: int) -> str:
-    s = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{s}"
 
 
 WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]

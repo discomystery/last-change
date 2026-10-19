@@ -21,6 +21,7 @@ import json
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and
 from pipeline.config import SITE_DATA
 
 LEAGUE_TOP = {"goals": 50, "assists": 50, "points": 50, "gwg": 25, "otg": 25, "otg3": 10}
@@ -34,10 +35,6 @@ WHERE = {k: ("" if k == "otg3" else " in NHL history") for k in WHAT}
 def _ord(n: int) -> str:
     from pipeline.export.league_lists import _ord as o
     return o(n)
-
-
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else f"{', '.join(xs[:-1])} and {xs[-1]}"
 
 
 def _name(r: dict, names: dict[int, str]) -> str:

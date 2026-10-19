@@ -137,7 +137,7 @@ def test_goals_taken_off_get_a_follow_up():
     off = [{"period": 1, "sec": 100}]
     g = lambda per, sec, home, st="ev": {"period": per, "sec": sec, "home": home, "strength": st}
     assert stories._wipe_after(off, [g(2, 50, False)], True, False, 1, "REG", pk) == " That one stung in a one-goal loss."
-    assert stories._wipe_after(off + [{"period": 1, "sec": 500}], [], True, False, 1, "SO", pk) == " Those stung in a game that went to a shootout."
+    assert stories._wipe_after(off + [{"period": 1, "sec": 500}], [], True, False, 1, "SO", pk) == " Those disallowed goals stung: the game went to a shootout."
     assert stories._wipe_after(off, [g(1, 145, True)], True, True, 2, "REG", pk) == " They got it back just 45 seconds later."
     assert stories._wipe_after(off, [g(2, 10, True, "pp")], True, True, 2, "REG", pk) == " The power play gave it back."
     assert stories._wipe_after(off, [g(2, 10, True)], True, True, 2, "REG", pk) == " It didn’t cost them in the end."
@@ -265,3 +265,21 @@ def test_season_defining_runs_lead_the_story():
     # a short run is not the story
     assert stories._run_story([loss(), loss(), win], [win, win, loss()], "PHI", "OTT", W, pk) == ([], [], set())
     assert stories.defining_run(phi[:-1]) and not stories.defining_run([win, loss(), loss()])
+
+
+def test_a_delayed_penalty_goal_is_not_a_power_play_goal(tmp_path, monkeypatch):
+    """Outside notes, 2026-10-18: Fantilli's goal at 19:12 of the first (CBJ at MIN, 2026020135) came 6-on-5 with the
+    Columbus net empty during a delayed penalty (code 0651) and read "on the power play"."""
+    import polars as pl
+    d = tmp_path / "2026"
+    d.mkdir()
+    row = dict(event_id=1, period_type="REG", p2=None, p3=None, home_goalie=30, away_goalie=31, zone="O", shot_type="wrist")
+    pl.DataFrame([
+        row | dict(game_id=2026020135, sort=1, period=1, sec=1152, type="goal", team_id=29, p1=7, situation_code="0651"),
+        row | dict(game_id=2026020135, sort=2, period=1, sec=1152, type="penalty", team_id=30, p1=8, situation_code="0651"),
+        row | dict(game_id=2026020135, sort=3, period=2, sec=1500, type="goal", team_id=29, p1=7, situation_code="1541"),
+    ]).write_parquet(d / "events.parquet")
+    monkeypatch.setattr(stories, "TABLES", tmp_path)
+    goals = stories._goals(2026020135, 2026, home_id=30)
+    assert [g["strength"] for g in goals] == ["dp", "pp"]
+    assert not goals[0]["own_extra"]  # first period: not "with the goalie pulled"
