@@ -42,6 +42,8 @@ VALUE_LAMBDA = 15000.0  # ratings as the win model's lineups
 # what today's absences are worth a game, told for the top three clubs when it is twice the median club's and at least
 # NOW_FLOOR expected goals a game (about one top-line forward).
 NOW_FLOOR = 0.2
+# Every line says the count is weighed, without the method (Sora, 2026-10-20: imply it is more than a head count).
+WEIGHED = "Counting how much each missing player usually brings"
 # Filling in on faceoffs: a forward who had been taking fewer than RARE_DRAWS a game (over GP_BEFORE+ games) took
 # FILL_DRAWS+ in the club's last game while a player who takes CENTER_DRAWS+ a game was out.
 RARE_DRAWS, GP_BEFORE, FILL_DRAWS, CENTER_DRAWS = 3.0, 20, 8, 8.0
@@ -228,8 +230,8 @@ def sentence(r: dict | None, the) -> str | None:
     if not out_now(r):
         return None
     if r["now_rank"] == 1:
-        return "No team is missing more right now."
-    return f"Only {and_list([the(t) for t in r['now_ahead']])} are missing more right now."
+        return f"{WEIGHED}, no team is missing more right now."
+    return f"{WEIGHED}, only {and_list([the(t) for t in r['now_ahead']])} are missing more right now."
 
 
 def postgame_line(r: dict | None, team_the: str, won: bool, the) -> str | None:
@@ -242,7 +244,7 @@ def postgame_line(r: dict | None, team_the: str, won: bool, the) -> str | None:
     tail = ("no team was missing more at the time" if r["now_rank"] == 1
             else f"only {and_list([the(t) for t in r['now_ahead']])} were missing more at the time")
     verb = "won without" if won else "were without"
-    return f"{team_the[0].upper() + team_the[1:]} {verb} {names}, and {tail}."
+    return f"{team_the[0].upper() + team_the[1:]} {verb} {names}. {WEIGHED}, {tail}."
 
 
 def filling_in(season: int, day: str, team: str) -> dict | None:
@@ -303,4 +305,5 @@ def intro_line(r: dict | None, team_the: str, the) -> str | None:
         return None
     names = and_list([n for _, n in r["names"][:3]])
     tail = f", with {names} still out." if names else "."
-    return f"They’ve also been hit harder by absences {than_whom(r, the)}: their regulars have missed {r['missed']} games so far{tail}"
+    who = "no team has" if r["rank"] == 1 else f"only {and_list([the(t) for t in r['ahead']])} have"
+    return f"{WEIGHED}, {who} been hit harder by absences: their regulars have missed {r['missed']} games so far{tail}"
