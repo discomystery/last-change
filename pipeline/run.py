@@ -234,7 +234,7 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 5  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 6  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
 # 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
 # 4 (2026-10-11): expected-goals model v2; earlier seasons' shots are rebuilt and re-rated
