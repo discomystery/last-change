@@ -15,7 +15,7 @@ from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.export import grades, pending, previews, wording
 from pipeline.ingest import game_stats
 from pipeline.export import surprises as surprise_rules
-from pipeline.metrics import adjust, goalies, replays, team_style
+from pipeline.metrics import adjust, goalies, line_order, replays, team_style
 
 # A call on a game whose shift chart the NHL is still filling in: graded on a later run (see pending.py).
 PENDING = {"verdict": "pending", "happened": "Checked once the NHL finishes filling in who was on the ice."}
@@ -490,7 +490,7 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         for r in units.iter_rows(named=True):
             ids = {int(x) for x in r["unit"].split("-")}
             if ids not in usual:
-                trios.append((t, (lambda xs: ", ".join(xs[:-1]) + " and " + xs[-1])([S.full.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, "").split(" ", 1)[-1])]), int(r["sec"]), ids))
+                trios.append((t, (lambda xs: ", ".join(xs[:-1]) + " and " + xs[-1])([S.full.get(i, "?") for i in line_order.order(S.season, S.team_id[(gid, t)], sorted(ids), g["date"])]), int(r["sec"]), ids))
                 break
     left = {t: [x for x in S.exits(gid, S.team_id[(gid, t)]) if x["regular"]] for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)

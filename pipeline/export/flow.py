@@ -120,10 +120,13 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
     # Tonight's lines and pairs by 5-on-5 time together, numbered as team and preview pages number them; anyone
     # else is listed under "other".
     group: dict[int, str] = {}
+    slot: dict[int, int] = {}  # place within a forward line: 0 left wing, 1 center, 2 right wing
     if gu is not None:
         for team_id in (g["away_id"], g["home_id"]):
-            for _, label, u in U.game_lines(season, gu, gid, team_id):
-                for pid in u["unit"].split("-"):
+            for kind, label, u in U.game_lines(season, gu, gid, team_id):
+                for i, pid in enumerate(u["unit"].split("-")):
+                    if int(pid) not in group and kind == "F":
+                        slot[int(pid)] = i
                     group.setdefault(int(pid), label)  # a forward on two lines (11 dressed) keeps the higher one
 
     skaters: dict[int, list] = {}
@@ -145,7 +148,7 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
     for pid, spans in skaters.items():
         pos = info.get(pid, {}).get("pos")
         grp = group.get(pid) or ("XD" if pos == "D" else "XF")
-        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans)})
+        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans), **({"o": slot[pid]} if pid in slot else {})})
     gks = [{"id": pid, "n": name(pid), "h": side_of[pid], "s": merge(spans)} for pid, spans in goalies.items()]
     # Shooters, passers, penalty takers and shootout shooters not on a shift chart still need a name.
     ids = {s[i] for s in shots for i in (6, 10, 11)} | {b[i] for b in blocks for i in (4, 5)} | {p[i] for p in pens for i in (2, 3, 7)}
