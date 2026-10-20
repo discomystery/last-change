@@ -145,7 +145,7 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 };
 const trend = trendFor(abbr!);
 const hasTeamStats = statSeasons('teams').some((x) => statRows('teams', x).some((r) => r.team === abbr));
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(hasTeamStats ? [['stats', 'Team stats']] : []), ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(hasTeamStats ? [['stats', 'Team stats']] : []), ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Playing style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 // The head coach from the club's latest game; a coach who took over this season says since when.
@@ -197,7 +197,7 @@ const coachSince = coach && (team as any).coach_since
     </Section>
   )}
 
-  <Section id="style" title="Style fingerprint" placeholder={false} share="team" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
+  <Section id="style" title="Playing style" placeholder={false} share="team" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
     <Fragment slot="explain">
       <p class="note m-blend">Real numbers through {asOf}: {mine.games} games this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">Real numbers through {asOf}, from this season’s {mine.games} games only. Expect these to swing a lot this early, which is why the likely ranges are so wide.</p>
@@ -314,7 +314,7 @@ const coachSince = coach && (team as any).coach_since
     )}
   </Section>
 
-  <Section id="matchups" title="Who plays against whom" placeholder={false} takeaway={`Which opposing lines each ${team.place} group has actually been out against at 5-on-5.`}>
+  <Section id="matchups" title="Matchups" placeholder={false} takeaway={`Which opposing lines each ${team.place} group has actually been out against at 5-on-5.`}>
     <Fragment slot="explain">
       {mu && <p class="note">Each strip adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. Sized by ice time, a wider box means more time against that line; even columns line the boxes up so you can compare groups straight down. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes.</p>}
       {mu && <p class="note"><strong>What “with no line matching” means:</strong> if a coach just rolled his lines and took whoever was out there, each of his groups would face the opponent’s first line about as often as that line is on the ice. If opposing first lines play a third of the time against {team.place}, every {team.place} group would see them for about a third of its shifts. A number well above that means the coach is sending that group out against them on purpose; well below means he is keeping it away.</p>}
@@ -470,7 +470,7 @@ const coachSince = coach && (team as any).coach_since
     )}
   </Section>
 
-  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway={`How ${team.place}’s goals are scored and allowed, against the league average, and how much of any difference luck alone could explain.`}>
+  <Section id="sources" title="Goal sources" placeholder={false} takeaway={`How ${team.place}’s goals are scored and allowed, against the league average, and how much of any difference luck alone could explain.`}>
     <Fragment slot="explain">
       {how?.sources && <p class="note">Every goal counts once, in the first of these that applies: empty net, power play, shorthanded, goalie pulled, then rebound, turnover, faceoff win, and everyday play. These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last.</p>}
       {how?.sources && <p class="note">Each row has its own scale, so a small source is not squeezed against the left edge.</p>}
