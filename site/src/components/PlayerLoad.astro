@@ -81,7 +81,7 @@ const span = out?.missed ? (out.first === out.last ? `on ${day(out.first)}` : `b
 const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
 ---
 {c && (
-<Section id="carries" title="What he carries" placeholder={false} takeaway={`How much of ${place}’s game runs through him, and what they would have to replace without him.`}>
+<Section id="carries" title="Offense" placeholder={false} takeaway={`How much of ${place}’s game runs through him, and what they would have to replace without him.`}>
   <Fragment slot="explain">
     <p class="note">{idle ? '“Picked up by” is the teammate whose share of that job has grown the most since last season: who now plays beside his old linemates, which of last season’s part-timers are dressing, and who gained power-play, penalty-kill or overall ice time. Newcomers are measured against their own last season, wherever they played.' : 'Names come from what has happened when a regular sat out in 2023-26: his linemates’ usual stand-in over the last ten games took the spot about a third of the time, the most-used part-timer dressed about two times in three, and power-play and penalty-kill names are only the most likely of several. Nobody is named for ice time, because a missing player’s minutes get shared out.'} It is not a guess at the coach’s choice. Dots in the cards above are his {place} teammates, each over the games they played; hover one for the name.</p>
   </Fragment>

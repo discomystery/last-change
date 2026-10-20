@@ -42,7 +42,7 @@ const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en
 const SW = 1.2; // Swing bar half-width, in Swing points
 ---
 {rows.length > 0 && (<>
-<Section id="counted" title={`What ${place} count on him for`} placeholder={false} takeaway="What his post-game report cards judge him on, why, and how often he has done it.">
+<Section id="counted" title="Responsibilities" placeholder={false} takeaway="What his post-game report cards judge him on, why, and how often he has done it.">
   <Fragment slot="explain">
     <p class="note">His report card grades him on what {place} rely on him for and what he does better than most at his position: better than 75% of {peer[p.sub === 'C' || p.sub === 'W' ? p.sub : p.group] ?? 'players'}, or a regular share of the power play, penalty kill or faceoffs. These are the others.</p>
   </Fragment>

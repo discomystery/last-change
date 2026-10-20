@@ -206,8 +206,8 @@ const story = r.story;
 // How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
 const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it unfolded']] : []), ['preview', 'Preview vs result'],
-  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'Game flow']] : []), ['preview', 'Preview review'],
+  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'Goalies'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
 import GameSwitch from '../../components/GameSwitch.astro';
@@ -270,13 +270,13 @@ import GameSwitch from '../../components/GameSwitch.astro';
   </section>
 
   {hasFlow && (
-    <Section id="flow" title="How it unfolded" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
+    <Section id="flow" title="Game flow" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
       <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
       <LineMatchups id={r.game_id} awayPlace={place(away)} homePlace={place(home)} />
     </Section>
   )}
 
-  <Section id="preview" title="What the preview said" placeholder={false} takeaway={takeaway} lead>
+  <Section id="preview" title="Preview review" placeholder={false} takeaway={takeaway} lead>
     <Fragment slot="explain">
       <p class="note">Each call is checked by a rule set before the game. <strong>Called it</strong>: the team reached their usual level. <strong>Close</strong>: they fell short of their usual level but still beat the league average. When a call says one team will come out ahead, called it means they won by at least half their usual gap, and partly means they won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     </Fragment>
@@ -304,7 +304,7 @@ import GameSwitch from '../../components/GameSwitch.astro';
 
     {r.surprises.length > 0 && (
       <>
-        <Explain id="surprises" title="What it didn’t see coming">
+        <Explain id="surprises" title="Surprises">
           <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of their usual habit. <strong>Bad to worse</strong> and <strong>Good to better</strong>: a team known for a weakness or a strength (or facing one) went further even than that. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: two teams who usually land about average here, far from it. Each is measured against what both teams’ numbers before the game predicted, and special teams also against five seasons of real power-play and penalty-kill conversion.</p>
         </Explain>
         <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.flipped ? 'Flipped a call' : s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3>{s.flipped && <p class="flipped">The preview said “{s.flipped}.”</p>}<p>{s.body}</p></li>)}</ul>
@@ -316,7 +316,7 @@ import GameSwitch from '../../components/GameSwitch.astro';
 
   <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
-  <Section id="goalies" title="In net" placeholder={false} takeaway={hasGoalieCards ? "Each goalie’s night: the goals he stopped beyond what the shots were worth, and the dangerous and routine saves." : "How many goals each goalie stopped beyond what the shots he faced were worth."}>
+  <Section id="goalies" title="Goalies" placeholder={false} takeaway={hasGoalieCards ? "Each goalie’s night: the goals he stopped beyond what the shots were worth, and the dangerous and routine saves." : "How many goals each goalie stopped beyond what the shots he faced were worth."}>
     <Fragment slot="explain">
       {!hasGoalieCards && <p class="note">Empty-net shots are left out. Expected-goal models can’t see passes before a shot, so a goalie beaten by cross-ice passes looks worse here than he really was.</p>}
     </Fragment>

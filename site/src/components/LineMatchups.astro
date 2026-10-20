@@ -16,8 +16,8 @@ const poss = (p: string) => (p.endsWith('s') ? `${p}’` : `${p}’s`);
 ---
 {mu && (
   <details class="fold pgmu-fold">
-    <summary><span class="closed">Show who played against whom</span><span class="opened">Hide who played against whom</span></summary>
-    <h3 class="sub pgmu-h">Who played against whom</h3>
+    <summary><span class="closed">Show the matchups</span><span class="opened">Hide the matchups</span></summary>
+    <h3 class="sub pgmu-h">Matchups</h3>
     <p class="pgmu-lede">{mu.lede}</p>
     {mu.notes.length > 0 && (
       <div class="card pgmu-changed">
