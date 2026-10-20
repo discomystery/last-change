@@ -38,7 +38,10 @@ STARTER = 0.2  # share of the club's starts that makes a goalie a regular (the b
 RANK_TOP, MIN_GAMES, MIN_MISSED, OVER_MEDIAN = 3, 6, 6, 2.0
 REPLACEMENT = 0.2  # replacement level: this quantile of rated regulars (skaters 20+ games, goalies 10+ starts)
 VALUE_LAMBDA = 15000.0  # ratings as the win model's lineups
-NOW_MIN = 4  # regulars out at once that make "no team has more out right now" worth saying
+# Right now (Sora, 2026-10-20: the season total suits the team blurb, previews and post-game pages want who is out today):
+# what today's absences are worth a game, told for the top three clubs when it is twice the median club's and at least
+# NOW_FLOOR expected goals a game (about one top-line forward).
+NOW_FLOOR = 0.2
 # Filling in on faceoffs: a forward who had been taking fewer than RARE_DRAWS a game (over GP_BEFORE+ games) took
 # FILL_DRAWS+ in the club's last game while a player who takes CENTER_DRAWS+ a game was out.
 RARE_DRAWS, GP_BEFORE, FILL_DRAWS, CENTER_DRAWS = 3.0, 20, 8, 8.0
@@ -182,29 +185,34 @@ def table(season: int, day: str) -> dict[str, dict]:
     now = worth(_is_regular(today.filter(_out(today)), reg)).sort("val", "weight", descending=True)
     names = {t: [(r["player_id"], f"{r['first']} {r['last']}") for r in d.iter_rows(named=True)]
              for (t,), d in now.group_by("team", maintain_order=True)}
-    per = per.with_columns(now=pl.col("team").map_elements(lambda t: len(names.get(t, [])), return_dtype=pl.Int64))
+    now_lost = dict(now.group_by("team").agg(pl.col("val").sum()).iter_rows()) if now.height else {}
+    per = per.with_columns(now=pl.col("team").map_elements(lambda t: len(names.get(t, [])), return_dtype=pl.Int64),
+                           now_lost=pl.col("team").replace_strict(now_lost, default=0.0, return_dtype=pl.Float64))
     per = per.with_columns(rank=pl.col("lost").rank("min", descending=True).cast(pl.Int64),
-                           now_rank=pl.col("now").rank("min", descending=True).cast(pl.Int64))
+                           now_rank=pl.col("now_lost").rank("min", descending=True).cast(pl.Int64))
     median = float(per["missed"].median())
     lost_median = float(per["lost"].median())
+    now_median = float(per["now_lost"].median())
+    by_now = per.sort("now_lost", descending=True)
     out = {}
     for r in per.sort("lost", descending=True).iter_rows(named=True):
-        out[r["team"]] = {**r, "median": median, "lost_median": lost_median, "names": names.get(r["team"], []),
+        out[r["team"]] = {**r, "median": median, "lost_median": lost_median, "now_median": now_median, "names": names.get(r["team"], []),
+                          "now_ahead": [t for t, m in zip(by_now["team"], by_now["now_lost"]) if m > r["now_lost"]],
                           "ahead": [t for t, m in zip(per.sort("lost", descending=True)["team"], per.sort("lost", descending=True)["lost"]) if m > r["lost"]],
-                          "now_tied": int((per["now"] == r["now"]).sum()) - 1}
+}
     return out
 
 
-def stands_out(r: dict | None) -> str | None:
-    """"season" when the club's missed games are worth a league rank, "now" when only today's count is, else None."""
-    if not r:
-        return None
-    if (r["rank"] <= RANK_TOP and r["games"] >= MIN_GAMES and r["missed"] >= MIN_MISSED
-            and r["lost"] >= OVER_MEDIAN * r["lost_median"]):
-        return "season"
-    if r["now"] >= NOW_MIN and r["now_rank"] == 1 and not r["now_tied"]:
-        return "now"
-    return None
+def stands_out(r: dict | None) -> bool:
+    """True when the club's season of missed games is worth a league rank (team blurbs)."""
+    return bool(r) and (r["rank"] <= RANK_TOP and r["games"] >= MIN_GAMES and r["missed"] >= MIN_MISSED
+                        and r["lost"] >= OVER_MEDIAN * r["lost_median"])
+
+
+def out_now(r: dict | None) -> bool:
+    """True when what the club is missing right now is worth a league rank (previews and post-game pages)."""
+    return bool(r) and (r["now_rank"] <= RANK_TOP and r["now_lost"] >= NOW_FLOOR
+                        and r["now_lost"] >= OVER_MEDIAN * r["now_median"])
 
 
 def than_whom(r: dict, the) -> str:
@@ -213,17 +221,28 @@ def than_whom(r: dict, the) -> str:
     return "than any other team" if r["rank"] == 1 else f"than anyone but {and_list([the(t) for t in r['ahead']])}"
 
 
-def sentence(r: dict, the) -> str | None:
-    """"Their regulars have missed 25 games this season, and only the Islanders have been hit harder by absences." or None."""
+def sentence(r: dict | None, the) -> str | None:
+    """Preview, after the Out item's names: "No team is missing more right now." or "Only the Flyers and the Wild are
+    missing more right now." None unless it stands out."""
     from pipeline.export.grammar import and_list
-    kind = stands_out(r)
-    if kind == "season":
-        tail = ("no team has been hit harder by absences" if r["rank"] == 1
-                else f"only {and_list([the(t) for t in r['ahead']])} have been hit harder by absences")
-        return f"Their regulars have missed {r['missed']} games this season, and {tail}."
-    if kind == "now":
-        return "No team has more regulars out right now."
-    return None
+    if not out_now(r):
+        return None
+    if r["now_rank"] == 1:
+        return "No team is missing more right now."
+    return f"Only {and_list([the(t) for t in r['now_ahead']])} are missing more right now."
+
+
+def postgame_line(r: dict | None, team_the: str, won: bool, the) -> str | None:
+    """Post-game: "The Hurricanes won without Seth Jarvis, Mark Jankowski and Taylor Hall, and no team was missing more at
+    the time." Names only, at most three, the costliest first; past tense, since the page stays up."""
+    from pipeline.export.grammar import and_list
+    if not out_now(r) or not r["names"]:
+        return None
+    names = and_list([n for _, n in r["names"][:3]] + (["others"] if len(r["names"]) > 3 else []))
+    tail = ("no team was missing more at the time" if r["now_rank"] == 1
+            else f"only {and_list([the(t) for t in r['now_ahead']])} were missing more at the time")
+    verb = "won without" if won else "were without"
+    return f"{team_the[0].upper() + team_the[1:]} {verb} {names}, and {tail}."
 
 
 def filling_in(season: int, day: str, team: str) -> dict | None:
@@ -276,14 +295,12 @@ def filling_text(x: dict, team_the: str, N: dict[int, str], fallback: dict[int, 
 
 
 def intro_line(r: dict | None, team_the: str, the) -> str | None:
-    """Team intro: "They’ve also been hit harder by absences than any other team: their regulars have missed 25 games so
-    far, with Seth Jarvis, Taylor Hall and Jordan Staal still out." Names only, at most three, the costliest first."""
+    """Team intro, the season so far: "They’ve also been hit harder by absences than any other team: their regulars
+    have missed 25 games so far, with Seth Jarvis, Taylor Hall and Jordan Staal still out." Names only, at most three,
+    the costliest first."""
     from pipeline.export.grammar import and_list
-    kind = stands_out(r)
-    names = and_list([n for _, n in r["names"][:3]]) if kind else ""
-    if kind == "season":
-        tail = f", with {names} still out." if names else "."
-        return f"They’ve also been hit harder by absences {than_whom(r, the)}: their regulars have missed {r['missed']} games so far{tail}"
-    if kind == "now":
-        return f"No team has more regulars out right now than {team_the}, with {names} among them."
-    return None
+    if not stands_out(r):
+        return None
+    names = and_list([n for _, n in r["names"][:3]])
+    tail = f", with {names} still out." if names else "."
+    return f"They’ve also been hit harder by absences {than_whom(r, the)}: their regulars have missed {r['missed']} games so far{tail}"

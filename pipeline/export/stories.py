@@ -549,7 +549,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
                              "start": N[nxt[0]] if nxt and nxt[1] >= LIKELY and N.get(nxt[0]) else None})
         if team_out:
             item = _merge_out(team_out, _cap(W.the(t)), n_games)
-            league = absences.sentence(absences.table(season, day).get(t), W.the)  # how unusual it is (Sora, 2026-10-19)
+            league = absences.sentence(absences.table(season, day).get(t), W.the)  # who's out right now, against the league (Sora, 2026-10-20)
             if league:
                 item["text"] += " " + league
             items.append(item)
@@ -2563,6 +2563,11 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         fill = _filled_in(gid, r["date"], t, home_id if t == home else row["away_id"][0], season, N, name)
         if fill:
             items.append(fill)
+    missing = absences.table(season, r["date"])  # who each club was missing tonight, against the league (Sora, 2026-10-20)
+    for t in (winner, loser):
+        text = absences.postgame_line(missing.get(t), W.the(t), t == winner, W.the)
+        if text:
+            items.append({"tag": "Shorthanded", "text": text, "score": 52 if t == winner else 44})
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
     items += _league_marks(G, r["date"], gid, season, W, winner, loser)
     league = []
