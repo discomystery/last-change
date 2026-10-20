@@ -217,7 +217,11 @@ def game_lines(season: int, gu: pl.DataFrame, gid: int, team_id: int) -> list[tu
     weight = _player_weight(season, team_id, {g: len(window) - 1 - k for k, g in enumerate(window)})
     mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
     share = eleven(season, gid, team_id)
-    return [(kind, f"{tag}{i}", u) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
+    day = games["date"].max()
+    from pipeline.metrics import line_order
+    # A forward line's "unit" comes back written left wing, center, right wing (`line_order`) for the pages to list.
+    lw_c_rw = lambda kind, u: {**u, "unit": "-".join(map(str, line_order.order(season, team_id, u["unit"].split("-"), day)))} if kind == "F" else u
+    return [(kind, f"{tag}{i}", lw_c_rw(kind, u)) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
             for i, u in enumerate(_by_role(_pick(mine.filter(pl.col("kind") == kind), count, share=share and kind == "F"), weight), 1)]
 
 

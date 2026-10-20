@@ -159,7 +159,7 @@ const base = import.meta.env.BASE_URL;
 
 <script>
   type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number; type: string; ast: string[] };
-  type Skater = { id: number; n: string; h: number; grp: string; s: [number, number][]; toi: number };
+  type Skater = { id: number; n: string; h: number; grp: string; s: [number, number][]; toi: number; o?: number };
   type Pen = { t: number; h: number; who: string; drawn: string; min: number; code: string; what: string; served: string; pid: number | null; end: number };
   type Block = { t: number; h: number; x: number; y: number; who: string; shooter: string };
   type Attempt = { h: number; who: string; gk: string; res: number; type: string };
@@ -496,7 +496,7 @@ const base = import.meta.env.BASE_URL;
           const gk = onAt(g.gk.filter((p: any) => p.h === h), t)[0] as any;
           // on a change the shift records can overlap by a second; keep the most recent arrivals
           const startOf = (p: Skater) => p.s.find(([a, b]) => t >= a && t < b)![0];
-          const sk = onAt(g.players.filter((p: Skater) => p.h === h) as Skater[], t).sort((a, b) => startOf(b) - startOf(a)).slice(0, gk ? 5 : 6).sort((a, b) => ORDER.indexOf(a.grp) - ORDER.indexOf(b.grp));
+          const sk = onAt(g.players.filter((p: Skater) => p.h === h) as Skater[], t).sort((a, b) => startOf(b) - startOf(a)).slice(0, gk ? 5 : 6).sort((a, b) => ORDER.indexOf(a.grp) - ORDER.indexOf(b.grp) || (a.o ?? 9) - (b.o ?? 9));
           const fw = sk.filter((p) => p.grp[0] === 'L' || p.grp === 'XF'), dd = sk.filter((p) => p.grp[0] === 'P' || p.grp === 'XD');
           const tags = (ps: Skater[]) => [...new Set(ps.map((p) => p.grp).filter((x) => x[0] !== 'X'))].map((x) => `<span class="ltag chip">${x}</span>`).join('');
           const list = (ps: Skater[]) => ps.map((p) => last(p.n)).join(' · ') || '<span class="none">none</span>';
@@ -591,7 +591,7 @@ const base = import.meta.env.BASE_URL;
         txt(svg, 4, y + 8, (h ? g.hn : g.an).toUpperCase(), 'gf-axh').style.fill = C[h];
         y += 16; bandTop.push(y);
         for (const grp of ORDER) {
-          const ps = (g.players as Skater[]).filter((p) => p.h === h && p.grp === grp).sort((a, b) => b.toi - a.toi);
+          const ps = (g.players as Skater[]).filter((p) => p.h === h && p.grp === grp).sort((a, b) => (a.o ?? 9) - (b.o ?? 9) || b.toi - a.toi);  // forward lines left wing, center, right wing
           if (!ps.length) continue;
           const y0 = y;
           for (const p of ps) { rows.push({ p, y }); y += STEP; }
