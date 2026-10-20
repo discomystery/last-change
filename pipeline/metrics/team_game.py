@@ -19,6 +19,10 @@ CLOSE_DISTANCE = 20  # feet from the middle of the goal line: "in close"
 # A shot against counts as "on a long shift" when the defending skaters average 45 s or more into their shifts
 # (about the top fifth of shots). How often a team is caught there repeats strongly half to half (r 0.76-0.82,
 # 2023-26); how much worse its chances against get there does not (r -0.33 to 0.25), so only the first is a trait.
+# Since 2026-10-20 it also needs the shift to have been spent in the team's own end: at least one play in its own zone
+# during the defenders' time out and no more plays at the other end. About a third of long-shift shots against came
+# after the team had been pressing in the other end and got caught on the way back (Carolina 20th to 4th in 2023-24);
+# pressing is not being pinned. Split-half r 0.68-0.72; r with 5-on-5 attempt share -0.5 to -0.6 (was -0.3 to -0.4).
 LONG_SHIFT = 45
 BREAKDOWN_XG = 0.15  # an off-turnover shot at least this dangerous counts as a breakdown chance
 FACEOFF_WINDOW = 5  # seconds from an offensive-zone faceoff win to a goal for it to count as off the draw
@@ -30,6 +34,20 @@ COUNTS = ["cf", "ff", "sf", "gf", "xgf", "reb_xgf", "to_xgf", "point_cf", "d_cf"
 
 def _state(diff: int) -> int:
     return max(-3, min(3, diff))
+
+
+def _pinned(located: list[tuple], shot: dict, defending_home: bool) -> bool:
+    """Whether the defenders' current shift, as far back as their average time on the ice, was spent in their own end:
+    at least one play in their own zone and no more plays in the other team's zone (plays from earlier periods aside)."""
+    since = shot["sec"] - shot["def_shift_avg"]
+    own = attack = 0
+    for sec, period, home, x in reversed(located):
+        if period != shot["period"] or sec < since:
+            break
+        x = x if home == defending_home else -x  # toward the defending team's attacking end
+        own += x < -25
+        attack += x > 25
+    return own > 0 and own >= attack
 
 
 def _forget() -> None:
@@ -51,7 +69,7 @@ def build(season: int) -> dict:
     own = pl.read_parquet(d / "shots_xg_own.parquet").rename({"xg": "xGoal"})
     feats = pl.read_parquet(d / "shot_features.parquet").select(
         "game_id", "event_id", ((pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3)).alias("shotRebound"),
-        (pl.col("def_shift_avg") >= LONG_SHIFT).alias("long_shift"))
+        (pl.col("def_shift_avg") >= LONG_SHIFT).alias("long_shift"), "def_shift_avg")
     events = pl.read_parquet(d / "events.parquet").join(own, on=["game_id", "event_id"], how="left").join(feats, on=["game_id", "event_id"], how="left").sort("game_id", "sort")
     stints = pl.read_parquet(d / "stints.parquet")
 
@@ -77,11 +95,15 @@ def build(season: int) -> dict:
     last_turnover: dict[bool, int] = {}
     last_faceoff = None  # (second, won by home team) of the last offensive-zone faceoff win since play stopped
     current = None
+    located: list[tuple] = []  # (second, period, home side, x toward that side's attacking end) of this game's plays
     for e in events.iter_rows(named=True):
         gid = e["game_id"]
         if gid != current:
-            current, last_turnover, last_faceoff = gid, {}, None
+            current, last_turnover, last_faceoff, located = gid, {}, None, []
         typ, home = e["type"], e["is_home"]
+        pinned = typ in UNBLOCKED and bool(e["long_shift"]) and home is not None and _pinned(located, e, not home)
+        if e["x_norm"] is not None and home is not None:
+            located.append((e["sec"], e["period"], home, e["x_norm"]))
         if typ in ("stoppage", "faceoff", "period-start", "period-end"):
             last_turnover, last_faceoff = {}, None
             if typ == "faceoff" and home is not None and (e["x_norm"] or 0) > 25:
@@ -131,8 +153,8 @@ def build(season: int) -> dict:
                     bump(side, "f" + sfx)
                     if close:
                         bump(side, "close_f" + sfx)
-                    if sfx == "a" and e["long_shift"]:
-                        bump(side, "long_fa")  # the defending team's skaters were 45 s or more into their shift
+                    if sfx == "a" and pinned:
+                        bump(side, "long_fa")  # the defending skaters were 45 s+ into a shift spent in their own end
                     bump(side, "xg" + sfx, xg)
                     if e["shotRebound"]:
                         bump(side, "reb_xg" + sfx, xg)
