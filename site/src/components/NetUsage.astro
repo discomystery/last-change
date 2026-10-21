@@ -1,0 +1,80 @@
+---
+// "Who's been in net" (Sora, 2026-10-18): she wanted to see at a glance which of a club's goalies has been starting
+// and who played last, to make sense of a backup getting the start. One small table per club: each goalie who has
+// played this season, his starts this season and over the club's last ten games, and his last start and relief appearances. On a preview
+// (`before` = the game's date) a line under it says when the club last played and who was in net, and whether
+// tonight is the second night of a back-to-back. Facts only: never a guess at why a goalie is or isn't playing.
+import { netOf, type NetGame } from '../lib/gamelog';
+import { fullName, playerHref } from '../lib/playerLinks';
+import teamsData from '../../public/data/teams.json';
+
+interface Props { team: string; before?: string; side?: 'away' | 'home'; title?: boolean }
+const { team, before, side, title = false } = Astro.props;
+const games = netOf(team, before);
+const TS = teamsData as { abbr: string; nick: string; place: string }[];
+const T = TS.find((t) => t.abbr === team);
+const placeOf = (a: string) => TS.find((t) => t.abbr === a)?.place ?? a;
+const nick = T?.nick ?? team;
+const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const res = (g: NetGame) => `${g.us > g.them ? 'W' : g.end === 'REG' ? 'L' : 'OTL'} ${g.us}–${g.them}${g.end !== 'REG' ? ` ${g.end}` : ''}`;
+// The last-ten column only says something once the club has played more than ten.
+const tenCol = games.length > 10;
+type Row = { id: number; starts: number; last10: number; relief: number; last?: NetGame; lastAny?: NetGame };
+const rows = new Map<number, Row>();
+const row = (id: number) => rows.get(id) ?? rows.set(id, { id, starts: 0, last10: 0, relief: 0 }).get(id)!;
+games.forEach((g, i) => {
+  if (g.starter != null) {
+    const r = row(g.starter);
+    r.starts++;
+    if (i < 10) r.last10++;
+    r.last ??= g;
+    r.lastAny ??= g;
+  }
+  for (const id of g.relief) { const r = row(id); r.relief++; r.lastAny ??= g; }
+});
+const list = [...rows.values()].sort((a, b) => b.last10 - a.last10 || b.starts - a.starts || (b.lastAny?.date ?? '').localeCompare(a.lastAny?.date ?? ''));
+const lastGame = games[0];
+const name = (id: number) => fullName(id, String(id));
+const days = lastGame && before ? Math.round((Date.parse(`${before}T12:00:00Z`) - Date.parse(`${lastGame.date}T12:00:00Z`)) / 86400000) : null;
+const lastLine = lastGame && before && (() => {
+  const who = lastGame.starter != null ? `${name(lastGame.starter)} in net` : null;
+  const when = days === 1 ? 'yesterday' : fmt(lastGame.date);
+  const b2b = days === 1 ? ' This is the second night of a back-to-back.' : days != null && days > 1 ? ` That gives them ${days - 1} ${days === 2 ? 'day' : 'days'} off before this one.` : '';
+  return `The ${nick} last played ${when} ${lastGame.home ? 'against' : 'in'} ${placeOf(lastGame.opp)}${who ? `, with ${who}` : ''}.${b2b}`;
+})();
+---
+{list.length > 0 && (
+  <div class:list={['card', 'nu', side && `t-${side}`]}>
+    <p class="mini-h">{title ? `Who’s been in net for the ${nick}` : 'Who’s been in net'}</p>
+    <table class="stbl nu-t">
+      <thead><tr>
+        <th>Goalie</th>
+        <th><span class="term" tabindex="0" data-tip="Games he started this season.">Starts</span></th>
+        {tenCol && <th><span class="term" tabindex="0" data-tip={`Games he started of the ${nick}’ last 10.`}>Last 10</span></th>}
+        <th class="nu-l">Last start</th>
+      </tr></thead>
+      <tbody>
+        {list.map((r) => { const href = playerHref(r.id); return (
+          <tr>
+            <th>{side && <i class="nu-dot"></i>}{href ? <a class="plink" href={href}>{name(r.id)}</a> : name(r.id)}{r.relief > 0 && <span class="nu-rel">{r.relief === 1 ? 'once in relief' : `${r.relief} times in relief`}</span>}</th>
+            <td>{r.starts}</td>
+            {tenCol && <td>{r.last10}</td>}
+            <td class="nu-l">{r.last ? <span class="term" tabindex="0" data-tip={`${res(r.last)}`}><span class="nu-wd">{fmt(r.last.date).slice(0, 5)}</span>{fmt(r.last.date).slice(5)} {r.last.home ? 'vs' : 'at'} {r.last.opp}</span> : <span class="n">None this season</span>}</td>
+          </tr>
+        ); })}
+      </tbody>
+    </table>
+    {lastLine && <p class="nu-last">{lastLine}</p>}
+  </div>
+)}
+
+<style>
+  .nu { display: grid; gap: 10px; align-content: start; }
+  .nu-t { width: 100%; }
+  .nu-t th:first-child { white-space: normal; }
+  .nu-t .nu-l { text-align: right; }
+  .nu-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team, var(--ink-3)); margin-right: 8px; vertical-align: 1px; }
+  .nu-rel { display: block; font: 400 12px var(--ui); color: var(--ink-3); }
+  .nu-last { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 0; }
+  @media (max-width: 560px) { .nu-wd { display: none; } }
+</style>

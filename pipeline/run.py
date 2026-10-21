@@ -196,6 +196,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["stats"] = stats.run(season)  # tonight's goals and assists in the season lines and the Leaders page
     from pipeline.export import ledger
     out["ledger"] = ledger.run(season)  # this season's line in each player's career ledger
+    from pipeline.export import gamelog
+    out["gamelog"] = gamelog.run(season)  # tonight's game in each player's recent games
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
 

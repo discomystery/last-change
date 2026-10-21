@@ -15,6 +15,7 @@ import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import PlayerGames from '../../components/PlayerGames.astro';
 import PlayerStats from '../../components/PlayerStats.astro';
 import RecordBook from '../../components/RecordBook.astro';
 import { ledgerOf } from '../../lib/ledger';
@@ -155,6 +156,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
     </div>
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} nextStart={introNext.start} colour={teamPaint(p.team)} class="pstory" />
     <RecordBook id={p.id} />
+    <PlayerGames p={p} goalie={isG} />
     {hasLine && <PlayerStats id={p.id} pos={p.pos} goalie={isG} />}
     <SectionNav items={nav as [string, string][]} />
 
