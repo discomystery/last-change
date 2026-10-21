@@ -26,7 +26,7 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, num
 PERIODS = {1: "first", 2: "second", 3: "third"}
 RUN_GAP = 300  # seconds between two goals by one team that read as one sentence
 RELATIVE = 300  # a goal this soon after the last one told is "x:xx later"
-LATE = 300  # the last five minutes of the third read "with x:xx left"
+LATE = 480  # the last eight minutes of the third read "with six minutes left" (outside notes, Oct 20: 6:22 left read "late in the third")
 HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty shot", "dp": " on a delayed penalty"}
 PERIOD_END = 30  # a goal this close to the end of the first or second is told by the clock ("with 12 seconds left in the first")
 SEASON_MARKS = (20, 30, 40, 50, 60, 70)  # a scorer's nth goal of the season worth a clause
@@ -62,10 +62,11 @@ def when(g: dict) -> str:
     if p <= 2 and s >= 1200 - PERIOD_END:  # "Kent Johnson made it 2-0 with 12 seconds left in the first" (Sora)
         return f"with {left_(1200 - s)} left in the {PERIODS[p]}"
     if s < 60:  # a goal in the first minute gets told as one (Sora: give quick starts some panache)
-        return f"just {s} seconds into the game" if p == 1 else f"just {s} seconds into the {PERIODS[p]}"
+        n = num(s) if s < 10 else s  # "just nine seconds into the period" (Sora's notes, Oct 20: small numbers in words)
+        return f"just {n} seconds into the game" if p == 1 else f"just {n} seconds into the {PERIODS[p]}"
     if p == 1 and s < 120:
         return f"{span(s)} in"
-    part = "early in" if s < 400 else "midway through" if s < 800 else "late in"
+    part = "early in" if s < 400 else "midway through" if s < 900 else "late in"  # "late" from 15:00 (13:54 read "late in the first")
     return f"{part} the {PERIODS[p]}"
 
 
@@ -87,6 +88,7 @@ class Game:
     wiped: list = field(default_factory=list)  # stories._overturned rows
     reviews: list = field(default_factory=list)  # storylines.reviews rows
     ps_stopped: list = field(default_factory=list)
+    luck_ps: dict | None = None  # the losers' stopped penalty shot their luck ran out on (set by paragraph)
     changes: list = field(default_factory=list)  # (team, first goalie, relief goalie, pulled) from recap_story
     exits: list = field(default_factory=list)  # recaps' `left` rows
     so: tuple = (None, "", [])  # shootout decider, how to tell it, every scorer for the winner
@@ -115,6 +117,7 @@ def paragraph(gm: Game) -> list[str]:
     goals = gm.goals
     W = gm.W
     out: list[tuple[str, dict]] = []  # (sentence, what it tells: kind, team, words) for the joining pass
+    gm.luck_ps = _turning_ps(gm)
     ws, ls = (max(goals[-1]["hs"], goals[-1]["as"]), min(goals[-1]["hs"], goals[-1]["as"])) if goals else (0, 0)
     margin = ws - ls
     # the goal that put the winner ahead for good (after the last tie), and the official winner
@@ -210,7 +213,8 @@ def paragraph(gm: Game) -> list[str]:
                 out.append((f"The league looked at a {W.nick.get(t, t)} chance {when(x)} on video and ruled no goal.", {"kind": "other"}))
             elif kind == "ps":
                 if x["type"] == "shot-on-goal" and x.get("goalie"):
-                    out.append((f"{gm.name(x['goalie'])} stopped {gm.name(x['p1'])} on a penalty shot {when(x)}.", {"kind": "other"}))
+                    luck = (f", but that’s where {grammar.possessive(W.place(gm.loser))} luck ran out" if x is gm.luck_ps else "")
+                    out.append((f"{gm.name(x['goalie'])} stopped {gm.name(x['p1'])} on a penalty shot {when(x)}{luck}.", {"kind": "other"}))
                 else:
                     out.append((f"{gm.name(x['p1'])} missed the net on a penalty shot {when(x)}.", {"kind": "other"}))
             elif kind == "change":
@@ -251,6 +255,8 @@ def paragraph(gm: Game) -> list[str]:
             if (gm.side(a) != gm.side(b) or at(b) - at(a) > RUN_GAP or b["period"] != a["period"] or b["period"] > 3 or len(run) >= 3
                     or any(goals[i]["strength"] in ("ps", "en") for i in (run[-1], j)) or j in gm.attach or run[-1] in gm.attach
                     or j in gm.hat3 or x in gm.hat3
+                    # a shorthanded goal keeps its own sentence (Cowan's read as even strength inside a run, Oct 20)
+                    or ("sh" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
                     or j in gm.relief or run[-1] in gm.relief or got_back in (run[-1], j)
                     or (b["period"], b["sec"]) in stood or (a["period"], a["sec"]) in stood):
                 break
@@ -495,6 +501,9 @@ def _time(gm: Game, g: dict, prev: dict | None) -> str:
     else was told in between (Sora: "4:39 later" after a fight read as 4:39 after the fight) or the clock says more
     ("with 12 seconds left in the first")."""
     w = when(g)
+    quick = prev is not None and g["period"] == prev["period"] and not gm.broke and 0 < at(g) - at(prev) < 60
+    if quick and g["period"] == 3 and 120 < 1200 - g["sec"] <= LATE:
+        return f"{span(at(g) - at(prev))} later"  # a quick answer reads better as one than as the clock ("47 seconds later")
     if " left" in w or " into the " in w:
         return w
     if prev is not None and g["period"] == prev["period"] and g["period"] <= 3 and not gm.broke:
@@ -655,6 +664,27 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     return " ".join(_cap(body).replace(" ,", ",").split()) + "."
 
 
+def _turning_ps(gm: Game) -> dict | None:
+    """The winners' penalty shot the losers' goalie stopped with the game tied or the losers within one, after which the
+    winners scored and the losers never did: "Meriläinen stopped Aho on a penalty shot late in the second, but that’s
+    where Vancouver’s luck ran out" (Sora's notes, Oct 20: say it on the moment that turned the game, not on the goal
+    before)."""
+    for x in gm.ps_stopped:
+        # the losers' goalie stopped the winners' penalty shot: their last break before the game got away
+        if (gm.home if x.get("home") else gm.away) != gm.winner or x.get("type") != "shot-on-goal":
+            continue
+        if not any(gm.side(g) == gm.winner for g in gm.goals if at(g) > at(x)):
+            continue
+        before = [g for g in gm.goals if at(g) < at(x)]
+        if any(gm.side(g) == gm.loser for g in gm.goals if at(g) > at(x)):
+            continue
+        h, a_ = (before[-1]["hs"], before[-1]["as"]) if before else (0, 0)
+        mine, theirs = (h, a_) if gm.loser == gm.home else (a_, h)
+        if theirs - 1 <= mine <= theirs:
+            return x
+    return None
+
+
 def _last_word(gm: Game, i: int) -> str:
     """The loser's last goal of a regulation game, when it got them level, ahead or within one and they never scored
     again: "but that’s where Colorado’s luck ran out", "but that was as close as the Penguins got" (Sora's review,
@@ -666,7 +696,13 @@ def _last_word(gm: Game, i: int) -> str:
     if gm.end != "REG" or t != gm.loser or any(gm.side(h) == t for h in rest) or not rest or all(h["strength"] == "en" for h in rest):
         return ""  # an empty-netter that ends it says so itself ("ended any hope of a comeback")
     m, th_ = gm.score(g, t)
-    if m >= th_:
+    if gm.luck_ps is not None and at(gm.luck_ps) > at(g):
+        return ""  # their luck ran out on the stopped penalty shot, told there (Sora's notes, Oct 20)
+    if m > th_:  # still ahead: their luck had not run out yet (LAK at WSH, Oct 20)
+        return gm.pk(["but they didn’t score again", "and they didn’t score again"], "lastw", i)
+    if m == th_ and at(rest[0]) - at(g) <= 120:
+        return ""  # the go-ahead came right back; "they didn’t score again" then reads oddly (PIT at WPG, Oct 20)
+    if m == th_:
         return gm.pk([f"but that’s where {grammar.possessive(W.place(t))} luck ran out", "but they didn’t score again"], "lastw", i)
     if m == th_ - 1:
         return gm.pk(["but that was as close as they got", "but they got no closer"], "lastw", i)
@@ -829,6 +865,10 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             told.add(pid)
         elif k == "club_goal" and i is not None:
             att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"
+            told.add(pid)
+        elif k == "milestone" and x["what"] == "game" and i is not None and not (att.get(i) or {}).get("tail"):
+            # "Matthews scored in his 700th NHL game" rides on his goal (outside notes, Oct 20: told apart, it led the story)
+            att.setdefault(i, {})["tail"] = f"in his {th(x['mark'])} NHL game"
             told.add(pid)
         elif k == "milestone" and x["what"] in ("goal", "point", "assist") and x.get("have") is not None:
             n = x["mark"] - x["have"]  # his nth of tonight reached the mark
