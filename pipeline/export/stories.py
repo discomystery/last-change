@@ -1935,7 +1935,10 @@ def _big_nights(night: pl.DataFrame, winner: str, loser: str, W, name, said: set
     # One sentence for the night's big point totals (Sora's review, 2026-10-19): a lone "Novak also had an assist" is
     # not news, but "Novak added an assist for a three-point night" is, and two totals read as one sentence.
     lines = []
-    for r in rows[:most]:
+    keep = rows[:most]
+    if len(rows) > most and all(r["pts"] == rows[0]["pts"] for r in rows[:most + 1]):  # a tie for the last place is not cut (Blake's three assists, 2026-10-20)
+        keep = [r for r in rows if r["pts"] == rows[0]["pts"]][:4]
+    for r in keep:
         pid, g, a, pts = r["player_id"], int(r["g"]), int(r["pts"] - r["g"]), int(r["pts"])
         known = pid in said
         assists = "an assist" if a == 1 else f"{num(a)} assists"
@@ -1956,6 +1959,10 @@ def _big_nights(night: pl.DataFrame, winner: str, loser: str, W, name, said: set
         return []
     if len(lines) == 1:
         return [_cap(lines[0]["clause"]) + "."]
+    if len(lines) > 2:
+        words = {3: "three", 4: "four"}
+        parts = [f"{l['who']} with {l['what']}" for l in lines]
+        return [f"There were {words[len(lines)]} {num(lines[0]['pts'])}-point nights: {', '.join(parts[:-1])}, and {parts[-1]}."]
     x, y = lines
     if not x["known"] and not y["known"] and x["what"] == y["what"]:  # "Bratt and Hughes each had a goal and two assists"
         return [f"{_cap(x['who'])} and {y['who']} each had {x['what']}."]
