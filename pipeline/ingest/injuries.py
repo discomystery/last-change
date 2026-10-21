@@ -123,26 +123,38 @@ def classify(e: dict, season: int) -> tuple[str, str | None] | None:
     return None
 
 
+def _group(pos: str) -> str:
+    return {"D": "D", "G": "G"}.get(pos, "F")
+
+
 def _matcher(season: int):
     """(club, folded name) -> player, from the club's roster listings and game rosters this season, plus names that
     belong to one player only."""
     by_club: dict[tuple[str, str], set[int]] = {}
     by_last: dict[tuple[str, str], set[tuple[int, str]]] = {}
+    group: dict[int, str] = {}
     for f in ("rosters.parquet", "game_rosters.parquet", "availability.parquet"):
         t = TABLES / str(season) / f
         if t.exists():
             for pid, team, first, last in pl.read_parquet(t, columns=["player_id", "team", "first", "last"]).drop_nulls().unique().iter_rows():
                 by_club.setdefault((team, _fold(f"{first} {last}")), set()).add(pid)
                 by_last.setdefault((team, _fold(last)), set()).add((pid, _fold(first)))
+    r = TABLES / str(season) / "rosters.parquet"
+    if r.exists():
+        group = {pid: _group(p) for pid, p in pl.read_parquet(r, columns=["player_id", "pos"]).drop_nulls().unique().iter_rows()}
     unique = known_names(season)
 
-    def find(team: str | None, name: str | None) -> int | None:
+    def find(team: str | None, name: str | None, pos: str | None = None) -> int | None:
         if not name:
             return None
         n = _fold(name)
         ids = by_club.get((team, n), set())
+        if len(ids) > 1 and pos:  # two players with one name on the club (Vancouver's Elias Petterssons): by position
+            ids = {i for i in ids if group.get(i) == _group(pos)}
         if len(ids) == 1:
             return next(iter(ids))
+        if len(ids) > 1:
+            return None
         if n in unique:
             return unique[n]
         # "Sam" for Samuel, "Joe" for Joseph: one player on the club with that last name and the same first initial
@@ -162,7 +174,7 @@ def build(season: int) -> dict:
             entries = json.load(fh)
         now = {}
         for e in entries:
-            pid = find(e.get("team"), e.get("name"))
+            pid = find(e.get("team"), e.get("name"), e.get("pos"))
             if pid is None:
                 unmatched.add(e.get("name"))
                 continue

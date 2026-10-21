@@ -33,7 +33,7 @@ def test_injury_words():
 def test_build_dates_entries_and_clears_players_dropped_from_the_list(tmp_path, monkeypatch):
     monkeypatch.setattr(injuries, "raw_dir", lambda s: tmp_path / "raw")
     monkeypatch.setattr(injuries, "path", lambda s: tmp_path / "injuries.parquet")
-    monkeypatch.setattr(injuries, "_matcher", lambda s: lambda team, name: {"Frederik Andersen": 1, "Zach Hyman": 2}.get(name))
+    monkeypatch.setattr(injuries, "_matcher", lambda s: lambda team, name, pos=None: {"Frederik Andersen": 1, "Zach Hyman": 2}.get(name))
     filler = [e("Out", "OUT", "Knee", team="XXX", name=f"Prospect {i}", date="2026-10-01") for i in range(injuries.MIN_ENTRIES)]
     days = {"2026-10-12": [e("Injured Reserve", "IR-NR", "Knee", team="EDM", name="Frederik Andersen", date="2026-09-29"),
                            e("Day-To-Day", "Day-To-Day", "Undisclosed", team="EDM", name="Zach Hyman", date="2026-10-11")],
