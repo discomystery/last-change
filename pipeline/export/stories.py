@@ -2294,7 +2294,12 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     fights = penalties.fight_events(gid, season, name)
     fighters = {p_ for _, ps_, _ in fights for p_ in ps_}
     later_firsts = [x for x in found if _later_first(x, night, fighters)]
-    s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=[x for x in found if x not in later_firsts],
+    # A debut, club debut or return whose only mark is an assist waits until after the goals, beside the big nights
+    # (Sora, 2026-10-21: Välimäki's first game for Carolina after 600+ days is news, but not the game's lead)
+    after_goals = [x for x in found if x not in later_firsts and x["kind"] in ("debut", "club_debut", "return")
+                   and x.get("points") and not x.get("goals") and not x.get("first_round")]
+    s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first,
+                       found=[x for x in found if x not in later_firsts and x not in after_goals],
                        kinds=("debut", "return", "club_debut", "first_point", "milestone", "first_win", "first_shutout", "first_start", "win_since"),
                        goals_told=True, saves=saves_, in_net=net_firsts)
     # goalie changes: "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as
@@ -2357,6 +2362,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             s1.append(line)
     for f_ in hat_lines:
         s1 += f_()
+    if after_goals:
+        s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=after_goals,
+                           kinds=("debut", "return", "club_debut"), goals_told=True, saves=saves_, in_net=net_firsts)
     s1 += _big_nights(night, winner, loser, W, name, said, last, big_told | hat_ids, verb="finished with")
     # A hot opening line for the nights fans talk about the next morning, each earned by the goals themselves
     # (Sora, 2026-10-14): a three-goal comeback, a tie with the goalie pulled that went on to win, a six-goal rout.
