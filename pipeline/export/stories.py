@@ -30,6 +30,7 @@ History starts in 2023-24, so records against a team say "since 2023-24".
 Everything a preview story reads is from before the game's date, so a rebuilt preview tells it as a live one would.
 """
 import gzip
+import math
 import json
 import re
 import zlib
@@ -2130,7 +2131,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     found = _found_firsts(gid, season, G, P)
     res_w = results(G.filter(pl.col("date") <= r["date"]), winner, season)
     res_l = results(G.filter(pl.col("date") <= r["date"]), loser, season)
-    heads += _fact_heads(found, night, res_w, res_l, winner, loser, W, W_, L_, last, N)
+    rare = _rare_scorers(P, night, r["date"], N)
+    heads += _fact_heads(found, night, res_w, res_l, winner, loser, W, W_, L_, last, N, rare)
     run_heads, run_lead, run_told = _run_story(res_w, res_l, winner, loser, W, pk)
     heads += run_heads
     if keeper_goals:
@@ -2288,6 +2290,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                       f"{W.poss(gt) if gt else ''} {name(pid)} got the Gordie Howe, a goal, an assist and a fight.".replace("  ", " "))
         elif N.get(pid):
             s1.append(f"{name(pid)} had a Gordie Howe hat trick: a goal, an assist and a fight.")
+    for x in rare[:1]:  # a rare scorer's two goals open the story (Sora, 2026-10-21)
+        if x["pid"] not in hat_ids:
+            how = f"scores in about 1 game in {round(1 / x['odds'])}"
+            s1.append(f"{_cap(name(x['pid']))}, who {how}, scored {'twice' if x['goals'] == 2 else num(x['goals']) + ' times'}.")
     # debuts, returns and games played lead too; goals and points attach to the goal they came on
     net_firsts: list[str] = []  # a goalie's first win or shutout, told with the goaltending
     saves_ = {x["id"]: x.get("saves") for x in r.get("goalies", [])}
@@ -2832,7 +2838,33 @@ def _run_story(res_w: list[dict], res_l: list[dict], winner: str, loser: str, W:
 
 
 
-def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], winner: str, loser: str, W: Words, W_: str, L_: str, last, N) -> list[tuple[int, str]]:
+RARE_SCORER = 0.10  # goals a game (shrunk) at or under which a two-goal night leads the story: a player who scores about once in ten games
+
+
+def _rare_scorers(P: pl.DataFrame, night: pl.DataFrame, day: str, N: dict[int, str]) -> list[dict]:
+    """Players who scored 2+ goals tonight but rarely score (Sora, 2026-10-21: Deslauriers' two goals are the story of
+    a game; two goals from a regular scorer are not). His goals a game before tonight, since 2023-24, are pulled toward
+    his position's average with 20 games' weight, the same shrink the report cards use for "scores in 1 game in N"."""
+    before = P.filter((pl.col("date") < day) & (pl.col("pos") != "G"))
+    if not before.height:
+        return []
+    avg = {k: v for k, v in before.group_by(pl.col("pos") == "D").agg(pl.col("g").mean()).iter_rows()}
+    out = []
+    for r in night.iter_rows(named=True):
+        pid = r["player_id"]
+        if r["g"] < 2 or pid not in N:
+            continue
+        mine = before.filter(pl.col("player_id") == pid)
+        if not mine.height:
+            continue
+        isd = bool(mine["pos"][-1] == "D")
+        lam = (float(mine["g"].sum()) + 20 * avg.get(isd, 0.18)) / (mine.height + 20)
+        if lam <= RARE_SCORER:
+            out.append({"pid": pid, "team": r["team"], "goals": int(r["g"]), "lam": lam, "odds": 1 - math.exp(-lam)})
+    return sorted(out, key=lambda x: -x["goals"])
+
+
+def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], winner: str, loser: str, W: Words, W_: str, L_: str, last, N, rare: list[dict] | None = None) -> list[tuple[int, str]]:
     """Headlines that lead with the night's big fact, as NHL.com and AP do (Sora's review of 2025-26, 2026-10-17):
     a round-number milestone (300 goals, 500 points, 1,000 games), a goal in an NHL debut, a four-point night, a
     seventh straight win, a long point streak ended. Each still carries the result."""
@@ -2858,6 +2890,10 @@ def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], 
             who = last(row["player_id"])
             as_ = f" as {beat}" if row["team"] == winner else f", but {W.the(row['team'])} lose"
             heads.append((85, f"{_cap(num(int(row['pts'])))} points for {who}{as_}"))
+    for x in rare or []:
+        who = last(x["pid"])
+        as_ = f" as {beat}" if x["team"] == winner else f", but {W.the(x['team'])} lose"
+        heads.append((80, f"{who} scores {'twice' if x['goals'] == 2 else num(x['goals']) + ' times'}{as_}"))
     k, n = streak(res_w)
     if k == "won" and n >= 7:
         heads.append((84, f"{W_} make it {num(n)} straight"))
