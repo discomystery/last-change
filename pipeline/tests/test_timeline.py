@@ -103,3 +103,11 @@ def test_runs_stay_inside_one_period():
     gm = _game([(1, 1150, True, 3, "ev"), (2, 60, True, 4, "ev"), (2, 140, True, 5, "ev")])
     out = " ".join(timeline.paragraph(gm))
     assert "three goals" not in out and "late in the first" in out
+
+
+def test_return_rides_on_his_goal_unless_a_star():
+    base = {"kind": "return", "goals": 1, "weight": 60}
+    assert timeline.rides_on_goal(base)
+    assert not timeline.rides_on_goal({**base, "weight": 88})
+    assert not timeline.rides_on_goal({**base, "goals": 0})
+    assert not timeline.rides_on_goal({**base, "since": "2025-04-01"})

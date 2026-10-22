@@ -1770,6 +1770,59 @@ TWO_MAN_KILL = 60  # seconds of 5-on-3 (both goalies in) killed off that earn a 
 POSTS = 3  # posts and crossbars by the losers that earn a line (2 in a one-goal game)
 
 
+@lru_cache(maxsize=4)
+def _sh_periods(season: int) -> list[tuple[str, str, int]]:
+    """Every regular-season period since 2023-24 in which one team scored twice or more shorthanded (empty-net ones
+    included, read from the situation code as `_goals` does): (date, team, game)."""
+    out = []
+    for s_ in range(2023, season + 1):
+        d = TABLES / str(s_)
+        try:
+            ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "period", "period_type", "is_home", "situation_code"]).filter(
+                (pl.col("type") == "goal") & (pl.col("period_type") != "SO"))
+            gm = pl.read_parquet(d / "games.parquet", columns=["game_id", "game_type", "date", "home", "away"]).filter(pl.col("game_type") == REGULAR)
+        except Exception:
+            continue
+        n = {}
+        for r in ev.iter_rows(named=True):
+            code = str(r["situation_code"] or "1551")
+            if code in ("1010", "0101"):
+                continue
+            a_sk, h_sk = int(code[1]), int(code[2])
+            mine, theirs = (h_sk, a_sk) if r["is_home"] else (a_sk, h_sk)
+            if (code[0] if r["is_home"] else code[3]) == "0":
+                mine -= 1  # their own goalie off for an extra skater
+            if mine < theirs:
+                k = (r["game_id"], r["is_home"], r["period"])
+                n[k] = n.get(k, 0) + 1
+        info = {r["game_id"]: r for r in gm.iter_rows(named=True)}
+        for (g_, h, p), c in n.items():
+            if c >= 2 and g_ in info:
+                out.append((info[g_]["date"], info[g_]["home"] if h else info[g_]["away"], g_))
+    return sorted(out)
+
+
+def sh_pair(gid: int, season: int, day: str, goals: list[dict], home: str, away: str, W) -> list[dict]:
+    """"The Senators scored twice shorthanded in the third, their first time doing that since Jan 30, 2025." (outside
+    notes, Oct 21: NHL.com told how rare Ottawa's two shorthanded goals in one period were; we told the goals only.)"""
+    out = []
+    for t, is_home in ((away, False), (home, True)):
+        for p in sorted({g["period"] for g in goals}):
+            n = sum(1 for g in goals if g["period"] == p and g["home"] == is_home and g["strength"] == "sh")
+            if n < 2 or p > 3:
+                continue
+            before = [d for d, tm, g_ in _sh_periods(season) if tm == t and (d, g_) < (day, gid)]
+            if before:
+                d = Date.fromisoformat(before[-1])
+                when_ = f"their first time doing that since {MONTHS[d.month - 1]} {d.day}, {d.year}"
+            else:
+                when_ = "something they hadn’t done since at least the 2023-24 season"
+            twice = "twice" if n == 2 else f"{num(n)} times"
+            out.append({"tag": "Shorthanded", "score": 64,
+                        "text": f"{_cap(W.the(t))} scored {twice} shorthanded in the {PERIODS[p]}, {when_}."})
+    return out
+
+
 def two_man_kills(gid: int, season: int, home_id: int, home: str, away: str, goals: list[dict], W) -> list[str]:
     """"The Blue Jackets killed off a two-man advantage that lasted just under two minutes early in the first." (outside
     notes, 2026-10-18: AP told Columbus's 1:52 kill and we did not.) From the stints, 5-on-3 stretches with both goalies
@@ -2338,7 +2391,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first,
                        found=[x for x in found if x not in later_firsts and x not in after_goals
                               # a games-played milestone of a goal scorer rides on his goal ("in his 700th NHL game")
-                              and not (x["kind"] == "milestone" and x.get("what") == "game" and any(g["p1"] == x["pid"] for g in goals))],
+                              and not (x["kind"] == "milestone" and x.get("what") == "game" and any(g["p1"] == x["pid"] for g in goals))
+                              and not (timeline.rides_on_goal(x) and any(g["p1"] == x["pid"] for g in goals))],
                        kinds=("debut", "return", "club_debut", "first_point", "milestone", "first_win", "first_shutout", "first_start", "win_since"),
                        goals_told=True, saves=saves_, in_net=net_firsts)
     # goalie changes: "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as
@@ -2541,6 +2595,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         + posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
     # what it means
     items = []
+    items += sh_pair(gid, season, r["date"], goals, home, away, W)
     for t in (winner, loser):
         res = results(G.filter(pl.col("date") <= r["date"]), t, season)
         k, n = streak(res)
@@ -2782,6 +2837,9 @@ def _team_form(G: pl.DataFrame, r: dict, t: str, won: bool, W: Words, season: in
     k = _run_len(same, lambda x: x["win"])
     if won and k >= (HOME_RUN if here else ROAD_RUN) and k < wins:  # k == wins is the plain winning streak
         items.append({"tag": "Home run" if here else "Road run", "text": f"That is {num(k)} straight wins {where} for {W.the(t)}.", "score": 47 + k})
+    if won and not here and len(same) >= 3 and not any(x["win"] for x in same[:-1]):
+        # "the Flyers’ first road win of the season" (outside notes, Oct 21: NHL.com led its notes with it)
+        items.append({"tag": "Road run", "text": f"It was {W.poss(t)} first road win of the season, in their {ORDINAL_N(len(same))} road game.", "score": 56})
     kl = _run_len(same, lambda x: not x["win"])
     if not won and kl >= (HOME_RUN if here else ROAD_RUN) and kl > _run_len(res, lambda x: not x["win"]):
         verb = "lost" if all(x["end"] == "REG" for x in same[-kl:]) else "gone winless in"
@@ -2957,6 +3015,10 @@ def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], 
             heads.append((90, f"{who} reaches {x['mark']:,} points{as_}"))
         elif x["kind"] == "milestone" and x["what"] == "game" and x["mark"] >= 1000:
             heads.append((88, f"{who} plays his {timeline.th(x['mark'])} game{as_}"))
+        elif x["kind"] == "first_goal" and (x.get("goals") or 0) >= 2:
+            # NHL.com led with Knuble's first two NHL goals; ours led with the goalie (outside notes, Oct 21)
+            many = "two" if x["goals"] == 2 else num(x["goals"])
+            heads.append((91, f"{who} scores his first {many} NHL goals{as_}"))
         elif x["kind"] == "first_goal" and x.get("debut"):
             heads.append((82, f"{who} scores in his NHL debut{as_}"))
     for row in night.iter_rows(named=True):

@@ -5,13 +5,14 @@ The preview is never rewritten: grading reads the snapshot exactly as it was sav
 power play that barely happened, a line that was hardly on the ice) are marked "na" and left out of the tally.
 Reads the site JSON written earlier in `export` (snapshots, fingerprints, lines), so it runs after `previews`.
 """
+import gzip
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import grades, pending, previews, wording
 from pipeline.ingest import game_stats
 from pipeline.export import surprises as surprise_rules
@@ -450,6 +451,37 @@ def periods(S: Season, gid: int, g: dict) -> list[dict]:
     return out
 
 
+def official(season: int, gid: int) -> dict:
+    """The league's own shots on goal and goalie saves from the saved boxscore (refetched once after the game, when the
+    NHL settles its counts). The play-by-play is one shot short of the box in a few games a season, and fans check our
+    saves against NHL.com (outside notes, Oct 21: Schmid 24 of 29 here, 25 of 30 there). Empty when no box is saved."""
+    f = RAW / str(season) / "box" / f"{gid}.json.gz"
+    try:
+        b = json.load(gzip.open(f))
+    except (OSError, ValueError):
+        return {}
+    sog = {b[s]["abbrev"]: b[s]["sog"] for s in ("awayTeam", "homeTeam") if isinstance(b.get(s, {}).get("sog"), int)}
+    gk = {}
+    for side in ("awayTeam", "homeTeam"):
+        for x in (b.get("playerByGameStats") or {}).get(side, {}).get("goalies", []):
+            if isinstance(x.get("shotsAgainst"), int) and isinstance(x.get("saves"), int) and x["shotsAgainst"]:
+                gk[x["playerId"]] = (x["shotsAgainst"], x["saves"])
+    return {"sog": sog, "goalies": gk}
+
+
+def use_official(nums: dict, glines: list[dict], off: dict) -> None:
+    """Shots on goal and goalie saves as the league counts them; goals and chances (xG) stay ours."""
+    for t, n in (off.get("sog") or {}).items():
+        if t in nums:
+            nums[t]["shots"] = n
+    for g in glines:
+        sa_sv = (off.get("goalies") or {}).get(g["id"])
+        if sa_sv:
+            sa, sv = sa_sv
+            g.update(shots=sa, saves=sv, sv=round(sv / sa, 3))  # goals against stay ours: they match the box, which can
+            # count a goal with no shot (Lankinen, Oct 9: 8 against on 20 shots and 13 saves)
+
+
 def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     out = []
     for r in S.goalies.filter(pl.col("game_id") == gid).sort("team_id", "sec", descending=[False, True]).iter_rows(named=True):
@@ -544,6 +576,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         abbr_of = {g["home_id"]: g["home"], g["away_id"]: g["away"]}
         nums = {t: team_numbers(S, gid, t) for t in (g["away"], g["home"])}
         glines = goalie_lines(S, gid, abbr_of)
+        use_official(nums, glines, official(season, gid))
         snap = snaps.get(gid)
         rebuilt = bool((snap or {}).get("rebuilt"))
         pre = (snap or {}).get("pregame") or {}

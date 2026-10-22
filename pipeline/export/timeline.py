@@ -840,6 +840,12 @@ def _exit(gm: Game, x: dict) -> str:
     return " ".join(f"{who_} didn’t play after {surprises.clock_at(x['sec'])}.".split())
 
 
+def rides_on_goal(x: dict) -> bool:
+    """A return told on the player's goal rather than first in the story: anyone but a star, back from a missed
+    stretch (not a long time away, which keeps its own date line), who scored."""
+    return x["kind"] == "return" and bool(x.get("goals")) and not x.get("since") and not x.get("goalie") and x.get("weight", 0) < 88
+
+
 def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tuple[dict, set]:
     """Firsts and milestones that ride on a goal: {goal index: {"pre": "scored his first NHL goal", "tail": "..."}},
     and the players whose first the chronology now tells (so nothing else repeats it)."""
@@ -863,8 +869,16 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             if helper and gm.N.get(helper):
                 att[i]["helper"] = helper  # named when the sentence is written, so his first mention is his full name
             told.add(pid)
+            for n_, j in enumerate([j for j, g in enumerate(goals) if g["p1"] == pid][1:3], start=2):
+                att.setdefault(j, {})["pre"] = f"scored his {nth_word(n_)} NHL goal"  # "Knuble scored his second NHL goal"
         elif k == "club_goal" and i is not None:
             att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"
+            told.add(pid)
+        elif k == "return" and i is not None and rides_on_goal(x) and not (att.get(i) or {}).get("tail"):
+            # "Zucker got the Sabres on the board ..., in his first game of the season" (outside notes, Oct 21: told
+            # first, a depth player's season debut led the story ahead of the rookie's first two goals)
+            att.setdefault(i, {})["tail"] = ("in his first game of the season" if x.get("season_debut")
+                                             else f"in his first game back after missing {num(x['missed'])} games")
             told.add(pid)
         elif k == "milestone" and x["what"] == "game" and i is not None and not (att.get(i) or {}).get("tail"):
             # "Matthews scored in his 700th NHL game" rides on his goal (outside notes, Oct 20: told apart, it led the story)
