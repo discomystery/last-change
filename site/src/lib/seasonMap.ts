@@ -1,6 +1,6 @@
 // @ts-nocheck
 // The team page's season map (components/SeasonMap.astro), drawn in the browser: a map that plays the season so far,
-// the next road trip, a trip abroad, or the full season on a spinning globe, beside a list of every game.
+// the road trip they're on (or the next one), a trip abroad, or the full season on a spinning globe, beside a list of every game.
 // Shapes come from public/geo/flight-map.json (scripts/flight-map-geo.mjs); games, places and colours from the page.
 import { geoConicConformal, geoOrthographic, geoPath, geoGraticule10, geoRotation, geoInterpolate, geoDistance } from 'd3-geo';
 
@@ -89,12 +89,16 @@ export function mountSeasonMap(root) {
   const trips = [];
   for (let i = 0; i < all.length;) { if (!all[i].away) { i++; continue; } const a = i; while (i < all.length && all[i].away) i++; trips.push([a, i - 1]); }
   const tripOf = new Map(); trips.forEach((t) => { for (let k = t[0]; k <= t[1]; k++) tripOf.set(k, t); });
+  // On a trip now: at least one of its games played and at least one still to come (a game tonight counts as to come).
+  const curTrip = trips.find((t) => t[0] < now && t[1] >= now);
   const nextTrip = trips.find((t) => t[0] >= now && t[1] > t[0]) || trips.find((t) => t[0] >= now);
   const tripAbroad = (t) => { for (let k = t[0]; k <= t[1]; k++) { const c = abroadOf(all[k].city); if (c) return c; } return null; };
-  const abroadTrip = trips.find((t) => t[0] >= now && tripAbroad(t));
+  const abroadTrip = trips.find((t) => t[1] >= now && tripAbroad(t));
+  // 'trip' is the trip they're on, else the next one; 'next' is the next one while they're on a trip.
+  const tripFor = (md) => (md === 'trip' ? curTrip || nextTrip : md === 'next' ? nextTrip : md === 'abroad' ? abroadTrip : null);
   const tripMiles = (t) => { let s = mi(home, all[t[0]].city); for (let k = t[0] + 1; k <= t[1]; k++) s += all[k].mi; return s + mi(all[t[1]].city, home); };
   const stops = (gs) => { const out = []; gs.forEach((g, i) => { if (i && gs[i - 1].city === g.city) out[out.length - 1].n++; else out.push({ c: placeOf(g.city), n: 1 }); }); return out.map((o) => (o.n > 1 ? `${o.c} (${WORDS[o.n] ?? o.n} games)` : o.c)); };
-  const isGlobe = (md) => md === 'full' || md === 'abroad' || (md === 'trip' && !!nextTrip && !!tripAbroad(nextTrip));
+  const isGlobe = (md) => md === 'full' || md === 'abroad' || ((md === 'trip' || md === 'next') && !!tripFor(md) && !!tripAbroad(tripFor(md)));
 
   // ---- The list: every game, by month, opening at today ----
   const host = root.querySelector('.smap');
@@ -136,8 +140,10 @@ export function mountSeasonMap(root) {
   // ---- Map card (filled once the shapes arrive) ----
   const modeSel = el('select', { 'aria-label': 'Map story' },
     el('option', { value: 'so', text: 'the season so far' }),
-    nextTrip ? el('option', { value: 'trip', text: tripAbroad(nextTrip) ? `the trip to ${tripAbroad(nextTrip)}` : 'the next road trip' }) : null,
-    abroadTrip && abroadTrip !== nextTrip ? el('option', { value: 'abroad', text: `the trip to ${tripAbroad(abroadTrip)}` }) : null,
+    curTrip ? el('option', { value: 'trip', text: tripAbroad(curTrip) ? `the trip to ${tripAbroad(curTrip)}` : 'the current road trip' })
+      : nextTrip ? el('option', { value: 'trip', text: tripAbroad(nextTrip) ? `the trip to ${tripAbroad(nextTrip)}` : 'the next road trip' }) : null,
+    curTrip && nextTrip ? el('option', { value: 'next', text: tripAbroad(nextTrip) ? `the trip to ${tripAbroad(nextTrip)}` : 'the next road trip' }) : null,
+    abroadTrip && abroadTrip !== tripFor('trip') && abroadTrip !== tripFor('next') ? el('option', { value: 'abroad', text: `the trip to ${tripAbroad(abroadTrip)}` }) : null,
     el('option', { value: 'full', text: 'the full season' }));
   const again = el('button', { class: 'again', type: 'button', 'aria-label': 'Play again', title: 'Play again' });
   again.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M8.6 5a3.6 3.6 0 1 1-1-2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M8.9 0.9v2.4H6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -321,14 +327,19 @@ export function mountSeasonMap(root) {
           stats: [[record(done), `record in ${done.length} ${pl(done.length, 'game', 'games')}`], [d0(m), `${U.many} flown`], [String(aw), pl(aw, 'game away from home', 'games away from home')], b2bs(done)],
           note: [el('b', { text: done.length ? `${D.place} has played ${done.length} ${pl(done.length, 'game', 'games')}.` : `${D.place} hasn’t played yet.` }), ` They’re ${where === home ? 'home' : 'in ' + placeOf(where)} now${nxt ? `, ${nxt.isHome ? 'hosting' : 'off to'} ${D.teamPlaces[nxt.opp]} next` : ''}.`] };
       }
-      if (md === 'trip' || md === 'abroad') {
-        const t = md === 'abroad' ? abroadTrip : nextTrip, js = []; for (let j = t[0]; j <= t[1]; j++) js.push(j);
+      if (md === 'trip' || md === 'next' || md === 'abroad') {
+        const t = tripFor(md), js = []; for (let j = t[0]; j <= t[1]; j++) js.push(j);
         const back = all[t[1] + 1];
         if (back && !back.away) js.push(t[1] + 1);
         const gs = all.slice(t[0], t[1] + 1), fl = Math.max(...gs.map((g) => g.mi)), days = dd(gs[0].date, gs[gs.length - 1].date) + 1;
+        const on = t[0] < now && t[1] >= now, done = on ? all.slice(t[0], now) : [], left = gs.length - done.length;
+        const first = on
+          ? [record(done), `so far, ${WORDS[left] ?? left} ${pl(left, 'game', 'games')} to go`]
+          : [`${gs.length}`, `${pl(gs.length, 'game', 'games')} away in ${days} ${pl(days, 'day', 'days')}`];
+        const sofar = on ? ` They’ve played ${WORDS[done.length] ?? done.length} of the ${WORDS[gs.length] ?? gs.length}, with ${placeOf(all[now].city)} next.` : '';
         return { js, end: back && !back.away ? home : gs[gs.length - 1].city, view: [home, ...gs.map((g) => g.city)], speed: 1, focus: t[0], start: home,
-          stats: [[`${gs.length}`, `${pl(gs.length, 'game', 'games')} away in ${days} ${pl(days, 'day', 'days')}`], [d0(tripMiles(t)), `${U.many} there and back`], b2bs(gs), [d0(fl), `${U.many}, longest flight`]],
-          note: [el('b', { text: `${mdF.format(gs[0].t)} to ${mdF.format(gs[gs.length - 1].t)}:` }), ` ${stops(gs).join(', ')}${back && !back.away ? ', then home' : ''}.`] };
+          stats: [first, [d0(tripMiles(t)), `${U.many} there and back`], b2bs(gs), [d0(fl), `${U.many}, longest flight`]],
+          note: [el('b', { text: `${mdF.format(gs[0].t)} to ${mdF.format(gs[gs.length - 1].t)}:` }), ` ${stops(gs).join(', ')}${back && !back.away ? ', then home' : ''}.${sofar}`] };
       }
       const js = all.map((_, j) => j), m = all.reduce((s, g) => s + g.mi, 0) + mi(all[all.length - 1].city, home);
       const long = trips.reduce((b, t) => (t[1] - t[0] > b[1] - b[0] ? t : b), trips[0] || [0, -1]), ln = long[1] - long[0] + 1;
@@ -343,7 +354,7 @@ export function mountSeasonMap(root) {
       cancelAnimationFrame(anim); anim = 0; mode = md; stage = story(md); svg.classList.toggle('full', md === 'full');
       stats.replaceChildren(...stage.stats.map(([v, l]) => el('div', { class: 'sm-stat' }, el('b', { text: v }), el('span', { text: l }))));
       note.replaceChildren(...stage.note);
-      const inStory = new Set(stage.js), trip = md === 'trip' ? nextTrip : md === 'abroad' ? abroadTrip : null;
+      const inStory = new Set(stage.js), trip = tripFor(md);
       rows.forEach((r, j) => r.classList.toggle('inmode', md !== 'full' && inStory.has(j) && (!trip || j <= trip[1])));
       const vis = new Set(stage.view); for (const [a, e] of cityEls) e.classList.toggle('off', !vis.has(a));
       legs.forEach((l) => { setTrail(l, 0); l.base.style.display = md === 'full' || inStory.has(l.j) ? '' : 'none'; });
@@ -398,7 +409,7 @@ export function mountSeasonMap(root) {
     modeSel.addEventListener('change', () => play(modeSel.value));
     again.addEventListener('click', () => play(modeSel.value));
 
-    const first = nextTrip && dd(today, all[nextTrip[0]].date) <= 21 ? 'trip' : now ? 'so' : 'full';
+    const first = curTrip || (nextTrip && dd(today, all[nextTrip[0]].date) <= 21) ? 'trip' : now ? 'so' : 'full';
     modeSel.value = first;
     // Rest frame: the route already drawn, so the section reads before anything moves; it plays once when in view.
     requestAnimationFrame(() => { fit(); play(first, false); scrollToRow(now, false); });

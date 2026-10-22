@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import difflib
 import gzip
+import itertools
 import json
 import re
 from datetime import date as Date, datetime, timedelta, timezone
@@ -116,6 +117,7 @@ def known_skaters(season: int) -> dict[str, dict[str, tuple[int, str]]]:
             for x in pl.read_parquet(d / "players.parquet").unique(["team_id", "player_id"]).iter_rows(named=True):
                 rows.append({"team": abbr.get(x["team_id"]), "player_id": x["player_id"], "first": x["first"], "last": x["last"], "pos": x["pos"]})
     lasts: dict[str, dict[str, set]] = {}
+    fulls: dict[str, dict[str, dict]] = {}
     for x in rows:
         if not x["team"]:
             continue
@@ -123,22 +125,45 @@ def known_skaters(season: int) -> dict[str, dict[str, tuple[int, str]]]:
         out.setdefault(x["team"], {})[full] = (x["player_id"], x["pos"])
         out.setdefault("*", {})[full] = (x["player_id"], x["pos"])
         lasts.setdefault(x["team"], {}).setdefault(fold(x["last"]), set()).add((x["player_id"], x["pos"]))
+        fulls.setdefault(x["team"], {}).setdefault(full, {})[x["player_id"]] = x["pos"]
     for t, by in lasts.items():
         out["~" + t] = {k: next(iter(v)) for k, v in by.items() if len(v) == 1}
+    for t, by in fulls.items():  # two players with one name on a club (Vancouver's Elias Petterssons, #40 and #25)
+        if any(len(v) > 1 for v in by.values()):
+            out["=" + t] = {k: sorted(v.items()) for k, v in by.items() if len(v) > 1}
     return out
 
 
-def _match(name: str, team: str, known: dict) -> tuple[int, str] | None:
-    """A written name to (id, position): full name on the club, then anywhere, then a last name unique on the club
-    (NHL.com drops accents and sometimes writes a shorter first name)."""
+def _match(name: str, team: str, known: dict) -> list[tuple[int, str]]:
+    """A written name to the players it could be, as (id, position): full name on the club, then anywhere, then a last
+    name unique on the club (NHL.com drops accents and sometimes writes a shorter first name). Two players on the club
+    with the same name are both returned, for the row they sit in to decide (`_resolve`); empty when nobody matches."""
     n = fold(name)
     if not n:
-        return None
+        return []
+    if n in known.get("=" + team, {}):
+        return list(known["=" + team][n])
     got = known.get(team, {}).get(n) or known.get("*", {}).get(n) or known.get("~" + team, {}).get(n.split(" ")[-1])
     if got:
-        return got
+        return [got]
     close = difflib.get_close_matches(n, list(known.get(team, {})), n=1, cutoff=0.88)  # a typo ("Brenden Dillion")
-    return known[team][close[0]] if close else None
+    return [known[team][close[0]]] if close else []
+
+
+def _resolve(row: list[list[tuple[int, str]]], used: set[int]) -> list[tuple[int, str]]:
+    """One player per name in a lineup row. A name two teammates share goes to the one whose position fits the rest
+    of the row (a defenseman beside a defenseman, a forward on a line) and who isn't already listed; a name alone is a
+    goalie, then a defenseman (the seventh)."""
+    if all(len(c) == 1 for c in row):
+        return [c[0] for c in row]
+
+    def score(pick):
+        ids = [i for i, _ in pick]
+        clash = len(ids) - len(set(ids)) + sum(i in used for i in ids)
+        d = sum(p == "D" for _, p in pick)
+        fits = max(d, len(pick) - d) if len(pick) > 1 else {"G": 2, "D": 1}.get(pick[0][1], 0)
+        return (-clash, fits)
+    return list(max(itertools.product(*row), key=score))
 
 
 def lineups_from(body: str, away: str, home: str, known: dict) -> dict[str, dict]:
@@ -153,34 +178,87 @@ def lineups_from(body: str, away: str, home: str, known: dict) -> dict[str, dict
             if not ln or ROW_END.match(ln) or ln.lower().startswith(("scratched", "injured", "suspended")):
                 continue
             rows.append([n.strip(" *_") for n in SPLIT.split(ln) if n.strip(" *_")])
-        got = {"lines": [], "pairs": [], "extra_d": [], "goalies": [], "scratched": [], "injured": [], "missed": 0}
-        for row in rows:
-            ids = [_match(n, team, known) for n in row]
-            got["missed"] += sum(i is None for i in ids)
-            ids = [i for i in ids if i]
-            if not ids:
-                continue
-            pos = [p for _, p in ids]
-            if len(ids) == 1 and len(row) == 1:
-                pid, p = ids[0]
-                if p == "G":
-                    got["goalies"].append(pid)
-                elif p == "D":
-                    got["extra_d"].append(pid)
-                else:
-                    got["lines"].append([pid])
-                continue
-            kind = "pairs" if sum(p == "D" for p in pos) * 2 > len(pos) else "lines"
-            got[kind].append([i for i, _ in ids])
-        for label, key in (("Scratched", "scratched"), ("Injured", "injured")):
-            for n in _list(part, label):
-                m = _match(n, team, known)
-                if m:
-                    got[key].append(m[0])
-                else:
-                    got["missed"] += 1
+        cands = [[_match(n, team, known) for n in row] for row in rows]
+        lists = [[_match(n, team, known) for n in _list(part, label)] for label in ("Scratched", "Injured")]
+        out[team] = _place(cands, *lists, single=[len(row) == 1 for row in rows])
+    return out
+
+
+def _place(rows: list[list[list[tuple[int, str]]]], scratched: list, injured: list, single: list[bool] | None = None) -> dict:
+    """Matched rows (each name's candidates) sorted into lines, pairs, a seventh defenseman and goalies (told apart by
+    the players' listed positions, a two-forward row being the fourth line of an 11-forward lineup), then the scratched
+    and injured lists. A name shared by two teammates on those lists is the one not already in the lineup."""
+    got = {"lines": [], "pairs": [], "extra_d": [], "goalies": [], "scratched": [], "injured": [], "missed": 0}
+    used: set[int] = set()
+    for row, alone in zip(rows, single or [len(r) == 1 for r in rows]):
+        got["missed"] += sum(not c for c in row)
+        ids = _resolve([c for c in row if c], used)
+        if not ids:
+            continue
+        used |= {i for i, _ in ids}
+        pos = [p for _, p in ids]
+        if len(ids) == 1 and alone:
+            pid, p = ids[0]
+            if p == "G":
+                got["goalies"].append(pid)
+            elif p == "D":
+                got["extra_d"].append(pid)
+            else:
+                got["lines"].append([pid])
+            continue
+        kind = "pairs" if sum(p == "D" for p in pos) * 2 > len(pos) else "lines"
+        got[kind].append([i for i, _ in ids])
+    for key, names_ in (("scratched", scratched), ("injured", injured)):
+        for c in names_:
+            free = [i for i, _ in c if i not in used] if len(c) > 1 else [i for i, _ in c]
+            if len(free) == 1:
+                got[key].append(free[0])
+            else:
+                got["missed"] += 1
+    return got
+
+
+def repair(lineups: dict, known: dict) -> dict:
+    """A saved lineup read again with namesakes in mind: lineups saved before `_resolve` existed could put one of two
+    same-named teammates in the other's spot (Vancouver's forward Elias Pettersson on a defense pair, 2026-10-20).
+    Only the ids were kept, so each id on a club with namesakes stands for every player with his name."""
+    pos = {i: p for t, by in known.items() if t[:1] not in "*~=" for i, p in by.values()}
+    out = {}
+    for team, lu in lineups.items():
+        twins = {i: c for c in known.get("=" + team, {}).values() for i, _ in c}
+        if not twins or not any(i in twins for k in ("lines", "pairs", "extra_d", "scratched", "injured") for x in lu.get(k) or []
+                                for i in (x if isinstance(x, list) else [x])):
+            out[team] = lu
+            continue
+        cand = lambda i: list(twins.get(i) or [(i, pos.get(i, ""))])
+        rows = [[cand(i) for i in r] for r in (lu.get("lines") or []) + (lu.get("pairs") or [])] + [[cand(i)] for i in lu.get("extra_d") or []]
+        got = _place(rows, [cand(i) for i in lu.get("scratched") or []], [cand(i) for i in lu.get("injured") or []])
+        got["goalies"], got["missed"] = lu.get("goalies") or [], lu.get("missed", 0)
         out[team] = got
     return out
+
+
+def repair_saved(season: int = CURRENT_SEASON) -> int:
+    """Rewrite saved lineups that `repair` changes; returns how many files changed."""
+    folder = RAW / "nhl_previews" / str(season)
+    known = known_skaters(season)
+    if not folder.exists() or not any(t.startswith("=") for t in known):
+        return 0
+    changed = 0
+    for p in sorted(folder.glob("*.json.gz")):
+        try:
+            got = json.loads(gzip.open(p).read())
+        except (OSError, ValueError):
+            continue
+        if not got.get("lineups"):
+            continue
+        fixed = repair(got["lineups"], known)
+        if fixed != got["lineups"]:
+            got["lineups"] = fixed
+            with gzip.open(p, "wt") as f:
+                json.dump(got, f)
+            changed += 1
+    return changed
 
 
 def status_text(body: str) -> str | None:
@@ -225,8 +303,9 @@ def starters_from(body: str, away: str, home: str, known: dict[str, dict[str, in
 
 def update(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
     """Read NHL.com's preview for every game today or tomorrow that hasn't started."""
+    repaired = repair_saved(season)
     if OFFLINE:
-        return {"skipped": "offline"}
+        return {"skipped": "offline", "repaired": repaired}
     now = now or datetime.now(timezone.utc)
     games = json.loads(gzip.open(RAW / str(season) / "schedule.json.gz").read())  # refreshed by every online ingest
     names = {t["abbr"]: t["name"] for t in json.loads((SITE_DATA / "teams.json").read_text())}
@@ -259,7 +338,7 @@ def update(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
         p.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(p, "wt") as f:
             json.dump(body, f)
-    return {"asked": asked, "found": found}
+    return {"asked": asked, "found": found, "repaired": repaired}
 
 
 def projected(season: int, gid: int, before: str | None = None) -> dict[str, int]:
@@ -304,7 +383,8 @@ def sentences(text: str) -> list[str]:
 
 def _who(sentence: str, people: dict[int, tuple[str, str, str]]) -> list[int]:
     """Players of tonight's two clubs named in a sentence (last name as a whole, capitalized word; a full name wins
-    over a teammate with the same last name), in the order they appear."""
+    over a teammate with the same last name), in the order they appear. A name that still fits two players (a last
+    name alone, or two Elias Petterssons) is left out rather than guessed."""
     plain = names.strip(sentence)
     found = []
     for pid, (_, first, last) in people.items():
@@ -316,6 +396,8 @@ def _who(sentence: str, people: dict[int, tuple[str, str, str]]) -> list[int]:
     for pos, full, pid, last in sorted(found):
         if not full and any(f and l == last and p != pid for _, f, p, l in found):
             continue  # "Nick Foligno" named: not his brother Marcus
+        if any(l == last and p != pid and (f == full or (full and o == pos)) for o, f, p, l in found):
+            continue  # "Foligno" alone with both brothers playing, or one name for two players
         out.append(pid)
     return out
 

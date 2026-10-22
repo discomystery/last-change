@@ -1307,6 +1307,32 @@ def _chances(games: list[dict]) -> dict[int, dict]:
         return {}
 
 
+@lru_cache(maxsize=1)
+def _namesakes() -> frozenset[int]:
+    from pipeline.config import CURRENT_SEASON
+    from pipeline.ingest import nhl_previews as NP
+    return frozenset(i for t, by in NP.known_skaters(CURRENT_SEASON).items() if t.startswith("=") for c in by.values() for i, _ in c)
+
+
+def fix_namesakes(path, g: dict) -> bool:
+    """A started game's snapshot keeps everything as it was at puck drop except NHL.com's projected lines, which are
+    read again when they name one of two same-named teammates (`nhl_previews.repair`): a misread there put Vancouver's
+    forward Elias Pettersson on a defense pair, which is NHL.com's lineup shown wrong, not something we said."""
+    if not path.exists() or not _namesakes():
+        return False
+    snap = json.loads(path.read_text())
+    old = (snap.get("nhl_lineup") or {}).get("teams") or {}
+    if not any(p["id"] in _namesakes() for lu in old.values() for k in ("lines", "pairs", "extra_d") for x in lu.get(k) or []
+               for p in (x if isinstance(x, list) else [x])):
+        return False
+    new = (nhl_lineup({**g, "id": snap["game_id"]}, bool(snap.get("rebuilt"))) or {}).get("teams") or {}
+    if not new or new == old:
+        return False
+    snap["nhl_lineup"]["teams"] = new
+    path.write_text(json.dumps(snap, separators=(",", ":"), ensure_ascii=False))
+    return True
+
+
 def run(now: datetime | None = None, within: timedelta | None = None) -> dict:
     """Write a snapshot for every game in the next DAYS_AHEAD days that hasn't started, or only those starting within
     `within` (the quick game-night pass, which refreshes tonight's lineups and starters)."""
@@ -1322,6 +1348,7 @@ def run(now: datetime | None = None, within: timedelta | None = None) -> dict:
         start = datetime.fromisoformat(g["start"].replace("Z", "+00:00"))
         if start <= now:
             frozen += (out_dir / f"{g['id']}.json").exists()
+            fix_namesakes(out_dir / f"{g['id']}.json", g)
             continue  # started or finished: left as it was at puck drop (pregame.py rebuilds finished ones on a rules change)
         if g["final"] or start > now + (within or timedelta(days=DAYS_AHEAD)):
             continue
