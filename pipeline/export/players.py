@@ -15,7 +15,7 @@ import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
-from pipeline.ingest import careers, edge, official_stats, rosters
+from pipeline.ingest import careers, edge, names, official_stats, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics.players import POOL_GAMES
 
@@ -57,6 +57,21 @@ def area(x: float, y: float) -> str:
 
 
 AREAS = ["crease", "lowSlot", "netSideL", "netSideR", "highSlot", "circleL", "circleR", "behind", "cornerL", "cornerR", "outerL", "outerR", "point", "pointL", "pointR", "outside"]
+
+
+def _bio(landing: dict | None) -> dict | None:
+    """His basics from the NHL's player landing: height, weight, where he was born, his draft. None until a landing
+    saved with them (`careers.BIO_KEYS`) is on file. Birth cities use the accented spelling the NHL gives in his own
+    language, by the same rule as names; a state or province only for players born in the US or Canada."""
+    if not landing or not landing.get("bio"):
+        return None
+    country = landing.get("birthCountry")
+    out = {"ht": landing.get("heightInInches"), "cm": landing.get("heightInCentimeters"), "wt": landing.get("weightInPounds"),
+           "kg": landing.get("weightInKilograms"), "born": landing.get("birthDate"), "city": names.pick(landing.get("birthCity"), country),
+           "region": names.pick(landing.get("birthStateProvince"), country) if country in ("USA", "CAN") else None, "country": country}
+    d = landing.get("draftDetails")
+    out["draft"] = {"year": d.get("year"), "team": d.get("teamAbbrev"), "round": d.get("round"), "overall": d.get("overallPick")} if d else None
+    return {k: v for k, v in out.items() if v is not None} | {"draft": out["draft"]}
 
 
 def _seasons_frame(season: int, name: str) -> pl.DataFrame:
@@ -254,10 +269,12 @@ def run(season: int) -> int:
         team = listed.get(pid) or abbr.get(tid)
         e_now = edge.read(season, pid) or edge.read(season - 1, pid) or {}
         bio = e_now.get("player") or {}
+        landing = (careers.read(pid) or {}).get("landing")
         if not bio.get("birthDate"):  # no tracking file yet (a player who has not dressed): his career landing has the birth date
-            bio = {**bio, "birthDate": ((careers.read(pid) or {}).get("landing") or {}).get("birthDate")}
+            bio = {**bio, "birthDate": (landing or {}).get("birthDate")}
         base = {"id": pid, "first": row["first"], "last": row["last"], "name": f'{row["first"]} {row["last"]}', "number": row["number"], "pos": row["pos"],
-                "team": team, "shoots": bio.get("shootsCatches"), "age": _age(bio.get("birthDate")), "generated_at": now_iso, "season": season,
+                "team": team, "shoots": bio.get("shootsCatches") or (landing or {}).get("shootsCatches"), "age": _age(bio.get("birthDate")),
+                "bio": _bio(landing), "generated_at": now_iso, "season": season,
                 "photo": photos.get(pid) or (f"{MUGS}/{season_id(season)}/{team}/{pid}.png" if team else None)}
         stats = {}
         for s, key in ((season, "season"), (season - 1, "last")):

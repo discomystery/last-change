@@ -32,6 +32,7 @@ import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, mo
 import { goalieTraitInfo } from '../../lib/traits';
 import rosterData from '../../../public/data/roster.json';
 import { describe, type RosterPlayer } from '../../lib/roster';
+import { countryName, flagPath } from '../../lib/flags';
 import '../../styles/blocks.css';
 import { adjKind } from '../../lib/adjust';
 // Recorded twins read as better or worse (not more or fewer): faceoffs won, chances for and against with him on.
@@ -73,6 +74,29 @@ const words = isG ? 'goalies' : groupWord[s.group];
 const posName = posWord[p.pos] ?? p.pos;
 const shoots = p.shoots === 'L' ? (isG ? 'Catches left' : 'Shoots left') : p.shoots === 'R' ? (isG ? 'Catches right' : 'Shoots right') : null;
 const areaName = AREA_NAME;
+
+// ---- Bio line: height, weight, hand, birth, draft (from the NHL's player page; missing until it has been fetched) ----
+type Bio = { ht?: number; cm?: number; wt?: number; kg?: number; born?: string; city?: string; region?: string; country?: string; draft: { year: number; team: string; round: number; overall: number } | null };
+const bioData = p.bio as Bio | null | undefined;
+const bornDate = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const bioItems: { label: string; value: string; tip?: string; flag?: string | null; country?: string; nospell?: boolean }[] = [];
+if (bioData) {
+  const b = bioData;
+  if (b.ht) bioItems.push({ label: 'Height', value: `${Math.floor(b.ht / 12)}′${b.ht % 12}″`, tip: b.cm ? `${b.cm} cm` : undefined, nospell: true });
+  if (b.wt) bioItems.push({ label: 'Weight', value: `${b.wt} lb`, tip: b.kg ? `${b.kg} kg` : undefined, nospell: true });
+  if (shoots) bioItems.push({ label: isG ? 'Catches' : 'Shoots', value: p.shoots === 'L' ? 'Left' : 'Right' });
+  if (b.born) bioItems.push({ label: 'Born', value: `${bornDate(b.born)}${p.age ? ` (age ${p.age})` : ''}` });
+  if (b.city || b.country) {
+    // In the US and Canada the state or province names the place (the flag says the country); elsewhere, the country.
+    const where = [b.city, b.region ?? (b.country ? countryName(b.country) : null)].filter(Boolean).join(', ');
+    bioItems.push({ label: 'Birthplace', value: where, flag: b.country ? flagPath(b.country) : null, country: b.country ? countryName(b.country) : undefined });
+  }
+  const d = b.draft;
+  bioItems.push(d
+    ? { label: 'Drafted', value: `${d.year}, ${ordinal(d.overall)} overall (${d.team})`, tip: `Round ${d.round}, ${ordinal(d.overall)} pick overall, by ${(teams.find((t) => t.abbr === d.team)?.name) ?? d.team} in the ${d.year} NHL Draft.` }
+    : { label: 'Drafted', value: 'Undrafted', tip: 'Never picked in the NHL Draft.' });
+}
+const hasBio = bioItems.length > 0;
 
 // ---- Skater role sentences ----
 const role = isG ? null : s.role;
@@ -141,7 +165,20 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
         <h1>{p.name}</h1>
         <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
-      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{!isG && s.traits && <a class="pcmp" href={`${base}players/compare/#${p.id}`}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></svg><span>Compare with another player</span></a>}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
+      {hasBio && (
+        <dl class="pbio">
+          {bioItems.map((x) => (
+            <div>
+              <dt>{x.label}</dt>
+              <dd data-nospell={x.nospell ? '' : undefined}>
+                {x.flag && <img class="flag" src={`${base}${x.flag}`} alt={x.country} title={x.country} width="20" height="15" loading="lazy" decoding="async" />}
+                {x.tip ? <span class="term" tabindex="0" data-tip={x.tip}>{x.value}</span> : x.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <p class:list={['pmeta', hasBio && 'links']}>{!hasBio && [shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{!isG && s.traits && <a class="pcmp" href={`${base}players/compare/#${p.id}`}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></svg><span>Compare with another player</span></a>}{unplayed && <>{!hasBio && (shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
       {!isG && hasStats && (
         <div class="pstats-in">
           <table class="pstats">
@@ -587,36 +624,49 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   .phead > :not(.pnum-box), .phead .team-top > * { position: relative; z-index: 1; }
   /* The number's frame covers the card down to the stats table's top line on phones (the whole card on computers),
      so the number stands on the same line as the photo and never runs into the table. Only its foot is clipped. */
-  .phead .pnum-box { position: relative; z-index: 0; grid-column: 1 / -1; grid-row: 1 / 4; align-self: stretch; margin: 0 -24px 0 -28px; clip-path: inset(-100vh -100vw 0 -100vw); pointer-events: none; }
+  .phead .pnum-box { position: relative; z-index: 0; grid-column: 1 / -1; grid-row: 1 / 5; align-self: stretch; margin: 0 -24px 0 -28px; clip-path: inset(-100vh -100vw 0 -100vw); pointer-events: none; }
   /* Painted under everything else in the card but above its background, big enough to fill the card's right side,
      its foot cut off by the bottom of its frame. */
   .phead .pnum { position: absolute; z-index: 0; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
-  .phead .pmeta { grid-column: 1; grid-row: 2; }
-  .pstats-in { grid-column: 1; grid-row: 3; margin: 22px 0 16px; }
+  .phead .pbio { grid-column: 1; grid-row: 2; }
+  .phead .pmeta { grid-column: 1; grid-row: 3; }
+  .pstats-in { grid-column: 1; grid-row: 4; margin: 22px 0 16px; }
   .phead.no-stats .pmeta { padding-bottom: 26px; }
-  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 4; width: 290px; height: 290px; margin-right: 18px; }
+  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 5; width: 290px; height: 290px; margin-right: 18px; }
   .phead.no-stats :global(.phead-photo) { width: 210px; height: 210px; }
   .phead.no-stats .pnum { font-size: 340px; bottom: -88px; }
   @media (max-width: 719px) {
     /* Phones: the name runs the full width over the number; the photo stands on the stats table's top line. */
-    .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto; } /* the photo's extra height goes above the team line */
-    .phead .pnum-box { margin: 0 -16px; }
+    .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto auto; } /* the photo's extra height goes above the team line */
+    .phead .pnum-box { grid-row: 1 / 4; margin: 0 -16px; } /* stands on the bio's top line, like the photo */
     .phead .pnum { font-size: 240px; right: 6px; bottom: -46px; }
     .phead .team-top { display: contents; }
     .phead h1 { grid-column: 1 / -1; grid-row: 1; margin-top: 20px; }
     .phead .rec { grid-column: 1; grid-row: 2; margin-top: 6px; align-self: end; }
     .phead .pmeta { grid-row: 3; padding-bottom: 18px; }
+    /* The bio runs the full width under the photo, which stands on its top line; two facts a row. */
+    .phead .pbio { grid-column: 1 / -1; grid-row: 4; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
+    .phead .pbio > div:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .phead :global(.phead-photo) { grid-row: 2 / 4; width: 112px; height: 112px; margin: 0 -6px 0 0; }
     .phead.unplayed :global(.phead-photo) { width: 140px; height: 140px; } /* the status lines make room for a bigger photo */
-    .pstats-in { grid-column: 1 / -1; grid-row: 4; margin-top: 0; border-top: 1px solid var(--rule); }
+    .pstats-in { grid-column: 1 / -1; grid-row: 5; margin-top: 0; border-top: 1px solid var(--rule); }
     .pstats { width: 100%; }
     .phead.no-stats .pmeta { padding-bottom: 22px; }
+    .phead.no-stats .pbio { padding-bottom: 22px; }
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
     .phead.no-stats .pnum { font-size: 240px; bottom: -46px; }
     .pout-tag { display: table; margin: 10px 0 0 !important; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
+  .pmeta.links { margin-top: 10px; }
+  .pmeta.links .pout { display: table; }
+  .pmeta.links :global(.pshare), .pmeta.links .pcmp:first-child { margin-left: 0; }
+  /* Bio: small caps labels over plain values, in a row that wraps. */
+  .pbio { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 14px 0 0; font: 500 15px var(--ui); color: var(--ink); }
+  .pbio dt { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px; }
+  .pbio dd { margin: 0; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .pbio .flag { flex: none; width: 20px; height: 15px; border-radius: 2px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 14%, transparent); object-fit: cover; }
   .pmeta :global(.pshare) { margin-left: 14px; vertical-align: baseline; }
   /* Compare: a quiet link beside Share, in the same style. */
   .pcmp { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); text-decoration: underline 1px var(--rule); text-underline-offset: 5px; }

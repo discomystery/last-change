@@ -52,24 +52,30 @@ SEASON_KEYS = ("season", "gameTypeId", "sequence", "leagueAbbrev", "teamName", "
                "gamesStarted", "wins", "losses", "otLosses", "shotsAgainst", "goalsAgainst", "shutouts", "timeOnIce")
 
 
+# His basics for the player page's bio line (2026-10-23): height, weight, where he was born and which hand he shoots with.
+BIO_KEYS = ("heightInInches", "heightInCentimeters", "weightInPounds", "weightInKilograms", "birthCity", "birthStateProvince",
+            "birthCountry", "shootsCatches")
+
+
 def _trim_landing(land: dict) -> dict:
-    keep = ("playerId", "firstName", "lastName", "position", "headshot", "birthDate", "draftDetails")
+    keep = ("playerId", "firstName", "lastName", "position", "headshot", "birthDate", "draftDetails", *BIO_KEYS)
     out = {k: land.get(k) for k in keep}
     out["seasonTotals"] = [{k: s[k] for k in SEASON_KEYS if s.get(k) is not None}
                            for s in land.get("seasonTotals", []) if s.get("leagueAbbrev") == "NHL"]
     out["awards"] = [{"trophy": (a.get("trophy") or {}).get("default"), "seasons": sorted({x["seasonId"] for x in a.get("seasons", []) if x.get("seasonId")})}
                      for a in land.get("awards", [])]
     out["full"] = True
+    out["bio"] = True
     return out
 
 
 def stale(have: dict) -> bool:
-    """Whether the saved landing needs fetching again: saved before it kept every stat, or before the last finished
-    season's playoffs were over (July 1 of the year it ended), so its season lines are not final."""
+    """Whether the saved landing needs fetching again: saved before it kept every stat or his bio, or before the last
+    finished season's playoffs were over (July 1 of the year it ended), so its season lines are not final."""
     land = have.get("landing")
     if not land:
         return True
-    return not land.get("full") or have.get("fetched", "") < f"{CURRENT_SEASON}-07-01"
+    return not land.get("full") or not land.get("bio") or have.get("fetched", "") < f"{CURRENT_SEASON}-07-01"
 
 
 def _past_seasons(landing: dict) -> list[int]:
