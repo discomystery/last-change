@@ -135,7 +135,7 @@ def box_extras(season: int) -> dict[tuple[int, int], dict]:
                 continue
             ag, ask, hsk, hg = (int(c) for c in code)
             mine, theirs, my_g, their_g = (hsk, ask, hg, ag) if det.get("eventOwnerTeamId") == home else (ask, hsk, ag, hg)
-            kind = "sh" if mine < theirs and my_g else "pp" if mine > theirs and my_g and their_g else "ev"
+            kind = "sh" if mine < theirs and my_g and their_g else "pp" if mine > theirs and my_g and their_g else "ev"
             out[(d["id"], det["scoringPlayerId"])][kind] += 1
     return dict(out)
 

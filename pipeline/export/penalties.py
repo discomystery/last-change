@@ -111,7 +111,7 @@ def _when(period: int, sec: int) -> str:
         return f"at the end of the {PERIODS[period]}" if period < 3 else "at the final horn"
     if period == 3 and s >= 1080:
         return "in the final minutes"
-    part = "early in" if s < 400 else "midway through" if s < 800 else "late in"
+    part = "early in" if s < 400 else "midway through" if s < 900 else "late in"
     return f"{part} the {PERIODS[period]}"
 
 
