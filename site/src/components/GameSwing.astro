@@ -123,6 +123,16 @@ const rank = (r: Row, k: string) => {
 const byId = new Map(d?.players.map((r) => [r.id, r]) ?? []);
 const units = (t: string) => (d?.units?.[t] ?? []).map((u) => ({ ...u, key: `${u.kind === 'F' ? 'L' : 'P'}${u.n}` }));
 const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
+// Each player's breakdown cards, in page order, drawn in the browser the first time he is opened: written out as
+// markup for every player they were about a third of the page. Per part: key, value, lane position, table rows (a row
+// is a label and its values), the table's column heads when it is a grid, and his rank.
+const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === t).map((r) => ({
+  id: r.id,
+  p: pieces(r).map((p) => {
+    const tb = table(r, p.key, place(order.find((x) => x !== r.team) ?? ''), place(r.team));
+    return [p.key, one(p.v), pos(p.v), [...tb.rows, ...(tb.grid?.rows ?? [])], tb.grid?.cols ?? 0, `${rank(r, p.key)}.`];
+  }),
+})));
 ---
 {d && d.players.length > 0 && (
   <Section id="swing" title="Swing" placeholder={false} share="swing"
@@ -171,24 +181,6 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
                   {pills.get(r.id) ? <span class={`sw-pill ${pillClass[pills.get(r.id)!]}`}>{pillWord[pills.get(r.id)!]}</span> : <span></span>}
                 </div>
                 <div class="sw-det" hidden>
-                  <div class="sw-scs">
-                    {pieces(r).map((p) => (
-                      <div class="sw-sc">
-                        <p class="sw-sch"><span>{p.key === 'net' ? 'Saves' : p.label}</span><b>{one(p.v)}</b></p>
-                        <div class="sw-lane" data-k={p.key} data-me={r.id} aria-hidden="true"><i class="me" style={`left:${pos(p.v)}%`}></i></div>
-                        <p class="sw-ends" aria-hidden="true"><span>Cost them</span><span>Swung it</span></p>
-                        {(() => { const t = table(r, p.key, place(order.find((x) => x !== r.team) ?? ''), place(r.team)); return (
-                          <table class="sw-tab">
-                            {t.grid && <thead><tr>{t.grid.cols.map((h) => <th scope="col">{h}</th>)}</tr></thead>}
-                            <tbody>
-                              {t.rows.map(([l, v]) => <tr><th scope="row">{l}</th><td>{v}</td></tr>)}
-                              {t.grid?.rows.map(([l, ...vs]) => <tr><th scope="row">{l}</th>{vs.map((v) => <td>{v}</td>)}</tr>)}
-                            </tbody>
-                          </table>); })()}
-                        <p class="sw-sen"><b>{rank(r, p.key)}.</b></p>
-                      </div>
-                    ))}
-                  </div>
                   {r.pct != null && <p class="sw-dp"><Pips pct={r.pct} tip={tip(r)} /> Better than {r.pct}% of nights by {peer[r.pos] ?? 'forwards'} last season.</p>}
                 </div>
               </li>
@@ -202,6 +194,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
 )}
 
 <script type="application/json" id="sw-dist" set:html={JSON.stringify({ m: SM, ...dist })}></script>
+<script type="application/json" id="sw-parts" set:html={JSON.stringify(detail).replace(/</g, '\\u003c')}></script>
 
 <script is:inline>
   // "Show [team] highlighting [line]": opens on the visitor's own team when it played. Picking a line or pair fades
@@ -246,6 +239,27 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
       });
       lane.classList.add('drawn');
     };
+    // His breakdown cards, built on first open with the same markup (and scoped-style marker) the page itself uses.
+    const parts = JSON.parse(document.getElementById('sw-parts')?.textContent || '[]');
+    const LABEL = { sheet: 'Scoresheet', play: '5-on-5', special: 'Special teams', net: 'Saves' };
+    const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const dets = [...document.querySelectorAll('.sw-det')];
+    const build = (det) => {
+      const me = parts[dets.indexOf(det)];
+      if (!me || det.querySelector('.sw-scs')) return;
+      const cid = [...det.attributes].find((a) => /^data-(s-|astro-cid-)/.test(a.name));
+      const c = cid ? ` ${cid.name}` : '';
+      const tag = (n, inner, attrs = '') => `<${n}${attrs}${c}>${inner}</${n}>`;
+      const cards = me.p.map(([k, v, at, rows, cols, rank]) => tag('div', [
+        tag('p', tag('span', esc(LABEL[k])) + tag('b', esc(v)), ' class="sw-sch"'),
+        tag('div', `<i class="me" style="left:${at}%"${c}></i>`, ` class="sw-lane" data-k="${k}" data-me="${me.id}" aria-hidden="true"`),
+        tag('p', tag('span', 'Cost them') + tag('span', 'Swung it'), ' class="sw-ends" aria-hidden="true"'),
+        tag('table', (cols ? tag('thead', tag('tr', cols.map((h) => tag('th', esc(h), ' scope="col"')).join(''))) : '')
+          + tag('tbody', rows.map(([l, ...vs]) => tag('tr', tag('th', esc(l), ' scope="row"') + vs.map((x) => tag('td', esc(x))).join(''))).join('')), ' class="sw-tab"'),
+        tag('p', tag('b', esc(rank)), ' class="sw-sen"'),
+      ].join(''), ' class="sw-sc"'));
+      det.insertAdjacentHTML('afterbegin', tag('div', cards.join(''), ' class="sw-scs"'));
+    };
     // Tapping a player opens his breakdown (and closes any other); links inside the row still go to his page.
     document.querySelectorAll('.sw-row').forEach((row) => {
       const det = row.nextElementSibling;
@@ -253,7 +267,7 @@ const best = d ? d.players.filter((r) => r.pos !== 'G').slice(0, 3) : [];
         const open = row.getAttribute('aria-expanded') !== 'true';
         row.closest('.sw-rows').querySelectorAll('.sw-row[aria-expanded="true"]').forEach((o) => { o.setAttribute('aria-expanded', 'false'); o.nextElementSibling.hidden = true; o.parentElement.classList.remove('open'); });
         row.setAttribute('aria-expanded', String(open)); det.hidden = !open; row.parentElement.classList.toggle('open', open);
-        if (open) det.querySelectorAll('.sw-lane:not(.drawn)').forEach(draw);
+        if (open) { build(det); det.querySelectorAll('.sw-lane:not(.drawn)').forEach(draw); }
       };
       row.addEventListener('click', (e) => { if (!e.target.closest('a, .sw-tag')) toggle(); });
       row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
