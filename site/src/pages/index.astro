@@ -370,8 +370,8 @@ const base = import.meta.env.BASE_URL;
         const last = [...mine].reverse().find((g) => g.final);
         if (last) {
           const head = home?.latest?.[me]?.id === last.id ? home.latest[me].head : null;
-          // One line, like the Next game ticket: the score already says who won, so just the story's headline
-          // (cut with an ellipsis if it runs long), else the arena.
+          // The score already says who won, so just the story's headline (one line beside Next game, up to two
+          // on phones, cut with an ellipsis if longer), else the arena.
           const line = head ?? last.venue;
           const card = window.lcTicket(last, { eyebrow: 'Last game', href: `${base}recap/${last.id}/`, sub: line ? [line] : null, colour: colourOf });
           const sp = card.querySelector('.tk-sub');

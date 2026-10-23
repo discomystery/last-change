@@ -933,7 +933,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .tk-end { align-self: center; font: 600 12px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); }
   .tk-sub { font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .tk-sub strong { color: var(--ink); font-weight: 600; }
-  .tk-sub.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Side by side the Last game line stays on one line to match Next game; stacked (phones) it may take two. */
+  .tk-sub.one { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  @media (min-width: 820px) { .tk-sub.one { display: block; white-space: nowrap; text-overflow: ellipsis; } }
   @media (max-width: 420px) { .card.tk { grid-template-columns: 70px 1fr; } .tk-ab, .tk-sc { font-size: 28px; } .tk-d { font-size: 34px; } .tk-m { flex-wrap: nowrap; column-gap: 8px; } }
   /* The one line of facts under a rink header (date, time, arena), the same on every page that has one. */
   .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }
