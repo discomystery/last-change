@@ -80,6 +80,15 @@ const base = import.meta.env.BASE_URL;
   .gf-gl { transition: opacity 0.2s; cursor: pointer; }
   .gf-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--sheet); font: 500 12.5px/1.45 var(--ui); padding: 7px 10px; border-radius: 8px; width: max-content; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity 0.12s; z-index: 3; }
   .gf-tip.on { opacity: 1; }
+  /* A clicked goal: the tooltip's look, but it stays, takes clicks and carries the NHL.com video link. */
+  .gf-gcard { position: absolute; display: none; background: var(--ink); color: var(--sheet); font: 500 12.5px/1.45 var(--ui); padding: 8px 30px 9px 11px; border-radius: 8px; width: max-content; max-width: min(320px, 92vw); transform: translate(-50%, calc(-100% - 12px)); z-index: 4; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
+  .gf-gcard.on { display: block; animation: gf-lab 0.25s ease; }
+  .gf-gcard .tt { opacity: 0.65; }
+  .gf-gcard .gw { font-weight: 800; letter-spacing: 0.07em; font-size: 11px; }
+  .gf-gcard .gf-watch { display: inline-block; margin-top: 6px; color: var(--sheet); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .gf-gcard .gf-nov { display: inline-block; margin-top: 6px; opacity: 0.65; }
+  .gf-gcard .gf-gx { position: absolute; top: 3px; right: 4px; width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--sheet); opacity: 0.7; font: 500 18px/1 var(--ui); cursor: pointer; }
+  .gf-gcard .gf-gx:hover { opacity: 1; }
   .gf-tip .tt { opacity: 0.65; }
   .gf-tip .gw { font-weight: 800; letter-spacing: 0.07em; font-size: 11px; }
   .gf-key { display: flex; gap: 6px 16px; flex-wrap: wrap; font: 500 13px var(--ui); color: var(--ink-2); margin-top: 10px; }
@@ -158,7 +167,7 @@ const base = import.meta.env.BASE_URL;
 </style>
 
 <script>
-  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number; type: string; ast: string[] };
+  type Shot = { t: number; h: number; xg: number; g: number; x: number; y: number; who: string; en: number; st: number; type: string; ast: string[]; clip?: string };
   type Skater = { id: number; n: string; h: number; grp: string; s: [number, number][]; toi: number; o?: number };
   type Pen = { t: number; h: number; who: string; drawn: string; min: number; code: string; what: string; served: string; pid: number | null; end: number };
   type Block = { t: number; h: number; x: number; y: number; who: string; shooter: string };
@@ -206,7 +215,7 @@ const base = import.meta.env.BASE_URL;
         const pp = f.pp.map(([h, a, b]) => ({ h, a, b }));
         g = {
           away: ds.away, home: ds.home, an: ds.an, hn: ds.hn, score: sc, end: endWord, len: f.len, END,
-          shots: f.shots.map(([t, h, xg, gl, x, y, who, en, st, type, a1, a2]) => ({ t, h, xg, g: gl, x, y, who: nm(who), en, st: st ?? NaN, type: type ?? '', ast: [a1, a2].filter((a) => a != null).map(nm) }) as Shot),
+          shots: f.shots.map(([t, h, xg, gl, x, y, who, en, st, type, a1, a2, clip]) => ({ t, h, xg, g: gl, x, y, who: nm(who), en, st: st ?? NaN, type: type ?? '', ast: [a1, a2].filter((a) => a != null).map(nm), ...(clip ? { clip } : {}) }) as Shot),
           pp,
           players: f.players.map((p) => { const s = pairs(p.s); return { ...p, s, toi: s.reduce((v, [a, b]) => v + b - a, 0) }; }) as Skater[],
           gk: f.goalies.map((p) => ({ ...p, s: pairs(p.s) })),
@@ -377,6 +386,29 @@ const base = import.meta.env.BASE_URL;
       // blocked shots, at the spot of the block, in the blocking team's color
       const blks: [Block, any][] = selB.value === '1' ? g.blocks.map((b: Block, i: number) => { const [x, y] = at(b.h, b.x, b.y); return [b, mk('rect', { x: x - 1.25, y: y - 1.25, width: 2.5, height: 2.5, rx: 0.4, fill: C[1 - b.h], 'fill-opacity': 0.9, 'data-blk': i, style: 'cursor:pointer' }, blkG)]; }) : [];
       const ring = (s: Shot | null) => { ringG.replaceChildren(); if (!s) return; const d = dots.find((q) => q[0] === s)!; mk('circle', { cx: d[2], cy: d[3], r: +d[1].getAttribute('r') + 2.2, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 0.8 }, ringG); };
+      // a goal clicked on the rink, the chart or the calls strip opens a card over its shot with a link to the NHL's own
+      // video of it (Sora, 2026-10-25); the page only links to the clip, it never copies it
+      const cardRingG = mk('g', { 'pointer-events': 'none' }, rk);
+      const card = document.createElement('div'); card.className = 'gf-gcard'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Goal'); rw.append(card);
+      let cardShot: Shot | null = null;
+      const goalCard = (s: Shot | null, scroll = false) => {
+        cardShot = s; cardRingG.replaceChildren();
+        if (!s) { card.classList.remove('on'); return; }
+        const d = dots.find((q) => q[0] === s)!;
+        mk('circle', { cx: d[2], cy: d[3], r: +d[1].getAttribute('r') + 2.6, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.1 }, cardRingG);
+        const watch = s.clip ? `<a class="gf-watch" href="https://nhl.com/video/${s.clip}" target="_blank" rel="noopener">Watch the goal on NHL.com<span aria-hidden="true"> ↗</span></a>` : '<span class="gf-nov">No NHL.com video of this goal yet</span>';
+        card.innerHTML = `<button type="button" class="gf-gx" aria-label="Close">×</button>${shotTip(s)}<br>${watch}`;
+        card.querySelector('.gf-gx')!.addEventListener('click', () => goalCard(null));
+        rinkTip.hide(); card.classList.add('on');
+        const [x, y] = above(d[1], rw), w = card.offsetWidth, bw = rw.clientWidth;
+        card.style.left = Math.max(w / 2, Math.min(bw - w / 2, x)) + 'px'; card.style.top = y + 'px';
+        // after the tap's own focus has settled, or the browser's scroll to the focused chart cancels this one
+        if (scroll) setTimeout(() => { const b = rw.getBoundingClientRect(); if (b.top < 0 || b.bottom > innerHeight) rw.scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); }, 60);
+      };
+      // goals sit among the shots, often under a later one, so a click picks the goal under the pointer if there is one
+      const goalAt = (e: MouseEvent) => { for (const el of document.elementsFromPoint(e.clientX, e.clientY)) { const s = shotOf(el); if (s && s.g) return s; } return null; };
+      rk.addEventListener('click', (e: MouseEvent) => { const s = goalAt(e); goalCard(s && s !== cardShot ? s : null); });
+      card.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') goalCard(null); });
 
       const keyEl = $('gf-key'); keyEl.replaceChildren();
       const item = (cls: string | null, label: string, c?: string) => { const sp = document.createElement('span'); if (c) sp.style.setProperty('--c', c); sp.innerHTML = cls == null ? '' : `<i${cls ? ` class="${cls}"` : ''}></i>`; sp.append(label); keyEl.append(sp); };
@@ -416,9 +448,9 @@ const base = import.meta.env.BASE_URL;
       // ---- the calls strip: goals, big chances and penalties, newest first, slid to the moment on show ----
       const calls: { t: number; h: number; el: HTMLElement; so?: boolean }[] = [];
       const track = $('gf-track'); track.replaceChildren();
-      const addCall = (t: number, h: number, cls: string, html: string, so = false) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gf-chip' + (cls ? ' ' + cls : ''); b.style.setProperty('--c', C[h]); b.innerHTML = html; b.addEventListener('click', () => { stop(); pinned = so ? null : t; showAt(so ? END : t); iceAt(pinned); }); calls.push({ t, h, el: b, so }); };
+      const addCall = (t: number, h: number, cls: string, html: string, so = false, goal: Shot | null = null) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gf-chip' + (cls ? ' ' + cls : ''); b.style.setProperty('--c', C[h]); b.innerHTML = html; b.addEventListener('click', () => { stop(); pinned = so ? null : t; showAt(so ? END : t); iceAt(pinned); if (goal) goalCard(goal, true); }); calls.push({ t, h, el: b, so }); };
       for (const s of g.shots as Shot[]) {
-        if (s.g) addCall(s.t, s.h, 'goal', `<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : ''}`);
+        if (s.g) addCall(s.t, s.h, 'goal', `<span class="t">${clock(s.t)}</span><b>GOAL</b>${s.who}${s.en ? ', empty net' : s.st > 0 ? ', power play' : s.st < 0 ? ', shorthanded' : ''}`, false, s);
         else if (s.xg >= DANGER && !s.en) addCall(s.t, s.h, '', `<span class="t">${clock(s.t)}</span>Big chance · ${s.who}, ${Math.round(s.xg * 100)}%`);
       }
       for (const p of g.pens as Pen[]) addCall(p.t, p.h, 'pen', `<span class="t">${clock(p.t)}</span>${p.code === 'BEN' || !p.who ? 'Bench penalty' : `Penalty · ${p.who}`}`);
@@ -519,6 +551,7 @@ const base = import.meta.env.BASE_URL;
         if (anim) return;
         if ((e.target as Element).closest('[data-so]')) { $('gf-so').scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); return; }
         const s = shotOf(e.target as Element); pinned = s ? s.t : tAt(e);
+        if (s && s.g) goalCard(s, true);
       });
       svg.addEventListener('pointermove', (e: PointerEvent) => {
         if (anim) return;
@@ -553,7 +586,8 @@ const base = import.meta.env.BASE_URL;
         const s = shotOf(e.target as Element), be = (e.target as Element).closest('[data-blk]') as SVGElement | null;
         const b = be ? g.blocks[+be.dataset.blk!] as Block : null;
         if (!s && !b) { rinkTip.hide(); if (!anim) chartAt(T); return; }
-        const [x, y] = above(e.target as Element, rw); rinkTip.show(x, y, s ? shotTip(s) : blockTip(b!));
+        const [x, y] = above(e.target as Element, rw);
+        if (s && s === cardShot) rinkTip.hide(); else rinkTip.show(x, y, s ? shotTip(s) : blockTip(b!));
         if (!anim) chartAt((s ?? b)!.t);
       });
       rk.addEventListener('pointerleave', () => { rinkTip.hide(); if (!anim) chartAt(T); });
