@@ -56,6 +56,8 @@ export const SKATER: Record<string, Stat> = build([
   { key: 'blk', short: 'BLK', name: 'Blocked shots', tip: 'Shots he blocked, as recorded.', f: 'num' },
   { key: 'tk', short: 'TK', name: 'Takeaways', tip: 'Times he took the puck from an opponent, as recorded.', f: 'num' },
   { key: 'gv', short: 'GV', name: 'Giveaways', tip: 'Times he gave the puck away under no pressure, as recorded.', f: 'num', low: true },
+  // Ours, not the league's (pipeline/metrics/war.py): the only column on the Leaders page the NHL doesn't publish.
+  { key: 'war', short: 'WAR', name: 'Wins above replacement', tip: 'Our own estimate, not an NHL stat: how many wins his season has been worth compared with a fill-in from the bottom of a roster, from his 5-on-5 creating and preventing ratings, his power-play impact and the penalties he draws and takes. It counts up through the season, so more games and more ice time mean more.', f: 'dec2' },
 ]);
 
 export const GOALIE: Record<string, Stat> = build([

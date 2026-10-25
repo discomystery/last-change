@@ -17,6 +17,7 @@ from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
 from pipeline.ingest import careers, edge, names, official_stats, rosters
 from pipeline.metrics import players as rating
+from pipeline.metrics import war
 from pipeline.metrics.players import POOL_GAMES
 
 OUT = SITE_DATA / "players"
@@ -185,6 +186,8 @@ def run(season: int) -> int:
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     goalies = json.loads((SITE_DATA / "goalies.json").read_text())
     carried = carries.run(season, latest, lines, abbr, idle)
+    wins = war.load()["seasons"]
+    war_of = lambda pid: {k: v["players"][str(pid)] for k, v in (("now", wins.get(str(season))), ("last", wins.get(str(season - 1)))) if v and str(pid) in v["players"]} or None
     shift_table = _shift_table(season)
 
     # Team games played this season, and each skater's ice time rank among teammates at his position.
@@ -305,7 +308,7 @@ def run(season: int) -> int:
                 continue
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0), shift_table),
-                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid)}
+                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
                              for s_ in mine.select("x_norm", "y_norm", "xg", "type", "season").iter_rows(named=True)]

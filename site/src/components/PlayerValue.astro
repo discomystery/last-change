@@ -1,0 +1,88 @@
+---
+// "Wins above replacement": what his season has been worth in the standings, against a fill-in, this season and
+// last, with its parts. Data: `war` in his player JSON and each season's lane in war.json (pipeline/metrics/war.py).
+// Seasons stand on their own, so this section doesn't follow the Seasons setting.
+import Section from './Section.astro';
+import { ordinal } from '../lib/format';
+import { seasonName } from '../lib/stats';
+
+interface Props { p: any; place: string }
+const { p, place } = Astro.props;
+const file = Object.values(import.meta.glob('../../public/data/war.json', { eager: true, import: 'default' }))[0] as any;
+const w = p.war;
+const years = Object.keys(file?.seasons ?? {}).map(Number).sort((a, b) => b - a);
+const isD = p.group === 'D';
+const who = isD ? 'defensemen' : 'forwards';
+const cards = w && years.length ? ([['now', years[0], 'This season'], ['last', years[0] - 1, 'Last season']] as const)
+  .filter(([k]) => w[k]).map(([k, yr, label]) => {
+    const x = w[k];
+    const sc = file.seasons[String(yr)]?.scale?.[p.group];
+    // Early in a season every total is small, so it gets a second decimal until someone reaches two wins.
+    const d = sc && sc.hi < 2 ? 2 : 1;
+    const fmt = (v: number) => { const r = Math.abs(v).toFixed(d); return Number(r) === 0 ? r : `${v > 0 ? '+' : '−'}${r}`; };
+    const lo = sc ? Math.min(sc.lo, x.lo) : Math.min(-0.1, x.lo), hi = sc ? Math.max(sc.hi, x.hi) : Math.max(0.1, x.hi);
+    const at = (v: number) => (Math.round((1000 * (v - lo)) / (hi - lo)) / 10).toFixed(1);
+    return { k, yr, label, x, sc, fmt, at, d };
+  }) : [];
+const PARTS: [string, string, (yw: string) => string][] = [
+  ['ev', '5-on-5 play', (yw) => `His creating and preventing chances ratings at 5-on-5, which already account for his linemates and the opponents he faces, times his 5-on-5 ice time ${yw}, against an average ${isD ? 'defenseman' : 'forward'} playing the same minutes.`],
+  ['pp', 'Power play', (yw) => `His power-play impact rating times his power-play ice time ${yw}, against an average power-play ${isD ? 'defenseman' : 'forward'} in the same minutes. Zero if he doesn’t play it.`],
+  ['pen', 'Penalties', (yw) => `Power plays he drew minus penalties he took ${yw}, at about a sixth of a goal each, against an average ${isD ? 'defenseman' : 'forward'} over the same ice time.`],
+  ['fill', 'Over a fill-in', (yw) => `What an average ${isD ? 'defenseman' : 'forward'} gives over a fill-in from the bottom of a roster in the same ice time ${yw}. A player who is merely average still adds this much, because the alternative is a fill-in.`],
+];
+---
+{cards.length > 0 && (
+<Section id="value" title="Wins above replacement" placeholder={false} takeaway="What his season has been worth in the standings, compared with a fill-in from the bottom of a roster.">
+  <Fragment slot="explain">
+    <p class="note">Our own estimate, not an NHL stat. It adds up his 5-on-5 play (from his creating and preventing ratings, which already account for his linemates and opponents), his power play and the penalties he draws and takes, each against an average {isD ? 'defenseman' : 'forward'} in the same ice time; then what an average player gives over a fill-in (a skater outside a club’s top 13 forwards or top 7 defensemen by ice time); then turns goals into wins, at about {file?.seasons?.[String(years[0] - 1)]?.goals_per_win?.toFixed(0) ?? 6} goals a win. It counts up through a season, so more games and more ice time mean more. Each season stands on its own, so this section doesn’t follow the Seasons setting. Goalies aren’t rated yet: a season of saves above expected repeats too little to read much into.</p>
+  </Fragment>
+  <ul class="wv-cards">
+    {cards.map(({ k, yr, label, x, sc, fmt, at }) => {
+      const yw = k === 'now' ? 'this season' : `in ${seasonName(yr)}`;
+      return (
+        <li class="card wv">
+          <p class="ld-h">{label} <span class="n">{seasonName(yr)}</span></p>
+          <p class="wv-big"><strong>{fmt(x.war)}</strong> <span>wins above replacement</span></p>
+          <p class="ld-of"><span class="term" tabindex="0" data-tip={`Among every one of the ${x.of} ${who} who played ${yw}.`}>{ordinal(x.rank)} of {x.of} {who}</span> · <span class="term" tabindex="0" data-tip={`Likely range: 80% of the time his true figure would fall between ${fmt(x.lo)} and ${fmt(x.hi)}, given how sure we can be of his ratings.`}>likely {fmt(x.lo)} to {fmt(x.hi)}</span> · {x.gp} {x.gp === 1 ? 'game' : 'games'}</p>
+          <div class="wv-lane" role="img" aria-label={`${fmt(x.war)} wins above replacement, ${ordinal(x.rank)} of ${x.of} ${who}`}>
+            <span class="wv-line"></span>
+            <span class="wv-rng" style={`left:${at(x.lo)}%;width:${(Number(at(x.hi)) - Number(at(x.lo))).toFixed(1)}%`}></span>
+            <span class="wv-mark" style={`left:${at(0)}%`} tabindex="0" data-tip="A fill-in from the bottom of a roster: zero wins above replacement."><i></i><em>Fill-in</em></span>
+            {sc?.reg != null && Math.abs(Number(at(sc.reg)) - Number(at(0))) >= 3 && <span class="wv-mark up" style={`left:${at(sc.reg)}%`} tabindex="0" data-tip={`A typical regular: the middle of every club’s top 13 forwards and top 7 defensemen by ice time ${yw}, ${fmt(sc.reg)}.`}><i></i><em>Typical regular</em></span>}
+            <span class="wv-him" style={`left:${at(x.war)}%`}><i></i></span>
+          </div>
+          {sc && <p class="wv-ends"><span>{fmt(sc.lo)}</span><span>{fmt(sc.hi)}, the most of any {isD ? 'defenseman' : 'forward'}</span></p>}
+          <dl class="wv-parts">
+            {PARTS.map(([key, name, tip]) => <div><dt><span class="term" tabindex="0" data-tip={tip(yw)}>{name}</span></dt><dd>{fmt(x[key])}</dd></div>)}
+          </dl>
+        </li>
+      );
+    })}
+  </ul>
+  <p class="note">{w.last && p.moved_from ? `Last season counts his games for every club he played for. ` : ''}See who leads the league on the <a href={`${import.meta.env.BASE_URL}players/leaders/?g=${isD ? 'D' : 'F'}&s=war`}>Leaders page</a>.</p>
+</Section>
+)}
+
+<style>
+  .wv-cards { display: grid; gap: 14px; }
+  @media (min-width: 820px) { .wv-cards { grid-template-columns: 1fr 1fr; } }
+  .wv { display: grid; align-content: start; gap: 4px; }
+  .wv .ld-h .n { font: 400 14px var(--ui); color: var(--ink-3); margin-left: 4px; }
+  .wv-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 2px; font: 400 14px var(--ui); color: var(--ink-2); }
+  .wv-big strong { font: 600 40px/1.05 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); }
+  .ld-of { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .wv-lane { position: relative; height: 62px; margin: 10px 10px 4px; }
+  .wv-line { position: absolute; left: -10px; right: -10px; top: 26px; height: 4px; border-radius: 2px; background: var(--track); }
+  /* Likely range: the tinted 4 px whisker; named reference points are dotted (chart standards in blocks.css). */
+  .wv-rng { position: absolute; top: 26px; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--team) 45%, transparent); }
+  .wv-mark, .wv-him { position: absolute; top: 0; width: 0; }
+  .wv-mark i { position: absolute; top: 18px; left: -1px; width: 0; height: 20px; border-left: 2px dotted var(--ink-3); }
+  .wv-mark em { position: absolute; top: 44px; transform: translateX(-50%); font: 500 11px var(--ui); font-style: normal; color: var(--ink-3); white-space: nowrap; }
+  .wv-mark.up em { top: 0; }
+  .wv-him i { position: absolute; top: 21px; left: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); }
+  .wv-ends { display: flex; justify-content: space-between; gap: 12px; font: 400 12px var(--ui); color: var(--ink-3); margin: -4px 0 2px; }
+  .wv-parts { margin-top: 6px; }
+  .wv-parts > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--rule); font: 400 15px var(--ui); }
+  .wv-parts dt { color: var(--ink-2); }
+  .wv-parts dd { font-weight: 600; font-variant-numeric: tabular-nums; }
+</style>
