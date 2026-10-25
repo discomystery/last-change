@@ -7,6 +7,7 @@ Reads the site JSON written earlier in `export` (snapshots, fingerprints, lines)
 """
 import gzip
 import json
+from functools import lru_cache
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -482,6 +483,22 @@ def use_official(nums: dict, glines: list[dict], off: dict) -> None:
             # count a goal with no shot (Lankinen, Oct 9: 8 against on 20 shots and 13 saves)
 
 
+@lru_cache(maxsize=4)
+def _set_up_goals(season: int) -> dict:
+    """(game_id, goalie_id) -> goals he allowed that came off a pass (assisted) and that our chance model rated low.
+    A private study of the NHL's goal-tracking files (2026-10-25, project files goal-tracking/before-goals.md) found
+    the goals the model rates lowest mostly follow a pass or have an open shooter, which the model cannot see, so
+    these are usually well-made plays, not a goalie's fault. Used only to choose wording, never shown."""
+    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "event_id", "type", "p2", "goalie_id", "period_type"])
+    ev = ev.filter((pl.col("type") == "goal") & (pl.col("period_type") != "SO") & pl.col("p2").is_not_null() & pl.col("goalie_id").is_not_null())
+    gp = TABLES / str(season) / "goals.parquet"
+    if not gp.exists():
+        return {}
+    xg = pl.read_parquet(gp, columns=["game_id", "event_id", "xg"])
+    low = ev.join(xg, on=["game_id", "event_id"]).filter(pl.col("xg") < surprise_rules.SET_UP_XG)
+    return {(r["game_id"], r["goalie_id"]): r["len"] for r in low.group_by("game_id", "goalie_id").len().iter_rows(named=True)}
+
+
 def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     out = []
     for r in S.goalies.filter(pl.col("game_id") == gid).sort("team_id", "sec", descending=[False, True]).iter_rows(named=True):
@@ -598,7 +615,12 @@ def run(season: int = CURRENT_SEASON) -> dict:
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
+        su = _set_up_goals(season)
+        for gl_ in glines:
+            gl_["_set_up"] = su.get((gid, gl_["id"]), 0)
         surp, beyond = ([], {}) if waiting else surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
+        for gl_ in glines:
+            gl_.pop("_set_up", None)  # wording only: not exported
         for c in calls:  # heads and bodies are the frozen preview's own words
             for k in ("happened", "title", "plain", "saw"):
                 if c.get(k):

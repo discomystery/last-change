@@ -1342,6 +1342,9 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
     ev = pl.read_parquet(TABLES / str(season) / "events.parquet").filter((pl.col("game_id") == gid) & pl.col("type").is_in(["goal", "penalty"]))
     pens = [(r["team_id"], r["sec"]) for r in ev.filter(pl.col("type") == "penalty").iter_rows(named=True)]
     out, hs, as_ = [], 0, 0
+    gx = TABLES / str(season) / "goals.parquet"
+    xg = ({r["event_id"]: r["xg"] for r in pl.read_parquet(gx, columns=["game_id", "event_id", "xg"]).filter(pl.col("game_id") == gid).iter_rows(named=True)}
+          if gx.exists() else {})
     for r in ev.filter(pl.col("type") == "goal").sort("sort").iter_rows(named=True):  # `sec` counts from the opening faceoff; scores are kept here
         if r["period_type"] == "SO":
             continue
@@ -1360,6 +1363,7 @@ def _goals(gid: int, season: int, home_id: int) -> list[dict]:
                     else "ev")
         hs, as_ = hs + home, as_ + (not home)
         out.append({"period": r["period"], "sec": r["sec"] - 1200 * (r["period"] - 1), "home": home, "p1": r["p1"], "p2": r["p2"], "p3": r["p3"],
+                    "xg": xg.get(r["event_id"]),
                     "strength": strength, "hs": hs, "as": as_,
                     # the other side had pulled its goalie for an extra attacker (more skaters than the scorers), not
                     # just left the net during a delayed penalty
@@ -2127,6 +2131,15 @@ def _star_fight(say, fighters: list[int], gid: int, season: int, day: str, N: di
     return told
 
 
+def set_up_wins(goals: list[dict], home_won: bool) -> bool:
+    """The winners' goals were mostly set up by a pass and rated low by our chance model: a win "without the chances"
+    then reads as well-made plays the model can't see, not as luck (goal-tracking study, Sora approved 2026-10-25).
+    Empty-net goals left out."""
+    wg = [g for g in goals if g["home"] == home_won and g["strength"] != "en"]
+    n = sum(1 for g in wg if g.get("p2") and g.get("xg") is not None and g["xg"] < surprise_rules.SET_UP_XG)
+    return n >= 2 and 2 * n >= len(wg)
+
+
 def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | None:
     """The story for a finished game, from its post-game JSON (r), its Swing scores and the season's tables."""
     W = Words(places)
@@ -2258,9 +2271,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if share is not None and share <= 0.35 and ws - ls <= 2:
         thief = wg["name"].split(" ", 1)[-1] if wg and (wg.get("gsax") or 0) >= 1 else None
         where = f" {W.at(home)}" if winner == away else ""
-        heads.append((90, f"Highway robbery{where}" if share <= 0.25 else
-                      pk([f"{thief} steals one{where}", f"{thief} robs {L_}{where}"], "steal") if thief else
-                      pk([f"{W_} steal one{where}", f"{W_} get away with one{where}"], "steal")))
+        if set_up_wins(goals, winner == home):  # their goals were well-made plays: no "robbery" or "got away with one"
+            heads.append((90, pk([f"{thief} steals one{where}", f"{thief} robs {L_}{where}"], "steal") if thief else
+                          pk([f"{W_} make their chances count{where}", f"{W_} cash in{where}"], "cash")))
+        else:
+            heads.append((90, f"Highway robbery{where}" if share <= 0.25 else
+                          pk([f"{thief} steals one{where}", f"{thief} robs {L_}{where}"], "steal") if thief else
+                          pk([f"{W_} steal one{where}", f"{W_} get away with one{where}"], "steal")))
     nums_ = r.get("numbers") or {}
     slow = slow_start(r.get("periods") or [], winner, loser, W)
     fw = next((x for x in found if x["kind"] == "first_win" and x["team"] == winner), None)
@@ -2528,6 +2545,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 lead = f"{_cap(Wn)} outshot {Ln} {sw}-{sl}, but {W.poss(loser)} chances were the better ones."
             elif ws - ls >= 3:
                 lead = f"The score flatters {Wn}: {Ln} had the better of the play."
+            elif share <= 0.3 and set_up_wins(goals, winner == home):
+                lead = f"{_cap(Ln)} had the better of the play, but {Wn} made theirs count."
             elif share <= 0.3:
                 lead = pk([f"{_cap(Wn)} got away with one. {_cap(Ln)} had the better of the play.",
                            f"{_cap(Ln)} will be kicking themselves: they had the better of the play."], "steal")

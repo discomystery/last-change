@@ -284,3 +284,12 @@ def test_a_delayed_penalty_goal_is_not_a_power_play_goal(tmp_path, monkeypatch):
     goals = stories._goals(2026020135, 2026, home_id=30)
     assert [g["strength"] for g in goals] == ["dp", "pp"]
     assert not goals[0]["own_extra"]  # first period: not "with the goalie pulled"
+
+
+def test_set_up_wins_needs_most_goals_off_low_rated_passes():
+    from pipeline.export.stories import set_up_wins
+    g = lambda p2, xg, home=True, strength="ev": {"home": home, "p2": p2, "xg": xg, "strength": strength}
+    assert set_up_wins([g(1, 0.04), g(2, 0.06), g(None, 0.3)], True)
+    assert not set_up_wins([g(1, 0.04), g(None, 0.05), g(None, 0.3)], True)  # one set-up goal is not enough
+    assert not set_up_wins([g(1, 0.04), g(2, 0.06)], False)  # the other side's goals
+    assert not set_up_wins([g(1, 0.04), g(2, 0.25), g(3, 0.3)], True)
