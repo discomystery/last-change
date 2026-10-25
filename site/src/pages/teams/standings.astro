@@ -172,6 +172,14 @@ const anyClinch = teams.some((t: any) => t.clinch);
   /* The playoff cut: a firmer rule under the last team in. */
   .stbl.stand tbody tr.cut { border-bottom: 2px solid var(--ink-3); }
   .st-note { margin-top: 18px; }
+  /* Tablets standing up (iPad mini: 744 px): the full names push the last columns out of view, so they get the
+     abbreviations too, and every column fits without scrolling. */
+  @media (min-width: 720px) and (max-width: 1000px) {
+    .stbl.stand .who { width: auto; }
+    .stbl.stand th, .stbl.stand td { padding: 8px 7px; }
+    .st-tm .full { display: none; }
+    .st-tm .ab { display: inline; }
+  }
   @media (max-width: 719px) {
     .stbl.stand .rk { padding-left: 10px; width: 32px; min-width: 32px; max-width: 32px; }
     .stbl.stand .who { left: 32px; width: auto; }

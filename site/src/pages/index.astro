@@ -434,7 +434,7 @@ const base = import.meta.env.BASE_URL;
 
   /* A featured game beside a condensed list */
   #home .split { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
-  @media (min-width: 820px) { #home .split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+  @media (min-width: 720px) { #home .split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
   #home .feat { padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; color: var(--ink); }
   #home a.feat:hover, #home a.row:hover { border-color: var(--ink-3); }
   #home .feat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -475,7 +475,7 @@ const base = import.meta.env.BASE_URL;
   /* Leaders */
   #home .lead-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
   /* Side by side, the two cards share rows (heading, list), so both lists start on the same line and the cards end level. */
-  @media (min-width: 820px) {
+  @media (min-width: 720px) {
     #home .lead-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; row-gap: 0; align-items: stretch; }
     #home .lead-grid > .card { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
   }
