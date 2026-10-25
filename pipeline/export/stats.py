@@ -1,6 +1,7 @@
 """Plain counting stats, as the league records them: every skater's, goalie's and team's season line for this season
 and last (ingest/official_stats.py). Player pages show a player's lines, the Leaders page lists everyone sortable by any
-column, and team pages show their line with the league rank of each figure.
+column, and team pages show their line with the league rank of each figure. One column is ours, not the league's:
+skaters' wins above replacement (metrics/war.py, read from war.json), so the Leaders page can sort by it.
 
 Written to site/public/data/stats/{skaters,goalies,teams}.json as column lists plus one row per player (or club) per
 season, to keep the files small. Names are our own spellings (accents, ingest/names.py) where we have the player.
@@ -12,11 +13,12 @@ import polars as pl
 
 from pipeline.config import SITE_DATA, TABLES
 from pipeline.ingest import official_stats
+from pipeline.metrics import war
 
 OUT = SITE_DATA / "stats"
 
 SKATER = ["id", "name", "team", "pos", "gp", "g", "a", "p", "pm", "pim", "ppg", "ppp", "shg", "shp", "evg", "evp", "gwg", "otg",
-          "s", "spct", "toi", "evtoi", "pptoi", "shtoi", "shifts", "tps", "fow", "fol", "fopct", "hit", "blk", "tk", "gv"]
+          "s", "spct", "toi", "evtoi", "pptoi", "shtoi", "shifts", "tps", "fow", "fol", "fopct", "hit", "blk", "tk", "gv", "war"]
 GOALIE = ["id", "name", "team", "gp", "gs", "w", "l", "otl", "sa", "sv", "ga", "svpct", "gaa", "so", "toi"]
 TEAM = ["team", "gp", "w", "l", "otl", "pts", "ptspct", "rw", "gf", "ga", "gfpg", "gapg", "diff", "ppg", "ppo", "pppct", "ppga",
         "tsh", "pkpct", "shgf", "shga", "sfpg", "sapg", "fopct", "hit", "blk", "tk", "gv"]
@@ -62,6 +64,7 @@ def ice(ti: dict) -> dict:
 
 def skaters(season: int, names: dict[int, str]) -> list[list]:
     by = lambda report: {r["playerId"]: r for r in official_stats.read(season, report)}
+    wins = (war.load()["seasons"].get(str(season)) or {}).get("players", {})  # ours, not the league's: wins above replacement
     real, tois, fo = by("skater/realtime"), by("skater/timeonice"), by("skater/faceoffwins")
     rows = []
     for r in official_stats.read(season, "skater/summary"):
@@ -74,7 +77,8 @@ def skaters(season: int, names: dict[int, str]) -> list[list]:
                "gwg": r["gameWinningGoals"], "otg": r["otGoals"], "s": r["shots"], "spct": _r(r.get("shootingPct")),
                "toi": round(r["timeOnIcePerGame"] or 0), **ice(ti),
                "fow": fow, "fol": fol, "fopct": _r(fow / (fow + fol)) if fow + fol else None,
-               "hit": rt.get("hits"), "blk": rt.get("blockedShots"), "tk": rt.get("takeaways"), "gv": rt.get("giveaways")}
+               "hit": rt.get("hits"), "blk": rt.get("blockedShots"), "tk": rt.get("takeaways"), "gv": rt.get("giveaways"),
+               "war": (wins.get(str(pid)) or {}).get("war")}
         rows.append([rec[k] for k in SKATER])
     return rows
 

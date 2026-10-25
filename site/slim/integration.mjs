@@ -37,7 +37,7 @@ const MIN_SVG_BYTES = 1000;
 
 const SERVED_ONLY_INDEX = ['previews', 'recaps'];
 const BUILD_ONLY = ['careers', 'gamelog', 'matchups', 'intros', 'lines.json', 'trend.json', 'roster.json',
-  'fingerprints.json', 'goalies.json', 'goal_sources.json', 'records.json', 'arena_factors.json'];
+  'fingerprints.json', 'goalies.json', 'goal_sources.json', 'records.json', 'arena_factors.json', 'war.json'];
 
 function* walk(dir, skip = new Set()) {
   for (const f of readdirSync(dir)) {
