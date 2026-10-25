@@ -380,7 +380,7 @@ const base = import.meta.env.BASE_URL;
       const dots: [Shot, any, number, number][] = g.shots.map((s: Shot, i: number) => {
         const [x, y] = at(s.h, s.x, s.y);
         const c = mk('circle', { cx: x, cy: y, r: (1.1 + Math.sqrt(s.xg) * 5.2).toFixed(2), class: 'gf-shot', fill: C[s.h], 'fill-opacity': s.g ? 0.25 : s.en ? 0 : 0.6, stroke: s.g || s.en ? C[s.h] : 'none', 'stroke-width': s.g ? 2 : 0.7, 'stroke-dasharray': s.en && !s.g ? '1.6 1.2' : 'none', 'data-shot': i, style: 'cursor:pointer' }, dotsG);
-        if (s.g) { c.setAttribute('r', Math.max(3.2, +c.getAttribute('r'))); c.style.cursor = 'pointer'; }
+        if (s.g) c.setAttribute('r', Math.max(3.2, +c.getAttribute('r')));
         return [s, c, x, y];
       });
       // blocked shots, at the spot of the block, in the blocking team's color
@@ -402,9 +402,12 @@ const base = import.meta.env.BASE_URL;
         rinkTip.hide(); card.classList.add('on');
         const [x, y] = above(d[1], rw), w = card.offsetWidth, bw = rw.clientWidth;
         card.style.left = Math.max(w / 2, Math.min(bw - w / 2, x)) + 'px'; card.style.top = y + 'px';
-        if (scroll) { const b = rw.getBoundingClientRect(); if (b.top < 0 || b.bottom > innerHeight) rw.scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); }
+        // after the tap's own focus has settled, or the browser's scroll to the focused chart cancels this one
+        if (scroll) setTimeout(() => { const b = rw.getBoundingClientRect(); if (b.top < 0 || b.bottom > innerHeight) rw.scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); }, 60);
       };
-      rk.addEventListener('click', (e: MouseEvent) => { const s = shotOf(e.target as Element); goalCard(s && s.g ? (s === cardShot ? null : s) : null); });
+      // goals sit among the shots, often under a later one, so a click picks the goal under the pointer if there is one
+      const goalAt = (e: MouseEvent) => { for (const el of document.elementsFromPoint(e.clientX, e.clientY)) { const s = shotOf(el); if (s && s.g) return s; } return null; };
+      rk.addEventListener('click', (e: MouseEvent) => { const s = goalAt(e); goalCard(s && s !== cardShot ? s : null); });
       card.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') goalCard(null); });
 
       const keyEl = $('gf-key'); keyEl.replaceChildren();
