@@ -146,7 +146,7 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
 };
 const trend = trendFor(abbr!);
 const hasTeamStats = statSeasons('teams').some((x) => statRows('teams', x).some((r) => r.team === abbr));
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(hasTeamStats ? [['stats', 'Team stats']] : []), ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Playing style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['next', 'Next'], ['form', 'Schedule'], ...(hasTeamStats ? [['stats', 'Stats']] : []), ...(trend ? [['trend', 'Trend']] : []), ['style', 'Style'], ['players', 'Players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 // The head coach from the club's latest game; a coach who took over this season says since when.

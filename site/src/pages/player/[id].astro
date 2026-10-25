@@ -148,7 +148,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   return (a: Area) => Math.sqrt(a.share / top);
 };
 const hasLine = !!ledgerOf(p.id)?.rows.length;
-const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...((p as any).war ? [['value', 'Value']] : []), ...(p.carries ? [['carries', 'Offense']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Responsibilities'], ['recent', 'Recent games']] : []), ['standout', 'Strengths'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Card'], ['faced', 'Shots']] : !s.traits ? [] : [['role', 'Role'], ...((p as any).war ? [['value', 'Value']] : []), ...(p.carries ? [['carries', 'Offense']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Responsibilities'], ['recent', 'Recent']] : []), ['standout', 'Strengths'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);

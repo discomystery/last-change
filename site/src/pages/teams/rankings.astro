@@ -146,7 +146,7 @@ const srcRows = (side: 'for' | 'against', key: string) => {
 };
 const pc = (v: number, min: number, max: number) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)).toFixed(1);
 
-const nav: [string, string][] = [['style', 'Playing styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav: [string, string][] = [['style', 'Styles'], ['table', 'Traits'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 const _ = ordinal;
 ---
 <Base section="teams" title="Team rankings" description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
