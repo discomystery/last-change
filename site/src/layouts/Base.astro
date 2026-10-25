@@ -763,6 +763,15 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .site-nav .soon { color: var(--ink-3); font-weight: 500; cursor: default; }
   .site-nav .minor { font-weight: 500; color: var(--ink-2); padding-left: 14px; border-left: 1px solid var(--rule); border-bottom: 0; }
   .tabbar, .morepanel, .dock { display: none; }
+  /* Tablets standing up and narrow windows (iPad mini: 744 px): logo and menu share one line, with a smaller logo and
+     tighter spacing, instead of the menu dropping to a second row. */
+  @media (min-width: 720px) and (max-width: 940px) {
+    .brand { flex-wrap: nowrap; }
+    .site-head .brand-logo .logo { height: 30px; }
+    .brand-name { gap: 6px; }
+    .site-nav { flex-wrap: nowrap; gap: 4px 10px; }
+    .site-nav .minor { padding-left: 10px; }
+  }
   @media (max-width: 719px) {
     .site-nav { display: none; }
     body { padding-bottom: var(--dock-h, calc(102px + env(safe-area-inset-bottom))); }
