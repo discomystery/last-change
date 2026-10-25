@@ -230,7 +230,7 @@ const base = import.meta.env.BASE_URL;
   .day[aria-pressed='true'] span { color: var(--sheet); }
   .day-h { font: 600 22px/1.15 var(--display); margin: 26px 0 10px; scroll-margin-top: 80px; }
   .glist { display: grid; gap: 8px; }
-  @media (min-width: 820px) { .glist { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 720px) { .glist { grid-template-columns: 1fr 1fr; } }
   @media (min-width: 1000px) { .glist { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .glist .g-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 18px 0 2px; font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
   .glist .g-group:first-child { margin-top: 0; }

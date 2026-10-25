@@ -13,7 +13,7 @@
   .jump a:hover { border-color: var(--ink); }
   .next { margin-top: 18px; }
   .cols { display: grid; gap: 0 28px; }
-  @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
   .cols .sub { margin-top: 22px; }
   .games { display: grid; gap: 8px; }
   .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
