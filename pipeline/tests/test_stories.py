@@ -293,3 +293,29 @@ def test_set_up_wins_needs_most_goals_off_low_rated_passes():
     assert not set_up_wins([g(1, 0.04), g(None, 0.05), g(None, 0.3)], True)  # one set-up goal is not enough
     assert not set_up_wins([g(1, 0.04), g(2, 0.06)], False)  # the other side's goals
     assert not set_up_wins([g(1, 0.04), g(2, 0.25), g(3, 0.3)], True)
+
+
+def test_five_point_nights_lead_and_carry_a_milestone():
+    import polars as pl
+    from pipeline.export import stories
+    W = stories.Words({"EDM": "Edmonton", "CAR": "Carolina"})
+    night = pl.DataFrame({"player_id": [1, 2, 3], "team": ["EDM", "EDM", "CAR"], "g": [2, 1, 1], "pts": [5, 5, 2]})
+    last = {1: "Draisaitl", 2: "McDavid", 3: "Ehlers"}.get
+    heads = stories._night_heads(night, "EDM", W, "the Hurricanes", last, {1, 2, 3})
+    assert heads == [(97, "Draisaitl and McDavid each have five points as the Oilers beat the Hurricanes")]
+    one = night.filter(pl.col("player_id") == 1)
+    found = [{"kind": "milestone", "what": "point", "mark": 700, "pid": 1}]
+    assert stories._night_heads(one, "EDM", W, "the Hurricanes", last, {1}, found)[0] == \
+        (95, "Draisaitl reaches 700 points with a five-point night as the Oilers beat the Hurricanes")
+    # a loser's five points lead only over the plain headlines
+    assert stories._night_heads(one, "CAR", W, "the Oilers", last, {1})[0][0] == 70
+
+
+def test_star_line_needs_three_points_or_two_goals():
+    import polars as pl
+    from pipeline.export import stories
+    night = pl.DataFrame({"player_id": [1, 2], "team": ["CGY", "CGY"], "g": [1, 1], "pts": [3, 2]})
+    last = {1: "Farabee", 2: "Kadri"}.get
+    assert stories._star_line(night, "CGY", last, {1, 2}) == "Farabee has a goal and two assists"
+    assert stories._star_line(night.filter(pl.col("player_id") == 2), "CGY", last, {2}) is None
+    assert stories._pts_words(2, 0) == "two goals" and stories._pts_words(0, 3) == "three assists"

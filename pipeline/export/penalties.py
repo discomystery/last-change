@@ -242,8 +242,13 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name, fights_to
         if busy["n"] >= 2 and total <= QUIET_GAME and not must and not must_fight:
             notes.append((78, f"Only {num(total)} penalties were called, and {num(busy['n'])} of them were {name(busy['p1'])}’s."))
         elif busy["n"] >= BUSY_PLAYER:
-            share = f" of the game’s {num(total)}" if busy["n"] * 2 > total else ""
-            notes.append((68, f"{name(busy['p1'])} took {num(busy['n'])} penalties{share} on his own."))
+            # both Tkachuks took three for Florida (FLA at OTT, Oct 21): a tie names everyone in it, in a stable order
+            tied = sorted(r["p1"] for r in per.iter_rows(named=True) if r["n"] == busy["n"] and r["p1"] not in told)
+            if len(tied) > 1:
+                notes.append((68, f"{_and([name(x) for x in tied])} each took {num(busy['n'])} penalties."))
+            else:
+                share = f" of the game’s {num(total)}" if busy["n"] * 2 > total else ""
+                notes.append((68, f"{name(busy['p1'])} took {num(busy['n'])} penalties{share} on his own."))
     # ten-minute misconducts not already part of a scrum or an ejection
     tens = p.filter((pl.col("pen_desc") == "misconduct") & pl.col("p1").is_not_null() & ~pl.col("sec").is_in(list(scrum_secs))
                     & ~pl.col("p1").is_in(list(told)))
