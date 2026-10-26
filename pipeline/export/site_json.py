@@ -27,6 +27,8 @@ def run(season: int) -> dict:
     (SITE_DATA / "xg_check.json").unlink(missing_ok=True)  # the Chance check page is gone; drop its data from restored copies
     from pipeline.export import roster
     roster.run(season)  # every club's full roster and who is out, from availability.parquet
+    from pipeline.metrics import war
+    war.run(season)  # wins above replacement for every skater, this season and last (player pages, Leaders)
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import similar

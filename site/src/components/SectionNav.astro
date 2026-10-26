@@ -94,7 +94,14 @@ const inSentence = (label: string) => (/^[A-Z][a-z]/.test(label) ? label[0].toLo
         if (Math.abs(row.scrollLeft - want) > 4) row.scrollTo({ left: want, behavior: reduce ? 'auto' : 'smooth' });
       }
     };
-    const refresh = () => { lay(); cur = -1; update(); };
+    // Fade whichever side of the row has names out of view.
+    const edges = () => {
+      const max = row.scrollWidth - row.clientWidth;
+      row.classList.toggle('more-l', max > 2 && row.scrollLeft > 2);
+      row.classList.toggle('more-r', max > 2 && row.scrollLeft < max - 2);
+    };
+    row.addEventListener('scroll', edges, { passive: true });
+    const refresh = () => { lay(); cur = -1; update(); edges(); };
     addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
     if ('ResizeObserver' in window) { const ro = new ResizeObserver(refresh); ro.observe(row); ro.observe(dots); }
     else addEventListener('resize', refresh);
@@ -107,7 +114,13 @@ const inSentence = (label: string) => (/^[A-Z][a-z]/.test(label) ? label[0].toLo
 
 <style is:global>
   /* Plain section names; the one being read is dark. Pinned rows get the reading line underneath. */
-  .jump.secnav-pills { gap: 2px; }
+  /* The row scrolls sideways when the names don't fit (tablets, narrow windows); its reading line, dots and puck are
+     placed inside it so they scroll with the names instead of running off the page. A soft fade marks the side with
+     more names. */
+  .jump.secnav-pills { gap: 2px; position: relative; }
+  .jump.secnav-pills.more-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+  .jump.secnav-pills.more-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+  .jump.secnav-pills.more-l.more-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
   .jump.secnav-pills a { font-weight: 600; color: var(--ink-3); border: 0; background: none; padding: 5px 10px; transition: color 0.2s; }
   .jump.secnav-pills a:hover { color: var(--ink); }
   .jump.secnav-pills a.here { color: var(--ink); }
