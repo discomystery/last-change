@@ -1,6 +1,7 @@
 ---
 import { srcInfo, srcPhrase } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
+import WorthKnowing from '../../components/WorthKnowing.astro';
 // Team page: next game, results and schedule, season trend, fingerprint, lines, special teams, goalies, goal sources.
 import Base from '../../layouts/Base.astro';
 import { teamOg } from '../../lib/og';
@@ -264,10 +265,7 @@ const coachSince = coach && (team as any).coach_since
           <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
         </div>
         {ln.notes.length > 0 && (
-          <div class="card worth">
-            <p class="mini-h">Worth knowing</p>
-            <ul>{ln.notes.map((n) => <li><NoteText text={n.text} names={(n as any).names} /></li>)}</ul>
-          </div>
+          <WorthKnowing notes={ln.notes.map((n) => ({ text: n.text, names: (n as any).names }))} />
         )}
         <div class="two units2">
           {[ln.units.filter((u) => u.label[0] === 'L'), ln.units.filter((u) => u.label[0] === 'P')].map((group) => (

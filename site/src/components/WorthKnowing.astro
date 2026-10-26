@@ -1,0 +1,89 @@
+---
+// The "Worth knowing" card. A short list keeps its one-line look (team pill in front of each note). A long one
+// (LONG notes or more) is grouped under each team's pill, side by side on wide screens, with a hairline between
+// notes, and a team's notes past the first few wait behind a "Show more" bar. Without JavaScript every note shows.
+import NoteText from './NoteText.astro';
+
+interface Note { a?: string; text: string; names?: string[] }
+interface Team { a: string; label: string; cls: string; href: string }
+interface Props { notes: Note[]; teams?: Team[]; cls?: string }
+const { notes, teams = [], cls = '' } = Astro.props;
+
+const LONG = 4;
+const long = notes.length >= LONG;
+const byTeam = (a?: string) => teams.find((t) => t.a === a);
+// Teams in the order given, each with its notes; notes with no team form one unnamed group.
+const groups = teams.length
+  ? teams.map((t) => ({ t, ns: notes.filter((n) => n.a === t.a) })).filter((g) => g.ns.length)
+  : [{ t: undefined, ns: notes }];
+// Hide only when it saves two or more notes: one column shows 4, two columns 3 each.
+const keep = groups.length > 1 ? 3 : 4;
+const shown = (n: number) => (n > keep + 1 ? keep : n);
+const extra = groups.reduce((s, g) => s + g.ns.length - shown(g.ns.length), 0);
+const rows = groups.map((g) => ({ ...g, ns: g.ns.map((n, i) => ({ ...n, more: i + 1 > shown(g.ns.length) })) }));
+const label = `Show ${extra} more ${extra === 1 ? 'note' : 'notes'}`;
+---
+{!long ? (
+  <div class={`card worth ${cls}`}>
+    <p class="mini-h">Worth knowing</p>
+    <ul>{notes.map((n) => <li>{byTeam(n.a) && <><a class={`teampill ${byTeam(n.a)!.cls}`} href={byTeam(n.a)!.href}>{byTeam(n.a)!.label}</a> </>}<NoteText text={n.text} names={n.names} /></li>)}</ul>
+  </div>
+) : (
+  <div class={`card worth wk-long ${cls}`} data-wk>
+    <p class="mini-h">Worth knowing</p>
+    <div class={`wk-cols ${groups.length > 1 ? 'wk-two' : ''}`}>
+      {rows.map((g) => (
+        <div class="wk-group">
+          {g.t && <p class="wk-team"><a class={`teampill ${g.t.cls}`} href={g.t.href}>{g.t.label}</a><span class="wk-n">{g.ns.length} {g.ns.length === 1 ? 'note' : 'notes'}</span></p>}
+          <ul>{g.ns.map((n) => <li class={n.more ? 'wk-more' : undefined}><NoteText text={n.text} names={n.names} /></li>)}</ul>
+        </div>
+      ))}
+    </div>
+    {extra ? (
+      <button type="button" class="wk-toggle" hidden={true} aria-expanded="false">
+        <span class="closed">{label}</span><span class="opened">Show fewer</span>
+      </button>
+    ) : null}
+  </div>
+)}
+
+<script>
+  // Fold the extra notes away only once this runs, so the page is complete without it.
+  for (const card of document.querySelectorAll<HTMLElement>('[data-wk]')) {
+    const btn = card.querySelector<HTMLButtonElement>('.wk-toggle');
+    if (!btn) continue;
+    card.classList.add('wk-clip');
+    btn.hidden = false;
+    btn.addEventListener('click', () => {
+      const open = card.classList.toggle('wk-clip') === false;
+      btn.setAttribute('aria-expanded', String(open));
+    });
+  }
+</script>
+
+<style is:global>
+  .wk-long .wk-cols { display: grid; gap: 18px 40px; }
+  .wk-long .wk-team { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 4px; }
+  .wk-long .wk-n { font: 500 12px var(--ui); color: var(--ink-3); }
+  .wk-long ul { display: block; font: 400 15px/1.5 var(--ui); }
+  .wk-long li { padding: 10px 0; }
+  .wk-long li + li { border-top: 1px solid var(--rule); }
+  .wk-long li:last-child { padding-bottom: 2px; }
+  .wk-clip .wk-more { display: none; }
+  .wk-clip li:has(+ .wk-more) { padding-bottom: 2px; }
+  .wk-toggle { display: flex; width: 100%; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 16px; border: 0; border-radius: 12px; background: var(--track); font: 500 15px var(--ui); color: var(--ink); cursor: pointer; }
+  .wk-toggle[hidden] { display: none; }
+  .wk-toggle:hover { background: var(--rule); }
+  .wk-toggle::after { content: '+'; }
+  .wk-toggle[aria-expanded='true']::after { content: '–'; }
+  .wk-toggle .opened, .wk-toggle[aria-expanded='true'] .closed { display: none; }
+  .wk-toggle[aria-expanded='true'] .opened { display: inline; }
+  /* Stacked (phones, iPad mini): a clear break before the second team, a heavier rule than the notes' hairlines. */
+  @media (max-width: 899px) {
+    .wk-long .wk-two { gap: 0; }
+    .wk-long .wk-two .wk-group + .wk-group { margin-top: 22px; padding-top: 22px; border-top: 2px solid color-mix(in oklab, var(--ink-3) 55%, transparent); }
+  }
+  @media (min-width: 900px) {
+    .wk-long .wk-two { grid-template-columns: 1fr 1fr; }
+  }
+</style>

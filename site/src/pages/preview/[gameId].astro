@@ -1,6 +1,7 @@
 ---
 import { srcInfo } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
+import WorthKnowing from '../../components/WorthKnowing.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
@@ -105,6 +106,7 @@ const homeMu = LN[home]?.matchups?.home;
 // With a story at the top, the lineup notes move down into Lines (the faceoff note already shows in Special teams).
 const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })));
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
+const wkTeams = order.map((a) => ({ a, label: place(a), cls: `t-${side(a)}`, href: `${base}team/${a}/` }));
 
 // Special teams
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
@@ -197,10 +199,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
       {snap.claims.map((c) => <CallCard c={c as any} side={side} />)}
     </ol>
     {!story && notes.length > 0 && (
-      <div class="card worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={notes} teams={wkTeams} />
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
@@ -293,10 +292,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
     )}
 
     {story && lineNotes.length > 0 && (
-      <div class="card worth lines-worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{lineNotes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={lineNotes} teams={wkTeams} cls="lines-worth" />
     )}
 
     {((LN[away] as any)?.deploy || (LN[home] as any)?.deploy) && (
@@ -547,8 +543,8 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
-  .watch + .worth { margin-top: 16px; }
-  .lines-worth { margin: 20px 0 8px; }
+  .watch + :global(.worth) { margin-top: 16px; }
+  :global(.lines-worth) { margin: 20px 0 8px; }
   .nhl-proj { margin-bottom: 8px; }
   .proj-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .proj-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
