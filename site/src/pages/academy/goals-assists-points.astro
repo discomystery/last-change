@@ -1,0 +1,339 @@
+---
+// Academy 1.7: when a goal counts and who gets credit. A close-up of the puck crossing the goal line, step by step;
+// an own goal and who is credited with it; a passing play where you tap who gets the assists; notes on points and the
+// hat trick; this season's points leaders from the site's data; a quiz. Leans on 1.2 (goal line), 1.3 (positions).
+import Lesson from '../../layouts/Lesson.astro';
+import { pointsLeaders } from '../../lib/academy/real';
+import { asOf } from '../../lib/stats';
+const leaders = pointsLeaders(5);
+const asof = asOf('skaters');
+const asofDay = asof ? new Date(asof).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) : null;
+---
+<Lesson slug="goals-assists-points">
+  <section class="ac-part" aria-labelledby="line-h">
+    <header>
+      <h2 id="line-h">Goal or not?</h2>
+      <p>The goal line is two inches wide and the puck is three inches across. A goal only counts once the whole puck is past the line, with ice showing between them. Here it is from straight above, much closer than you’ll ever see it from a seat.</p>
+    </header>
+    <div class="ac-stage">
+      <div class="ac-view">
+        <svg class="ac-line" id="gl" viewBox="-15 -11 36 22" role="img" aria-label="Close up from above: the goal line, the inside of the net beyond it, and a puck crossing it"></svg>
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" id="glStep"></p>
+        <h3 id="glH"></h3>
+        <p id="glP"></p>
+        <div class="ac-track" id="glTrack"><span class="fill"></span></div>
+        <div class="ac-ctrl">
+          <button class="pill" id="glBack" type="button">Back</button>
+          <button class="pill primary" id="glNext" type="button">Next</button>
+          <button class="pill" id="glAgain" type="button">Watch again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="own-h">
+    <header>
+      <h2 id="own-h">The own goal</h2>
+      <p>It doesn’t matter who puts the puck in. If a player knocks it into his own net by accident, it’s a goal for the other team, unless the officials take it back for some other reason (lesson 2.7 covers those).</p>
+    </header>
+    <div class="ac-stage" id="play7">
+      <div class="ac-view">
+        <div class="ac-ctrl" style="justify-content: space-between">
+          <p class="pick">See it <select data-view aria-label="Viewpoint">
+            <option value="above">from above</option>
+            <option value="center">from a seat at center ice</option>
+          </select></p>
+          <p class="ac-board" aria-label="Scoreboard"><span class="tm"><span class="sw home"></span>Home <span class="sc" data-score>0</span></span><span class="tm"><span class="sw away"></span>Visitors <span class="sc">0</span></span></p>
+        </div>
+        <svg class="ac-rink" id="rink7" role="img" aria-label="A home player passes across the front of the net; the puck goes off a visiting defenseman’s stick and into his own net"></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="ast-h">
+    <header>
+      <h2 id="ast-h">Who gets the assists?</h2>
+      <p>The player who scores gets the goal, and up to two teammates who touched the puck just before him get an assist. Watch the play, then tap the two players you think get them.</p>
+    </header>
+    <div class="ac-stage" id="play7b">
+      <div class="ac-view">
+        <p class="pick">See it <select data-view aria-label="Viewpoint">
+          <option value="above">from above</option>
+          <option value="center">from a seat at center ice</option>
+        </select></p>
+        <svg class="ac-rink" id="rink7b" role="group" aria-label="A home team passing play ending in a goal. After the goal, tap two home players to give them the assists."></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button><button class="pill" type="button" id="astReset" hidden>Try again</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+        <p class="ac-pickout" id="astSay" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="pts-h">
+    <header>
+      <h2 id="pts-h">Points, and a hat trick</h2>
+      <p>Goals and assists add up to the number you’ll see most next to a player’s name.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><circle cx="10" cy="20" r="5" fill="currentColor"/><circle cx="32" cy="20" r="5" fill="currentColor"/><circle cx="54" cy="20" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 20h10M37 20h10" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/></svg>
+        <p class="box-h">Assists</p>
+        <p>The last teammate to touch the puck before the scorer gets the first assist, the one before him the second. If the other team takes control of the puck in between, the chain starts over. Some goals have one assist or none.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><text x="32" y="27" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor" font-family="var(--ui)">G+A=P</text></svg>
+        <p class="box-h">Points</p>
+        <p>A goal is one point for the scorer, and an assist is one point for each player who gets one. A player’s points are his goals plus his assists. It’s the usual way to rank scorers.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M12 30c0-10 8-16 20-16s20 6 20 16z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M6 30h52" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+        <p class="box-h">The hat trick</p>
+        <p>Three goals by one player in one game is a hat trick. It’s rare, and fans celebrate by throwing hats onto the ice. The arena crew sweeps them up before play goes on.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="12" y="6" width="40" height="28" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M20 15h24M20 21h16M20 27h20" stroke="currentColor" stroke-width="1.8" opacity="0.6"/></svg>
+        <p class="box-h">Credit can change</p>
+        <p>The official scorer decides who touched the puck, and sometimes changes his mind after watching the replay. A goal can move from one player to another hours later.</p>
+      </div>
+    </div>
+  </section>
+
+  {leaders.length > 0 && (
+    <section class="ac-part" aria-labelledby="lead-h">
+      <header>
+        <h2 id="lead-h">This season’s top scorers</h2>
+        <p>Here are the league’s points leaders right now{asofDay ? `, as of ${asofDay}` : ''}. G is goals, A is assists, P is points.</p>
+      </header>
+      <table class="ac-table">
+        <thead><tr><th scope="col">Player</th><th scope="col">Team</th><th scope="col">G</th><th scope="col">A</th><th scope="col">P</th></tr></thead>
+        <tbody>
+          {leaders.map((l) => (
+            <tr><th scope="row">{l.href ? <a class="plink" href={l.href}>{l.name}</a> : l.name}</th><td>{l.team}</td><td>{l.g}</td><td>{l.a}</td><td><b>{l.p}</b></td></tr>
+          ))}
+        </tbody>
+      </table>
+      <p class="ac-hint">The full list is on the <a href={`${import.meta.env.BASE_URL}players/leaders/`}>Leaders page</a>.</p>
+    </section>
+  )}
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>The puck is sitting on the goal line, half of it over. Goal?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Half isn’t enough. The whole puck has to be past the line.">Yes</button>
+          <button class="pill" type="button" data-right data-say="Right. Until the whole puck is past the line, it isn’t a goal.">No</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>A visiting defenseman accidentally knocks the puck into his own net. Who gets the goal?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Players never score for the other team in the stats. The goal goes to the last home player who touched the puck.">The defenseman</button>
+          <button class="pill" type="button" data-right data-say="Right. It’s the home team’s goal, credited to the last home player to touch the puck.">The last home player to touch it</button>
+          <button class="pill" type="button" data-say="Not quite. It counts, and someone on the home team gets it: the last one to touch the puck.">Nobody: it doesn’t count</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>A player scores once and sets up one other goal. How many points is that?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. The goal and the assist each count.">One</button>
+          <button class="pill" type="button" data-right data-say="Right. One goal plus one assist is two points.">Two</button>
+          <button class="pill" type="button" data-say="Not quite. Three goals would be a hat trick. A goal and an assist is two points.">Three</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+</Lesson>
+
+<script>
+  import { VIEWS, el, r2, whenSeen, motion } from '../../lib/academy/rink';
+  import { playerUI, lit } from '../../lib/academy/play';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  const $ = (id: string) => document.getElementById(id) as any;
+  const H = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'home', keys, ...extra });
+  const A = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'away', keys, ...extra });
+
+  // ---------- Goal or not: inches, from above. The goal line runs from x 0 to 2; the net is beyond it. ----------
+  const gl = $('gl');
+  const defs = el(gl, 'defs');
+  const pat = el(defs, 'pattern', { id: 'mesh', width: 2.4, height: 2.4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  el(pat, 'path', { d: 'M0 0V2.4M0 0H2.4', class: 'mesh' });
+  el(gl, 'rect', { class: 'gl-ice', x: -15, y: -11, width: 36, height: 22 });
+  el(gl, 'rect', { class: 'gl-net', x: 2, y: -11, width: 19, height: 22 });
+  el(gl, 'rect', { class: 'gl-crease', x: -15, y: -11, width: 15, height: 22 });
+  el(gl, 'rect', { class: 'gl-line', x: 0, y: -11, width: 2, height: 22 });
+  el(gl, 'text', { class: 'gl-lbl', x: -7.5, y: -8.6, 'text-anchor': 'middle' }, 'In front');
+  el(gl, 'text', { class: 'gl-lbl', x: 11.5, y: -8.6, 'text-anchor': 'middle' }, 'In the net');
+  el(gl, 'text', { class: 'gl-lbl', x: 1, y: 10, 'text-anchor': 'middle' }, 'Goal line');
+  const pk = el(gl, 'g', { class: 'gl-puck' });
+  el(pk, 'circle', { r: 1.5 });
+  const verdict = el(gl, 'text', { class: 'gl-v', x: -7.5, y: 6.4, 'text-anchor': 'middle' });
+  const STEPS = [
+    { x: -7, goal: false, h: 'On its way', p: 'The puck slides toward the net. The red stripe is the goal line, two inches wide.' },
+    { x: 0, goal: false, h: 'On the line', p: 'Half the puck is on the line. Not a goal: being on the line counts for nothing.' },
+    { x: 2.2, goal: false, h: 'Mostly over', p: 'Most of it is in the net now, but part of it still sits over the line. Still not a goal.' },
+    { x: 3.4, goal: false, h: 'A sliver left', p: 'Only a tiny edge still overlaps the line. Still not a goal. Calls this close are why there are cameras looking down into every net.' },
+    { x: 4.2, goal: true, h: 'All the way over', p: 'Now there’s ice between the puck and the line. The whole puck is over, so it’s a goal, even if it slides back out a moment later.' },
+  ];
+  const track = $('glTrack'), fill = track.querySelector('.fill');
+  const dots = STEPS.map((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.left = (i / (STEPS.length - 1) * 100) + '%';
+    b.setAttribute('aria-label', `Step ${i + 1}: ${s.h}`);
+    b.addEventListener('click', () => { stop(); show(i); });
+    track.appendChild(b); return b;
+  });
+  let step = STEPS.length - 1, auto: any = null;
+  function show(i: number) {
+    step = Math.max(0, Math.min(STEPS.length - 1, i));
+    const s = STEPS[step];
+    pk.setAttribute('transform', `translate(${s.x} 0)`);
+    verdict.textContent = s.goal ? 'Goal' : 'No goal';
+    verdict.classList.toggle('yes', s.goal);
+    $('glStep').textContent = `Step ${step + 1} of ${STEPS.length}`;
+    $('glH').textContent = s.h; $('glP').textContent = s.p;
+    dots.forEach((d, j) => d.classList.toggle('done', j <= step));
+    fill.style.width = (step / (STEPS.length - 1) * 100) + '%';
+    $('glBack').disabled = step === 0; $('glNext').disabled = step === STEPS.length - 1;
+  }
+  const stop = () => { clearInterval(auto); auto = null; };
+  const run = () => { stop(); show(0); auto = setInterval(() => (step >= STEPS.length - 1 ? stop() : show(step + 1)), 3600); };
+  $('glBack').onclick = () => { stop(); show(step - 1); };
+  $('glNext').onclick = () => { stop(); show(step + 1); };
+  $('glAgain').onclick = () => (motion() ? run() : show(0));
+  show(step);
+  whenSeen(gl, run);
+
+  // ---------- The own goal ----------
+  const GOAL_T = 4.7;
+  const own = {
+    length: 8,
+    area: [108, 0, 200, 85],
+    actors: [
+      H('hW', [[0, 150, 76], [1.6, 166, 78], [3.0, 176, 72], [4.4, 178, 70], [8, 176, 66]]),
+      H('hC', [[0, 150, 48], [2, 160, 44], [4.0, 168, 40], [8, 172, 42]]),
+      H('hW2', [[0, 140, 20], [4, 156, 20], [8, 162, 24]]),
+      H('hD1', [[0, 128, 64], [8, 130, 62]]), H('hD2', [[0, 128, 26], [8, 130, 28]]),
+      A('aG', [[0, 185.5, 42.5], [3.0, 185.4, 47], [3.8, 185.4, 48.5], [4.4, 185.6, 47], [8, 185.5, 44]], { goalie: true }),
+      A('aD1', [[0, 168, 52], [3.0, 176, 48], [4.2, 178, 45], [8, 178, 46]]),
+      A('aD2', [[0, 162, 74], [3.0, 170, 70], [4.4, 173, 69], [8, 172, 68]]),
+      A('aC', [[0, 156, 52], [4, 164, 50], [8, 166, 50]]),
+      A('aW1', [[0, 146, 32], [8, 150, 30]]), A('aW2', [[0, 140, 60], [8, 148, 58]]),
+    ],
+    puck: [[0, 150.5, 74.5], [1.6, 166.5, 76.5], [3.0, 176.5, 70.5], [4.2, 178.6, 46.6], [GOAL_T, 190.3, 42.2], [8, 190.5, 42]],
+    beats: [
+      { t: 0, h: 'Into the corner', p: 'The home team (dark) carries the puck down the side, attacking the net on the right.' },
+      { t: 3.0, h: 'Across the front', p: 'The winger passes into the middle, looking for his center in front of the net. The goalie moves across to cover the near post.' },
+      { t: 4.2, h: 'Off a defender’s stick', p: 'A visiting defenseman reaches out to stop the pass. The puck hits his stick and changes direction.' },
+      { t: GOAL_T, h: 'Into his own net', p: 'The puck goes in behind his own goalie. The whole puck crossed the goal line, so it counts: a goal for the home team.' },
+      { t: 6, h: 'Whose goal is it?', p: 'Not the defenseman’s. The goal is credited to the last home player to touch the puck: the winger who made the pass. Fans call it an own goal; in the stats, it’s the winger’s goal.' },
+    ],
+    events: [
+      ...lit(['hW'], 6), ...lit(['aD1'], 4.2, 6), ...lit(null, 4.2, 8, 'focus'),
+      {
+        t: GOAL_T,
+        on: (api: any) => {
+          const p = api.V.P(194, 42.5, api.V.top ? 0 : 6), s = p[2];
+          const lamp = el(api.fx, 'ellipse', { class: 'lamp', cx: r2(p[0]), cy: r2(p[1]), rx: r2(3 * s), ry: r2(3 * s) });
+          requestAnimationFrame(() => lamp.classList.add('on'));
+          score.textContent = '1';
+        },
+        off: (api: any) => { api.fx.replaceChildren(); score.textContent = '0'; },
+      },
+    ],
+  };
+  const root = $('play7'), viewSel = root.querySelector('[data-view]'), score = root.querySelector('[data-score]');
+  const OWN: Record<string, string> = {
+    hW: 'The home winger who made the pass. He gets the goal in the stats.',
+    aD1: 'The visiting defenseman whose stick sent the puck in.',
+    aG: 'The visiting goalie.',
+  };
+  const ui = playerUI(root, $('rink7'), own, () => (VIEWS as any)[viewSel.value], (a: any) => OWN[a.id] ?? `A ${a.kind === 'home' ? 'home' : 'visiting'} player.`);
+  viewSel.addEventListener('change', () => { root.classList.toggle('wide', viewSel.value !== 'above'); ui.rebuild(); });
+  whenSeen($('rink7'), () => ui.play());
+
+  // ---------- Who gets the assists ----------
+  // #4 (defenseman) to #19 (winger) to #11 (center), who scores. #8 and #2 never touch it.
+  const SHOT = 4.6;
+  const ast = {
+    length: 6.5,
+    area: [108, 0, 200, 85],
+    actors: [
+      H('d4', [[0, 128, 60], [1, 130, 62], [6.5, 132, 60]], { tag: '4' }),
+      H('w19', [[0, 156, 76], [2.0, 164, 76], [3.4, 166, 74], [6.5, 170, 70]], { tag: '19' }),
+      H('c11', [[0, 152, 52], [2.6, 160, 50], [3.6, 168, 47], [4.4, 172, 45], [6.5, 176, 46]], { tag: '11' }),
+      H('w8', [[0, 150, 22], [6.5, 160, 26]], { tag: '8' }),
+      H('d2', [[0, 128, 26], [6.5, 130, 28]], { tag: '2' }),
+      A('aG', [[0, 185.5, 42.5], [2.2, 185.4, 46], [3.8, 185.3, 45], [4.6, 185.5, 43], [6.5, 185.5, 43]], { goalie: true }),
+      A('aD1', [[0, 172, 40], [3.6, 174, 42], [6.5, 175, 41]]), A('aD2', [[0, 172, 66], [2.4, 166, 68], [6.5, 162, 64]]),
+      A('aC', [[0, 160, 42], [4, 162, 38], [6.5, 164, 40]]), A('aW1', [[0, 146, 30], [6.5, 148, 30]]), A('aW2', [[0, 144, 58], [6.5, 146, 60]]),
+    ],
+    puck: [[0, 129, 61.5], [1, 131, 63.5], [2.0, 163.5, 75], [3.4, 166.5, 72.5], [3.9, 169, 47.6], [4.4, 173, 46], [SHOT, 190.3, 41.2], [6.5, 190.5, 41]],
+    beats: [
+      { t: 0, h: 'From the blue line', p: 'Number 4, a defenseman, has the puck at the blue line.' },
+      { t: 1, h: 'Pass one', p: 'He passes down to number 19 along the boards.' },
+      { t: 3.4, h: 'Pass two', p: 'Number 19 passes out to number 11 in front of the net.' },
+      { t: SHOT, h: 'Goal', p: 'Number 11 scores. Now tap the two players you think get an assist.' },
+    ],
+    events: [
+      {
+        t: SHOT,
+        on: (api: any) => {
+          const p = api.V.P(194, 42.5, api.V.top ? 0 : 6), s = p[2];
+          const lamp = el(api.fx, 'ellipse', { class: 'lamp', cx: r2(p[0]), cy: r2(p[1]), rx: r2(3 * s), ry: r2(3 * s) });
+          requestAnimationFrame(() => lamp.classList.add('on'));
+        },
+        off: (api: any) => api.fx.replaceChildren(),
+      },
+    ],
+  };
+  const root2 = $('play7b'), viewSel2 = root2.querySelector('[data-view]'), say = $('astSay'), again = $('astReset');
+  let chosen: string[] = [];
+  const TAG: Record<string, string> = { d4: '4', w19: '19', c11: '11', w8: '8', d2: '2' };
+  function mark() {
+    for (const a of ui2.ctl.api.actors) a.f.g.classList.toggle('on', chosen.includes(a.id));
+  }
+  function verdict2() {
+    const right = chosen.includes('w19') && chosen.includes('d4');
+    const ans = 'Number 19 gets the first assist: his was the last pass before the goal. Number 4 gets the second, for the pass before that. Number 11 gets the goal. That’s a point each.';
+    say.textContent = right ? `Right! ${ans}` : chosen.includes('c11') ? `Not quite: number 11 scored, so he gets the goal, not an assist. ${ans}` : `Not quite: numbers 8 and 2 never touched the puck. ${ans}`;
+    again.hidden = false;
+  }
+  const ui2: any = playerUI(root2, $('rink7b'), ast, () => (VIEWS as any)[viewSel2.value], (a: any) => {
+    if (ui2.ctl.t < SHOT) return a.kind === 'home' ? `Number ${TAG[a.id]} on the home team.` : 'A visiting player.';
+    if (a.kind !== 'home') { say.hidden = false; say.textContent = 'Assists only go to the scoring team. Pick two home players (dark).'; return null; }
+    if (chosen.length >= 2) return null;
+    chosen = chosen.includes(a.id) ? chosen.filter((x) => x !== a.id) : [...chosen, a.id];
+    mark();
+    say.hidden = false;
+    if (chosen.length === 2) verdict2(); else say.textContent = `Number ${TAG[a.id]} picked. Tap one more.`;
+    return null;
+  });
+  again.addEventListener('click', () => { chosen = []; mark(); say.hidden = true; again.hidden = true; });
+  viewSel2.addEventListener('change', () => { root2.classList.toggle('wide', viewSel2.value !== 'above'); ui2.rebuild(); mark(); });
+  whenSeen($('rink7b'), () => ui2.play());
+  wireQuiz(document);
+</script>

@@ -1,0 +1,249 @@
+---
+// Academy 1.6: how a game is put together. A timeline of a whole game, game clock and real clock side by side, with a
+// small rink showing which end each team defends and the ice being resurfaced between periods; notes on periods, the
+// clock, intermissions, TV breaks, timeouts and ties; a scoreboard to tap; a quiz. Leans on 1.4 (whistle, faceoff).
+// TV breaks and intermission lengths are the league's usual pattern (checked Oct 2026), drawn as round figures.
+import Lesson from '../../layouts/Lesson.astro';
+---
+<Lesson slug="how-a-game-is-built">
+  <section class="ac-part" aria-labelledby="time-h">
+    <header>
+      <h2 id="time-h">Sixty minutes in two and a half hours</h2>
+      <p>A game is 60 minutes of hockey, but you’ll be in your seat for about two and a half hours. Watch where the time goes: the game clock on the left only runs while the puck is in play, the real clock on the right never stops.</p>
+    </header>
+    <div class="ac-stage" id="tl">
+      <div class="ac-view">
+        <div class="ac-clocks" data-nospell>
+          <div><p class="eyebrow">Game clock</p><p class="ac-big" id="gClock">20:00</p><p class="ac-sub" id="gPer">1st period</p></div>
+          <div><p class="eyebrow">Since puck drop</p><p class="ac-big" id="rClock">0:00</p><p class="ac-sub">hours : minutes</p></div>
+        </div>
+        <svg class="ac-tl" id="tlBar" viewBox="0 0 1000 74" role="img" aria-label="A timeline of a game: three periods of about 38 minutes each, with three TV breaks in each, and two intermissions of about 18 minutes"></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" id="tlScrub" aria-label="Move through the game" />
+        <svg class="ac-rink" id="tlRink" role="img" aria-label="A small rink showing which net each team defends, and the ice being resurfaced between periods"></svg>
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" id="tlStep"></p>
+        <h3 id="tlH"></h3>
+        <p id="tlP"></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" id="tlPlay">Play</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="parts-h">
+    <header>
+      <h2 id="parts-h">The pieces of a game</h2>
+      <p>The same handful of rules shape every game, from the first faceoff to the last horn.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="12" width="16" height="16" rx="3"/><rect x="24" y="12" width="16" height="16" rx="3"/><rect x="44" y="12" width="16" height="16" rx="3"/></g></svg>
+        <p class="box-h">Three periods</p>
+        <p>A game is three periods of 20 minutes each. The clock counts down, from 20:00 to zero, and teams switch ends after every period.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><circle cx="32" cy="22" r="14" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M27 16v12M37 16v12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <p class="box-h">The clock stops</p>
+        <p>Every whistle stops the clock, and the next faceoff starts it. That’s why a 20-minute period takes 35 to 40 minutes of real time.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="10" y="12" width="30" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M40 16h8l4 6v6H40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="18" cy="31" r="3" fill="currentColor"/><circle cx="44" cy="31" r="3" fill="currentColor"/></svg>
+        <p class="box-h">Intermissions</p>
+        <p>Between periods there’s a break of about 18 minutes. The players rest in the dressing room, and the ice resurfacer, a machine most people call a Zamboni, lays down a fresh, smooth coat of ice.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="12" y="6" width="40" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M26 36h12M32 32v4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M28 14l10 5-10 5z" fill="currentColor"/></svg>
+        <p class="box-h">TV breaks</p>
+        <p>Three times a period, at the first whistle after the 6, 10 and 14 minute marks, play pauses for a couple of minutes so TV can show ads. In the arena, that’s music and the scoreboard show.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M20 30V14a4 4 0 0 1 8 0v6M28 20v-8a4 4 0 0 1 8 0v8M36 20v-6a4 4 0 0 1 8 0v12a12 12 0 0 1-24 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>
+        <p class="box-h">One timeout each</p>
+        <p>Each team gets one 30-second timeout a game. Coaches usually save it for a big moment late in the game, or to rest tired players.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><text x="32" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor" font-family="var(--ui)">2 – 2</text><path d="M8 32h48" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 3" opacity="0.6"/></svg>
+        <p class="box-h">If it’s tied</p>
+        <p>In the regular season, a game tied after 60 minutes goes to five minutes of overtime, three skaters a side, and the first goal wins. Still tied? A shootout, where players take turns one-on-one against the goalie. So no game ends in a tie. Lesson 2.9 has the details, and the playoffs’ different rule.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="board-h">
+    <header>
+      <h2 id="board-h">Read the scoreboard</h2>
+      <p>Every arena has a big scoreboard over the ice, and TV shows a small one in the corner. They show the same few things. Tap any part of this one to see what it means.</p>
+    </header>
+    <div class="ac-sb" id="sb" data-nospell>
+      <button type="button" class="sb-team" data-k="score"><span class="sb-l">Visitors</span><span class="sb-n">1</span></button>
+      <div class="sb-mid">
+        <button type="button" class="sb-clock" data-k="clock">12:47</button>
+        <button type="button" class="sb-per" data-k="period"><span class="sb-l">Period</span><span class="sb-n small">2</span></button>
+      </div>
+      <button type="button" class="sb-team" data-k="score"><span class="sb-l">Home</span><span class="sb-n">2</span></button>
+      <button type="button" class="sb-row" data-k="shots"><span class="sb-l">Shots</span><span>14</span></button>
+      <button type="button" class="sb-row pen" data-k="penalty"><span class="sb-l">Penalty</span><span>#17 1:24</span></button>
+      <button type="button" class="sb-row" data-k="shots"><span class="sb-l">Shots</span><span>18</span></button>
+    </div>
+    <p class="ac-pickout" id="sbSay" aria-live="polite">Tap the scoreboard.</p>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>The scoreboard says 4:12 in the 3rd. What does that mean?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-right data-say="Right. The clock counts down, so there are 4 minutes 12 seconds of play left in the game.">4:12 left to play</button>
+          <button class="pill" type="button" data-say="Not quite. Hockey clocks count down, so 4:12 is how much is left.">4:12 has been played</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>A regular-season game is tied 2–2 after three periods. What happens?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Regular-season games don’t end in ties any more.">It ends in a tie</button>
+          <button class="pill" type="button" data-right data-say="Right. Five minutes of 3-on-3 overtime, and a shootout if nobody scores.">Overtime, then a shootout</button>
+          <button class="pill" type="button" data-say="Not quite. There’s no fourth full period in the regular season. It’s five minutes of 3-on-3 overtime, then a shootout.">A fourth full period</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>Why does a 20-minute period take so much longer than 20 minutes?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. The periods themselves are 20 minutes of play. It’s the stops that add time.">The periods are longer</button>
+          <button class="pill" type="button" data-right data-say="Right. The clock stops at every whistle, plus three TV breaks.">The clock stops at every whistle</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+</Lesson>
+
+<script>
+  import { VIEWS, el, r2, fit, drawRink, figure, pathOf, roundPts, whenSeen, motion } from '../../lib/academy/rink';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  const $ = (id: string) => document.getElementById(id) as any;
+
+  // ---------- The timeline, in real minutes from the first puck drop ----------
+  // Each period runs about 38 real minutes, three of them TV breaks of about 2.5; intermissions about 18.
+  const PER = 38, INT = 18, TV = 2.5;
+  type Seg = { kind: 'per' | 'int'; n: number; a: number; b: number; tv: [number, number][] };
+  const segs: Seg[] = [];
+  let at = 0;
+  for (let n = 1; n <= 3; n++) {
+    // The breaks fall at the first whistle after 6, 10 and 14 minutes of play: a little after those points in real time.
+    const play = PER - 3 * TV, tv = [6, 10, 14].map((m, i) => { const s = at + (m / 20) * play + i * TV + 0.6; return [s, s + TV] as [number, number]; });
+    segs.push({ kind: 'per', n, a: at, b: at + PER, tv }); at += PER;
+    if (n < 3) { segs.push({ kind: 'int', n, a: at, b: at + INT, tv: [] }); at += INT; }
+  }
+  const END = at, X = (m: number) => r2(8 + (m / END) * 984);
+  const bar = $('tlBar');
+  const ORD = ['1st', '2nd', '3rd'];
+  for (const s of segs) {
+    el(bar, 'rect', { class: s.kind === 'per' ? 'tl-per' : 'tl-int', x: X(s.a), y: 14, width: r2(X(s.b) - X(s.a) - 2), height: 28, rx: 6 });
+    for (const [a, b] of s.tv) el(bar, 'rect', { class: 'tl-tv', x: X(a), y: 14, width: r2(X(b) - X(a)), height: 28 });
+    el(bar, 'text', { class: 'tl-lbl', x: r2((X(s.a) + X(s.b)) / 2), y: 62, 'text-anchor': 'middle' }, s.kind === 'per' ? `${ORD[s.n - 1]} period` : 'Break');
+  }
+  const head = el(bar, 'path', { class: 'tl-head', d: '' });
+  const scrub = $('tlScrub'); scrub.max = String(END); scrub.step = '0.1';
+
+  // Game time from real time: only the stretches between TV breaks count, spread evenly over the 20 minutes.
+  function where(m: number) {
+    const s = segs.find((x) => m >= x.a && m < x.b) ?? segs[segs.length - 1];
+    if (m >= END) return { s, left: 0, tv: false, end: true };
+    if (s.kind === 'int') return { s, left: 0, tv: false, end: false };
+    let played = m - s.a, tv = false;
+    for (const [a, b] of s.tv) { if (m >= b) played -= TV; else if (m >= a) { played -= m - a; tv = true; } }
+    const left = Math.max(0, 1200 - Math.floor((played / (PER - 3 * TV)) * 1200));
+    return { s, left, tv, end: false };
+  }
+  const CAP: Record<string, [string, string]> = {
+    per1: ['The first period', 'The puck drops and the game clock starts at 20:00, counting down. Every whistle stops it, so the 20 minutes of play take about 35 to 40 minutes of real time.'],
+    tv: ['A TV break', 'At the first whistle after the 6, 10 and 14 minute marks, play waits a couple of minutes for TV ads. In the arena it’s music, the scoreboard show and a good moment to stretch.'],
+    int1: ['First intermission', 'About 18 minutes off. Players head to the dressing room and the ice resurfacer smooths the ice for the next period.'],
+    per2: ['The second period, other ends', 'The teams switch ends: each team defends the net it attacked in the first period.'],
+    int2: ['Second intermission', 'Another break, another fresh sheet of ice.'],
+    per3: ['The third period', 'The teams switch ends again, back to where they started. If one team is behind late, this is when things get desperate.'],
+    end: ['The final horn', 'Sixty minutes of play, about two and a half hours after the first puck drop. Whoever has more goals wins. If it’s tied, overtime comes next.'],
+  };
+  // The small rink: each goalie in the net his team defends that period; the ice resurfacer during the breaks.
+  const rink = $('tlRink'), V = VIEWS.above;
+  fit(rink, V, [0, 0, 200, 85], [2, 2, 2, 2]);
+  drawRink(rink, V, {});
+  const g = el(rink, 'g', { class: 'people' });
+  const hG = figure(g, V, 'home', { goalie: true, tag: 'G' }), aG = figure(g, V, 'away', { goalie: true, tag: 'G' });
+  const zam = el(g, 'g', { class: 'zam' });
+  el(zam, 'rect', { x: -5, y: -3.2, width: 10, height: 6.4, rx: 1.4 });
+  el(zam, 'rect', { class: 'zam-cab', x: 1.2, y: -2.2, width: 3, height: 4.4, rx: 0.8 });
+  const sheen = el(rink, 'path', { class: 'sheen', d: pathOf(V, roundPts(0, 0, 200, 85, 28, 14)) });
+  rink.insertBefore(sheen, g);
+  // The resurfacer drives laps that shrink toward the middle of the ice.
+  function zamAt(k: number) {
+    const laps = 4, a = k * laps * Math.PI * 2, shrink = 1 - 0.75 * k;
+    const x = 100 + 86 * shrink * Math.cos(a + Math.PI), y = 42.5 + 34 * shrink * Math.sin(a + Math.PI);
+    const dx = -Math.sin(a + Math.PI) * 86, dy = Math.cos(a + Math.PI) * 34;
+    return [x, y, Math.atan2(dy, dx) * 180 / Math.PI];
+  }
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  let m = 0, playing = false, raf = 0, last = 0;
+  function draw(t: number) {
+    m = Math.max(0, Math.min(END, t));
+    scrub.value = String(m);
+    const w = where(m), s = w.s;
+    head.setAttribute('d', `M${X(m)} 8V48`);
+    $('gClock').textContent = w.end ? '0:00' : s.kind === 'int' ? '20:00' : fmt(w.left);
+    $('gPer').textContent = w.end ? 'Final' : s.kind === 'int' ? `${ORD[s.n]} period next` : `${ORD[s.n - 1]} period${w.tv ? ' · clock stopped' : ''}`;
+    const mins = Math.floor(m);
+    $('rClock').textContent = `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
+    const key = w.end ? 'end' : w.tv ? 'tv' : `${s.kind}${s.n}`;
+    const [h, p] = CAP[key];
+    $('tlH').textContent = h; $('tlP').textContent = p;
+    $('tlStep').textContent = w.end ? 'End of the game' : s.kind === 'int' ? 'Between periods' : `${ORD[s.n - 1]} period`;
+    const flip = s.kind === 'per' && s.n === 2;
+    const onIce = s.kind === 'per' || w.end;
+    hG.set(flip ? 185.5 : 14.5, 42.5); aG.set(flip ? 14.5 : 185.5, 42.5);
+    hG.g.style.display = aG.g.style.display = onIce ? '' : 'none';
+    zam.style.display = onIce ? 'none' : '';
+    if (!onIce) {
+      const k = Math.min(1, (m - s.a) / (INT * 0.8));
+      const [x, y, r] = zamAt(k);
+      zam.setAttribute('transform', `translate(${r2(x)} ${r2(y)}) rotate(${r2(r)})`);
+      sheen.style.opacity = String(r2(0.6 * k));
+    } else sheen.style.opacity = '0';
+    $('tlPlay').textContent = playing ? 'Pause' : m >= END ? 'Watch again' : 'Play';
+  }
+  // A whole game in about 24 seconds.
+  const SPEED = END / 24;
+  function frame(now: number) {
+    if (!playing) return;
+    const dt = Math.max(0, (now - last) / 1000); last = now;
+    draw(m + dt * SPEED);
+    if (m >= END) { playing = false; draw(m); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  const play = () => { if (m >= END) m = 0; playing = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); draw(m); };
+  const pause = () => { playing = false; cancelAnimationFrame(raf); draw(m); };
+  $('tlPlay').addEventListener('click', () => (playing ? pause() : play()));
+  scrub.addEventListener('input', () => { const v = +scrub.value; pause(); draw(v); });
+  draw(motion() ? 0 : END);
+  whenSeen(rink, play);
+
+  // ---------- Read the scoreboard ----------
+  const SAY: Record<string, string> = {
+    score: 'The score: goals for each team. The home team has 2, the visitors 1. Home is usually listed second, or on the right.',
+    clock: 'Time left in the period. It counts down from 20:00 and stops at every whistle. Near the end of a period, many boards switch to tenths of a second.',
+    period: 'Which period it is: 1, 2 or 3. After that you’ll see OT for overtime, or SO for a shootout.',
+    shots: 'Shots on goal: every shot the goalie had to stop, plus the goals. Shots that miss the net or hit the post don’t count.',
+    penalty: 'A penalty clock. The visitors’ number 17 is in the penalty box for another 1:24, and his team plays a player short until then. Lesson 9 explains penalties.',
+  };
+  const sb = $('sb');
+  sb.querySelectorAll('button').forEach((b: HTMLButtonElement) => b.addEventListener('click', () => {
+    sb.querySelectorAll('button').forEach((x: HTMLButtonElement) => x.classList.toggle('on', x.dataset.k === b.dataset.k));
+    $('sbSay').textContent = SAY[b.dataset.k!];
+  }));
+  wireQuiz(document);
+</script>

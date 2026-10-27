@@ -20,7 +20,7 @@ export const motion = () => document.documentElement.classList.contains('motion'
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dotp = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l); };
-function seat(C, T) {
+export function seat(C, T) {
   const fw = norm(sub(T, C)), rt = norm([-fw[1], fw[0], 0]);
   const up = [fw[1] * rt[2] - fw[2] * rt[1], fw[2] * rt[0] - fw[0] * rt[2], fw[0] * rt[1] - fw[1] * rt[0]];
   const F = Math.hypot(...sub(T, C));
@@ -171,13 +171,15 @@ export const label = (g, V, cls, x, y, s, z = 0) => {
 // ---------- People and the puck ----------
 // A dot from above; a small upright figure from a seat. kind: home (dark sweater), away (white), ref (stripes);
 // goalies are drawn wider. Each has set(x, y) and remembers where it is.
-export function figure(g, V, kind, { goalie = false, tag = '' } = {}) {
-  const grp = el(g, 'g', { class: `fig ${kind}${goalie ? ' gk' : ''}` });
+export function figure(g, V, kind, { goalie = false, tag = '', band = false } = {}) {
+  // band: a referee's orange armbands (linesmen have none).
+  const grp = el(g, 'g', { class: `fig ${kind}${goalie ? ' gk' : ''}${band ? ' band' : ''}` });
   const o = { g: grp, V, x: 0, y: 0, kind, goalie };
   if (V.top) {
     el(grp, 'circle', { class: 'halo', r: 3.4 });
     el(grp, 'circle', { class: 'disc', r: goalie ? 2.2 : 1.8 });
-    if (tag) el(grp, 'text', { class: 'tag' }, tag);
+    if (band) el(grp, 'circle', { class: 'arm', r: 2.55 });
+    if (tag) el(grp, 'text', { class: tag.length > 1 ? 'tag tag2' : 'tag' }, tag);
     o.set = (x, y) => { o.x = x; o.y = y; grp.setAttribute('transform', `translate(${r2(x)} ${r2(y)})`); };
   } else {
     const halo = el(grp, 'ellipse', { class: 'halo' });
@@ -186,6 +188,7 @@ export function figure(g, V, kind, { goalie = false, tag = '' } = {}) {
     const body = el(grp, 'path', { class: 'body' });
     const inner = el(grp, 'path', { class: 'inner' });
     const head = el(grp, 'circle', { class: 'head' });
+    const arm = band ? el(grp, 'path', { class: 'arm' }) : null;
     const t = tag ? el(grp, 'text', { class: 'tag' }, tag) : null;
     const wide = goalie ? 1.35 : 1;
     o.set = (x, y) => {
@@ -198,8 +201,9 @@ export function figure(g, V, kind, { goalie = false, tag = '' } = {}) {
       const d = `M${r2(hip[0])} ${r2(hip[1])}L${r2(sh2[0])} ${r2(sh2[1])}`;
       body.setAttribute('d', d); body.setAttribute('stroke-width', r2(3.1 * s * wide));
       inner.setAttribute('d', d); inner.setAttribute('stroke-width', r2(2.1 * s * wide));
+      if (arm) { const a = V.P(x, y, 4.7); arm.setAttribute('d', `M${r2(a[0] - 1.75 * s)} ${r2(a[1])}h${r2(0.7 * s)}M${r2(a[0] + 1.05 * s)} ${r2(a[1])}h${r2(0.7 * s)}`); arm.setAttribute('stroke-width', r2(0.75 * s)); }
       head.setAttribute('cx', r2(hd[0])); head.setAttribute('cy', r2(hd[1])); head.setAttribute('r', r2(1.05 * s));
-      if (t) { t.setAttribute('x', r2((hip[0] + sh2[0]) / 2)); t.setAttribute('y', r2((hip[1] + sh2[1]) / 2)); t.style.fontSize = r2(2.2 * s) + 'px'; }
+      if (t) { t.setAttribute('x', r2((hip[0] + sh2[0]) / 2)); t.setAttribute('y', r2((hip[1] + sh2[1]) / 2)); t.style.fontSize = r2((tag.length > 1 ? 1.6 : 2.2) * s) + 'px'; }
     };
   }
   return o;
