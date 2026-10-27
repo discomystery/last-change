@@ -1,0 +1,24 @@
+---
+// The Academy glossary: every word a finished lesson introduces, A to Z, each linked to the lesson that teaches it.
+// Built from the lessons' own word lists (lib/academy/lessons.ts), so it never needs updating by hand.
+import Base from '../../layouts/Base.astro';
+import { TRACKS } from '../../lib/academy/lessons';
+import '../../styles/academy.css';
+const base = import.meta.env.BASE_URL;
+const words = TRACKS.flatMap((tr, ti) => tr.lessons.flatMap((l, i) => (l.ready ? (l.words ?? []).map((w) => ({ ...w, slug: l.slug, lesson: l.title, no: `${ti + 1}.${i + 1}` })) : [])))
+  .sort((a, b) => a.word.localeCompare(b.word));
+---
+<Base title="Glossary · Academy" description="Every hockey word the Academy lessons teach, in plain English.">
+  <div class="ac">
+    <nav class="crumbs" aria-label="Where you are"><a href={`${base}academy/`}>Academy</a><span aria-hidden="true">›</span><span aria-current="page">Glossary</span></nav>
+    <header class="ac-top">
+      <h1>Glossary</h1>
+      <p class="lede">Every word the lessons teach, in plain English. Each one links to the lesson where it comes up. The list grows as new lessons arrive.</p>
+    </header>
+    <section class="ac-part ac-words" aria-label="Words">
+      <dl>
+        {words.map((w) => <div id={w.word.toLowerCase().replace(/[^a-z]+/g, '-')}><dt>{w.word}</dt><dd>{w.means} <a href={`${base}academy/${w.slug}/`}>Lesson {w.no}</a></dd></div>)}
+      </dl>
+    </section>
+  </div>
+</Base>
