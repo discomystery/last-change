@@ -51,6 +51,8 @@ import ShareTeam from '../../components/ShareTeam.astro';
 import ShareGoalies from '../../components/ShareGoalies.astro';
 import ShareButton from '../../components/ShareButton.astro';
 import { trendFor } from '../../lib/trend';
+import BehindRecord from '../../components/BehindRecord.astro';
+import { behind as behindData, behindFor, pp3 } from '../../lib/behind';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -146,8 +148,9 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
 const trend = trendFor(abbr!);
+const bh = behindFor(abbr!);
 const hasTeamStats = statSeasons('teams').some((x) => statRows('teams', x).some((r) => r.team === abbr));
-const nav = [['next', 'Next'], ['form', 'Schedule'], ...(hasTeamStats ? [['stats', 'Stats']] : []), ...(trend ? [['trend', 'Trends']] : []), ['style', 'Style'], ['players', 'Players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
+const nav = [['next', 'Next'], ['form', 'Schedule'], ...(hasTeamStats ? [['stats', 'Stats']] : []), ...(bh ? [['record', 'Record']] : []), ...(trend ? [['trend', 'Trends']] : []), ['style', 'Style'], ['players', 'Players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 // The head coach from the club's latest game; a coach who took over this season says since when.
@@ -184,6 +187,18 @@ const coachSince = coach && (team as any).coach_since
   </Section>
 
   <TeamStats abbr={abbr!} place={team.place} />
+
+  {bh && (
+    <Section id="record" title="Behind the record" placeholder={false} takeaway={`Whether ${team.place}’s record matches how they’ve played, and what makes up the difference.`}>
+      <Fragment slot="explain">
+        <p><strong>What their chances are worth.</strong> Every shot gets a chance of going in, based on where and how it was taken. Add up the chances for and against at 5-on-5 and on special teams, and you get the goal difference a team’s play would usually bring. Over every team-season from 2023-24 to 2025-26, each expected goal of difference a game was worth about {pp3(behindData!.fit.per_goal)} of points percentage, starting from {pp3(behindData!.fit.base)} for an even team. That is the dotted mark.</p>
+        <p><strong>Why it matters.</strong> Tested on the same seasons, a team’s chances after 15 games told us more about how the rest of its season would go than its record did, and records far from the chances mostly came back toward them.</p>
+        <p><strong>The parts.</strong> Goal difference splits exactly into the chances at 5-on-5, the chances on special teams, shooting (goals against the chances their shots had), goaltending (chances against minus goals allowed) and empty-net goals. Shooting and goaltending swing a lot from one stretch of a season to the next, so the sentences say what has happened, not what will.</p>
+        <p><strong>The checks.</strong> A record {pp3(behindData!.gap)} or more away from what the chances are worth gets a reason: the one or two parts that pushed it there, or more than their share of one-goal and overtime results. Shooting is called out at 4.5 goals under the chances or 6 over; goalies when one is 3 goals above expected and another 3 below; lines when one forward line has 58% or more of the 5-on-5 chances and the rest of the lineup 47% or less, or when the players beyond the top two lines are clearly winning or losing their minutes. A group counts as on the ice when two of its three forwards are.</p>
+      </Fragment>
+      <BehindRecord t={bh} colour={teamPaint(abbr!)} place={team.place} base={behindData!.fit.base} />
+    </Section>
+  )}
 
   {trend && (
     <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} has come from, and whether this season’s team plays a new way.`}>

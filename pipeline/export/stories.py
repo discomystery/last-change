@@ -700,6 +700,11 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         text = _race_now(sd.race(going_in, t), W)
         if text:
             items.append({"tag": "Playoff race", "text": text, "score": 77})
+    from pipeline.export import behind
+    for t in (away, home):  # a record well away from the play, and the part of the goal difference behind it
+        item = behind.preview_item(t, season, before, W)
+        if item:
+            items.append(item)
     return out
 
 
