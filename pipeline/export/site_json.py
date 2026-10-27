@@ -37,6 +37,8 @@ def run(season: int) -> dict:
     stats.run(season)  # the league's own counting stats: player and team pages, the Leaders page
     from pipeline.export import ledger
     ledger.run(season)  # player pages' career ledger: every season's line and his trophies
+    from pipeline.export import canes
+    canes.run()  # the unlinked Hurricanes page: how Hurricane-y every skater is (reads the player JSON and careers)
     from pipeline.export import gamelog
     gamelog.run(season)  # player pages' recent games: his last ten boxscore lines
     from pipeline.export import record_book
