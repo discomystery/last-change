@@ -298,7 +298,11 @@ def test_set_up_wins_needs_most_goals_off_low_rated_passes():
 def test_five_point_nights_lead_and_carry_a_milestone():
     import polars as pl
     from pipeline.export import stories
+    # Nicknames are cached from whichever teams.json an earlier test read; set them here so the order doesn't matter.
+    previews.NICKS.clear()
+    previews.NICKS.update({"EDM": "Oilers", "CAR": "Hurricanes"})
     W = stories.Words({"EDM": "Edmonton", "CAR": "Carolina"})
+    previews.NICKS.clear()
     night = pl.DataFrame({"player_id": [1, 2, 3], "team": ["EDM", "EDM", "CAR"], "g": [2, 1, 1], "pts": [5, 5, 2]})
     last = {1: "Draisaitl", 2: "McDavid", 3: "Ehlers"}.get
     heads = stories._night_heads(night, "EDM", W, "the Hurricanes", last, {1, 2, 3})
