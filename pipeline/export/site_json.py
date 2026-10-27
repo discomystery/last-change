@@ -22,6 +22,8 @@ def run(season: int) -> dict:
     export_goal_sources(season)
     from pipeline.export import trend
     trend.run(season)  # team pages' season trend: history, two seasons game by game, then and now
+    from pipeline.export import behind
+    behind.run(season)  # what's behind each record: record against play, shooting, goalies, lines (reads goalies.json)
     from pipeline.export import xg_grid
     xg_grid.run()  # Methods page: average shot chance by spot and shot type
     (SITE_DATA / "xg_check.json").unlink(missing_ok=True)  # the Chance check page is gone; drop its data from restored copies
