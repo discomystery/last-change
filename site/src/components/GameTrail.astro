@@ -7,8 +7,9 @@ import recapIndex from '../../public/data/recaps/index.json';
 import previewIndex from '../../public/data/previews/index.json';
 
 // `part` picks the trail back to the day's games (above the rink) or each team's previous and next game (below it).
-interface Props { id: number; part: 'crumbs' | 'around' }
-const { id, part } = Astro.props;
+// `names` gives each club’s nickname and, before the game, its record: on phones they head that club's games.
+interface Props { id: number; part: 'crumbs' | 'around'; names?: Record<string, { full: string; rec?: string }> }
+const { id, part, names = {} } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const games = [...schedule.games].sort((a, b) => a.start.localeCompare(b.start));
 const g = games.find((x) => x.id === id)!;
@@ -39,8 +40,8 @@ const around = [g.away, g.home].map((me) => {
   <div class="under">
     <div class="when"><slot /></div>
     {around.map(({ me, prev, next }, i) => (
-      <nav class:list={['around', i ? 'home' : 'away']} aria-label={`${place[me] ?? me}: previous and next game`}>
-        <a class="who tlink" href={`${base}team/${me}/`}>{me}</a>
+      <nav class:list={['around', i ? 'home t-home' : 'away t-away']} aria-label={`${place[me] ?? me}: previous and next game`}>
+        <p class="who"><a class="tlink" href={`${base}team/${me}/`}>{names[me]?.full ?? me}</a>{names[me]?.rec && <span class="who-rec">{names[me].rec}</span>}</p>
         <span class="pills">
           {prev ? <a class="pill" href={href(prev)}><span aria-hidden="true">‹</span> {label(prev, me)}</a> : <span class="pill none">First game</span>}
           {next ? <a class="pill" href={href(next)}>{label(next, me)} <span aria-hidden="true">›</span></a> : <span class="pill none">Last game</span>}
@@ -59,13 +60,18 @@ const around = [g.away, g.home].map((me) => {
   .around.away { grid-area: away; }
   .around.home { grid-area: home; justify-items: end; }
   /* On wide screens each team's games sit under its own end of the rink, so the name is only needed on phones. */
-  .who { display: none; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-  .who:hover { color: var(--ink); }
+  /* On phones the rink shows only abbreviations, so each club's full name (and record before the game) heads its
+     own games, in its color: the one place the page names the teams in full (Sora, 2026-10-27). */
+  .who { display: none; margin: 0; font: 600 15px/1.3 var(--body); color: var(--ink); }
+  .who .tlink { color: inherit; }
+  .who-rec { font: 400 13px var(--ui); color: var(--ink-2); margin-left: 6px; white-space: nowrap; }
+  .home .who { text-align: right; }
   .pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .home .pills { justify-content: flex-end; }
   @media (max-width: 719px) {
     .under { grid-template-columns: 1fr 1fr; grid-template-areas: 'when when' 'away home'; align-items: start; padding-inline: 0; }
-    .who { display: block; }
+    .who { display: block; margin-bottom: 4px; }
+    .who::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team, var(--ink-3)); margin-right: 7px; vertical-align: 1px; }
     .pills { flex-direction: column; align-items: flex-start; }
     .home .pills { align-items: flex-end; }
   }

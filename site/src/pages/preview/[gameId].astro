@@ -171,7 +171,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
+    <GameTrail id={snap.game_id} part="around" names={Object.fromEntries(order.map((a) => [a, { full: T[a]?.nick ?? full(a), rec: rec(a) }]))}><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.
@@ -567,6 +567,9 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .st-h { display: flex; align-items: center; gap: 8px; }
   .g3 { display: grid; gap: 12px; margin-top: 18px; }
   @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
+  /* Smaller screens: the two goalies first (side by side on tablets), then the league chart that compares them (Sora, 2026-10-27). */
+  @media (max-width: 899px) { .g3 > .gmid { order: 1; } }
+  @media (min-width: 720px) and (max-width: 899px) { .g3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .g3 > .gmid { grid-column: 1 / -1; } .g3 > .gmid > :global(*) { width: 100%; max-width: 480px; margin-inline: auto; } }
   .g3 > [hidden], .gnights > [hidden], .fpc [hidden] { display: none; }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
   .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }

@@ -69,12 +69,14 @@ const lastLine = lastGame && before && (() => {
 )}
 
 <style>
-  .nu { display: grid; gap: 10px; align-content: start; }
+  .nu { display: grid; gap: 10px; align-content: start; container-type: inline-size; }
   .nu-t { width: 100%; }
   .nu-t th:first-child { white-space: normal; }
+  .nu-t tbody th:first-child { white-space: nowrap; }
   .nu-t .nu-l { text-align: right; }
   .nu-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team, var(--ink-3)); margin-right: 8px; vertical-align: 1px; }
   .nu-rel { display: block; font: 400 12px var(--ui); color: var(--ink-3); }
   .nu-last { font: 400 15px/1.45 var(--ui); color: var(--ink-2); margin: 0; }
-  @media (max-width: 560px) { .nu-wd { display: none; } }
+  /* Drop the weekday when the card is narrow (phones, and two cards side by side on tablets), so names stay on one line. */
+  @container (max-width: 400px) { .nu-wd { display: none; } .nu-t td.nu-l { white-space: normal; } }
 </style>

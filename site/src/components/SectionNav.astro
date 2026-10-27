@@ -123,11 +123,13 @@ const inSentence = (label: string) => (/^[A-Z][a-z]/.test(label) ? label[0].toLo
   .jump.secnav-pills.more-l.more-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
   .jump.secnav-pills a { font-weight: 600; color: var(--ink-3); border: 0; background: none; padding: 5px 10px; transition: color 0.2s; }
   .jump.secnav-pills a:hover { color: var(--ink); }
+  /* Tablets: a little less room around each name, so a team page's full menu fits across an iPad mini. */
+  @media (min-width: 720px) and (max-width: 1023px) { .jump.secnav-pills a { padding-inline: 7px; } }
   .jump.secnav-pills a.here { color: var(--ink); }
   /* The pinned row sits in a frosted strip with the team pill and the page-list icon at its right once the top menu
      has scrolled away (Sora, 2026-10-14). */
   .secnav-pin {
-    position: sticky; top: 0; z-index: 15; display: flex; align-items: flex-start; gap: 12px; margin: 14px -16px 0; padding-right: 16px;
+    position: sticky; top: 0; z-index: 15; display: flex; align-items: flex-start; gap: 12px; margin: 14px calc(-1 * var(--gut)) 0; padding-right: var(--gut);
   }
   /* The frosted background stops 3 px up, at the reading line's lower edge (the strip's own box runs on to hold the
      dots that hang below the line). */
