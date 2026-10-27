@@ -750,7 +750,11 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
     :root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%23e6edf3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   }
 
-  .site-head, main, .site-foot { max-width: 1080px; margin-inline: auto; padding-inline: 16px; }
+  /* Side gutter: 16 px on phones, 24 px from tablets up (the iPad mini's 744 px felt edge to edge at 16). The content
+     column stays 1,048 px wide on computers either way. Anything that bleeds to the screen edge uses var(--gut). */
+  :root { --gut: 16px; }
+  @media (min-width: 720px) { :root { --gut: 24px; } }
+  .site-head, main, .site-foot { max-width: calc(1048px + 2 * var(--gut)); margin-inline: auto; padding-inline: var(--gut); }
   .site-head { padding-block: 18px 6px; display: grid; gap: 14px; }
   .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
   .site-nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 18px; font: 600 14px var(--ui); }
@@ -945,6 +949,8 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   /* Side by side the Last game line stays on one line to match Next game; stacked (phones) it may take two. */
   .tk-sub.one { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
   @media (min-width: 720px) { .tk-sub.one { display: block; white-space: nowrap; text-overflow: ellipsis; } }
+  /* Two tickets side by side on a tablet: slightly smaller type keeps a final score on one line. */
+  @media (min-width: 720px) and (max-width: 900px) { .tk-main { padding-inline: 14px; } .tk-ab, .tk-sc { font-size: 28px; } .tk-dash { font-size: 26px; } .tk-d { font-size: 34px; } .tk-m { column-gap: 8px; } }
   @media (max-width: 420px) { .card.tk { grid-template-columns: 70px 1fr; } .tk-ab, .tk-sc { font-size: 28px; } .tk-d { font-size: 34px; } .tk-m { flex-wrap: nowrap; column-gap: 8px; } }
   /* The one line of facts under a rink header (date, time, arena), the same on every page that has one. */
   .next-meta { font: 400 14px var(--ui); color: var(--ink-2); margin-top: 12px; }

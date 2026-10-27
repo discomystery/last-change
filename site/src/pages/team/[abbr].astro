@@ -166,7 +166,6 @@ const coachSince = coach && (team as any).coach_since
         <h1>{team.name}</h1>
         <p class="rec">{team.w}-{team.l}-{team.otl}</p>
         {coach && <p class="coach">Head coach <span class="coach-name">{coach}</span>{coachSince && <span class="coach-since"> since {coachSince}</span>}</p>}
-        <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
       </header>
     </div>
     <Intro text={tiText} colour={teamPaint(abbr)} class="tstory" />

@@ -7,8 +7,7 @@
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
   .crumbs + .team-top { margin-top: 0; }
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
-  .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
-  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
+  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px calc(-1 * var(--gut)) 0; padding: 2px var(--gut) 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); transition: border-color 0.15s ease; }
   .jump a:hover { border-color: var(--ink); }
   .next { margin-top: 18px; }
@@ -151,6 +150,13 @@
 
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
+  /* Tablets: power play and penalty kill stacked on the left, the shot map beside them (pinned while they scroll),
+     instead of one map the full width of the screen. */
+  @media (min-width: 720px) and (max-width: 899px) {
+    .st3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+    .st3 > .mapcard { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 72px; }
+    .st3 > .card:not(.mapcard) { grid-column: 1; }
+  }
   .st3 > .card { display: flex; flex-direction: column; }
   .st3 .stunit { flex: 1; }
   .mapcard { justify-content: center; }
@@ -197,6 +203,14 @@
   .unit-two { font: 400 14px var(--ui); color: var(--ink-3); margin-top: 4px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
   .stats .lab-short { display: none; }
+  /* Line and pair cards switch to the short labels by their own width, so two narrow cards side by side on a tablet
+     keep every label on one line. */
+  .card.unit { container-type: inline-size; }
+  @container (max-width: 400px) {
+    .stats dt { white-space: nowrap; }
+    .stats .lab-long { display: none; }
+    .stats .lab-short { display: inline; }
+  }
   @media (max-width: 479px) {
     .stats { gap: 12px 6px; }
     .stats dt { font-size: 11.5px; white-space: nowrap; }
