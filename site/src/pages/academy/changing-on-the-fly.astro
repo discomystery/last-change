@@ -1,0 +1,302 @@
+---
+// Academy 1.5: shifts and line changes. A play seen across the ice toward the benches, with a shift clock over each
+// skater: a tired line changes on the fly while play goes on. Notes on shifts, lines, pairs and the goalie; a skater
+// whose legs go the longer he stays out; a real team's four lines and three pairs; this season's average shift; a quiz.
+// Leans on 1.2 (bench), 1.3 (forwards, defensemen) and 1.4 (whistle).
+import Lesson from '../../layouts/Lesson.astro';
+import { teamLines, example, averageShift } from '../../lib/academy/real';
+const real = { teams: teamLines(), example: example(), shift: averageShift() };
+---
+<Lesson slug="changing-on-the-fly">
+  <section class="ac-part" aria-labelledby="fly-h">
+    <header>
+      <h2 id="fly-h">A change without a whistle</h2>
+      <p>Hockey players skate flat out, so nobody stays on for long. Every minute or so, a team swaps players, and most of the time play doesn’t even stop. The number over each player is how long he’s been out there.</p>
+    </header>
+    <div class="ac-stage wide" id="play5">
+      <div class="ac-view">
+        <p class="pick">See it <select data-view aria-label="Viewpoint">
+          <option value="center">from a seat across from the benches</option>
+          <option value="above">from above</option>
+        </select></p>
+        <svg class="ac-rink" id="rink5" role="img" aria-label="The home team’s three tired forwards skate to their bench while three fresh ones jump over the boards, as play goes on. Each player has a shift clock over his head."></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="how-h">
+    <header>
+      <h2 id="how-h">How teams take turns</h2>
+      <p>Twenty players dress for a game and only six play at once, so a coach is always deciding who goes next. Here’s how it’s organized.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><circle cx="32" cy="22" r="14" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M32 22V12M32 22l7 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M28 5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <p class="box-h">A shift</p>
+        <p>One turn on the ice is a shift. Most last well under a minute, because skating that hard burns out the legs fast. A player might get 20 or more shifts in a game.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="currentColor"><circle cx="14" cy="12" r="4.5"/><circle cx="32" cy="12" r="4.5"/><circle cx="50" cy="12" r="4.5"/></g><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="23" cy="30" r="4.5"/><circle cx="41" cy="30" r="4.5"/></g></svg>
+        <p class="box-h">Lines and pairs</p>
+        <p>Forwards go on in threes, called lines, and defensemen in twos, called pairs. They’re usually the same groups game after game, because players who know each other play better together.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="currentColor">{[0, 1, 2, 3].map((r) => [0, 1, 2].map((c) => <circle cx={8 + c * 8} cy={6 + r * 9} r="3"/>))}</g><g fill="none" stroke="currentColor" stroke-width="1.6">{[0, 1, 2].map((r) => [0, 1].map((c) => <circle cx={42 + c * 9} cy={8 + r * 11} r="3"/>))}</g></svg>
+        <p class="box-h">Four lines, three pairs</p>
+        <p>That’s why teams dress 12 forwards and 6 defensemen. The first line usually has the best scorers and plays the most; the fourth line plays least. Defensemen play longer shifts than forwards.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M40 8h16v24H40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><circle cx="34" cy="20" r="6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M8 20h14" stroke="currentColor" stroke-width="2" stroke-dasharray="2 3" opacity="0.6"/></svg>
+        <p class="box-h">The goalie stays in</p>
+        <p>Goalies don’t change. The starter usually plays the whole game, unless he’s hurt or having a rough night and the coach sends in the backup.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="currentColor">{[0, 1, 2, 3, 4, 5].map((i) => <circle cx={7 + i * 8.5} cy="20" r="3.4"/>)}</g><circle cx="58" cy="20" r="4.4" fill="none" stroke="var(--ac-red)" stroke-width="2"/></svg>
+        <p class="box-h">Too many men</p>
+        <p>The tired player has to be close to the bench before his replacement steps on. Get it wrong and a team has six skaters on the ice at once, which is a penalty. Lesson 2.4 has the details.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="legs-h">
+    <header>
+      <h2 id="legs-h">Watch his legs go</h2>
+      <p>Start a shift and watch one skater. The longer he stays out, the slower he gets. The clock runs three times faster than real life, so you don’t have to wait.</p>
+    </header>
+    <div class="ac-stage">
+      <div class="ac-view">
+        <svg class="ac-rink" id="legs" role="img" aria-label="One skater doing laps of the rink, slowing down as his shift goes on"></svg>
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow">Shift clock</p>
+        <p class="ac-big" id="legClock" data-nospell>0:00</p>
+        <div class="ac-meter" aria-hidden="true"><span id="legBar"></span></div>
+        <h3 id="legH">Fresh legs</h3>
+        <p id="legP">Press start and he jumps over the boards.</p>
+        <div class="ac-ctrl">
+          <button class="pill primary" type="button" id="legGo">Start the shift</button>
+          <button class="pill" type="button" id="legOff" disabled>Change him</button>
+        </div>
+        <p class="ac-hint">The slowdown is a picture, not a measurement, but the shape is real, and it’s why coaches keep shifts short.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="real-h">
+    <header>
+      <h2 id="real-h">A real team’s lines</h2>
+      <p>Here are the four lines and three pairs a real team has used most lately, from the site’s data.{real.shift ? ` This season, the average NHL shift has lasted ${real.shift} seconds.` : ''}</p>
+    </header>
+    <p class="pick">Show the <select id="realTeam" aria-label="Team"></select></p>
+    <div class="ac-lines" id="lines"></div>
+    <p class="ac-hint" id="realHint"></p>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>Does play have to stop for a team to change players?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Teams can change at a whistle, but most changes happen while play goes on: changing on the fly.">Yes</button>
+          <button class="pill" type="button" data-right data-say="Right. Most changes happen on the fly, while play goes on.">No</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>About how long is a typical shift?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. That’s far too short to get anything done. Most shifts last most of a minute.">Ten seconds</button>
+          <button class="pill" type="button" data-right data-say="Right. Most shifts are well under a minute.">Under a minute</button>
+          <button class="pill" type="button" data-say="Not quite. Nobody could skate that hard for five minutes. Most shifts are under a minute.">Five minutes</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>Three forwards who usually go on together are called…</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-right data-say="Right. Three forwards make a line; two defensemen make a pair.">A line</button>
+          <button class="pill" type="button" data-say="Not quite. A pair is two defensemen. Three forwards are a line.">A pair</button>
+          <button class="pill" type="button" data-say="Not quite. A shift is one turn on the ice. Three forwards are a line.">A shift</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+  <script type="application/json" id="realData" set:html={JSON.stringify(real)} />
+</Lesson>
+
+<script>
+  import { VIEWS, seat, el, r2, fit, drawRink, figure, label, whenSeen, motion } from '../../lib/academy/rink';
+  import { playerUI, lit } from '../../lib/academy/play';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  const $ = (id: string) => document.getElementById(id) as any;
+  const H = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'home', keys, ...extra });
+  const A = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'away', keys, ...extra });
+  const B = -3.5; // on the bench, just behind the boards
+
+  // ---------- A change without a whistle ----------
+  // The home team (dark) attacks the right end. Its defenseman dumps the puck in and three tired forwards change.
+  const def: any = {
+    length: 12,
+    area: [20, -7, 200, 85],
+    narrow: [48, -7, 160, 48],
+    rink: { off: true },
+    actors: [
+      H('hG', [[0, 14.5, 42.5], [12, 14.5, 42.5]], { goalie: true }),
+      H('O1', [[0, 118, 22], [1.2, 120, 20], [2.6, 98, 7], [3.6, 82, 1.5], [4.2, 76, B], [12, 76, B]]),
+      H('O2', [[0, 122, 44], [1.2, 122, 40], [2.8, 100, 13], [3.8, 86, 1.5], [4.4, 84, B], [12, 84, B]]),
+      H('O3', [[0, 116, 64], [1.2, 118, 60], [3.0, 97, 22], [4.0, 90, 2], [4.6, 90, B], [12, 90, B]]),
+      H('N1', [[0, 66, B], [3.2, 66, B], [3.7, 68, 3], [6, 110, 14], [9, 150, 16], [12, 176, 18]]),
+      H('N2', [[0, 72, B], [3.3, 72, B], [3.8, 74, 3], [6, 112, 30], [9, 152, 36], [12, 168, 40]]),
+      H('N3', [[0, 78, B], [3.5, 78, B], [4.0, 80, 3], [6.5, 112, 50], [9.5, 150, 56], [12, 163, 58]]),
+      H('hD1', [[0, 96, 30], [1.2, 105, 29], [4, 110, 26], [8, 122, 24], [12, 124, 26]]),
+      H('hD2', [[0, 88, 58], [4, 100, 58], [8, 118, 60], [12, 122, 60]]),
+      A('aG', [[0, 185.5, 42.5], [3, 185.5, 40], [12, 185.5, 42.5]], { goalie: true }),
+      A('aD1', [[0, 170, 30], [2, 182, 20], [3.6, 190.5, 21.5], [5, 188, 26], [6.5, 182, 22], [9, 178, 26], [12, 172, 30]]),
+      A('aD2', [[0, 168, 56], [4, 178, 54], [12, 176, 52]]),
+      A('aC', [[0, 150, 44], [4, 164, 40], [8, 150, 34], [12, 132, 34]]),
+      A('aW1', [[0, 150, 18], [4, 160, 14], [7.5, 160, 12], [10, 132, 14], [12, 120, 18]]),
+      A('aW2', [[0, 150, 64], [6, 160, 66], [12, 140, 64]]),
+      A('s1', [[0, 116, B], [12, 116, B]]), A('s2', [[0, 123, B], [12, 123, B]]), A('s3', [[0, 130, B], [12, 130, B]]),
+    ],
+    puck: [[0, 96.5, 31], [1.2, 105.5, 30], [2.8, 187, 9], [3.6, 191, 22], [5, 188.5, 26.5], [6.5, 182.5, 22.5], [7.5, 160.5, 12.5], [10, 132.5, 14.5], [12, 120.5, 18.5]],
+    beats: [
+      { t: 0, h: 'A tired line', p: 'The home team’s three forwards have been out for most of a minute, and you can see it on their shift clocks. Their defenseman has the puck.' },
+      { t: 1.2, h: 'Dump it in and change', p: 'He shoots the puck deep into the other end. That buys time: the other team has to go and get it, while the tired forwards head for the bench.' },
+      { t: 3.2, h: 'Over the boards', p: 'As each tired player gets close to the bench, a fresh one jumps over the boards and takes his place. Their clocks start at zero.' },
+      { t: 6, h: 'Play never stopped', p: 'Nobody blew a whistle. Three players came off and three went on at full speed. That’s changing on the fly.' },
+      { t: 9, h: 'Fresh legs', p: 'The new line chases the puck with all their energy. The defensemen stay out a little longer: they’ll change when they get their own chance.' },
+    ],
+    events: [...lit(['O1', 'O2', 'O3'], 0, 3.2), ...lit(['N1', 'N2', 'N3'], 3.2, 9), ...lit(null, 0, 9, 'focus')],
+  };
+  // Shift clocks: seconds already played at the start (tired ones), or the moment a fresh one steps on.
+  const CLOCKS: Record<string, { from: number; until?: number; start?: number }> = {
+    O1: { from: 44, until: 3.4 }, O2: { from: 47, until: 3.6 }, O3: { from: 51, until: 3.8 },
+    N1: { from: 0, start: 3.8 }, N2: { from: 0, start: 3.95 }, N3: { from: 0, start: 4.15 },
+    hD1: { from: 31 }, hD2: { from: 35 },
+  };
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const root = $('play5'), svg = $('rink5');
+  const viewSel = root.querySelector('[data-view]');
+  function clocks(t: number, ctl: any) {
+    if (!ctl) return;
+    const { V, actors } = ctl.api;
+    let g = svg.querySelector('.timers');
+    if (!g) { g = el(svg, 'g', { class: 'timers', 'data-nospell': '' }); for (const id in CLOCKS) el(g, 'text', { 'data-id': id, 'text-anchor': 'middle' }); }
+    for (const a of actors) {
+      const c = CLOCKS[a.id];
+      if (!c) continue;
+      const tx = g.querySelector(`[data-id="${a.id}"]`);
+      const on = (c.start == null || t >= c.start) && (c.until == null || t < c.until);
+      tx.style.display = on ? '' : 'none';
+      if (!on) continue;
+      const s = c.from + t - (c.start ?? 0);
+      const p = V.P(a.f.x, a.f.y - (V.top ? 4.2 : 0), V.top ? 0 : 8.6);
+      tx.setAttribute('x', r2(p[0])); tx.setAttribute('y', r2(p[1]));
+      tx.setAttribute('class', `sclk${s >= 45 ? ' tired' : ''}`);
+      const txt = mmss(s);
+      if (tx.textContent !== txt) tx.textContent = txt;
+    }
+  }
+  const WHO: Record<string, string> = {
+    O1: 'A tired forward, heading for the bench.', O2: 'A tired forward, heading for the bench.', O3: 'A tired forward, heading for the bench.',
+    N1: 'A fresh forward, just over the boards.', N2: 'A fresh forward, just over the boards.', N3: 'A fresh forward, just over the boards.',
+    hD1: 'A home defenseman. He stays out for now.', hD2: 'A home defenseman. He stays out for now.',
+    s1: 'A visiting player waiting on his bench.', s2: 'A visiting player waiting on his bench.', s3: 'A visiting player waiting on his bench.',
+  };
+  // A seat low down across from the benches, so the change is close enough to see.
+  const ACROSS = seat([100, 112, 78], [104, 20, 0]);
+  const ui = playerUI(root, svg, def, () => (viewSel.value === 'center' ? ACROSS : VIEWS.above), (a: any) =>
+    WHO[a.id] ?? (a.goalie ? 'A goalie. He stays in all game.' : 'A visiting skater.'), { onTick: clocks });
+  viewSel.addEventListener('change', () => { ui.rebuild(); clocks(ui.ctl.t, ui.ctl); });
+  clocks(ui.ctl.t, ui.ctl);
+  whenSeen(svg, () => ui.play());
+
+  // ---------- Watch his legs go ----------
+  // One skater doing laps; his speed holds for about 25 seconds, then falls toward half of his best.
+  const legs = $('legs'), V = VIEWS.above;
+  fit(legs, V, [0, -8, 200, 85], [1, 2, 2, 2]);
+  drawRink(legs, V, { off: true });
+  const pg = el(legs, 'g', { class: 'people' });
+  const sk = figure(pg, V, 'home', {});
+  const BENCH = [80, B];
+  sk.set(BENCH[0], BENCH[1]);
+  const speed = (s: number) => (s < 25 ? 1 : 1 - 0.5 * (1 - Math.exp(-(s - 25) / 40)));
+  const SAYS: [number, string, string][] = [
+    [0, 'Flying', 'Full speed, first few strides. This is when players are most dangerous.'],
+    [30, 'Starting to slow', 'Still quick, but not quite as quick. Most shifts end around here.'],
+    [50, 'Running out of gas', 'He’s noticeably slower now. A fresh opponent would skate right past him.'],
+    [75, 'Needs a change, badly', 'This is a long shift. Coaches hate these: tired players make mistakes and give up goals.'],
+  ];
+  let running = false, sec = 0, ang = Math.PI, raf = 0, last = 0, onIce = false;
+  const avg = JSON.parse($('realData').textContent).shift;
+  function paint() {
+    $('legClock').textContent = mmss(sec);
+    $('legBar').style.width = `${Math.round(speed(sec) * 100)}%`;
+    const s = SAYS.filter((x) => sec >= x[0]).pop()!;
+    if (running || sec > 0) { $('legH').textContent = s[1]; $('legP').textContent = s[2] + (sec >= 30 && avg ? ` The average NHL shift this season has been ${avg} seconds.` : ''); }
+  }
+  function frame(now: number) {
+    if (!running) return;
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+    sec += dt * 3;
+    if (!onIce) {
+      // Over the boards and onto his lap.
+      const tx = 100 + 70 * Math.cos(ang), ty = 42.5 + 30 * Math.sin(ang);
+      const k = Math.min(1, sec / 1.2);
+      sk.set(BENCH[0] + (tx - BENCH[0]) * k, BENCH[1] + (ty - BENCH[1]) * k);
+      if (k >= 1) onIce = true;
+    } else {
+      ang += dt * 1.1 * speed(sec);
+      sk.set(100 + 70 * Math.cos(ang), 42.5 + 30 * Math.sin(ang));
+    }
+    paint();
+    raf = requestAnimationFrame(frame);
+  }
+  $('legGo').addEventListener('click', () => {
+    if (running) { running = false; cancelAnimationFrame(raf); $('legGo').textContent = 'Keep going'; return; }
+    running = true; last = performance.now(); $('legGo').textContent = 'Pause'; $('legOff').disabled = false;
+    if (!motion()) { sec = 45; onIce = true; sk.set(100 + 70 * Math.cos(ang + 1), 42.5 + 30 * Math.sin(ang + 1)); running = false; $('legGo').textContent = 'Keep going'; paint(); return; }
+    raf = requestAnimationFrame(frame);
+  });
+  $('legOff').addEventListener('click', () => {
+    running = false; cancelAnimationFrame(raf); sec = 0; onIce = false; ang = Math.PI; sk.set(BENCH[0], BENCH[1]);
+    $('legGo').textContent = 'Start the shift'; $('legOff').disabled = true;
+    $('legH').textContent = 'Fresh legs'; $('legP').textContent = 'Back on the bench to rest. A fresh player takes his place: press start to send him out.';
+    paint();
+  });
+  paint();
+
+  // ---------- A real team's lines ----------
+  const real = JSON.parse($('realData').textContent);
+  const sel = $('realTeam');
+  const mine = document.documentElement.dataset.team || '';
+  for (const t of real.teams) sel.add(new Option(t.nick, t.abbr));
+  sel.value = real.teams.some((t: any) => t.abbr === mine) ? mine : real.example;
+  const NTH = ['First', 'Second', 'Third', 'Fourth'];
+  const nm = (p: any) => (p.href ? `<a class="plink" href="${p.href}">${p.name}</a>` : `<span>${p.name}</span>`);
+  const card = (title: string, ps: any[]) => `<div class="ac-unit"><p class="eyebrow">${title}</p><p>${ps.map(nm).join('<span class="sep">·</span>')}</p></div>`;
+  function showReal() {
+    const t = real.teams.find((x: any) => x.abbr === sel.value);
+    if (!t) return;
+    $('lines').innerHTML =
+      `<div class="col"><p class="box-h">Forward lines</p>${t.lines.map((l: any, i: number) => card(`${NTH[i]} line`, l)).join('')}</div>` +
+      `<div class="col"><p class="box-h">Defense pairs</p>${t.pairs.map((l: any, i: number) => card(`${NTH[i]} pair`, l)).join('')}</div>`;
+    $('realHint').textContent = mine ? 'Lines change as players get hurt or coaches shuffle them, so this list moves during the season.' : 'Pick your team in the settings and it shows up here first.';
+  }
+  sel.addEventListener('change', showReal);
+  showReal();
+  wireQuiz(document);
+</script>

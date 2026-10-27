@@ -188,3 +188,112 @@ html.motion .ac-board .sc.bump { animation: ac-bump 0.6s ease; }
 .ac-size .field { fill: none; stroke: var(--ink-2); stroke-width: 1.2; stroke-dasharray: 3 2.4; }
 .ac-size .field-fill { fill: color-mix(in oklab, var(--ink-3) 8%, transparent); }
 .ac-size .flbl { font: 600 calc(3.6px * var(--k, 1)) var(--ui); fill: var(--ink-2); letter-spacing: 0.05em; text-transform: uppercase; }
+
+/* Lighting up players during a play: with .focus on the drawing, everyone not lit fades back. */
+.ac-rink .fig { transition: opacity 0.4s ease; }
+.ac-rink.focus .people .fig:not(.on) { opacity: 0.28; }
+.ac-rink .fig.on .halo { opacity: 0.16; }
+.ac-rink .fig.faded { opacity: 0.45; pointer-events: none; }
+/* A referee's orange armbands. */
+:root { --ac-orange: #e0782b; }
+.ac-rink .fig .arm { fill: none; stroke: var(--ac-orange); }
+.ac-rink .fig circle.arm { stroke-width: 0.7; }
+.ac-rink .fig path.arm { stroke-linecap: round; }
+
+/* Spot the positions: label chips above the rink, placed labels above each player. */
+.ac-tray { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-lbl { font: 600 14px/1 var(--ui); padding: 10px 14px; border-radius: 999px; border: 0; background: var(--ice); color: var(--ink); cursor: grab; touch-action: none; user-select: none; }
+.chip-lbl.on { background: var(--ink); color: var(--sheet); }
+.chip-lbl.used { opacity: 0.35; text-decoration: line-through; cursor: default; }
+.chip-lbl.ghost { position: fixed; z-index: 50; transform: translate(-50%, -130%); pointer-events: none; background: var(--ink); color: var(--sheet); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
+.ac-rink .ptag { font: 700 calc(3.6px * var(--k, 1)) var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: calc(1px * var(--k, 1)); }
+@media (max-width: 600px) { .ac-rink .ptag { font-size: calc(5.4px * var(--k, 1)); } }
+.ac-rink .fig.placed .halo { opacity: 0.14; }
+html.motion .ac-rink .fig.nope { animation: ac-nope 0.4s ease; }
+@keyframes ac-nope { 25% { opacity: 0.4; } 75% { opacity: 0.4; } }
+
+/* A real team's players, laid out like the positions: forwards, then defense, then the goalie. */
+.ac-six { display: grid; gap: 10px; }
+.ac-six .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ac-six .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 67%; margin: 0 auto; }
+.ac-six .row.one { grid-template-columns: minmax(0, 1fr); width: 33%; margin: 0 auto; }
+.ac-p { background: var(--ice); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; font: 600 16px/1.3 var(--ui); min-width: 0; }
+@media (max-width: 600px) {
+  .ac-six .row.two, .ac-six .row.one { width: 100%; }
+  .ac-six .row { grid-template-columns: minmax(0, 1fr); }
+  .ac-six .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ac-p { font-size: 15px; padding: 10px 12px; }
+}
+
+/* The whistle: a ring that spreads from the official who blew it. */
+.ac-rink .blow { fill: none; stroke: var(--ink); stroke-width: 0.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.ac-rink .blow.on { opacity: 0.7; }
+html.motion .ac-rink .blow.on { animation: ac-blow 0.9s ease-out 3; }
+@keyframes ac-blow { from { transform: scale(0.4); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
+.ac-board .stop { font: 600 12px/1 var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ac-red); }
+
+/* Shift clocks over players' heads. */
+.ac-rink .sclk { font: 700 calc(3px * var(--k, 1)) var(--ui); fill: var(--ink-2); paint-order: stroke; stroke: var(--sheet); stroke-width: calc(0.9px * var(--k, 1)); font-variant-numeric: tabular-nums; }
+.ac-rink .sclk.tired { fill: var(--ac-red); }
+@media (max-width: 600px) { .ac-rink .sclk { font-size: calc(4.4px * var(--k, 1)); } }
+.ac-cap .ac-big, .ac-big { font: 700 44px/1 var(--display); font-variant-numeric: tabular-nums; }
+.ac-meter { height: 8px; border-radius: 8px; background: var(--track); overflow: hidden; }
+.ac-meter span { display: block; height: 100%; width: 100%; background: var(--ink); border-radius: 8px; transition: width 0.3s linear; }
+
+/* A real team's lines and pairs. */
+.ac-lines { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; }
+.ac-lines .col { display: grid; gap: 10px; align-content: start; }
+.ac-unit { background: var(--ice); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; }
+.ac-unit p:last-child { font: 600 16px/1.4 var(--ui); }
+.ac-unit .sep { color: var(--ink-3); margin: 0 8px; }
+@media (max-width: 700px) { .ac-lines { grid-template-columns: minmax(0, 1fr); } }
+
+/* How a game is built: two clocks, the game timeline, the scoreboard to tap. */
+.ac-clocks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ac-clocks > div { background: var(--ice); border-radius: 14px; padding: 12px 16px; display: grid; gap: 4px; }
+.ac-clocks .ac-big { font-size: 36px; }
+svg.ac-tl { width: 100%; height: auto; display: block; overflow: visible; }
+.ac-tl .tl-per { fill: color-mix(in oklab, var(--ink) 34%, var(--sheet)); }
+.ac-tl .tl-int { fill: var(--track); }
+.ac-tl .tl-tv { fill: var(--ac-red); opacity: 0.35; }
+.ac-tl .tl-lbl { font: 600 13px var(--ui); fill: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; }
+.ac-tl .tl-head { stroke: var(--ac-red); stroke-width: 3; stroke-linecap: round; }
+@media (max-width: 600px) { .ac-tl .tl-lbl { font-size: 22px; } .ac-tl .tl-lbl:nth-of-type(even) { display: none; } }
+.ac-rink .zam rect { fill: var(--ink-2); }
+.ac-rink .zam .zam-cab { fill: var(--sheet); opacity: 0.8; }
+.ac-rink .sheen { fill: var(--ac-lit); opacity: 0; pointer-events: none; }
+.ac-sb { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px 10px; background: #0f1c2b; color: #f4f7fa; border-radius: 16px; padding: 16px; max-width: 560px; justify-self: center; width: 100%; box-sizing: border-box; }
+.ac-sb button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: 10px; padding: 8px; cursor: pointer; display: grid; justify-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.ac-sb button:hover, .ac-sb button.on { background: rgba(255, 255, 255, 0.12); }
+.ac-sb .sb-l { font: 600 11px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+.ac-sb .sb-n { font: 700 44px/1 var(--ui); }
+.ac-sb .sb-n.small { font-size: 22px; }
+.ac-sb .sb-mid { display: grid; gap: 4px; justify-items: center; }
+.ac-sb .sb-clock { font: 700 36px/1 var(--ui); color: #ffcf5a; }
+.ac-sb .sb-row { font: 700 18px var(--ui); }
+.ac-sb .sb-row.pen { color: #ffcf5a; font-size: 16px; }
+@media (max-width: 420px) { .ac-sb .sb-n { font-size: 34px; } .ac-sb .sb-clock { font-size: 28px; } .ac-sb { padding: 10px; gap: 4px; } }
+
+/* Goal or not: the goal line close up, in inches. */
+svg.ac-line { width: 100%; height: auto; display: block; border-radius: 14px; }
+.ac-line .gl-ice { fill: var(--sheet); }
+.ac-line .gl-crease { fill: var(--ac-crease); }
+.ac-line .gl-net { fill: url(#mesh); }
+.ac-line .mesh { stroke: var(--ink-3); stroke-width: 0.12; opacity: 0.5; fill: none; }
+.ac-line .gl-line { fill: var(--ac-red); }
+.ac-line .gl-lbl { font: 600 1.15px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink-3); }
+.ac-line .gl-puck circle { fill: var(--ink); stroke: var(--sheet); stroke-width: 0.15; }
+html.motion .ac-line .gl-puck { transition: transform 1.1s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.ac-line .gl-v { font: 700 2.4px var(--display); fill: var(--ink-2); }
+.ac-line .gl-v.yes { fill: var(--ac-red); }
+@media (max-width: 600px) { .ac-line .gl-lbl { font-size: 1.6px; } }
+
+/* A small table of real numbers. */
+.ac-table { width: 100%; border-collapse: collapse; font: 500 16px/1.3 var(--ui); font-variant-numeric: tabular-nums; }
+.ac-table th, .ac-table td { padding: 10px 8px; border-bottom: 1px solid var(--rule); text-align: right; }
+.ac-table thead th { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+.ac-table :is(th, td):first-child { text-align: left; }
+.ac-table :is(th, td):nth-child(2) { text-align: left; }
+.ac-table td:nth-child(2) { color: var(--ink-2); }
+.ac [hidden] { display: none !important; }
+.ac-unit a { white-space: nowrap; }

@@ -1,0 +1,248 @@
+---
+// Academy 1.4: the four officials. A play that freezes with the officials lit, then shows where each one skates
+// (referees deep, linesmen on the lines) and ends on a whistle that stops the clock; notes on who does what; a faceoff
+// close up that can be scrubbed through moment by moment; a quiz. Leans on 1.2 (blue lines, dots) and 1.3 (center).
+import Lesson from '../../layouts/Lesson.astro';
+---
+<Lesson slug="officials">
+  <section class="ac-part" aria-labelledby="four-h">
+    <header>
+      <h2 id="four-h">Four people in stripes</h2>
+      <p>Skating among the twelve players are four officials in striped shirts. They have different jobs, and where each one skates tells you which. Watch how they move with the play.</p>
+    </header>
+    <div class="ac-stage wide" id="play4">
+      <div class="ac-view">
+        <div class="ac-ctrl" style="justify-content: space-between">
+          <p class="pick">See it <select data-view aria-label="Viewpoint">
+            <option value="above">from above</option>
+            <option value="center">from a seat at center ice</option>
+          </select></p>
+          <p class="ac-board" aria-label="Game clock"><span class="clk" data-clock>14:37</span><span class="stop" data-stopped hidden>Clock stopped</span></p>
+        </div>
+        <svg class="ac-rink" id="rink4" role="img" aria-label="Twelve players and four officials. Two referees with orange armbands skate deep in the zones; two linesmen stay near the blue lines. The play ends when the goalie covers the puck and a referee blows the whistle."></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+        <p class="ac-hint">Pause anywhere and tap someone in stripes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="jobs-h">
+    <header>
+      <h2 id="jobs-h">Who does what</h2>
+      <p>Two of the four are in charge of the game; the other two look after the lines on the ice. Here’s how to tell them apart.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="22" y="4" width="20" height="32" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M26 4v32M32 4v32M38 4v32" stroke="currentColor" stroke-width="2" opacity="0.5"/><path d="M14 12h8M42 12h8" stroke="#e0782b" stroke-width="5" stroke-linecap="round"/></svg>
+        <p class="box-h">Two referees</p>
+        <p>The referees wear orange armbands. They call penalties and decide whether a goal counts. One usually skates deep, near the goal line ahead of the play, and the other trails behind it.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="22" y="4" width="20" height="32" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M26 4v32M32 4v32M38 4v32" stroke="currentColor" stroke-width="2" opacity="0.5"/><path d="M6 38V2M58 38V2" stroke="var(--ac-blue)" stroke-width="3.5"/></svg>
+        <p class="box-h">Two linesmen</p>
+        <p>The linesmen have no armbands. They watch the blue lines and the center line for offside and icing (lesson 8), drop the puck at most faceoffs, and step in to break up scuffles.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M10 22a9 9 0 1 0 18 0v-5h22a4 4 0 0 1 0 8H30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M44 8l4-5M52 11l6-3M36 7l-1-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <p class="box-h">The whistle stops everything</p>
+        <p>Play only stops when an official blows the whistle, and when it does, the game clock stops too. It starts again when the puck is dropped.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><circle cx="32" cy="22" r="15" fill="none" stroke="var(--ac-red)" stroke-width="1.6"/><circle cx="32" cy="22" r="2.4" fill="var(--ac-red)"/><circle cx="24" cy="22" r="4" fill="currentColor"/><circle cx="40" cy="22" r="4" fill="none" stroke="currentColor" stroke-width="2"/><ellipse cx="32" cy="6" rx="3" ry="1.6" fill="currentColor"/></svg>
+        <p class="box-h">The faceoff</p>
+        <p>Every restart is a faceoff: an official drops the puck between two players on one of the nine dots. A referee drops it at center ice to start each period and after a goal; a linesman handles all the others.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="fo-h">
+    <header>
+      <h2 id="fo-h">A faceoff, slowed down</h2>
+      <p>A faceoff is over in about a second, so it helps to see one slowly. Drag the slider to move through it moment by moment, or press Play.</p>
+    </header>
+    <div class="ac-stage" id="play4b">
+      <div class="ac-view">
+        <p class="pick">See it <select data-view aria-label="Viewpoint">
+          <option value="above">from above</option>
+          <option value="center">from a seat at center ice</option>
+        </select></p>
+        <svg class="ac-rink" id="rink4b" role="img" aria-label="A faceoff in one end of the rink: the two centers at the dot, the wingers lined up at the edge of the circle, a linesman dropping the puck, and the home center winning it back to a defenseman"></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the faceoff" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>Who drops the puck at most faceoffs?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. A referee drops it at center ice to start a period or after a goal. Every other faceoff is a linesman’s.">A referee</button>
+          <button class="pill" type="button" data-right data-say="Right. Linesmen handle every faceoff except the ones at center ice to start a period or after a goal.">A linesman</button>
+          <button class="pill" type="button" data-say="Not quite. The goalie never takes part in a faceoff. An official drops the puck, usually a linesman.">The goalie</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>An official in stripes has an orange band on his arm. What is he?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-right data-say="Right. Referees wear the orange armbands. They call penalties and goals.">A referee</button>
+          <button class="pill" type="button" data-say="Not quite. Linesmen have plain sleeves. The orange bands are for referees.">A linesman</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>An official blows the whistle. What happens to the game clock?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. The clock only counts time when the puck is in play.">It keeps running</button>
+          <button class="pill" type="button" data-right data-say="Right. The clock stops at every whistle and starts again with the next faceoff.">It stops</button>
+          <button class="pill" type="button" data-say="Not quite. Nothing resets: the clock just pauses until the next faceoff.">It goes back to 20:00</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+</Lesson>
+
+<script>
+  import { VIEWS, el, r2, whenSeen } from '../../lib/academy/rink';
+  import { playerUI, lit } from '../../lib/academy/play';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  const $ = (id: string) => document.getElementById(id) as any;
+  const H = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'home', keys, ...extra });
+  const A = (id: string, keys: number[][], extra = {}) => ({ id, kind: 'away', keys, ...extra });
+  const O = (id: string, keys: number[][], band = false) => ({ id, kind: 'ref', band, keys });
+  const REFS = ['R1', 'R2'], LINES = ['L1', 'L2'];
+
+  // ---------- Four people in stripes ----------
+  // The home team (dark) carries the puck into the right end, the visitors take it the other way, and the home goalie
+  // covers it: whistle.
+  const WHISTLE = 15.3;
+  const def = {
+    length: 17,
+    actors: [
+      H('hG', [[0, 14.5, 42.5], [14.6, 14.5, 42.5], [15.2, 16.5, 42.5], [17, 16.5, 42.5]], { goalie: true }),
+      H('hC', [[0, 102, 41], [2, 102, 41], [4.5, 138, 37], [6, 160, 40], [8, 168, 46], [10, 150, 50], [13, 90, 46], [16, 60, 44], [17, 56, 44]]),
+      H('hW1', [[0, 108, 20], [2, 108, 20], [5, 150, 18], [6.5, 172, 16.5], [8.5, 178, 23], [10, 160, 26], [13, 100, 24], [16, 70, 30], [17, 66, 30]]),
+      H('hW2', [[0, 106, 66], [2, 106, 66], [5, 148, 66], [7, 170, 62], [9, 165, 58], [12, 110, 60], [16, 62, 58], [17, 58, 58]]),
+      H('hD1', [[0, 80, 28], [2, 80, 28], [5, 126, 24], [8.5, 127, 30], [10, 115, 32], [13, 70, 32], [16, 36, 34], [17, 34, 34]]),
+      H('hD2', [[0, 80, 58], [2, 80, 58], [5, 126, 62], [8.5, 128, 58], [10, 112, 55], [13, 62, 54], [16, 34, 52], [17, 32, 52]]),
+      A('aG', [[0, 185.5, 42.5], [7, 185, 40], [9, 185.5, 42.5], [17, 185.5, 42.5]], { goalie: true }),
+      A('aC', [[0, 112, 46], [2, 112, 46], [5, 150, 44], [8, 172, 40], [10, 140, 40], [13, 70, 40], [15, 30, 42], [16, 26, 44], [17, 25, 44]]),
+      A('aW1', [[0, 118, 24], [2, 118, 24], [5, 155, 24], [8, 165, 30], [10, 130, 22], [13, 60, 22], [16, 30, 26], [17, 28, 27]]),
+      A('aW2', [[0, 118, 62], [2, 118, 62], [5, 156, 62], [8, 162, 58], [10, 132, 64], [13, 66, 62], [16, 36, 62], [17, 34, 61]]),
+      A('aD1', [[0, 128, 34], [2, 128, 34], [5, 165, 30], [7.5, 175, 22], [9, 170, 28], [13, 95, 30], [16, 40, 38], [17, 40, 38]]),
+      A('aD2', [[0, 130, 52], [2, 130, 52], [5, 168, 52], [8, 174, 50], [10, 140, 50], [13, 80, 48], [16, 45, 48], [17, 44, 48]]),
+      O('R1', [[0, 168, 81], [2, 168, 81], [5, 186, 79], [9, 186, 78], [11, 152, 81], [14, 118, 82], [17, 108, 82]], true),
+      O('R2', [[0, 82, 7], [2, 82, 7], [5, 112, 6], [9, 128, 6], [11, 100, 5], [13.5, 42, 6], [15.5, 14, 8], [17, 13, 9]], true),
+      O('L1', [[0, 123, 83], [2, 123, 83], [5, 125, 83], [9, 125, 83], [10.5, 120, 83], [13, 82, 83], [17, 76, 83]]),
+      O('L2', [[0, 100, 2.5], [2, 100, 2.5], [5, 118, 2.5], [9, 121, 2.5], [11, 104, 2.5], [14, 80, 2.5], [17, 76, 2.5]]),
+    ],
+    puck: [[0, 104.5, 40], [2, 104.5, 40], [4.5, 140.5, 37], [5.5, 170, 18], [6.5, 172.5, 18], [7.6, 176, 22.5], [8.6, 171, 27], [9, 170.5, 28.5], [10, 141.5, 40], [13, 71.5, 40], [14.6, 36, 41.5], [15.1, 17, 42.5], [17, 17, 42.5]],
+    beats: [
+      { t: 0, h: 'Four officials', p: 'Freeze the game and look for the striped shirts. There are four of them on the ice, and they move with every play.' },
+      { t: 2, h: 'Out of the way, close to the play', p: 'Officials try to see everything without getting in anyone’s way. They skate along the boards and around the edges of the play.' },
+      { t: 4.5, h: 'The referees go deep', p: 'The two with orange armbands are the referees. One races ahead to the goal line to watch the net; the other stays back, behind the play.' },
+      { t: 7.5, h: 'The linesmen watch the lines', p: 'The other two are linesmen. They stay close to the blue lines, because whether the puck or a player crosses a line first is their call.' },
+      { t: 10, h: 'The play turns, and so do they', p: 'When the other team takes the puck the other way, the officials swap roles: the referee who was trailing becomes the deep one at the other end.' },
+      { t: WHISTLE, h: 'The whistle', p: 'The goalie covers the puck, the referee blows the whistle, and play stops. So does the game clock, until the next faceoff.' },
+    ],
+    events: [
+      ...lit([...REFS, ...LINES], 0, 2), ...lit(REFS, 4.5, 7.5), ...lit(LINES, 7.5, 10), ...lit([...REFS, ...LINES], 10, WHISTLE),
+      ...lit(null, 0, 2, 'focus'), ...lit(null, 4.5, WHISTLE, 'focus'),
+      ...lit(['R2'], WHISTLE),
+      {
+        t: WHISTLE,
+        on: (api: any) => {
+          const r = api.actors.find((a: any) => a.id === 'R2').f;
+          const p = api.V.P(r.x, r.y, api.V.top ? 0 : 7), s = p[2];
+          const w = el(api.fx, 'circle', { class: 'blow', cx: r2(p[0]), cy: r2(p[1]), r: r2(2.5 * s) });
+          requestAnimationFrame(() => w.classList.add('on'));
+        },
+        off: (api: any) => api.fx.replaceChildren(),
+      },
+    ],
+  };
+  const WHO: Record<string, string> = {
+    R1: 'A referee: orange armbands. Referees call penalties and goals.',
+    R2: 'A referee: orange armbands. Referees call penalties and goals.',
+    L1: 'A linesman: no armbands. Linesmen watch the lines and drop the puck at most faceoffs.',
+    L2: 'A linesman: no armbands. Linesmen watch the lines and drop the puck at most faceoffs.',
+  };
+  const root = $('play4');
+  const viewSel = root.querySelector('[data-view]');
+  const clock = root.querySelector('[data-clock]'), stopped = root.querySelector('[data-stopped]');
+  const ui = playerUI(root, $('rink4'), def, () => (VIEWS as any)[viewSel.value], (a: any) =>
+    WHO[a.id] ?? (a.goalie ? 'A goalie, not an official.' : `A player on the ${a.kind === 'home' ? 'home team (dark)' : 'visiting team (white)'}. Officials wear stripes.`),
+  { onTick: (t: number) => {
+    // The clock runs while the puck is in play and stops at the whistle.
+    const left = 877 - Math.floor(Math.max(0, Math.min(t, WHISTLE) - 2));
+    clock.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    stopped.hidden = t < WHISTLE;
+  } });
+  viewSel.addEventListener('change', () => ui.rebuild());
+  whenSeen($('rink4'), () => ui.play());
+
+  // ---------- A faceoff, slowed down ----------
+  // A faceoff on the near dot in the right end. The home team (dark) attacks that end.
+  const LS = [[0, 160, 77], [1.5, 163, 71], [2.6, 167.6, 67.6], [3.6, 168.4, 66.9], [4.4, 167.5, 69], [5.4, 163, 74], [8, 159, 78]];
+  const fo = {
+    length: 8,
+    area: [126, 34, 200, 86],
+    actors: [
+      H('hC', [[0, 150, 60], [1.5, 160, 63], [2.6, 166, 64.5], [4.0, 166, 64.5], [4.5, 165.5, 63.8], [8, 160, 61]], { tag: 'C' }),
+      A('aC', [[0, 182, 60], [1.5, 176, 63], [2.6, 172, 64.5], [4.0, 172, 64.5], [4.5, 172.5, 65.2], [8, 176, 61]], { tag: 'C' }),
+      H('hW1', [[0, 148, 50], [2.6, 165, 49], [4.2, 165, 49], [8, 170, 52]]),
+      H('hW2', [[0, 150, 81], [2.6, 165, 80.5], [4.2, 165, 80.5], [8, 172, 77]]),
+      A('aW1', [[0, 186, 52], [2.6, 173, 49], [4.2, 173, 49], [8, 167, 52]]),
+      A('aW2', [[0, 184, 81], [2.6, 173, 80.5], [4.2, 173, 80.5], [8, 171, 76]]),
+      H('hD1', [[0, 134, 66], [2.6, 131, 64], [8, 132, 62]]),
+      H('hD2', [[0, 134, 42], [2.6, 131, 42], [8, 131, 44]]),
+      A('aD1', [[0, 180, 46], [2.6, 181, 47], [8, 180, 49]]),
+      A('aD2', [[0, 186, 60], [2.6, 186, 57], [8, 183, 56]]),
+      A('aG', [[0, 185.5, 44], [6.6, 185.5, 45], [7.4, 185, 46.5], [8, 185.5, 45]], { goalie: true }),
+      O('L', LS),
+    ],
+    puck: [...LS.slice(0, 4).map(([t, x, y]) => [t, x + 0.4, y - 0.4]), [4.0, 169, 64.5], [4.4, 168, 64.4], [5.6, 131.5, 63.6], [6.6, 131.8, 62.8], [7.3, 184.5, 45.8], [8, 184.5, 45.8]],
+    beats: [
+      { t: 0, h: 'Everyone lines up', p: 'After a whistle, play starts again on a dot. The two centers skate in; everyone else lines up outside the circle, with the wingers on the marks at its edge.' },
+      { t: 2.6, h: 'Two centers at the dot', p: 'The centers face each other with their sticks down beside the dot. Everyone else has to stay out of the circle until the puck drops.' },
+      { t: 3.6, h: 'The linesman drops the puck', p: 'The linesman holds the puck over the dot and drops it. Nobody can move until it falls.' },
+      { t: 4.0, h: 'The battle', p: 'The centers swipe at it. Usually the winner pulls it back to a teammate rather than going forward with it.' },
+      { t: 4.5, h: 'Won back', p: 'The home center wins it back to his defenseman at the blue line. That counts as a faceoff win.' },
+      { t: 6.6, h: 'Play is on', p: 'From there it’s ordinary hockey again: the defenseman shoots and the goalie makes the save. The clock started the moment the puck dropped.' },
+    ],
+    events: [
+      ...lit(['hC', 'aC'], 2.6, 3.6), ...lit(['L'], 3.6, 4.0), ...lit(['hC', 'aC'], 4.0, 4.5), ...lit(['hC', 'hD1'], 4.5, 6.6),
+      ...lit(null, 2.6, 6.6, 'focus'),
+    ],
+  };
+  const root2 = $('play4b');
+  const viewSel2 = root2.querySelector('[data-view]');
+  const FO: Record<string, string> = {
+    hC: 'The home team’s center, taking the faceoff.', aC: 'The visiting team’s center, taking the faceoff.',
+    L: 'A linesman, here to drop the puck.', aG: 'The visiting team’s goalie.',
+  };
+  const ui2 = playerUI(root2, $('rink4b'), fo, () => (VIEWS as any)[viewSel2.value], (a: any) =>
+    FO[a.id] ?? `A ${a.id.includes('D') ? 'defenseman' : 'winger'} on the ${a.kind === 'home' ? 'home team (dark)' : 'visiting team (white)'}, waiting outside the circle.`);
+  viewSel2.addEventListener('change', () => ui2.rebuild());
+  wireQuiz(document);
+</script>

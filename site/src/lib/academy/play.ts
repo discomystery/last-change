@@ -41,7 +41,7 @@ export function mountPlay(svg, def, V, { onBeat, onTick, onPick } = {}) {
   drawRink(svg, V, def.rink ?? {});
   const fx = el(svg, 'g', { class: 'fx' });
   const g = el(svg, 'g', { class: 'people' });
-  const actors = def.actors.map((a) => ({ ...a, f: figure(g, V, a.kind, { goalie: a.goalie, tag: a.tag }) }));
+  const actors = def.actors.map((a) => ({ ...a, f: figure(g, V, a.kind, { goalie: a.goalie, tag: a.tag, band: a.band }) }));
   const pk = puck(g, V);
   const api = { svg, fx, V, actors, puck: pk };
   for (const a of actors) {
@@ -53,16 +53,15 @@ export function mountPlay(svg, def, V, { onBeat, onTick, onPick } = {}) {
   }
   let t = 0, raf = 0, last = 0, playing = false, beat = -1;
   const fired = new Set();
+  const evs = (def.events ?? []).slice().sort((a, b) => a.t - b.t);
   function draw(at) {
     t = Math.max(0, Math.min(def.length, at));
     for (const a of actors) a.f.set(...glide(a.keys, t));
     pk.set(...straight(def.puck, t));
     sortDepth(V, g, [...actors.map((a) => a.f), pk]);
-    for (const [i, ev] of (def.events ?? []).entries()) {
-      const on = t >= ev.t;
-      if (on && !fired.has(i)) { fired.add(i); ev.on(api); }
-      if (!on && fired.has(i)) { fired.delete(i); ev.off && ev.off(api); }
-    }
+    // Undo events we have gone back past (latest first), then fire the ones we have reached (in order).
+    for (let i = evs.length - 1; i >= 0; i--) if (t < evs[i].t && fired.has(i)) { fired.delete(i); evs[i].off && evs[i].off(api); }
+    evs.forEach((ev, i) => { if (t >= ev.t && !fired.has(i)) { fired.add(i); ev.on(api); } });
     let b = -1;
     def.beats.forEach((x, i) => { if (t >= x.t) b = i; });
     if (b !== beat) { beat = b; onBeat && onBeat(b, def.beats[b]); }
@@ -89,7 +88,7 @@ export function mountPlay(svg, def, V, { onBeat, onTick, onPick } = {}) {
 
 // The usual controls under a play: play/pause, a scrubber and a caption. root holds [data-play], [data-scrub],
 // [data-step], [data-h], [data-p], [data-pick]. makeView(name) rebuilds for a new viewpoint, keeping the moment.
-export function playerUI(root, svg, def, viewOf, picked) {
+export function playerUI(root, svg, def, viewOf, picked, { onTick } = {}) {
   const btn = root.querySelector('[data-play]'), scrub = root.querySelector('[data-scrub]');
   const stepEl = root.querySelector('[data-step]'), h = root.querySelector('[data-h]'), p = root.querySelector('[data-p]');
   const pick = root.querySelector('[data-pick]');
@@ -104,8 +103,8 @@ export function playerUI(root, svg, def, viewOf, picked) {
         stepEl.textContent = i < 0 ? '' : `${i + 1} of ${def.beats.length}`;
         h.textContent = b ? b.h : ''; p.textContent = b ? b.p : '';
       },
-      onTick: (t) => { scrub.value = String(t); },
-      onPick: (a) => { ctl.pause(); label(); if (pick) { pick.hidden = false; pick.textContent = picked(a); } },
+      onTick: (t) => { scrub.value = String(t); onTick && onTick(t, ctl); },
+      onPick: (a) => { ctl.pause(); label(); const say = picked(a); if (pick && say) { pick.hidden = false; pick.textContent = say; } },
     });
     ctl.onstop = label;
     if (at != null) ctl.seek(at);
@@ -116,4 +115,14 @@ export function playerUI(root, svg, def, viewOf, picked) {
   btn.addEventListener('click', () => { if (pick) pick.hidden = true; ctl.playing ? ctl.pause() : ctl.play(); label(); });
   scrub.addEventListener('input', () => { ctl.pause(); ctl.seek(+scrub.value); label(); });
   return { rebuild: build, play() { ctl.play(); label(); }, get ctl() { return ctl; } };
+}
+
+// Light up some players (by id) from t0 until t1, or a class on the whole drawing (ids = null). Two events, so
+// scrubbing back and forth turns it on and off again.
+export function lit(ids, t0, t1 = Infinity, cls = 'on') {
+  const each = (api, fn) => (ids ? api.actors.filter((a) => ids.includes(a.id)).map((a) => a.f.g) : [api.svg]).forEach((g) => fn(g.classList));
+  const add = (api) => each(api, (c) => c.add(cls)), drop = (api) => each(api, (c) => c.remove(cls));
+  const evs = [{ t: t0, on: add, off: drop }];
+  if (t1 !== Infinity) evs.push({ t: t1, on: drop, off: add });
+  return evs;
 }
