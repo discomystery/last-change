@@ -104,7 +104,8 @@
   html[data-mode='season'] .gmode.m-season { display: block; }
   html[data-mode='season'] .gmode.m-blend { display: none; }
   .g2 { display: grid; gap: 12px; margin-top: 12px; }
-  @media (min-width: 900px) { .g2 { grid-template-columns: 1fr 1fr; } }
+  /* Goalie card beside the league chart from tablet width up, so the chart is never a whole screen on its own. */
+  @media (min-width: 720px) { .g2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
   .gname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font: 700 22px/1.1 var(--display); margin-bottom: 14px; }
   .gbig { font: 400 14px var(--ui); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
@@ -150,12 +151,12 @@
 
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
-  /* Tablets: power play and penalty kill stacked on the left, the shot map beside them (pinned while they scroll),
-     instead of one map the full width of the screen. */
+  /* Tablets: power play and penalty kill side by side as on a computer, the shot map under both (Sora, 2026-10-27). */
   @media (min-width: 720px) and (max-width: 899px) {
-    .st3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-    .st3 > .mapcard { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 72px; }
-    .st3 > .card:not(.mapcard) { grid-column: 1; }
+    .st3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .st3 > .mapcard { grid-column: 1 / -1; grid-row: 2; }
+    .st3 > .mapcard > * { width: 100%; max-width: 440px; margin-inline: auto; }
+    .st3 .stunit { flex: none; }
   }
   .st3 > .card { display: flex; flex-direction: column; }
   .st3 .stunit { flex: 1; }
