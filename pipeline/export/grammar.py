@@ -94,7 +94,7 @@ def span(s: int) -> str:
     seconds"); longer stretches round to words ("just over a minute", "a minute and a half", "less than three minutes",
     "just under six minutes")."""
     if s < 60:
-        return f"just {s} second{'' if s == 1 else 's'}" if s <= 20 else f"{s} seconds"
+        return f"just {num(s) if s < 10 else s} second{'' if s == 1 else 's'}" if s <= 20 else f"{s} seconds"
     m, r = divmod(s, 60)
     mins = lambda k: "a minute" if k == 1 else f"{num(k)} minutes"
     if r == 0:
@@ -116,7 +116,7 @@ def time_left(s: int) -> str:
     if s <= 0:
         return "less than a second"
     if s < 60:
-        return ("just one second" if s == 1 else f"just {s} seconds") if s <= 10 else "just under a minute" if s >= 50 else f"{s} seconds"
+        return ("just one second" if s == 1 else f"just {num(s)} seconds") if s <= 10 else "just under a minute" if s >= 50 else f"{s} seconds"
     return span(s)
 
 

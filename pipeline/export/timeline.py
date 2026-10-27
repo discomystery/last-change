@@ -26,7 +26,7 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, num
 PERIODS = {1: "first", 2: "second", 3: "third"}
 RUN_GAP = 300  # seconds between two goals by one team that read as one sentence
 RELATIVE = 300  # a goal this soon after the last one told is "x:xx later"
-LATE = 300  # the last five minutes of the third read "with x:xx left"
+LATE = 480  # the last eight minutes of the third read "with six minutes left" (outside notes, Oct 20: 6:22 left read "late in the third")
 HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty shot", "dp": " on a delayed penalty"}
 PERIOD_END = 30  # a goal this close to the end of the first or second is told by the clock ("with 12 seconds left in the first")
 SEASON_MARKS = (20, 30, 40, 50, 60, 70)  # a scorer's nth goal of the season worth a clause
@@ -62,10 +62,12 @@ def when(g: dict) -> str:
     if p <= 2 and s >= 1200 - PERIOD_END:  # "Kent Johnson made it 2-0 with 12 seconds left in the first" (Sora)
         return f"with {left_(1200 - s)} left in the {PERIODS[p]}"
     if s < 60:  # a goal in the first minute gets told as one (Sora: give quick starts some panache)
-        return f"just {s} seconds into the game" if p == 1 else f"just {s} seconds into the {PERIODS[p]}"
+        n = num(s) if s < 10 else s  # "just nine seconds into the period" (Sora's notes, Oct 20: small numbers in words)
+        return f"just {n} seconds into the game" if p == 1 else f"just {n} seconds into the {PERIODS[p]}"
     if p == 1 and s < 120:
         return f"{span(s)} in"
-    part = "early in" if s < 400 else "midway through" if s < 800 else "late in"
+    # "early" to 8:00 (outside notes, Oct 22-23: 6:50 and 7:45 read "midway"), "late" from 15:00 (13:54 read "late in the first")
+    part = "early in" if s < 480 else "midway through" if s < 900 else "late in"
     return f"{part} the {PERIODS[p]}"
 
 
@@ -87,6 +89,7 @@ class Game:
     wiped: list = field(default_factory=list)  # stories._overturned rows
     reviews: list = field(default_factory=list)  # storylines.reviews rows
     ps_stopped: list = field(default_factory=list)
+    luck_ps: dict | None = None  # the losers' stopped penalty shot their luck ran out on (set by paragraph)
     changes: list = field(default_factory=list)  # (team, first goalie, relief goalie, pulled) from recap_story
     exits: list = field(default_factory=list)  # recaps' `left` rows
     so: tuple = (None, "", [])  # shootout decider, how to tell it, every scorer for the winner
@@ -115,6 +118,7 @@ def paragraph(gm: Game) -> list[str]:
     goals = gm.goals
     W = gm.W
     out: list[tuple[str, dict]] = []  # (sentence, what it tells: kind, team, words) for the joining pass
+    gm.luck_ps = _turning_ps(gm)
     ws, ls = (max(goals[-1]["hs"], goals[-1]["as"]), min(goals[-1]["hs"], goals[-1]["as"])) if goals else (0, 0)
     margin = ws - ls
     # the goal that put the winner ahead for good (after the last tie), and the official winner
@@ -172,9 +176,14 @@ def paragraph(gm: Game) -> list[str]:
             period_now = p_now
             if p_now in busy and not (out and out[-1][1]["kind"] == "wiped"):  # "It was a busy second period." (Sora's own line for CAR at CHI)
                 n_ = busy[p_now]
-                out.append((gm.pk([f"It was a busy {PERIODS[p_now]} period.", f"The {PERIODS[p_now]} period was a wild one."] if n_ == 4 else
-                                  [f"The {PERIODS[p_now]} period brought {num(n_)} goals.", f"There were {num(n_)} goals in the {PERIODS[p_now]} period alone."],
-                                  "busy", p_now), {"kind": "other"}))
+                pool = ([f"It was a busy {PERIODS[p_now]} period.", f"The {PERIODS[p_now]} period was a wild one."] if n_ == 4 else
+                        [f"The {PERIODS[p_now]} period brought {num(n_)} goals.", f"There were {num(n_)} goals in the {PERIODS[p_now]} period alone."])
+                # each wording once a story: "was a wild one" for both the second and the third read canned (outside
+                # notes, Oct 22, four games); a repeat falls back to the goal count
+                fresh = [x for x in pool if x.split(PERIODS[p_now])[-1] not in gm.said] or [f"The {PERIODS[p_now]} period brought {num(n_)} goals."]
+                line = gm.pk(fresh, "busy", p_now)
+                gm.said.add(line.split(PERIODS[p_now])[-1])
+                out.append((line, {"kind": "other"}))
         if kind == "goal" and x in taken:
             k += 1
             continue
@@ -210,7 +219,8 @@ def paragraph(gm: Game) -> list[str]:
                 out.append((f"The league looked at a {W.nick.get(t, t)} chance {when(x)} on video and ruled no goal.", {"kind": "other"}))
             elif kind == "ps":
                 if x["type"] == "shot-on-goal" and x.get("goalie"):
-                    out.append((f"{gm.name(x['goalie'])} stopped {gm.name(x['p1'])} on a penalty shot {when(x)}.", {"kind": "other"}))
+                    luck = (f", but that’s where {grammar.possessive(W.place(gm.loser))} luck ran out" if x is gm.luck_ps else "")
+                    out.append((f"{gm.name(x['goalie'])} stopped {gm.name(x['p1'])} on a penalty shot {when(x)}{luck}.", {"kind": "other"}))
                 else:
                     out.append((f"{gm.name(x['p1'])} missed the net on a penalty shot {when(x)}.", {"kind": "other"}))
             elif kind == "change":
@@ -251,6 +261,8 @@ def paragraph(gm: Game) -> list[str]:
             if (gm.side(a) != gm.side(b) or at(b) - at(a) > RUN_GAP or b["period"] != a["period"] or b["period"] > 3 or len(run) >= 3
                     or any(goals[i]["strength"] in ("ps", "en") for i in (run[-1], j)) or j in gm.attach or run[-1] in gm.attach
                     or j in gm.hat3 or x in gm.hat3
+                    # a shorthanded goal keeps its own sentence (Cowan's read as even strength inside a run, Oct 20)
+                    or ("sh" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
                     or j in gm.relief or run[-1] in gm.relief or got_back in (run[-1], j)
                     or (b["period"], b["sec"]) in stood or (a["period"], a["sec"]) in stood):
                 break
@@ -385,7 +397,7 @@ def _join(items: list[tuple[str, dict]]) -> list[str]:
             plain = lambda t: not any(w in t for w in (" but ", ", and ", ": ", "; ", "No harm done", " while "))
             fits = (ma["kind"] in ("goal", "fight") and mb["kind"] in ("goal", "fight") and na <= JOIN_WORDS and nb <= JOIN_WORDS
                     and na + nb <= JOIN_MAX and plain(a) and plain(b) and not ma.get("fixed") and not mb.get("fixed")
-                    and not b.startswith("They ") and max(ma.get("period", 9), mb.get("period", 9)) <= 3
+                    and not b.startswith(("They ", "With the goalie pulled")) and max(ma.get("period", 9), mb.get("period", 9)) <= 3
                     and (ma["kind"] == mb["kind"] or ma.get("period") == mb.get("period")))
             if fits:
                 answer = mb["kind"] == "goal" and ma["kind"] == "goal" and mb["team"] != ma["team"] and mb.get("cut")
@@ -495,6 +507,9 @@ def _time(gm: Game, g: dict, prev: dict | None) -> str:
     else was told in between (Sora: "4:39 later" after a fight read as 4:39 after the fight) or the clock says more
     ("with 12 seconds left in the first")."""
     w = when(g)
+    quick = prev is not None and g["period"] == prev["period"] and not gm.broke and 0 < at(g) - at(prev) < 60
+    if quick and g["period"] == 3 and 120 < 1200 - g["sec"] <= LATE:
+        return f"{span(at(g) - at(prev))} later"  # a quick answer reads better as one than as the clock ("47 seconds later")
     if " left" in w or " into the " in w:
         return w
     if prev is not None and g["period"] == prev["period"] and g["period"] <= 3 and not gm.broke:
@@ -606,6 +621,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         # a real 6-on-5, not a delayed penalty (stories._goals decides), said first: "With the goalie pulled, Connor
         # McMichael scored ..." (Sora's review, 2026-10-19: tacked on at the end it read as an afterthought)
         pulled = g["own_extra"] and g["period"] == 3
+    if m == th_ and g["own_extra"] and g["period"] == 3:  # a tying goal with the goalie out (outside notes, Oct 22 and 24:
+        pulled = True  # Hintz's and Rakell's late equalizers never said so)
     if g["period"] > 3 and len(goals) == 1:  # "Kent Johnson won it in overtime" alone read too thin
         fin = f"scored the only goal of the game{how}" if gm.end == "OT" else fin
     if g["strength"] == "en" and g["period"] == 3:  # "with 1:09 left" is in the beat already ("into the empty net with 1:09 left")
@@ -640,8 +657,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         tail.append(f"and {W.the(gm.winner)} had to hang on")
     if not tail and t == gm.loser and g["period"] == 3 and th_ - m >= 4:  # a goal that changed nothing (DeBrusk's, down 7-2)
         tail.append(gm.pk(["but by then the game was long gone", "far too late to matter"], "late", i))
-    if not tail and not is_last and _last_word(gm, i):
-        tail.append(_last_word(gm, i))
+    if not tail and not is_last and _last_word(gm, i, body):
+        tail.append(_last_word(gm, i, body))
     if g["strength"] == "en" and any(gm.side(h) != t for h in goals[i + 1:]):  # the scoring wasn't over (Sora, CHI 4-2 STL)
         tail.append(f"but that didn’t stop {W.place(other)}")
     if tail:
@@ -655,7 +672,28 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     return " ".join(_cap(body).replace(" ,", ",").split()) + "."
 
 
-def _last_word(gm: Game, i: int) -> str:
+def _turning_ps(gm: Game) -> dict | None:
+    """The winners' penalty shot the losers' goalie stopped with the game tied or the losers within one, after which the
+    winners scored and the losers never did: "Meriläinen stopped Aho on a penalty shot late in the second, but that’s
+    where Vancouver’s luck ran out" (Sora's notes, Oct 20: say it on the moment that turned the game, not on the goal
+    before)."""
+    for x in gm.ps_stopped:
+        # the losers' goalie stopped the winners' penalty shot: their last break before the game got away
+        if (gm.home if x.get("home") else gm.away) != gm.winner or x.get("type") != "shot-on-goal":
+            continue
+        if not any(gm.side(g) == gm.winner for g in gm.goals if at(g) > at(x)):
+            continue
+        before = [g for g in gm.goals if at(g) < at(x)]
+        if any(gm.side(g) == gm.loser for g in gm.goals if at(g) > at(x)):
+            continue
+        h, a_ = (before[-1]["hs"], before[-1]["as"]) if before else (0, 0)
+        mine, theirs = (h, a_) if gm.loser == gm.home else (a_, h)
+        if theirs - 1 <= mine <= theirs:
+            return x
+    return None
+
+
+def _last_word(gm: Game, i: int, body: str = "") -> str:
     """The loser's last goal of a regulation game, when it got them level, ahead or within one and they never scored
     again: "but that’s where Colorado’s luck ran out", "but that was as close as the Penguins got" (Sora's review,
     round 2: say when a team's scoring stopped)."""
@@ -666,9 +704,22 @@ def _last_word(gm: Game, i: int) -> str:
     if gm.end != "REG" or t != gm.loser or any(gm.side(h) == t for h in rest) or not rest or all(h["strength"] == "en" for h in rest):
         return ""  # an empty-netter that ends it says so itself ("ended any hope of a comeback")
     m, th_ = gm.score(g, t)
-    if m >= th_:
-        return gm.pk([f"but that’s where {grammar.possessive(W.place(t))} luck ran out", "but they didn’t score again"], "lastw", i)
+    if gm.luck_ps is not None and at(gm.luck_ps) > at(g):
+        return ""  # their luck ran out on the stopped penalty shot, told there (Sora's notes, Oct 20)
+    # the team named, not "they": "Lafrenière tied it for the Rangers, but they didn’t score again" read as either side
+    # (outside notes, Oct 22). No "luck ran out" on a goal: a tie that never broke their way isn't luck (goal-tracking
+    # study, 2026-10-25); the stopped penalty shot keeps it.
+    other = gm.winner
+    names = {W.the(other), W.place(other), W.nick.get(other, other)}
+    T = W.the(t) if any(n and n in body for n in names) else "they"  # "they" only when no other team is named before it
+    if m > th_:  # still ahead
+        return gm.pk([f"but {T} didn’t score again", f"and {T} didn’t score again"], "lastw", i)
+    if m == th_ and at(rest[0]) - at(g) <= 120:
+        return ""  # the go-ahead came right back; "they didn’t score again" then reads oddly (PIT at WPG, Oct 20)
+    if m == th_:  # level: "they didn't score again" could be either side, so the team is named
+        return gm.pk([f"but {W.the(t)} didn’t score again", f"but that was the last goal {W.the(t)} would get"], "lastw", i)
     if m == th_ - 1:
+        # "got no closer" can only be the side that was behind, so "they" stays clear there
         return gm.pk(["but that was as close as they got", "but they got no closer"], "lastw", i)
     return ""
 
@@ -732,7 +783,7 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
     elif t == gm.loser and not after_ and gm.end == "REG" and ta - ma == 1:
         tail = gm.pk([f", but {W.the(t)} couldn’t find another", f", but {W.the(gm.winner)} held on"], "runheld", run[0])
     elif t == gm.loser and after_ and gm.end == "REG":
-        lw = _last_word(gm, run[-1])
+        lw = _last_word(gm, run[-1], did)
         tail = f", {lw}" if lw else ""
     if len(set(names)) == 1:
         who = gm.name(names[0])
@@ -804,6 +855,12 @@ def _exit(gm: Game, x: dict) -> str:
     return " ".join(f"{who_} didn’t play after {surprises.clock_at(x['sec'])}.".split())
 
 
+def rides_on_goal(x: dict) -> bool:
+    """A return told on the player's goal rather than first in the story: anyone but a star, back from a missed
+    stretch (not a long time away, which keeps its own date line), who scored."""
+    return x["kind"] == "return" and bool(x.get("goals")) and not x.get("since") and not x.get("goalie") and x.get("weight", 0) < 88
+
+
 def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tuple[dict, set]:
     """Firsts and milestones that ride on a goal: {goal index: {"pre": "scored his first NHL goal", "tail": "..."}},
     and the players whose first the chronology now tells (so nothing else repeats it)."""
@@ -827,8 +884,20 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             if helper and gm.N.get(helper):
                 att[i]["helper"] = helper  # named when the sentence is written, so his first mention is his full name
             told.add(pid)
+            for n_, j in enumerate([j for j, g in enumerate(goals) if g["p1"] == pid][1:3], start=2):
+                att.setdefault(j, {})["pre"] = f"scored his {nth_word(n_)} NHL goal"  # "Knuble scored his second NHL goal"
         elif k == "club_goal" and i is not None:
             att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"
+            told.add(pid)
+        elif k == "return" and i is not None and rides_on_goal(x) and not (att.get(i) or {}).get("tail"):
+            # "Zucker got the Sabres on the board ..., in his first game of the season" (outside notes, Oct 21: told
+            # first, a depth player's season debut led the story ahead of the rookie's first two goals)
+            att.setdefault(i, {})["tail"] = ("in his first game of the season" if x.get("season_debut")
+                                             else f"in his first game back after missing {num(x['missed'])} games")
+            told.add(pid)
+        elif k == "milestone" and x["what"] == "game" and i is not None and not (att.get(i) or {}).get("tail"):
+            # "Matthews scored in his 700th NHL game" rides on his goal (outside notes, Oct 20: told apart, it led the story)
+            att.setdefault(i, {})["tail"] = f"in his {th(x['mark'])} NHL game"
             told.add(pid)
         elif k == "milestone" and x["what"] in ("goal", "point", "assist") and x.get("have") is not None:
             n = x["mark"] - x["have"]  # his nth of tonight reached the mark
