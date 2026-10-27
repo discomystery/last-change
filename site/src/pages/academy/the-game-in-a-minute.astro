@@ -1,0 +1,170 @@
+---
+// Academy 1.1: the whole game before any rules. One short play (puck drop, a rush, a save, a rebound goal) that can
+// be paused anywhere; tap a player to see who they are. Words introduced here: puck, stick, net, goal, goalie, skater.
+import Lesson from '../../layouts/Lesson.astro';
+---
+<Lesson slug="the-game-in-a-minute">
+  <section class="ac-part" aria-labelledby="watch-h">
+    <header>
+      <h2 id="watch-h">Watch one goal</h2>
+      <p>Here’s a few seconds of a game, start to goal. Let it play, then pause wherever you like and tap any player to see who they are.</p>
+    </header>
+    <div class="ac-stage wide" id="play1">
+      <div class="ac-view">
+        <div class="ac-ctrl" style="justify-content: space-between">
+          <p class="pick">See it <select data-view aria-label="Viewpoint">
+            <option value="center">from a seat at center ice</option>
+            <option value="above">from above</option>
+          </select></p>
+          <p class="ac-board" aria-label="Scoreboard"><span class="tm"><span class="sw home"></span>Home <span class="sc" data-score="home">0</span></span><span class="tm"><span class="sw away"></span>Visitors <span class="sc" data-score="away">0</span></span><span class="clk" data-clock>20:00</span></p>
+        </div>
+        <svg class="ac-rink" id="rink1" role="img" aria-label="A rink with two teams of six. The home team, in dark sweaters, carries the puck up the ice, shoots, and scores on the rebound."></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+        <p class="ac-hint">Pause anywhere, then tap a player.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="four-h">
+    <header>
+      <h2 id="four-h">Four things to know</h2>
+      <p>That play holds most of the game. Here it is again in words.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M40 8h16v24H40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M44 8l12 4M44 32l12-4M48 8v24" stroke="currentColor" stroke-width="1" opacity="0.5"/><ellipse cx="46" cy="22" rx="4" ry="2.2" fill="currentColor"/><path d="M8 24h22" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 3" opacity="0.6"/></svg>
+        <p class="box-h">Put the puck in their net</p>
+        <p>Each team defends one net and attacks the other. Players move the <b>puck</b>, a hard rubber disc, with their <b>sticks</b>. Getting it into the other team’s <b>net</b> is a <b>goal</b>.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="currentColor"><circle cx="10" cy="14" r="4"/><circle cx="22" cy="26" r="4"/><circle cx="32" cy="12" r="4"/><circle cx="42" cy="28" r="4"/><circle cx="52" cy="16" r="4"/></g><circle cx="58" cy="32" r="5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>
+        <p class="box-h">Six a side</p>
+        <p>Each team has five <b>skaters</b> and one <b>goalie</b> on the ice. The goalie guards the net and is the only player allowed to hold on to the puck.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="4" y="6" width="56" height="28" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><text x="32" y="26" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor" font-family="var(--ui)">3 – 2</text></svg>
+        <p class="box-h">Most goals wins</p>
+        <p>A game is 60 minutes of playing time. Whoever has more goals at the end wins. Scores are low: a typical game has about six goals between both teams.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M8 14h44M44 8l8 6-8 6M56 28H12M20 22l-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p class="box-h">It hardly ever stops</p>
+        <p>Play keeps going until something stops it, and everyone skates both ways, attacking one moment and defending the next. The next few lessons explain what can stop it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Two quick ones, just to check it clicked. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>Which player is allowed to hold on to the puck?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Skaters can knock the puck down with a glove, but they can’t hang on to it.">Any player</button>
+          <button class="pill" type="button" data-right data-say="Right. Only the goalie can catch the puck and keep it.">The goalie</button>
+          <button class="pill" type="button" data-say="Not quite. One player can: the goalie.">Nobody</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>How many players does each team have on the ice?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. That’s just the skaters. Add the goalie.">Five</button>
+          <button class="pill" type="button" data-right data-say="Right. Five skaters and a goalie.">Six</button>
+          <button class="pill" type="button" data-say="Not quite. That’s soccer. Hockey has five skaters and a goalie.">Eleven</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+</Lesson>
+
+<script>
+  import { VIEWS, el, label, r2 } from '../../lib/academy/rink';
+  import { playerUI } from '../../lib/academy/play';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  import { whenSeen } from '../../lib/academy/rink';
+
+  // The play, in feet and seconds. The home team (dark) attacks the net on the right.
+  const H = (id, keys, extra = {}) => ({ id, kind: 'home', keys, ...extra });
+  const A = (id, keys, extra = {}) => ({ id, kind: 'away', keys, ...extra });
+  const GOAL_T = 8.35;
+  const def = {
+    length: 12,
+    narrow: [64, 0, 200, 85],
+    actors: [
+      H('hG', [[0, 14, 42.5], [4, 15, 42.5], [8, 16, 43], [12, 15, 42.5]], { goalie: true }),
+      H('hD1', [[0, 80, 30], [1.0, 80, 30], [1.5, 83, 33], [2.4, 88, 32], [3.5, 100, 28], [6, 124, 25], [9, 128, 27], [12, 130, 30]]),
+      H('hD2', [[0, 80, 56], [1.0, 80, 56], [3, 96, 57], [6, 124, 58], [9, 128, 56], [12, 128, 54]]),
+      H('hC', [[0, 97.5, 42.5], [1.0, 97.5, 42.5], [1.6, 100, 40], [3.2, 118, 38], [5.2, 145, 40], [6.3, 163, 40], [7.4, 168, 44], [9.5, 175, 46], [12, 176, 47]]),
+      H('hW1', [[0, 98, 24], [1.0, 98, 24], [2.0, 103, 22], [3.2, 110, 20], [5.2, 144, 18], [6.0, 153, 20], [8.4, 165, 26], [10, 172, 40], [12, 174, 43]]),
+      H('hW2', [[0, 98, 61], [1.0, 98, 61], [2.4, 108, 62], [4, 128, 62], [5.6, 152, 60], [7.2, 168, 56], [7.7, 173, 54], [8.0, 175, 53], [8.6, 178, 50], [10, 176, 48], [12, 177, 49]]),
+      A('aG', [[0, 185.5, 42.5], [6.3, 185.5, 41.5], [6.9, 185.5, 43], [7.6, 185, 46], [8.2, 185.5, 48], [9, 185.8, 47], [12, 185.5, 44]], { goalie: true }),
+      A('aC', [[0, 102.5, 42.5], [1.0, 102.5, 42.5], [1.8, 99, 40], [3.5, 118, 42], [5.5, 150, 44], [6.5, 160, 45], [8.5, 168, 47], [12, 166, 47]]),
+      A('aW1', [[0, 102, 61], [1.0, 102, 61], [2.5, 101, 58], [4.5, 130, 52], [6.5, 158, 52], [8, 168, 58], [12, 164, 57]]),
+      A('aW2', [[0, 102, 24], [1.0, 102, 24], [2.5, 108, 26], [4.5, 128, 28], [6.5, 154, 30], [8, 162, 32], [12, 158, 34]]),
+      A('aD1', [[0, 120, 30], [1.0, 120, 30], [3, 132, 24], [5.2, 149, 22], [6, 155, 25], [7.5, 170, 34], [12, 171, 36]]),
+      A('aD2', [[0, 120, 56], [1.0, 120, 56], [3, 135, 56], [5.5, 158, 52], [6.6, 170, 47], [8.2, 172, 51], [12, 171, 53]]),
+      { id: 'ref', kind: 'ref', keys: [[0, 100, 47], [1.0, 100, 46], [1.8, 98, 66], [4, 108, 76], [8, 146, 79], [12, 156, 79]] },
+    ],
+    puck: [[0, 100, 42.5], [1.0, 100, 42.5], [1.5, 85.5, 33.5], [2.4, 90.5, 32.5], [3.2, 112.5, 20.5], [5.2, 146.5, 18.5], [5.8, 155, 20.5], [6.4, 165.5, 40.5], [6.9, 183.5, 43], [7.6, 176, 52], [8.0, 176.5, 53.5], [GOAL_T, 190.2, 40.6], [12, 190.4, 40.8]],
+    beats: [
+      { t: 0, h: 'The puck drops', p: 'Play starts with an official, the one in stripes, dropping the puck between two players in the middle of the ice.' },
+      { t: 1.5, h: 'Two teams of six', p: 'Each team has five skaters and one goalie. The dark sweaters are the home team; the visitors wear white.' },
+      { t: 3.2, h: 'Up the ice', p: 'The home team is trying to score in the net on the right. They pass the puck ahead and skate after it.' },
+      { t: 6.6, h: 'A shot, and a save', p: 'The goalie’s whole job is to stop the puck. He does, but it bounces loose.' },
+      { t: 8.2, h: 'Goal', p: 'A teammate gets to the loose puck first and puts it in. A red light goes on behind the net, and the home team leads 1–0.' },
+      { t: 10, h: 'That’s the idea', p: 'Whoever has more goals after 60 minutes wins. After a goal, play starts again from the middle.' },
+    ],
+    events: [
+      {
+        t: GOAL_T,
+        on: (api) => {
+          const p = api.V.P(194, 42.5, api.V.top ? 0 : 6), s = p[2];
+          const lamp = el(api.fx, 'ellipse', { class: 'lamp', cx: r2(p[0]), cy: r2(p[1]), rx: r2(3 * s), ry: r2(3 * s) });
+          requestAnimationFrame(() => lamp.classList.add('on'));
+          score(1);
+        },
+        off: (api) => { api.fx.replaceChildren(); score(0); },
+      },
+    ],
+  };
+
+  const root = document.getElementById('play1')!;
+  const svg = document.getElementById('rink1') as unknown as SVGSVGElement;
+  const viewSel = root.querySelector<HTMLSelectElement>('[data-view]')!;
+  const homeScore = root.querySelector<HTMLElement>('[data-score="home"]')!;
+  const clock = root.querySelector<HTMLElement>('[data-clock]')!;
+  function score(n: number) {
+    if (homeScore.textContent === String(n)) return;
+    homeScore.textContent = String(n);
+    homeScore.classList.remove('bump'); void homeScore.offsetWidth; if (n) homeScore.classList.add('bump');
+  }
+  const WHO: Record<string, string> = {
+    home: 'A skater on the home team (dark sweaters).',
+    away: 'A skater on the visiting team (white sweaters).',
+    ref: 'An official. They keep the game fair and stop play when something goes wrong. Lesson 4 is all about them.',
+  };
+  const ui = playerUI(root, svg, def, () => (VIEWS as any)[viewSel.value], (a: any) =>
+    a.goalie ? `The ${a.kind === 'home' ? 'home' : 'visiting'} team’s goalie. He guards the net and is the only player allowed to hold on to the puck.` : WHO[a.kind]);
+  viewSel.addEventListener('change', () => ui.rebuild());
+  // The clock runs from the puck drop and stops at the goal, as a real game clock does.
+  const tick = () => {
+    const t = ui.ctl.t, ran = Math.max(0, Math.min(t, GOAL_T) - 1.0), left = 1200 - Math.floor(ran);
+    clock.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    requestAnimationFrame(tick);
+  };
+  tick();
+  whenSeen(svg, () => ui.play());
+  wireQuiz(document);
+</script>

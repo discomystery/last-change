@@ -1,0 +1,64 @@
+---
+// The Academy's front page: every lesson in order, by track. Lessons with a page link to it; finished ones get a
+// check mark from this device (localStorage lc-academy-done). Reached only from a quiet link in the footer for now.
+import Base from '../../layouts/Base.astro';
+import { TRACKS } from '../../lib/academy/lessons';
+import '../../styles/academy.css';
+const base = import.meta.env.BASE_URL;
+---
+<Base title="Academy" description="Hockey from the very beginning: short lessons with pictures for people new to the game.">
+  <div class="ac">
+    <header class="ac-top page-top">
+      <p class="eyebrow">Spare Line Change</p>
+      <h1>Academy</h1>
+      <p class="lede">New to hockey? Start here. Short lessons, mostly pictures, that take you from your very first game to the numbers on the rest of this site. Each one only uses what the lessons before it taught, so you can go in order and never get lost.</p>
+    </header>
+    {TRACKS.map((tr, ti) => (
+      <section class="ac-part ac-trackcard" aria-labelledby={`tr-${tr.id}`}>
+        <header>
+          <p class="eyebrow">Track {ti + 1}</p>
+          <h2 id={`tr-${tr.id}`}>{tr.title}</h2>
+          <p>{tr.blurb}</p>
+        </header>
+        <ol class="ac-list">
+          {tr.lessons.map((l, i) => (
+            <li class:list={[{ soon: !l.ready, extra: l.extra }]} data-slug={l.slug}>
+              <span class="no">{ti + 1}.{i + 1}</span>
+              <span class="what">
+                {l.ready ? <a href={`${base}academy/${l.slug}/`} class="t">{l.title}</a> : <span class="t">{l.title}</span>}
+                {l.blurb && <span class="b">{l.blurb}</span>}
+              </span>
+              <span class="st">{l.extra && <span class="chip">Extra credit</span>}{!l.ready && <span class="chip">Coming soon</span>}<span class="done" aria-label="Done" hidden>✓</span></span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+    <p class="ac-hint">Every word the lessons teach is in the <a href={`${base}academy/words/`}>glossary</a>. Finished lessons get a check mark, saved on this device only.</p>
+  </div>
+</Base>
+
+<style>
+  .ac-list { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ac-list li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 12px 0; border-top: 1px solid var(--rule); }
+  .ac-list li:first-child { border-top: 0; }
+  .no { font: 600 14px/1.4 var(--ui); color: var(--ink-3); }
+  .what { display: grid; gap: 2px; }
+  .t { font: 600 19px/1.3 var(--display); }
+  a.t:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+  .b { font-size: 16px; color: var(--ink-2); }
+  .soon .t { color: var(--ink-2); }
+  .st { display: flex; gap: 6px; align-items: center; }
+  .done { font: 700 16px/1 var(--ui); width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--ink); color: var(--sheet); }
+  .done[hidden] { display: none; }
+  @media (max-width: 600px) { .ac-list li { grid-template-columns: 36px minmax(0, 1fr); } .st { grid-column: 2; } .st:empty { display: none; } }
+</style>
+
+<script>
+  try {
+    const done = new Set(JSON.parse(localStorage.getItem('lc-academy-done') || '[]'));
+    document.querySelectorAll<HTMLElement>('.ac-list li[data-slug]').forEach((li) => {
+      if (done.has(li.dataset.slug)) li.querySelector<HTMLElement>('.done')!.hidden = false;
+    });
+  } catch {}
+</script>

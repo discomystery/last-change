@@ -399,6 +399,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         <span class="term" tabindex="0" data-nospell data-tip="American: defense, center, feet and mph. Canadian: defence, centre, metres and km/h.">Spelling and units</span>
         <button type="button" data-pref="spell" data-value="us" data-nospell>American</button><span aria-hidden="true">·</span><button type="button" data-pref="spell" data-value="ca" data-nospell>Canadian</button>
       </p>
+      <p class="foot-quiet"><a class="foot-academy" href={`${base}academy/`}>Academy</a></p>
     </footer>
     <div id="tip" role="tooltip" hidden></div>
     <script is:inline define:vars={{ adjKinds: ADJ_KIND }}>window.lcAdjKinds = adjKinds;</script>
@@ -983,6 +984,9 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
   .site-foot { padding-block: 28px 48px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
   .foot-spell { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 2px; }
   .foot-spell .term { margin-right: 2px; }
+  /* The Academy is reached only from here until it is ready to show (Sora, 2026-10-23). */
+  .foot-academy { color: var(--ink-3); }
+  .foot-academy:hover { color: var(--ink); }
   .foot-spell button { font: inherit; color: var(--ink-3); background: none; border: 0; padding: 0; cursor: pointer; }
   .foot-spell button:hover { color: var(--ink); }
   .foot-spell button[aria-pressed='true'] { color: var(--ink); font-weight: 600; cursor: default; }
