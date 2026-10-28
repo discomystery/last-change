@@ -289,6 +289,28 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   </dd>
                 </div>
               )}
+              {s.zone_starts && modes.some(([m]) => s.zone_starts![m]) && (
+                <div>
+                  <dt>Zone starts</dt>
+                  <dd>
+                    {modes.map(([m, mw]) => {
+                      const z = s.zone_starts![m];
+                      const place = team?.place ?? p.team;
+                      if (!z) return <div class={`gmode m-${m}`}><p class="n">Too few faceoff shifts with {place} yet to say.</p></div>;
+                      // This season: the head coach by name when he has run the bench all season. Blended: the club, since last season's bench may differ.
+                      const who = m === 'season' && s.zone_starts!.coach ? `${s.zone_starts!.coach} starts` : `${place} ${m === 'season' ? 'starts' : 'has started'}`;
+                      const pc = (x: number) => `${Math.round(100 * x)}%`;
+                      const split = [z.home != null && `home ${pc(z.home)}`, z.road != null && `road ${pc(z.road)}`].filter(Boolean);
+                      const tip = `Of the 5-on-5 shifts he began by coming on for a faceoff in one of the two ends, ${mw}: ${z.oz} in the offensive zone and ${z.dz} in his own (neutral-zone draws left out). Coaches send scorers out for draws in the offensive zone and trusted defensive players for draws in their own end, most of all at home, where they have the last change. It shows how he is used, not how good he is; his “Creating chances” and “Preventing chances” ratings already account for where his shifts start.`;
+                      return (
+                        <div class={`gmode m-${m}`}>
+                          <p>{who} him in the offensive zone on <strong class="term" tabindex="0" data-tip={tip}>{pc(z.share)}</strong> of his faceoff shifts{z.pct != null && <>, {compared(z.pct, 'more often than', 'less often than', groupWord[s.group], true)} <Marker pct={z.pct} tip={`${compared(z.pct, 'More offensive-zone starts than', 'Fewer offensive-zone starts than', groupWord[s.group])}, ${mw}. Not good or bad in itself: it is how his coach uses him.`} /></>}{split.length > 0 && <span class="n"> · {split.join(', ')}</span>}</p>
+                        </div>
+                      );
+                    })}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
           {role.notes.length > 0 && (

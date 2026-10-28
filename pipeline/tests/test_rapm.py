@@ -34,3 +34,11 @@ def test_stretches_hold_all_5v5_expected_goals():
     games = pl.read_parquet(TABLES / "2025" / "games.parquet").filter(pl.col("game_type") == 2).select("game_id")
     tg = pl.read_parquet(TABLES / "2025" / "team_game.parquet").filter(pl.col("strength") == "5v5").join(games, on="game_id")
     assert st["xg_home"].sum() + st["xg_away"].sum() == pytest.approx(tg["xgf"].sum(), rel=1e-6)
+
+
+def test_a_faceoff_inside_a_stint_starts_a_new_stretch():
+    st = pl.DataFrame({"game_id": [1, 1], "start": [0, 50], "end": [50, 120], "home_skaters": [[1, 2], [1, 3]], "away_skaters": [[9], [9]]})
+    ev = pl.DataFrame({"game_id": [1, 1, 1, 1], "sec": [0, 30, 50, 80], "type": ["faceoff", "faceoff", "faceoff", "shot-on-goal"]})
+    out = rapm.split_at_faceoffs(st, ev)
+    assert out.select("start", "end", "duration").rows() == [(0, 30, 30), (30, 50, 20), (50, 120, 70)]
+    assert out["home_skaters"].to_list() == [[1, 2], [1, 2], [1, 3]]
