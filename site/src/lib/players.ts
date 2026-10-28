@@ -20,10 +20,13 @@ export const pkRoleTip = {
   second: 'Second wave: kills often, but usually comes on after the first change rather than at the start.',
   spot: 'Spot duty: used in some kills (10% to 40% of them), for at least 20 seconds at a time.',
 } as const;
+/** Where his current club starts his 5-on-5 shifts that begin with a faceoff in either end (attacking-zone share). */
+export type ZoneShare = { share: number; oz: number; dz: number; home: number | null; road: number | null; pct: number | null };
+export type ZoneStarts = Partial<Record<Mode, ZoneShare>> & { coach: string | null };
 export type Stats = { gp: number; g: number; a: number; p: number; sog: number; toi: number };
 export type Skater = {
   id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
-  group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
+  group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; zone_starts?: ZoneStarts | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
 };

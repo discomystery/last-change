@@ -152,6 +152,34 @@ def _pct(v: float, pool: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * p, 1, 99))
 
 
+ZONE_MIN_STARTS = 30  # faceoff shift starts before the share is shown; half its spread is habit at about 55 (split-half r 0.72, 2024-26)
+
+
+def _zone_starts(season: int, team_now: dict[int, int]) -> dict[int, dict]:
+    """Where his current club starts his 5-on-5 shifts when they begin with a faceoff in either end (units.shift_starts):
+    the attacking-zone share this season and over this season and last, overall, at home (where his coach has the last
+    change) and on the road. Only games with his current club count, so it describes how this coach uses him."""
+    from pipeline.metrics import units
+
+    parts = [units.shift_starts(s).with_columns(pl.lit(s).alias("season")) for s in (season - 1, season) if (TABLES / str(s) / "stints.parquet").exists()]
+    if not parts:
+        return {}
+    z = pl.concat(parts)
+    z = z.filter(pl.col("team_id") == pl.col("player_id").replace_strict(team_now, default=None, return_dtype=pl.Int64))
+    out: dict[int, dict] = {}
+    for mode, rows in (("blend", z), ("season", z.filter(pl.col("season") == season))):
+        agg = rows.group_by("player_id", "home").agg(pl.col("oz", "dz").sum())
+        for pid, g in agg.group_by("player_id"):
+            by = {r["home"]: (r["oz"], r["dz"]) for r in g.iter_rows(named=True)}
+            oz = sum(v[0] for v in by.values())
+            dz = sum(v[1] for v in by.values())
+            if oz + dz < ZONE_MIN_STARTS:
+                continue
+            side = lambda h: None if h not in by or sum(by[h]) < ZONE_MIN_STARTS else round(by[h][0] / sum(by[h]), 3)
+            out.setdefault(pid[0], {})[mode] = {"share": round(oz / (oz + dz), 3), "oz": int(oz), "dz": int(dz), "home": side(True), "road": side(False)}
+    return out
+
+
 def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dict:
     """Ratings for everyone who has dressed this season. `idle` (player id -> current team id) adds players a club
     holds who have not dressed yet (injured, in the minors): rated from last season alone, with no games this season."""
@@ -292,6 +320,16 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
             pools = {k: np.array([c[pid][k] for pid in members if regular(players[pid], mode) and c[pid][k] is not None]) for k in ("all", "home", "road")}
             for pid in members:
                 out[pid].setdefault("competition", {})[mode] = {k: None if c[pid][k] is None else {"v": round(c[pid][k], 3), "pct": round(_pct(c[pid][k], pools[k], True))} for k in ("all", "home", "road")}
+    for pid, z in _zone_starts(season, team_now).items():
+        if pid in out:
+            out[pid]["zone_starts"] = z
+    for mode in ("blend", "season"):
+        for g in ("F", "D"):
+            have = [pid for pid, p in players.items() if p["group"] == g and (out[pid].get("zone_starts") or {}).get(mode)]
+            pool = np.array([out[pid]["zone_starts"][mode]["share"] for pid in have if regular(players[pid], mode)])
+            for pid in have:
+                z = out[pid]["zone_starts"][mode]
+                z["pct"] = round(_pct(z["share"], pool, True)) if len(pool) else None
     for pid, p in players.items():
         out[pid]["totals"] = {"season": {c_: float(p["sums"]["season"][i]) for c_, i in C.items()},
                               "last": None if p["sums"]["last"] is None else {c_: float(p["sums"]["last"][i]) for c_, i in C.items()}}

@@ -56,8 +56,8 @@ def stretches(season: int) -> pl.DataFrame:
     games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
     st = pl.read_parquet(d / "stints.parquet").join(games, on="game_id").filter(
         (pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null() & (pl.col("duration") > 0))
-    st = st.with_row_index("sid").select("sid", "game_id", "start", "end", "duration", "home_skaters", "away_skaters")
     ev = pl.read_parquet(d / "events.parquet").join(games, on="game_id")
+    st = split_at_faceoffs(st.select("game_id", "start", "end", "home_skaters", "away_skaters"), ev).with_row_index("sid")
     per = _stint_xg(season, st, ev)
 
     # Score before the stint, from the home side.
@@ -72,6 +72,23 @@ def stretches(season: int) -> pl.DataFrame:
     fo = fo.with_columns(home_zone=pl.when(pl.col("zone") == "N").then(pl.lit("N")).when((pl.col("zone") == "O") == pl.col("is_home")).then(pl.lit("O")).otherwise(pl.lit("D")))
     out = st.join(per, on="sid", how="left").join(score, on="sid", how="left").join(fo.select("game_id", "start", "home_zone"), on=["game_id", "start"], how="left")
     return out.with_columns(pl.col("xg_home", "xg_away").fill_null(0.0), pl.col("home_state").fill_null(0), pl.col("home_zone").fill_null("F"))
+
+
+def split_at_faceoffs(st: pl.DataFrame, ev: pl.DataFrame) -> pl.DataFrame:
+    """Cut each stint at every faceoff inside it, so a draw taken by the same ten skaters who were already on the ice
+    (about 14% of 5-on-5 faceoffs, e.g. after an icing when neither side changed) still starts a stretch and its zone
+    is counted. Same players, so totals and every player's seconds are unchanged (2026-10-28)."""
+    fo = ev.filter(pl.col("type") == "faceoff").select("game_id", pl.col("sec").alias("cut")).unique().sort("cut")
+    keyed = st.with_row_index("_i").sort("start")
+    inside = fo.join_asof(keyed.select("game_id", "start", "end", "_i"), left_on="cut", right_on="start", by="game_id",
+                          strategy="backward", check_sortedness=False).filter((pl.col("cut") > pl.col("start")) & (pl.col("cut") < pl.col("end")))
+    cuts = inside.group_by("_i").agg(pl.col("cut").sort())
+    out = keyed.join(cuts, on="_i", how="left").with_columns(pl.col("cut").fill_null(pl.lit([], dtype=pl.List(pl.Int64))))
+    out = out.with_columns(
+        s=pl.concat_list(pl.col("start"), pl.col("cut")),
+        e=pl.concat_list(pl.col("cut"), pl.col("end"))).drop("start", "end", "cut").explode("s", "e")
+    return out.sort("_i", "s").select("game_id", pl.col("s").alias("start"), pl.col("e").alias("end"), (pl.col("e") - pl.col("s")).alias("duration"),
+                                     "home_skaters", "away_skaters")
 
 
 def _stint_xg(season: int, st: pl.DataFrame, ev: pl.DataFrame) -> pl.DataFrame:
