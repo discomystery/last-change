@@ -850,9 +850,37 @@ def _exit(gm: Game, x: dict) -> str:
     from pipeline.export import surprises
     W = gm.W
     who_ = f"{_cap(W.poss(x['team']))} {gm.name(x['id'])}" if x["id"] not in gm.said else gm.name(x["id"])
-    if x.get("confirmed", True):
-        return " ".join(f"{who_} left {surprises.when_left(x['sec'])} and didn’t return.".split())
+    news = injury_news(x.get("news"))
+    if x.get("confirmed", True) or news:
+        return " ".join(f"{who_} left {surprises.when_left(x['sec'])} and didn’t return.{news}".split())
     return " ".join(f"{who_} didn’t play after {surprises.clock_at(x['sec'])}.".split())
+
+
+INJURY_SAID = {"ir": "was placed on injured reserve", "week": "was listed as week to week", "day": "was listed as day to day",
+               "season": "was ruled out for the rest of the season", "out": "was ruled out"}
+INJURY_ENDS = ("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear", "concussion")
+
+
+def injury_news(n: dict | None) -> str:
+    """" Two days later, he was placed on injured reserve with a lower-body injury.": what the league or ESPN said
+    about a player who left, the day after the game or the day after that (recaps.Season.injury_news; Sora,
+    2026-10-29). Only their words: the status, the injury they named and their timeline, never a guess."""
+    if not n:
+        return ""
+    st, tl = n["status"], (n.get("timeline") or "").strip()
+    if st == "long":
+        rest = tl[4:].strip() if tl.lower().startswith("out ") else None
+        said = (f"was ruled out {'' if rest.lower().startswith(('for ', 'indefinitely', 'long')) else 'for '}{rest}" if rest else
+                f"was placed {tl}" if tl.lower().startswith("on ") else "was ruled out long term")
+    else:
+        said = INJURY_SAID.get(st)
+    if not said:
+        return ""
+    when = "The next day" if n["days"] <= 1 else "Two days later"
+    inj = (n.get("injury") or "").strip().lower().replace("upper body", "upper-body").replace("lower body", "lower-body")
+    if inj and not inj.endswith(INJURY_ENDS):
+        inj += " injury"
+    return f" {when}, he {said}{' with ' + grammar.article(inj) if inj else ''}."
 
 
 def rides_on_goal(x: dict) -> bool:
