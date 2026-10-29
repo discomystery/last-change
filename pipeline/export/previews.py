@@ -196,7 +196,7 @@ CLASH_WORDS = {
 PACE_WORDS = {
     "fast": (["Expect a track meet", "Shots should fly both ways", "Nobody’s sitting back in this one", "Buckle up", "Bring popcorn", "Run and gun", "Pond hockey"],
              "{A} play some of the league’s fastest games, and so do {H}. We think this one runs hotter than either team’s usual."),
-    "slow": (["Expect a grind", "Bring a pillow", "Don’t blink and you still might miss the shots", "Trench warfare", "Every inch will be earned", "A grinder’s delight"],
+    "slow": (["Expect a grind", "Bring a pillow", "Shots will be scarce", "Trench warfare", "A grinder’s delight"],
              "{A} play some of the league’s slowest games, and so do {H}. We think this one is even quieter than either team’s usual."),
 }
 # The gist of each call, one short sentence with no numbers, for the story at the top of the page.
