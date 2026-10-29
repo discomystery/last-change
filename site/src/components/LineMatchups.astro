@@ -1,11 +1,11 @@
 ---
 // Post-game "Who played against whom" (Sora, 2026-10-15, after the mock-up "Post-game Line Matchups"), under a fold at
 // the bottom of "How it unfolded". The lede and "What changed" notes come from matchups/{id}.json (export/matchups.py)
-// at build time; since 2026-10-29 the chart is the shift tape (LineTape.astro), whose row captions carry the split
-// strips that used to stand here.
+// at build time; since 2026-10-29 the chart is one grid of lines and pairs against each other (LineGrid.astro), with
+// each 5-on-5 goal marked in the cell of the two lines and the two pairs on the ice.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import LineTape from './LineTape.astro';
+import LineGrid from './LineGrid.astro';
 
 interface Props { id: number; away: string; home: string; awayPlace: string; homePlace: string }
 const { id, away, home, awayPlace, homePlace } = Astro.props;
@@ -24,7 +24,7 @@ const mu = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
         {mu.foot && <p class="pgmu-foot">{mu.foot}</p>}
       </div>
     )}
-    <LineTape id={id} away={away} home={home} awayPlace={awayPlace} homePlace={homePlace} />
+    <LineGrid id={id} away={away} home={home} awayPlace={awayPlace} homePlace={homePlace} />
   </details>
 )}
 

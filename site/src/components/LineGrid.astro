@@ -1,0 +1,233 @@
+---
+// Post-game line matchups as one grid (Sora, 2026-10-29, thread "Design post-game line matchup visuals": the shift tape
+// made the page much longer, she asked for matchup success shown concisely). Rows are the home team's lines and pairs,
+// columns the visitors'; each cell is the time the two groups spent against each other at 5-on-5, shaded by its share of
+// the row's time (the site's split-strip shading), with a dot in the scoring team's colour for every 5-on-5 goal
+// scored while both were on. Pips give each group's strength coming into the season, so a goal by a weaker group
+// against a stronger one can be read off the grid. Tap a cell for its time, chances and goals.
+// Drawn in the browser from data/flow/{id}.json (pipeline/export/flow.py), fetched when the fold opens: the shifts give
+// who was on the ice at every moment, `r` each skater's 5-on-5 rating coming into the season (ratings stop at the end
+// of last season, so strength is never tuned to the result), `cuts` the league's quintiles for pips.
+interface Props { id: number; away: string; home: string; awayPlace: string; homePlace: string }
+const { id, away, home, awayPlace, homePlace } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<div class="pick lg-pick"><span>Show {homePlace}’s</span><select id="lg-r" aria-label="Home groups"><option value="L">forward lines</option><option value="P">defense pairs</option></select><span>against {awayPlace}’s</span><select id="lg-c" aria-label="Visiting groups"><option value="L">forward lines</option><option value="P">defense pairs</option></select></div>
+<div class="card lgrid" id="lgrid" data-src={`${base}data/flow/${id}.json`} data-abbr={`${away},${home}`} data-place={`${awayPlace}|${homePlace}`} data-base={base}>
+  <p class="lg-say" id="lg-say">Loading the shifts…</p>
+  <div class="lg-wrap" id="lg-grid"></div>
+  <div class="lg-cap" id="lg-cap" aria-live="polite"></div>
+  <p class="note lg-note">Each cell is the 5-on-5 time those two groups spent against each other; stronger shading means more of the row’s time. Each dot is a 5-on-5 goal scored while both were on, in the scoring team’s colour. <span class="term" tabindex="0" data-tip="How strong a line or pair is, from its players’ 5-on-5 ratings coming into the season (chances created plus chances prevented). More filled means stronger than more of the lines or pairs that have played at 5-on-5 this season. Players new to the NHL count as average.">Pips</span> show how strong each group is.</p>
+</div>
+
+<script>
+  type Sk = { id: number; n: string; h: number; grp: string; s: number[]; r?: number };
+  type Seg = { s: number; e: number; dur: number; str: string; on: number[][]; F: (string | null)[]; P: (string | null)[] };
+  type Shot = { t: number; h: number; xg: number; goal: boolean; who: number; en: boolean; seg?: Seg; score?: number[] };
+  const root = document.getElementById('lgrid');
+  if (root) {
+    const ABBR = root.dataset.abbr!.split(','), PLACE = root.dataset.place!.split('|'), BASE = root.dataset.base!;
+    const SIDE = ['t-away', 't-home'];
+    const LAB = ['L1', 'L2', 'L3', 'L4', 'P1', 'P2', 'P3'];
+    const PER = ['', '1st', '2nd', '3rd', 'OT'];
+    const PIPWORD = ['', 'weaker than most', 'below average', 'about average', 'above average', 'stronger than most'];
+    const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    const per = (t: number) => Math.min(4, Math.floor(Math.max(t - 1, 0) / 1200) + 1);
+    const when = (t: number) => `${clock(t - (per(t) - 1) * 1200)} of the ${PER[per(t)] === 'OT' ? 'overtime' : PER[per(t)]}`;
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const poss = (p: string) => (p.endsWith('s') ? `${p}’` : `${p}’s`);
+    const an = (n: number) => (/^(8|11|18)/.test(String(n)) ? 'an' : 'a');
+    const vb = (p: string) => (p.startsWith('NY ') ? 'lead' : 'leads');
+    let D: any = null, P = new Map<number, Sk>(), sets: Record<string, Set<number>>[] = [{}, {}], segs: Seg[] = [], shots: Shot[] = [], goals: Shot[] = [], END = 3600;
+
+    const isD = (id: number) => { const g = P.get(id)?.grp ?? ''; return g[0] === 'P' || g === 'XD'; };
+    const link = (id: number) => `<a class="plink" href="${BASE}player/${id}/">${esc(P.get(id)?.n ?? '?')}</a>`;
+    function labelOf(k: number, ids: number[], kind: 'L' | 'P') {
+      let best: string | null = null, n = 0;
+      for (const [lab, mem] of Object.entries(sets[k])) {
+        if (lab[0] !== kind) continue;
+        const c = ids.filter((i) => mem.has(i)).length;
+        if (c > n) { best = lab; n = c; }
+      }
+      return n >= (kind === 'L' ? 2 : 1) ? best : null;
+    }
+    const sideStr = (str: string, h: number) => (str === '5v5' ? 'ev' : str === `PP${h}` ? 'pp' : str === `PP${1 - h}` ? 'pk' : 'oth');
+    const rate = (ids: number[]) => ids.reduce((a, i) => a + (P.get(i)?.r ?? 0), 0);
+    const pipsOf = (v: number, cuts: number[]) => 1 + cuts.filter((c) => v > c).length;
+    const members = (k: number, lab: string) => D.players.filter((p: Sk) => sets[k][lab]?.has(p.id)) as Sk[];
+    const groupPips = (k: number, lab: string) => pipsOf(rate(members(k, lab).map((p) => p.id)), lab[0] === 'L' ? D.cuts.trio : D.cuts.pair);
+    const pips = (n: number, what: string) => {
+      const tip = `${what}: ${PIPWORD[n]}, by its players’ 5-on-5 ratings coming into the season`;
+      return `<span class="pips" role="img" tabindex="0" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+    };
+    const names = (k: number, lab: string) => members(k, lab).map((p) => esc(p.n)).join(' · ');
+    const CH = '<span class="term" tabindex="0" data-tip="Chances for and against while they were on the ice at 5-on-5, in expected goals: how many goals shots like those usually produce.">Chances</span>';
+    const how = (sec: number, xf: number, xa: number, gf: number, ga: number, tail = 'at 5-on-5') =>
+      `<strong>${clock(sec)}</strong> ${tail} · ${CH} <strong>${xf.toFixed(1)}–${xa.toFixed(1)}</strong>${gf || ga ? ` · Goals <strong>${gf}–${ga}</strong>` : ''}`;
+
+    // Who was on the ice at every moment, from the merged shifts: cut the game at every change.
+    function build() {
+      P = new Map(D.players.map((p: Sk) => [p.id, p]));
+      sets = [{}, {}];
+      for (const p of D.players as Sk[]) if (/^[LP]\d$/.test(p.grp)) (sets[p.h][p.grp] ??= new Set()).add(p.id);
+      const cuts = new Set<number>([0]);
+      const spans = (s: number[]) => { const out: [number, number][] = []; for (let i = 0; i < s.length; i += 2) out.push([s[i], s[i + 1]]); return out; };
+      const sk = (D.players as Sk[]).map((p) => ({ p, sp: spans(p.s) }));
+      const gk = (D.goalies as Sk[]).map((p) => ({ p, sp: spans(p.s) }));
+      for (const x of [...sk, ...gk]) for (const [a, b] of x.sp) { cuts.add(a); cuts.add(b); }
+      const ts = [...cuts].sort((a, b) => a - b);
+      END = Math.max(D.len, ts[ts.length - 1]);
+      segs = [];
+      for (let i = 0; i < ts.length - 1; i++) {
+        const s = ts[i], e = ts[i + 1];
+        if (e <= s) continue;
+        const on: number[][] = [[], []], g = [false, false];
+        for (const { p, sp } of sk) if (sp.some(([a, b]) => a <= s && e <= b)) on[p.h].push(p.id);
+        for (const { p, sp } of gk) if (sp.some(([a, b]) => a <= s && e <= b)) g[p.h] = true;
+        const str = !g[0] || !g[1] ? 'EN' : on[0].length === on[1].length ? `${on[0].length}v${on[1].length}` : `PP${on[1].length > on[0].length ? 1 : 0}`;
+        segs.push({ s, e, dur: e - s, str, on, F: [0, 1].map((k) => labelOf(k, on[k].filter((x) => !isD(x)), 'L')), P: [0, 1].map((k) => labelOf(k, on[k].filter(isD), 'P')) });
+      }
+      const segAt = (t: number) => segs.find((g) => g.s < t && t <= g.e) ?? segs.find((g) => g.s <= t && t < g.e);
+      shots = D.shots.map((s: any[]) => ({ t: s[0], h: s[1], xg: s[2], goal: !!s[3], who: s[6], en: !!s[7], seg: segAt(s[0]) }));
+      let sc = [0, 0];
+      goals = shots.filter((s) => s.goal && s.seg).map((g) => { sc = [...sc]; sc[g.h]++; return { ...g, score: sc }; });
+    }
+
+    const H = 1, A = 0;  // rows: home groups; columns: visiting groups
+    type Cell = { sec: number; xf: number; xa: number; goals: Shot[] };
+    let grid: Record<string, Cell> = {}, rowSet: Record<string, Record<string, number>> = {}, other: Shot[] = [];
+    const say = document.getElementById('lg-say')!, wrap = document.getElementById('lg-grid')!, cap = document.getElementById('lg-cap')!;
+    let sel: string | null = null;
+
+    // Every 5-on-5 moment counts for the four cells its two lines and two pairs make.
+    function tally() {
+      grid = {}; rowSet = {}; other = [];
+      const keys = (g: Seg) => {
+        const out: [string, string][] = [];
+        for (const r of [g.F[H], g.P[H]]) for (const c of [g.F[A], g.P[A]]) if (r && c) out.push([r, c]);
+        return out;
+      };
+      const cell = (r: string, c: string) => (grid[`${r}|${c}`] ??= { sec: 0, xf: 0, xa: 0, goals: [] });
+      for (const g of segs) if (g.str === '5v5') for (const [r, c] of keys(g)) {
+        cell(r, c).sec += g.dur;
+        const blk = (rowSet[r] ??= {}); blk[c[0]] = (blk[c[0]] ?? 0) + g.dur;
+      }
+      for (const sh of shots) if (sh.seg?.str === '5v5') for (const [r, c] of keys(sh.seg)) { const x = cell(r, c); if (sh.h === H) x.xf += sh.xg; else x.xa += sh.xg; }
+      for (const g of goals) { if (g.seg!.str === '5v5') for (const [r, c] of keys(g.seg!)) cell(r, c).goals.push(g); else other.push(g); }
+    }
+    const gapOf = (g: Shot) => rate(g.seg!.on[g.h]) - rate(g.seg!.on[1 - g.h]);
+    const goalLine = (g: Shot) => {
+      const [a, h] = g.score!, gap = gapOf(g);
+      const v = gap <= -0.35 ? ', against a stronger group' : gap >= 0.35 ? ', by the stronger group' : '';
+      return `${link(g.who)}, ${when(g.t)}, ${ABBR[0]} ${a}–${h} ${ABBR[1]}${v}`;
+    };
+
+    function draw() {
+      const narrow = wrap.clientWidth < 560;
+      const rk = (document.getElementById('lg-r') as HTMLSelectElement).value, ck = (document.getElementById('lg-c') as HTMLSelectElement).value;
+      const ROWS = LAB.filter((l) => l[0] === rk), COLS = LAB.filter((l) => l[0] === ck);
+      // Column pips need about 56 pixels a column; on the narrowest phones they move to a key under the grid.
+      const colPips = (wrap.clientWidth - (narrow ? 60 : 300)) / COLS.length >= 56;
+      const head = (k: number, lab: string) => `<span class="lg-lab"><b>${lab}</b>${narrow ? '' : `<span class="lg-names">${names(k, lab)}</span>`}</span>${pips(groupPips(k, lab), `${poss(PLACE[k])} ${lab}`)}`;
+      let h = `<div class="lg-g${narrow ? ' narrow' : ''}" style="--n:${COLS.length}">`;
+      h += `<span class="lg-corner"><i class="lt-dot ${SIDE[H]}"></i>${esc(PLACE[H])}</span><span class="lg-top ${SIDE[A]}"><i class="lt-dot"></i>against ${esc(PLACE[A])}</span>`;
+      h += '<span></span>' + COLS.map((c) => `<span class="lg-ch${sel?.endsWith('|' + c) ? ' on' : ''}" data-tip="${esc(`${poss(PLACE[A])} ${c}: ${names(A, c)}`)}" tabindex="0"><b>${c}</b>${colPips ? pips(groupPips(A, c), `${poss(PLACE[A])} ${c}`) : ""}</span>`).join('');
+      ROWS.forEach((r) => {
+        h += `<span class="lg-rh ${SIDE[H]}${sel?.startsWith(r + '|') ? ' on' : ''}">${head(H, r)}</span>`;
+        COLS.forEach((c) => {
+          const x = grid[`${r}|${c}`], tot = rowSet[r]?.[c[0]] ?? 0, p = x && tot ? Math.round((100 * x.sec) / tot) : 0;
+          const tip = x ? `${poss(PLACE[H])} ${r} against ${poss(PLACE[A])} ${c}: ${clock(x.sec)} at 5-on-5, ${p}% of ${poss(PLACE[H])} ${r}’s time against ${c[0] === 'L' ? 'set lines' : 'set pairs'}.` : `${poss(PLACE[H])} ${r} never faced ${poss(PLACE[A])} ${c} at 5-on-5.`;
+          const dots = (x?.goals ?? []).map((g) => `<i class="lt-dot ${SIDE[g.h]}"></i>`).join('');
+          h += `<button type="button" class="lg-c${p >= 46 ? ' hot hotter' : p >= 36 ? ' hot' : ''}${sel === `${r}|${c}` ? ' on' : ''}" style="--h:${p}" data-k="${r}|${c}" data-tip="${esc(tip)}" aria-label="${esc(tip)}"${x ? '' : ' disabled'}><span class="lg-dots">${dots}</span>${!narrow && x && x.sec >= 60 ? `<span class="lg-t">${clock(x.sec)}</span>` : ''}</button>`;
+        });
+      });
+      h += '</div>';
+      if (!colPips) h += `<p class="lg-key ${SIDE[A]}"><span class="mini-h">${esc(poss(PLACE[A]))} groups</span>${COLS.map((c) => `<span><b>${c}</b>${pips(groupPips(A, c), `${poss(PLACE[A])} ${c}`)}</span>`).join('')}</p>`;
+      wrap.innerHTML = h;
+      wrap.querySelectorAll<HTMLButtonElement>('.lg-c').forEach((b) => b.addEventListener('click', () => { sel = sel === b.dataset.k ? null : b.dataset.k!; draw(); caption(); }));
+    }
+
+    function caption() {
+      if (!sel) { cap.innerHTML = ''; return; }
+      const [r, c] = sel.split('|'), x = grid[sel];
+      cap.innerHTML = `<p class="lt-fh"><b>${esc(poss(PLACE[H]))} ${r}</b><span>${members(H, r).map((p) => link(p.id)).join(' · ')}</span></p>
+        <p class="lt-fh lg-vs"><span>against</span><b>${esc(poss(PLACE[A]))} ${c}</b><span>${members(A, c).map((p) => link(p.id)).join(' · ')}</span></p>
+        <p class="how lt-how">${how(x.sec, x.xf, x.xa, x.goals.filter((g) => g.h === H).length, x.goals.filter((g) => g.h === A).length)}</p>
+        ${x.goals.length ? `<ul class="lg-gl">${x.goals.map((g) => `<li><i class="lt-dot ${SIDE[g.h]}"></i>${goalLine(g)}</li>`).join('')}</ul>` : ''}`;
+    }
+
+    // The one-line takeaway: how the 5-on-5 goals line up with strength, and what the grid leaves out.
+    function summary() {
+      const ev = goals.filter((g) => g.seg!.str === '5v5');
+      const up = ev.filter((g) => gapOf(g) <= -0.35).length, down = ev.filter((g) => gapOf(g) >= 0.35).length;
+      const W = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+      const w = (n: number) => W[n] ?? String(n), cap1 = (t: string) => t[0].toUpperCase() + t.slice(1);
+      let t = !ev.length ? 'None of the goals came at 5-on-5, so the grid has no dots. '
+        : ev.length === goals.length ? `All ${w(ev.length)} goals came at 5-on-5. ` : `${cap1(w(ev.length))} of the ${w(goals.length)} goals came at 5-on-5. `;
+      if (ev.length) {
+        const parts = [up ? `${w(up)} ${up === 1 ? 'was' : 'were'} scored against a stronger group` : '', down ? `${w(down)} by the stronger group` : ''].filter(Boolean);
+        t += parts.length ? `${cap1(parts.join(' and '))}. ` : 'Every one came between evenly matched groups. ';
+      }
+      say.innerHTML = t + '<span class="lg-tap">Tap a cell for the details.</span>';
+    }
+
+    const redraw = () => { if (!D) return; draw(); caption(); };
+    async function load() {
+      if (D) return;
+      try { D = await (await fetch(root!.dataset.src!)).json(); } catch { say.textContent = 'The shifts could not be loaded.'; return; }
+      if (!D.cuts) { say.textContent = 'The shifts for this game are still being prepared.'; return; }
+      build(); tally(); summary(); redraw();
+    }
+    for (const id of ['lg-r', 'lg-c']) document.getElementById(id)!.addEventListener('change', () => { sel = null; redraw(); });
+    let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(redraw, 150); });
+    const fold = root.closest('details');
+    if (fold && !fold.open) fold.addEventListener('toggle', () => { if (fold.open) load(); }, { once: true }); else load();
+  }
+</script>
+
+<style is:global>
+  .lgrid { margin-top: 14px; }
+  .lg-say { font: 400 17px/1.5 var(--body); color: var(--ink); margin: 0 0 14px; }
+  .lg-tap { color: var(--ink-3); }
+  .lg-pick { margin-top: 22px; }
+  .lg-g { display: grid; grid-template-columns: minmax(0, 300px) repeat(var(--n), minmax(0, 120px)); gap: 3px; align-items: stretch; }
+  .lg-g.narrow { grid-template-columns: 60px repeat(var(--n), minmax(0, 1fr)); }
+  .lg-corner, .lg-top { font: 600 14px var(--ui); color: var(--ink); white-space: nowrap; align-self: end; padding-bottom: 4px; }
+  .lg-top { grid-column: 2 / -1; }
+  .lg-g .lt-dot { margin-right: 6px; }
+  .lg-ch { display: flex; flex-direction: column; align-items: center; gap: 7px; padding-bottom: 6px; font: 500 13px var(--ui); color: var(--ink-2); cursor: help; }
+  .lg-ch b, .lg-rh b { font-weight: 700; color: var(--ink); }
+  .lg-rh { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 8px; font: 500 13px var(--ui); color: var(--ink-2); }
+  .lg-lab { display: flex; gap: 8px; min-width: 0; flex: 1; }
+  .lg-lab b { flex: none; width: 22px; }
+  .lg-names { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lg-g.narrow .lg-rh { flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; padding: 0; }
+  .lg-g.narrow .lg-rh .pips, .lg-g.narrow .lg-ch .pips { gap: 1px; }
+  .lg-g.narrow .lg-lab { flex: none; }
+  .lg-c { position: relative; min-height: 40px; border: 0; border-radius: 4px; padding: 4px 2px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); color: var(--ink); font: 500 11px var(--ui); font-variant-numeric: tabular-nums; }
+  .lg-c:disabled { cursor: default; background: var(--sheet); outline: 1px dashed var(--rule); outline-offset: -1px; }
+  .lg-c.hot { color: var(--heat-on-hot); }
+  .lg-c.hotter { color: var(--heat-on-hotter); }
+  .lg-c.on { box-shadow: inset 0 0 0 2px var(--ink); }
+  .lg-c:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .lg-g.narrow .lg-c { min-height: 44px; }
+  .lg-rh.on b, .lg-ch.on b { text-decoration: underline 2px; text-underline-offset: 4px; }
+  .lg-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+  .lg-dots .lt-dot { width: 9px; height: 9px; margin: 0; box-shadow: 0 0 0 1.5px var(--sheet); }
+  .lg-t { opacity: 0.8; }
+  .lg-key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 14px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .lg-key .mini-h { width: 100%; margin: 0; }
+  .lg-key b { margin-right: 6px; color: var(--ink); }
+  .lg-cap:not(:empty) { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 14px; }
+  .lg-vs { margin-top: 4px !important; }
+  .lg-gl { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font: 400 15px/1.45 var(--body); color: var(--ink); }
+  .lg-gl .lt-dot { margin-right: 8px; }
+  .lg-note { margin: 14px 0 0; }
+  /* Shared with the shift tape's goal card styles. */
+  .lgrid .lt-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); vertical-align: 0; }
+  .lgrid .lt-fh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font: 500 14px var(--ui); color: var(--ink-2); }
+  .lgrid .lt-fh b { color: var(--ink); font-weight: 700; }
+  .lgrid .lt-how { margin: 8px 0 0; font: 400 14px/1.5 var(--ui); color: var(--ink-2); }
+  .lgrid .lt-how strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+</style>
