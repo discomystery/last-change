@@ -158,6 +158,26 @@ def test_graded_shot_call_reads_in_plain_words_with_a_chart():
     assert not any(k.startswith("_") for k in res)
 
 
+def test_a_projected_starter_is_named_where_a_call_says_their_goalie(monkeypatch):
+    from pipeline.export import previews
+    monkeypatch.setattr(previews, "NICKS", {"WPG": "Jets", "CAR": "Hurricanes"})
+    places = {"WPG": "Winnipeg", "CAR": "Carolina"}
+    claims = [{"head": "Somebody warn the Jets’ goalie", "body": "The Jets’ goalie had better be ready. Then the Jets’ goalie again."},
+              {"head": "Carolina’s goalie stays generic", "body": "No projection for the Hurricanes’ goalie."}]
+    site = {"teams": {"WPG": [{"id": 1, "name": "C. Hellebuyck"}], "CAR": [{"id": 2, "name": "F. Andersen"}]}}
+    out = previews.name_goalies(claims, {"WPG": {"id": 1, "from": "nhl"}}, site, places, {1: "Connor Hellebuyck"})
+    assert out == {"WPG": "Connor Hellebuyck"}
+    assert claims[0]["head"] == "Somebody warn Connor Hellebuyck"
+    assert claims[0]["body"] == "Hellebuyck had better be ready. Then Hellebuyck again."
+    assert "Hurricanes’ goalie" in claims[1]["body"]
+
+
+def test_the_outlook_names_the_goalie_it_needs_a_big_night_from():
+    from pipeline.export import outlook
+    assert outlook._in_goal("The Jets’ best hope is shooting, plus a big night in goal.", "Connor Hellebuyck").endswith("a big night from Connor Hellebuyck.")
+    assert outlook._in_goal("They need shots and a goalie who steals the show.", None).endswith("a goalie who steals the show.")
+
+
 def test_penalty_context():
     """Power-play calls say how many power plays to expect from penalties taken and drawn; other calls say nothing."""
     from pipeline.export.previews import penalty_context

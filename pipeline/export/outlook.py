@@ -273,8 +273,16 @@ def _agree(text: str) -> str:
     return text[0].upper() + text[1:]
 
 
-def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) -> dict[str, dict]:
-    """The pre-game note for each team. Holds words only, never the chance itself."""
+def _in_goal(caveat: str, goalie: str | None) -> str:
+    """"a big night in goal" names the team's projected starter when there is one (Sora, 2026-10-15)."""
+    if not goalie:
+        return caveat
+    return caveat.replace("a big night in goal", f"a big night from {goalie}").replace("a goalie who steals the show", f"{goalie} stealing the show")
+
+
+def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict, goalies: dict | None = None) -> dict[str, dict]:
+    """The pre-game note for each team. Holds words only, never the chance itself. `goalies` gives each team's
+    projected starter by name, where we have one."""
     from pipeline.export.previews import team_words
     raw_places, places = places, {t: "the " + p[3:] if p.startswith("NY ") else p for t, p in places.items()}
     out = {}
@@ -287,7 +295,7 @@ def notes(gid: int, away: str, home: str, chance: dict, fp: dict, places: dict) 
         how_o, how_o_bare = _route(fp, opp, team)
         w = {**team_words(team, raw_places, "T"), **team_words(opp, raw_places, "O"), "how": how, "how_bare": how_bare, "how_o": how_o, "how_o_bare": how_o_bare}
         out[team] = {"head": _agree(_pick(heads, gid, team, "head").format(**w)),
-                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, nicks), _agree(_pick(caveats, gid, team, "caveat").format(**w))))}
+                     "body": _agree(_join(_why(chance["steps"], team, opp, home, places, lineups, nicks), _agree(_in_goal(_pick(caveats, gid, team, "caveat").format(**w), (goalies or {}).get(team)))))}
     return out
 
 
