@@ -472,21 +472,21 @@ def _race_after(gid: int, day: str, teams: tuple[str, str], W: Words, season: in
         if now["clinch"] and (not was or was["clinch"] != now["clinch"]):
             what = CLINCH.get(now["clinch"])
             if what:
-                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} {what.format(**now)}.", "score": 80})
+                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} {what.format(**now)}.", "score": 80, "team": t})
             continue
         if was and now["clinch"] is None and now["left"] <= RACE_MOVES and (was["spot"][0] == "out") != (now["spot"][0] == "out"):
             rival = W.place(now["rival"]) if now["rival"] else None
             if now["spot"][0] != "out":
                 where = SPOT.get(now["spot"]) or f"{ORDINAL_N(now['spot'][1])} place in the {now['division']}"
                 tail = f", {_points(now['gap'])} ahead of {rival}" if rival and now["gap"] else f", level on points with {rival}" if rival else ""
-                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} moved into {where}{tail}.", "score": 72})
+                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} moved into {where}{tail}.", "score": 72, "team": t})
             else:
                 tail = f", {_points(-now['gap'])} behind {rival}" if rival and now["gap"] else f", level on points with {rival}" if rival else ""
-                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} dropped out of the playoff spots{tail}.", "score": 72})
+                out.append({"tag": "Playoff race", "text": f"{_cap(W.the(t))} dropped out of the playoff spots{tail}.", "score": 72, "team": t})
             continue
         text = _race_now(now, W)
         if text:
-            out.append({"tag": "Playoff race", "text": text, "score": 58})
+            out.append({"tag": "Playoff race", "text": text, "score": 58, "team": t})
     return out
 
 
@@ -2192,14 +2192,222 @@ def settled_in(gid: int, season: int, pid: int) -> tuple[int, int, int] | None:
     return (len(hits), hits[-1] + 1, after) if after >= SETTLED_SAVES else None
 
 
-def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: int, gid, skip: set) -> str | None:
-    """"The Bruins improved to 6-2-0, and the Ducks fell to 4-3-0." Teams in `skip` already had their record told."""
+PLAYOFF_PICTURE = RACE_MOVES  # games left for the median club when the standings line starts saying what it means for the playoffs
+UP_WORDS = ("taking", "climbing")  # standings phrases that move a club up ...
+DOWN_WORDS = ("slipping", "sinking", "giving", "losing")  # ... or down
+
+
+def _table_marks(rows: tuple) -> dict[str, dict]:
+    """Each club's place in one day's standings: league rank by points and by points percentage (1 = best, ties share
+    a rank, `*_n` how many share it), the same counted from the bottom, and its division place (the NHL's own order,
+    tiebreakers included) out of how many."""
+    from fractions import Fraction
+    pct = {r["teamAbbrev"]: Fraction(r["points"], 2 * r["gamesPlayed"]) if r["gamesPlayed"] else Fraction(0) for r in rows}
+    pts = {r["teamAbbrev"]: r["points"] for r in rows}
+    size: dict[str, int] = {}
+    for r in rows:
+        size[r["divisionName"]] = size.get(r["divisionName"], 0) + 1
+    out = {}
+    for r in rows:
+        t = r["teamAbbrev"]
+        out[t] = {"pts": 1 + sum(v > pts[t] for v in pts.values()), "pts_n": sum(v == pts[t] for v in pts.values()),
+                  "pct": 1 + sum(v > pct[t] for v in pct.values()), "pct_n": sum(v == pct[t] for v in pct.values()),
+                  "pts_low": 1 + sum(v < pts[t] for v in pts.values()), "pct_low": 1 + sum(v < pct[t] for v in pct.values()),
+                  "div": r["divisionSequence"], "div_n": size[r["divisionName"]], "division": r["divisionName"],
+                  "gp": r["gamesPlayed"]}
+    return out
+
+
+def _league_top(m: dict) -> tuple[bool, bool]:
+    return m["pts"] == 1, m["pct"] == 1
+
+
+def _standing(t: str, opp: str, now: dict, was: dict | None, W) -> tuple[str, str] | None:
+    """Where a club landed in the standings after the night, as (a phrase to ride on its record, a sentence of its own):
+    ("taking sole possession of first in the NHL in both points and points percentage", "took sole possession of ...").
+    League first place (points or points percentage) and last place come first, then the division: first place won or
+    lost, the bottom reached or left, a move up or down, or simply where they sit (Sora, 2026-10-29)."""
+    m, b = now[t], (was or {}).get(t)
+    top_pts, top_pct = _league_top(m)
+    was_pts, was_pct = _league_top(b) if b else (False, False)
+    sole = lambda k: m[f"{k}_n"] == 1
+    if top_pts or top_pct:
+        if top_pts and top_pct and sole("pts") and sole("pct"):
+            what = "first in the NHL in both points and points percentage"
+            if b and was_pts and was_pct and b["pts_n"] == 1 and b["pct_n"] == 1:
+                return f"still {what}", f"are still {what}"
+            return f"taking sole possession of {what}", f"took sole possession of {what}"
+        k = "pts" if top_pts else "pct"
+        what = "points" if k == "pts" else "points percentage"
+        if not sole(k):
+            return f"tied for first in the NHL in {what}", f"are tied for first in the NHL in {what}"
+        if b and (was_pts if k == "pts" else was_pct):
+            return f"still first in the NHL in {what}", f"are still first in the NHL in {what}"
+        return f"climbing into first in the NHL in {what}", f"climbed into first in the NHL in {what}"
+    if b and (was_pts or was_pct):
+        lost = "points percentage" if was_pct and not was_pts else "points" if was_pts and not was_pct else None
+        o_pts, o_pct = _league_top(now[opp]) if opp in now else (False, False)
+        if lost and ((lost == "points" and o_pts) or (lost == "points percentage" and o_pct)):
+            best = "the most points" if lost == "points" else "the best points percentage"
+            return f"giving up {best} in the NHL to {W.the(opp)}", f"gave up {best} in the NHL to {W.the(opp)}"
+        return "slipping out of first in the NHL", "slipped out of first in the NHL"
+    last = m["pts_low"] == 1 and m["pct_low"] == 1
+    was_last = bool(b) and b["pts_low"] == 1 and b["pct_low"] == 1
+    if last:
+        return ("still last in the NHL", "are still last in the NHL") if was_last else ("sinking to last in the NHL", "sank to last in the NHL")
+    if was_last:
+        return "climbing out of last place in the NHL", "climbed out of last place in the NHL"
+    d, n, div = m["div"], m["div_n"], m["division"]
+    bd = b["div"] if b and b["division"] == div else None
+    if d == 1:
+        if bd == 1:
+            return f"still first in the {div}", f"are still first in the {div}"
+        return f"climbing into first in the {div}", f"climbed into first in the {div}"
+    if bd == 1:
+        if now.get(opp, {}).get("div") == 1 and now[opp]["division"] == div:
+            return f"losing first place in the {div} to {W.the(opp)}", f"lost first place in the {div} to {W.the(opp)}"
+        return f"slipping out of first in the {div}", f"slipped out of first in the {div}"
+    if d == n:
+        if bd == n:
+            return f"still last in the {div}", f"are still last in the {div}"
+        return f"sinking to the bottom of the {div}", f"sank to the bottom of the {div}"
+    if bd == n:
+        return f"climbing off the bottom of the {div}, now {ORDINAL_N(d)}", f"climbed off the bottom of the {div} to {ORDINAL_N(d)}"
+    if bd and d < bd:
+        return f"climbing to {ORDINAL_N(d)} in the {div}", f"climbed to {ORDINAL_N(d)} in the {div}"
+    if bd and d > bd:
+        return f"slipping to {ORDINAL_N(d)} in the {div}", f"slipped to {ORDINAL_N(d)} in the {div}"
+    return f"{ORDINAL_N(d)} in the {div}", f"are {ORDINAL_N(d)} in the {div}"
+
+
+def _playoff_part(t: str, rows: tuple) -> str | None:
+    """In the playoff picture (the median club has `PLAYOFF_PICTURE` games or fewer left): where the night left a club
+    against the playoff line, unless it has clinched or been eliminated. "holding the first wild card in the East",
+    "two points out of a playoff spot"."""
+    from pipeline.ingest import standings_daily as sd
+    r = sd.race(rows, t)
+    if not r or r["clinch"]:
+        return None
+    conf = {"Eastern": "East", "Western": "West"}.get(r["conference"] or "", r["conference"])
+    if r["spot"][0] == "div":
+        return "in playoff position"
+    if r["spot"][0] == "wc":
+        return f"holding {SPOT[r['spot']]} in the {conf}"
+    if r["gap"] is None:
+        return None
+    return "level on points with the last playoff spot" if r["gap"] == 0 else f"{_points(-r['gap'])} out of a playoff spot"
+
+
+def _swap(winner: str, loser: str, now: dict, was: dict | None, rows: tuple, prev: tuple | None, picture: bool,
+          got: dict, raced: set, W) -> tuple[str, str | None] | None:
+    """When the winner took a place straight from the club it beat (Sora, 2026-10-29: two lines saying the same swap
+    read as repetitive), what it took, as "took first place in the Metropolitan from", plus an optional sentence of
+    its own. In order: first in the NHL in points or points percentage, first in the division, a wild card (in the
+    playoff picture, unless a Playoff race item tells it), then any other division place (outside the picture)."""
+    if not was or winner not in was or loser not in was or loser not in now:
+        return None
+    w, l, bw, bl = now[winner], now[loser], was[winner], was[loser]
+    taken = [k for k in ("pts", "pct") if bl[k] == 1 and w[k] == 1 and w[f"{k}_n"] == 1 and l[k] != 1]
+    if taken:
+        both = w["pts"] == 1 and w["pct"] == 1 and w["pts_n"] == 1 and w["pct_n"] == 1
+        if len(taken) == 2:
+            return "took first place in the NHL in both points and points percentage from", None
+        what = "the most points" if taken[0] == "pts" else "the best points percentage"
+        extra = f"That leaves {W.the(winner)} first in the NHL in both points and points percentage." if both else None
+        return f"took {what} in the NHL from", extra
+    if any(" NHL" in (got.get(t) or ("",))[0] for t in (winner, loser)):
+        return None  # league news comes first
+    div = w["division"]
+    same = l["division"] == div and bw["division"] == div and bl["division"] == div
+    if same and w["div"] == 1 and bl["div"] == 1:
+        return f"took first place in the {div} from", None
+    if picture and not ({winner, loser} & set(raced)) and prev:
+        from pipeline.ingest import standings_daily as sd
+        rw, rl, pl_ = sd.race(rows, winner), sd.race(rows, loser), sd.race(prev, loser)
+        if rw and rl and pl_ and rw["conference"] == rl["conference"] and pl_["spot"][0] == "wc" \
+                and rw["spot"] == pl_["spot"] and rl["spot"] != pl_["spot"] and not rw["clinch"]:
+            conf = {"Eastern": "East", "Western": "West"}.get(rw["conference"] or "", rw["conference"])
+            return f"took {SPOT[rw['spot']]} in the {conf} from", None
+        return None
+    if same and w["div"] == bl["div"] and bw["div"] > bl["div"] and l["div"] > w["div"]:
+        return f"took {ORDINAL_N(w['div'])} place in the {div} from", None
+    return None
+
+
+def standings_after(season: int, day: str, winner: str, loser: str, W, raced: set = frozenset()) -> dict[str, tuple[str, str]]:
+    """Each club's standings phrase once every game on `day` is final (the saved standings for that day: until then
+    the post-game page shows only the record, and the next run after the last game adds it). The phrase is fixed to
+    that night's table, so the page keeps telling where the night left them. Clubs in `raced` already have a Playoff
+    race item, so the playoff part is left to it."""
+    from pipeline.ingest import standings_daily as sd
+    rows = sd.table(season, day[:10])
+    if not rows:
+        return {}
+    now = _table_marks(rows)
+    prev = sd.before(season, day[:10])
+    was = _table_marks(prev) if prev else None
+    gps = sorted(r["gamesPlayed"] for r in rows)
+    picture = sd.GAMES - gps[len(gps) // 2] <= PLAYOFF_PICTURE
+    out = {}
+    for t, opp in ((winner, loser), (loser, winner)):
+        if t not in now:
+            continue
+        got = _standing(t, opp, now, was, W)
+        if not got:
+            continue
+        extra = _playoff_part(t, rows) if picture and t not in raced else None
+        league = " NHL" in got[0]
+        if extra == "in playoff position" and (league or "first in the" in got[0]):
+            extra = None  # the league's or a division's top club: being in is a given
+        if extra and extra.startswith("holding") and not got[0].startswith(UP_WORDS + DOWN_WORDS + ("still",)):
+            got = (extra, "hold" + extra[len("holding"):])  # "fifth in the Central" says less than the wild card it holds
+        elif extra:
+            got = (f"{got[0]}, {extra}", f"{got[1]}, {extra}")
+        out[t] = got
+    swap = _swap(winner, loser, now, was, rows, prev, picture, out, raced, W)
+    if swap:
+        out["_swap"] = swap
+    return out
+
+
+def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: int, gid, skip: set,
+                standing: dict[str, tuple[str, str]] | None = None) -> str | None:
+    """"The Bruins improved to 6-2-0, and the Ducks fell to 4-3-0." Teams in `skip` already had their record told.
+    With `standing` (standings_after), each record carries where the club landed: "The Hurricanes improved to 10-2-1,
+    taking sole possession of first in the NHL in both points and points percentage, and the Bruins fell to 9-3-1,
+    giving up the best points percentage in the NHL to the Hurricanes." A club whose record was told elsewhere gets
+    its place as a sentence of its own."""
     played = G.filter(pl.col("date") <= day)
-    parts = []
+    standing = standing or {}
+    swap = standing.get("_swap")
+    if swap and winner not in skip and loser not in skip:
+        # one sentence for a place taken straight from the club they beat: "The Hurricanes improved to 10-2-2 and took
+        # first place in the Metropolitan from the Devils, who fell to 9-3-1."
+        head, extra = swap
+        ls = standing.get(loser)
+        sank = f" and {ls[1]}" if ls and ls[1].startswith("sank") else ""
+        if sank and f"the {(div := sank.rsplit(' the ', 1)[-1])}" in head:
+            sank = sank[: -len(div)] + "division"  # "took seventh place in the Metropolitan ... sank to the bottom of the division"
+        line = (f"{_cap(W.the(winner))} {_pick(['improved to', 'moved to'], gid, 'rec', winner)} {record(results(played, winner, season))} "
+                f"and {head} {W.the(loser)}, who {_pick(['fell to', 'dropped to'], gid, 'rec', loser)} {record(results(played, loser, season))}{sank}.")
+        return f"{line} {extra}" if extra else line
+    parts, alone = [], []
     for t, pool in ((winner, ["improved to", "moved to"]), (loser, ["fell to", "dropped to"])):
         if t not in skip:
-            parts.append(f"{W.the(t)} {_pick(pool, gid, 'rec', t)} {record(results(played, t, season))}")
-    return f"{_cap(' and '.join(parts) if len(parts) == 1 else parts[0] + ', and ' + parts[1])}." if parts else None
+            st = standing.get(t)
+            # a winner that still slipped, or a loser that still climbed, reads with "but": "fell to 8-5-0 but moved up to second"
+            against = st and st[0].startswith(UP_WORDS if t == loser else DOWN_WORDS)
+            tail = (f" but {st[1]}" if against else f", {st[0]}") if st else ""
+            parts.append(f"{W.the(t)} {_pick(pool, gid, 'rec', t)} {record(results(played, t, season))}{tail}")
+        elif t in standing:
+            alone.append(f"{_cap(W.the(t))} {standing[t][1]}.")
+    if not parts:
+        return " ".join(alone) or None
+    if len(parts) == 2 and standing.get(winner):
+        line = f"{_cap(parts[0])}. {_cap(parts[1])}."  # two clauses with their own commas read best apart
+    else:
+        line = f"{_cap(' and '.join(parts) if len(parts) == 1 else parts[0] + ', and ' + parts[1])}."
+    return " ".join([line, *alone])
 
 
 def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: str, pk=None, season: int | None = None) -> list[str]:
@@ -3033,7 +3241,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         picked.append({"tag": i["tag"], "text": i["text"]})
     # each team's record after the game closes the story, as wire recaps do, unless an item already says it
     told_rec: set = set()  # both records always close the story, even beside a Start item (Sora's review, round 2)
-    rec = record_line(G, r["date"], winner, loser, W, season, gid, told_rec | (run_told - {winner}))
+    raced = {i.get("team") for i in items if i["tag"] == "Playoff race" and any(p_["text"] == i["text"] for p_ in picked)}
+    rec = record_line(G, r["date"], winner, loser, W, season, gid, told_rec | (run_told - {winner}),
+                      standings_after(season, r["date"], winner, loser, W, raced))
     # a home opener with nothing to join reads best on the record line: "the Canucks fell to 1-1-0 in their home opener"
     ho = next((i for i in picked if i["tag"] == "Home opener"), None)
     if ho and rec:

@@ -37,11 +37,32 @@ def _finished_days(season: int) -> list[str]:
     return sorted(per.filter(pl.col("done"))["date"].to_list())
 
 
+def _played(season: int) -> dict[str, list[str]]:
+    """Each club's finished regular-season game dates, sorted."""
+    g = pl.read_parquet(TABLES / str(season) / "games.parquet", columns=["game_type", "date", "state", "away", "home"]).filter(
+        (pl.col("game_type") == REGULAR) & pl.col("state").is_in(list(FINAL_STATES)))
+    out: dict[str, list[str]] = {}
+    for d, a, h in g.select("date", "away", "home").iter_rows():
+        out.setdefault(a, []).append(d[:10])
+        out.setdefault(h, []).append(d[:10])
+    return {t: sorted(v) for t, v in out.items()}
+
+
+def _complete(rows: list[dict], day: str, played: dict[str, list[str]]) -> bool:
+    """Whether a day's table counts every club's games through that day. The NHL updates its standings a while after
+    the last horn: tables fetched right after a game night (every night from 2026-10-13, once game-night runs began)
+    were the day before's, a day behind on the race and on the post-game standings line."""
+    return all(r["gamesPlayed"] == sum(x <= day for x in played.get(r["teamAbbrev"], [])) for r in rows)
+
+
 def update(season: int, limit: int = 250) -> dict:
-    """Save the standings after every finished game day not saved yet (a capped batch per run)."""
+    """Save the standings after every finished game day not saved yet (a capped batch per run), and fetch again any
+    saved day whose table is missing games (saved before the NHL had counted them)."""
     if OFFLINE:
         return {"skipped": "offline"}
-    todo = [d for d in _finished_days(season) if not _path(season, d).exists()][:limit]
+    played = _played(season)
+    todo = [d for d in _finished_days(season) if not _path(season, d).exists() or not _complete(table(season, d) or (), d, played)][:limit]
+    table.cache_clear()
     saved = 0
     for d in todo:
         try:
@@ -49,8 +70,8 @@ def update(season: int, limit: int = 250) -> dict:
         except (httpx.HTTPError, RuntimeError):
             continue  # tried again next run
         keep = [{k: (r.get(k) or {}).get("default") if isinstance(r.get(k), dict) else r.get(k) for k in KEEP} for r in rows]
-        if len(keep) < 30:
-            continue
+        if len(keep) < 30 or not _complete(keep, d, played):
+            continue  # not counted yet: tried again next run
         _path(season, d).parent.mkdir(parents=True, exist_ok=True)
         _path(season, d).write_bytes(gzip.compress(json.dumps(keep).encode()))
         saved += 1

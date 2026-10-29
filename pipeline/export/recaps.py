@@ -9,7 +9,7 @@ import gzip
 import json
 from functools import lru_cache
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import polars as pl
 
@@ -27,6 +27,9 @@ MIN_PP_SEC = 60  # less power-play time than this and a power-play call can't be
 MIN_CLOSE_SEC = 600  # hit rates need some close-game time
 MIN_MATCHUP_SEC = 180
 EXIT_SEC = 1200  # a skater with no shift in the game's last 20 minutes or more left it (see Season.exits)
+NEWS_DAYS = 2  # an injury report the day after the game or the day after that is told on the player who left it (Sora, 2026-10-29)
+# most telling first: a placement on injured reserve says more than "day to day", which says more than a bare "out"
+NEWS_RANK = {"season": 6, "long": 5, "ir": 4, "week": 3, "day": 2, "out": 1}
 BENCHED_SEC = 1800  # a matchup call needs the group on the ice against the opposing lines for three minutes
 
 
@@ -182,11 +185,41 @@ class Season:
         availability table (NHL.com Status Report, ESPN injuries, roster moves) has a report on him after this game."""
         if nxt and (nxt, pid) not in self.dressed:
             return True
-        if self._av is None:
-            f = TABLES / str(self.season) / "availability.parquet"
-            self._av = pl.read_parquet(f, columns=["date", "player_id", "report_status", "report_date"]).drop_nulls("report_status") if f.exists() else pl.DataFrame()
+        self._availability()
         day = self.games[gid]["date"]
         return bool(self._av.height and self._av.filter((pl.col("player_id") == pid) & (pl.col("report_date") >= day)).height)
+
+    def _availability(self) -> pl.DataFrame:
+        """Every availability row that carries a report (NHL.com Status Report, ESPN injuries, roster moves)."""
+        if self._av is None:
+            f = TABLES / str(self.season) / "availability.parquet"
+            self._av = pl.read_parquet(f, columns=["date", "player_id", "report_status", "report_date", "report_injury", "report_timeline"]).drop_nulls(
+                "report_status") if f.exists() else pl.DataFrame()
+        return self._av
+
+    def injury_news(self, gid: int, pid: int) -> dict | None:
+        """The injury report that came out on a player within `NEWS_DAYS` of the game he left (Sora, 2026-10-29: once
+        the league or ESPN says he is on injured reserve or day to day, the story should say so instead of only that he
+        didn't return). The most telling report in that window (`NEWS_RANK`), dated by its first day, with the injury
+        and timeline from any report in it. A bare "out" needs an injury named; suspensions and personal leave are
+        not injuries, so they are left out. Post-game pages are rebuilt on every update, so the line appears on the
+        first run after the report."""
+        av = self._availability()
+        if not av.height:
+            return None
+        day = self.games[gid]["date"][:10]
+        until = (datetime.fromisoformat(day) + timedelta(days=NEWS_DAYS)).date().isoformat()
+        # from the next day on: a report dated the game day can be the morning's, from before he got hurt
+        reps = (av.filter((pl.col("player_id") == pid) & (pl.col("report_date") > day) & (pl.col("report_date") <= until)
+                          & pl.col("report_status").is_in(list(NEWS_RANK)))
+                .select("report_date", "report_status", "report_injury", "report_timeline").unique().sort("report_date"))
+        injury = next((x for x in reps["report_injury"].to_list() if x and x.lower() not in ("undisclosed", "unknown")), None)
+        reps = reps.filter((pl.col("report_status") != "out") | pl.lit(injury is not None))
+        if not reps.height:
+            return None
+        best = max(reps.iter_rows(named=True), key=lambda r: (NEWS_RANK[r["report_status"]], -int(r["report_date"].replace("-", ""))))
+        days = (datetime.fromisoformat(best["report_date"]) - datetime.fromisoformat(day)).days
+        return {"status": best["report_status"], "days": days, "injury": injury, "timeline": best["report_timeline"]}
 
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
@@ -636,8 +669,9 @@ def run(season: int = CURRENT_SEASON) -> dict:
                "reveal": reveals.get(gid), "numbers": nums, "periods": periods(S, gid, g), "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
         if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
-            gone = [{"id": x["id"], "team": t, "sec": x["sec"], "regular": x["regular"], "confirmed": x["confirmed"]} for t in (g["away"], g["home"])
-                    for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
+            gone = [{"id": x["id"], "team": t, "sec": x["sec"], "regular": x["regular"], "confirmed": x["confirmed"],
+                     **({"news": n} if (n := S.injury_news(gid, x["id"])) else {})}
+                    for t in (g["away"], g["home"]) for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
             if gone:
                 rec["left"] = sorted(gone, key=lambda x: x["sec"])
         (out_dir / f"{gid}.json").write_text(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
