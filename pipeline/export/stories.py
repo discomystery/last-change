@@ -2082,6 +2082,42 @@ def _playoff_part(t: str, rows: tuple) -> str | None:
     return "level on points with the last playoff spot" if r["gap"] == 0 else f"{_points(-r['gap'])} out of a playoff spot"
 
 
+def _swap(winner: str, loser: str, now: dict, was: dict | None, rows: tuple, prev: tuple | None, picture: bool,
+          got: dict, raced: set, W) -> tuple[str, str | None] | None:
+    """When the winner took a place straight from the club it beat (Sora, 2026-10-29: two lines saying the same swap
+    read as repetitive), what it took, as "took first place in the Metropolitan from", plus an optional sentence of
+    its own. In order: first in the NHL in points or points percentage, first in the division, a wild card (in the
+    playoff picture, unless a Playoff race item tells it), then any other division place (outside the picture)."""
+    if not was or winner not in was or loser not in was or loser not in now:
+        return None
+    w, l, bw, bl = now[winner], now[loser], was[winner], was[loser]
+    taken = [k for k in ("pts", "pct") if bl[k] == 1 and w[k] == 1 and w[f"{k}_n"] == 1 and l[k] != 1]
+    if taken:
+        both = w["pts"] == 1 and w["pct"] == 1 and w["pts_n"] == 1 and w["pct_n"] == 1
+        if len(taken) == 2:
+            return "took first place in the NHL in both points and points percentage from", None
+        what = "the most points" if taken[0] == "pts" else "the best points percentage"
+        extra = f"That leaves {W.the(winner)} first in the NHL in both points and points percentage." if both else None
+        return f"took {what} in the NHL from", extra
+    if any(" NHL" in (got.get(t) or ("",))[0] for t in (winner, loser)):
+        return None  # league news comes first
+    div = w["division"]
+    same = l["division"] == div and bw["division"] == div and bl["division"] == div
+    if same and w["div"] == 1 and bl["div"] == 1:
+        return f"took first place in the {div} from", None
+    if picture and not ({winner, loser} & set(raced)) and prev:
+        from pipeline.ingest import standings_daily as sd
+        rw, rl, pl_ = sd.race(rows, winner), sd.race(rows, loser), sd.race(prev, loser)
+        if rw and rl and pl_ and rw["conference"] == rl["conference"] and pl_["spot"][0] == "wc" \
+                and rw["spot"] == pl_["spot"] and rl["spot"] != pl_["spot"] and not rw["clinch"]:
+            conf = {"Eastern": "East", "Western": "West"}.get(rw["conference"] or "", rw["conference"])
+            return f"took {SPOT[rw['spot']]} in the {conf} from", None
+        return None
+    if same and w["div"] == bl["div"] and bw["div"] > bl["div"] and l["div"] > w["div"]:
+        return f"took {ORDINAL_N(w['div'])} place in the {div} from", None
+    return None
+
+
 def standings_after(season: int, day: str, winner: str, loser: str, W, raced: set = frozenset()) -> dict[str, tuple[str, str]]:
     """Each club's standings phrase once every game on `day` is final (the saved standings for that day: until then
     the post-game page shows only the record, and the next run after the last game adds it). The phrase is fixed to
@@ -2112,6 +2148,9 @@ def standings_after(season: int, day: str, winner: str, loser: str, W, raced: se
         elif extra:
             got = (f"{got[0]}, {extra}", f"{got[1]}, {extra}")
         out[t] = got
+    swap = _swap(winner, loser, now, was, rows, prev, picture, out, raced, W)
+    if swap:
+        out["_swap"] = swap
     return out
 
 
@@ -2124,6 +2163,18 @@ def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: i
     its place as a sentence of its own."""
     played = G.filter(pl.col("date") <= day)
     standing = standing or {}
+    swap = standing.get("_swap")
+    if swap and winner not in skip and loser not in skip:
+        # one sentence for a place taken straight from the club they beat: "The Hurricanes improved to 10-2-2 and took
+        # first place in the Metropolitan from the Devils, who fell to 9-3-1."
+        head, extra = swap
+        ls = standing.get(loser)
+        sank = f" and {ls[1]}" if ls and ls[1].startswith("sank") else ""
+        if sank and f"the {(div := sank.rsplit(' the ', 1)[-1])}" in head:
+            sank = sank[: -len(div)] + "division"  # "took seventh place in the Metropolitan ... sank to the bottom of the division"
+        line = (f"{_cap(W.the(winner))} {_pick(['improved to', 'moved to'], gid, 'rec', winner)} {record(results(played, winner, season))} "
+                f"and {head} {W.the(loser)}, who {_pick(['fell to', 'dropped to'], gid, 'rec', loser)} {record(results(played, loser, season))}{sank}.")
+        return f"{line} {extra}" if extra else line
     parts, alone = [], []
     for t, pool in ((winner, ["improved to", "moved to"]), (loser, ["fell to", "dropped to"])):
         if t not in skip:

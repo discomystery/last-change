@@ -87,3 +87,54 @@ def test_a_standings_table_missing_the_nights_games_is_not_kept():
     rows = [{"teamAbbrev": "CAR", "gamesPlayed": 1}, {"teamAbbrev": "BOS", "gamesPlayed": 0}]
     assert not sd._complete(rows, "2026-10-27", played)
     assert sd._complete(rows, "2026-10-26", played)
+
+
+def _line(standing):
+    W = _words()
+    G = pl.DataFrame({"date": ["2026-10-28"], "game_id": [1]})
+    orig = stories.results, stories.record
+    stories.results, stories.record = (lambda played, t, season: t), (lambda res: {"CAR": "10-2-2", "BOS": "9-3-1", "NJD": "8-5-0"}[res])
+    try:
+        return stories.record_line(G, "2026-10-28", "CAR", standing["_loser"], W, 2026, 1, set(),
+                                   {k: v for k, v in standing.items() if k != "_loser"})
+    finally:
+        stories.results, stories.record = orig
+
+
+def test_a_place_taken_straight_from_the_club_they_beat_is_one_sentence():
+    W = _words()
+    was = stories._table_marks((_row("CAR", "Metropolitan", 1, 13, 20), _row("BOS", "Atlantic", 1, 12, 19),
+                                _row("PHI", "Metropolitan", 2, 13, 10), _row("NJD", "Metropolitan", 3, 12, 9)))
+    now = stories._table_marks((_row("CAR", "Metropolitan", 1, 14, 22), _row("BOS", "Atlantic", 1, 13, 19),
+                                _row("PHI", "Metropolitan", 3, 13, 10), _row("NJD", "Metropolitan", 2, 13, 11)))
+    got = {t: stories._standing(t, o, now, was, W) for t, o in (("CAR", "BOS"), ("BOS", "CAR"))}
+    swap = stories._swap("CAR", "BOS", now, was, (), None, False, got, set(), W)
+    assert swap[0] == "took the best points percentage in the NHL from"
+    line = _line({**got, "_swap": swap, "_loser": "BOS"})
+    assert line.count("Bruins") == 1 and ("who fell to 9-3-1." in line or "who dropped to 9-3-1." in line)
+    assert line.endswith("That leaves the Hurricanes first in the NHL in both points and points percentage.")
+
+
+def test_division_first_and_places_swapped_with_the_club_they_beat():
+    W = _words()
+    rows = lambda seqs: tuple(_row(t, "Metropolitan", s, 10, p) for t, s, p in seqs) + (_row("BOS", "Atlantic", 1, 10, 30), _row("XYZ", "Atlantic", 2, 10, 2))
+    was = stories._table_marks(rows([("CAR", 2, 14), ("NJD", 1, 15), ("PHI", 3, 12)]))
+    now = stories._table_marks(rows([("CAR", 1, 16), ("NJD", 2, 15), ("PHI", 3, 13)]))
+    got = {t: stories._standing(t, o, now, was, W) for t, o in (("CAR", "NJD"), ("NJD", "CAR"))}
+    swap = stories._swap("CAR", "NJD", now, was, (), None, False, got, set(), W)
+    assert swap == ("took first place in the Metropolitan from", None)
+    assert _line({**got, "_swap": swap, "_loser": "NJD"}).split(" and took ")[1].startswith("first place in the Metropolitan from the Devils, who ")
+    was = stories._table_marks(rows([("CAR", 3, 12), ("NJD", 2, 13), ("PHI", 1, 20)]))
+    now = stories._table_marks(rows([("CAR", 2, 14), ("NJD", 3, 13), ("PHI", 1, 20)]))
+    swap = stories._swap("CAR", "NJD", now, was, (), None, False, {}, set(), W)
+    assert swap == ("took second place in the Metropolitan from", None)
+    # a club that didn't take the loser's place keeps the two lines
+    now = stories._table_marks(rows([("CAR", 3, 14), ("NJD", 2, 15), ("PHI", 1, 20)]))
+    assert stories._swap("CAR", "NJD", now, was, (), None, False, {}, set(), W) is None
+
+
+def test_a_club_pushed_to_the_bottom_by_the_club_that_passed_it():
+    line = _line({"CAR": ("climbing to seventh in the Metropolitan", "climbed to seventh in the Metropolitan"),
+                  "NJD": ("sinking to the bottom of the Metropolitan", "sank to the bottom of the Metropolitan"),
+                  "_swap": ("took seventh place in the Metropolitan from", None), "_loser": "NJD"})
+    assert line.endswith("8-5-0 and sank to the bottom of the division.")
