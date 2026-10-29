@@ -111,3 +111,22 @@ def test_return_rides_on_his_goal_unless_a_star():
     assert not timeline.rides_on_goal({**base, "weight": 88})
     assert not timeline.rides_on_goal({**base, "goals": 0})
     assert not timeline.rides_on_goal({**base, "since": "2025-04-01"})
+
+
+def test_a_long_stretch_without_a_shot_is_told_where_it_began_with_its_periods_named():
+    # Boston at Carolina, 2026-10-27: 20:39 without a shot from 7:41 of the second (Sora, 2026-10-29)
+    d = {"team": "MTL", "start": 1200 + 461, "end": 2400 + 500, "gap": 1239, "other": 12, "pp": 0, "ot": False, "rare": "season"}
+    gm = _game([(2, 400, True, 3, "ev"), (3, 700, True, 4, "ev")], droughts=[d])
+    out = timeline.paragraph(gm)
+    assert out[1] == ("The Canadiens went more than 20 minutes without a shot on goal, from early in the second to midway through the third, "
+                      "while the Rangers put twelve on net.")  # not "from early in the period": the periods stay named
+    assert out[2] == "Most teams don’t go that long without a shot even once a season."
+    assert out[3].startswith("Will Cuylle made it 2-0")
+
+
+def test_shot_droughts_from_puck_drop_and_to_the_horn():
+    a = {"team": "MTL", "start": 0, "end": 1100, "gap": 1100, "other": 3, "pp": 120, "ot": False, "rare": None}
+    b = {"team": "NYR", "start": 2400 + 200, "end": 3600, "gap": 1000, "other": 5, "pp": 0, "ot": True, "rare": None}
+    assert timeline._drought(_game([]), a) == ["\x01The Canadiens didn’t get their first shot on goal until late in the first, "
+                                               "more than 18 minutes into the game, even with a power play in that stretch."]
+    assert timeline._drought(_game([]), b) == ["\x01The Rangers didn’t get a shot on goal over the final 16 minutes of regulation."]

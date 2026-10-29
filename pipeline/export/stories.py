@@ -1424,6 +1424,66 @@ def _ps_stopped(gid: int, season: int) -> list[dict]:
             for r in ev.sort("sort").iter_rows(named=True)]
 
 
+DROUGHT = 960  # a team's longest regulation stretch without a shot on goal, told from 16:00 (about 1 team-game in 35, 2023-26;
+# 15:00 came up in 1 game in 7 of 2026-27, too often to be news)
+
+
+def _longest_gaps(ev: pl.DataFrame, home: bool) -> tuple[int, int, int]:
+    """(gap, start, end) of one side's longest regulation stretch without a shot on goal, from puck drop to the end of
+    the third."""
+    ts = sorted([0, *ev.filter((pl.col("is_home") == home) & pl.col("type").is_in(["shot-on-goal", "goal"]))["sec"].to_list(), 3600])
+    return max(((b - a, a, b) for a, b in zip(ts, ts[1:])), default=(0, 0, 0))
+
+
+@lru_cache(maxsize=1)
+def _drought_norms() -> list[int]:
+    """Every team-game's longest stretch without a shot on goal over the full seasons, sorted."""
+    out = []
+    for s in FULL_SEASONS:
+        d = TABLES / str(s)
+        if not (d / "events.parquet").exists():
+            continue
+        g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id")
+        ev = (pl.read_parquet(d / "events.parquet", columns=["game_id", "period", "sec", "type", "is_home"])
+              .filter((pl.col("period") <= 3) & pl.col("type").is_in(["shot-on-goal", "goal"])).join(g, on="game_id"))
+        for (_, h), part in ev.group_by(["game_id", "is_home"]):
+            out.append(_longest_gaps(part, h)[0])
+    return sorted(out)
+
+
+def shot_droughts(gid: int, season: int, home: str, away: str) -> list[dict]:
+    """A team's long stretch without a shot on goal (Sora, 2026-10-29: Boston went 20:39 without one at Carolina, and
+    the story never said so). Regulation only, 15:00 or longer. Each: team, start and end (game seconds), gap, the
+    other team's shots on goal in it, seconds of power play the team had in it, whether the game reached overtime,
+    and `rare`: "never" when no team-game of the full seasons went that long, "season" when most teams never go that
+    long in a season (82 games)."""
+    d = TABLES / str(season)
+    if not (d / "events.parquet").exists():
+        return []
+    ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "period", "period_type", "sec", "type", "is_home", "situation_code"]).filter(
+        pl.col("game_id") == gid)
+    ot = ev.filter(pl.col("period") > 3).height > 0
+    reg = ev.filter(pl.col("period") <= 3).sort("sec")
+    norms = _drought_norms()
+    out = []
+    for is_home, t in ((False, away), (True, home)):
+        gap, a, b = _longest_gaps(reg, is_home)
+        if gap < DROUGHT:
+            continue
+        other = reg.filter((pl.col("is_home") != is_home) & pl.col("type").is_in(["shot-on-goal", "goal"]) & (pl.col("sec") > a) & (pl.col("sec") < b)).height
+        pp = 0  # seconds the team had more skaters, both goalies in, by the situation code of the play before
+        rows_ = reg.filter((pl.col("sec") >= a) & (pl.col("sec") <= b)).select("sec", "situation_code").rows()
+        for (s0, c), (s1, _) in zip(rows_, rows_[1:]):
+            c = str(c or "").zfill(4)
+            if len(c) == 4 and c[0] == "1" == c[3]:
+                mine, theirs = (int(c[2]), int(c[1])) if is_home else (int(c[1]), int(c[2]))
+                pp += (s1 - s0) if mine > theirs else 0
+        p = (len(norms) - __import__("bisect").bisect_left(norms, gap)) / len(norms) if norms else 0
+        out.append({"team": t, "start": a, "end": b, "gap": gap, "other": other, "pp": pp, "ot": ot,
+                    "rare": None if not norms else "never" if gap > norms[-1] else "season" if (1 - p) ** 82 > 0.5 else None})
+    return out
+
+
 WIPED_WHY = {"off-side": "for offside", "goal-interference": "for goalie interference", "missed-stoppage": "for a missed stoppage"}
 REVIEW_WHY = {"high-stick": "for a high stick", "hand-pass": "for a hand pass"}  # league reviews; most give no reason
 SHOT_TYPES = ("shot-on-goal", "missed-shot")  # a blocked shot is owned by the blocking team
@@ -1572,6 +1632,146 @@ def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser
             text = (f"{_cap(W.the(winner))} made it two straight over {W.the(loser)}." if won_first else
                     f"{_cap(W.the(winner))} split the two-game set, {when} losing to {W.the(loser)}.")
             out.append({"tag": "Rematch", "text": text, "score": 54})
+    return out
+
+
+FOLLOW_TAGS = ("Haunts them", "Behind the record", "In net", "Bad blood", "Hot streak", "Milestone", "Club history")
+
+
+def _saved_preview_items(gid: int) -> list[tuple[str, str]]:
+    """The Who-to-watch items the game's preview printed: (tag, text)."""
+    f = SITE_DATA / "previews" / f"{gid}.json"
+    if not f.exists():
+        return []
+    try:
+        items = (json.loads(f.read_text()).get("story") or {}).get("items") or []
+    except ValueError:
+        return []
+    return [(x.get("tag", ""), x.get("text", "")) for x in items if x.get("tag") in FOLLOW_TAGS]
+
+
+def _count(word: str) -> int | None:
+    w = word.lower()
+    return grammar.WORDS.index(w) if w in grammar.WORDS else int(w.replace(",", "")) if w.replace(",", "").isdigit() else None
+
+
+def _preview_followups(gid: int, r: dict, season: int, P: pl.DataFrame, tonight: pl.DataFrame, N: dict[int, str], W: Words,
+                       winner: str, loser: str, home: str, away: str, fought: bool) -> list[dict]:
+    """What came of the storylines the preview told (Sora, 2026-10-29: the post-game story built everything from the
+    game itself and never picked up the threads the teams and players brought into it). Only items the preview
+    printed are followed, and only when tonight added to them: a player who haunts a team scored again, a club whose
+    record ran ahead of its chances won without the chances again or had them catch up, a goalie's record on this ice,
+    bad blood that carried over, a short point streak that ended, a milestone or club list that got closer. What other
+    items already say (streaks of five, old teams, rematches, brothers, a first goal of the season, a milestone or club
+    list reached) is left to them."""
+    out = []
+    day = r["date"]
+    line = {row["player_id"]: row for row in tonight.iter_rows(named=True)}
+
+    def named(text: str) -> list[int]:
+        return sorted((p for p in line if N.get(p) and N[p] in text), key=lambda p: text.index(N[p]))
+    for tag, text in _saved_preview_items(gid):
+        if tag == "Haunts them":
+            for pid in named(text)[:1]:
+                me = line[pid]
+                if not me["g"]:
+                    continue
+                vs = P.filter((pl.col("player_id") == pid) & (pl.col("opp") == me["opp"]) & (pl.col("date") <= day))
+                g_, gp = int(vs["g"].sum()), vs.height
+                again = "again" if me["g"] == 1 else "twice more" if me["g"] == 2 else f"{num(int(me['g']))} more times"
+                out.append({"tag": "Haunts them", "score": 56,
+                            "text": f"{N[pid]} scored {again} against {W.place(me['opp'])}, and has {num(g_)} goals in "
+                                    f"{num(gp) if gp <= 12 else gp} games against them since 2023-24."})
+        elif tag == "Behind the record":
+            from pipeline.export import behind
+            team = next((t for t in (away, home) if W.poss(t) in text or W.the(t) in text or _cap(W.the(t)) in text), None)
+            nums = (r.get("numbers") or {})
+            rec = behind.summary(season, day).get(team) if team else None
+            if not rec or team not in nums:
+                continue
+            opp = home if team == away else away
+            better = nums[team]["xg"] > nums[opp]["xg"]
+            won = team == winner
+            pp, play = behind.p3(rec["pp"]), behind.p3(rec["play"])
+            if rec["gap"] > 0 and not better:
+                text_ = (f"{_cap(W.the(team))} won without the better of the chances again. Their record ({pp}) has been well ahead of "
+                         f"what their chances are worth ({play})." if won else
+                         f"The chances caught up with {W.the(team)} this time. Their record ({pp}) had been well ahead of what "
+                         f"their chances were worth ({play}).")
+            elif rec["gap"] < 0 and better:
+                text_ = (f"{_cap(W.the(team))} got the result their play has been pointing to. Their chances have been worth about "
+                         f"{play}, better than their record ({pp})." if won else
+                         f"{_cap(W.the(team))} had the better chances and lost again. Their chances have been worth about {play}, "
+                         f"better than their record ({pp}).")
+            else:
+                continue
+            out.append({"tag": "Behind the record", "text": text_, "score": 54})
+        elif tag == "In net":
+            from pipeline.metrics import venues
+            g_ = next((x for x in r.get("goalies", []) if x.get("started") and N.get(x["id"]) and N[x["id"]] in text), None)
+            if not g_ or g_["team"] == home:
+                continue
+            try:
+                rec = venues.record(g_["id"], home, day)
+            except Exception:
+                rec = None
+            if not rec or not rec["starts"]:
+                continue
+            who, at = N[g_["id"]], W.at(home)
+            won = g_["team"] == winner
+            if rec["w"] == 0:
+                text_ = (f"{who} got his first career win {at}, in his {grammar.ordinal_word(rec['starts'] + 1)} start there." if won else
+                         f"{who} is still looking for his first career win {at}.")
+            elif "hasn’t won" in text:
+                text_ = (f"{who} won {at}, ending a run of {num(rec['winless'])} starts there without a win." if won else
+                         f"{who} is still looking for a win {at}, now {num(rec['winless'] + 1)} starts without one there.")
+            elif won:
+                text_ = f"{who} improved to {rec['w'] + 1}-{rec['l']}-{rec['o']} {at} in his career."
+            else:
+                continue
+            out.append({"tag": "In net", "text": text_, "score": 52 if won else 44})
+        elif tag == "Bad blood" and fought:
+            out.append({"tag": "Bad blood", "text": "The bad blood from their last meeting carried over into this one.", "score": 48})
+        elif tag == "Hot streak":
+            goals = "scored in" in text
+            ended = []
+            for pid in named(text):
+                me = line[pid]
+                mine_ = P.filter((pl.col("player_id") == pid) & (pl.col("season") == season) & (pl.col("team") == me["team"])
+                                 & (pl.col("date") < day)).sort("date")
+                n = run_of(mine_["g" if goals else "pts"].to_list())
+                # point streaks of STREAK_END or more are told by _streak_ends
+                if n and not me["g" if goals else "pts"] and (goals or n < STREAK_END):
+                    ended.append((pid, n))
+            if len(ended) == 1:
+                pid, n = ended[0]
+                out.append({"tag": "Streak over", "score": 42,
+                            "text": f"{grammar.possessive(N[pid])} {'goal' if goals else 'point'} streak ended at {num(n)} games."})
+            elif ended:
+                out.append({"tag": "Streak over", "score": 42,
+                            "text": f"{_and([N[p] for p, _ in ended])} saw their {'goal' if goals else 'point'} streaks end."})
+        elif tag in ("Milestone", "Club history"):
+            m = re.search(r"is (\w+) (goals?|assists?|points?) from (passing .+|\d[\d,]*)\.$", text)
+            pids = named(text)
+            if not m or not pids or _count(m.group(1)) is None:
+                continue
+            pid = pids[0]
+            me = line[pid]
+            unit = m.group(2).rstrip("s")
+            got = int({"goal": me["g"], "assist": me["pts"] - me["g"], "point": me["pts"]}[unit])
+            left = _count(m.group(1)) - got
+            if tag == "Milestone":  # counted again from his career, tonight included: the preview's day may be stale
+                car = _careers().get(pid)
+                target = _count(m.group(3))
+                if not car or target is None:
+                    continue
+                past = [x for x in car if x[0] <= day[:10]]
+                have = {"goal": sum(x[1] for x in past), "point": sum(x[2] for x in past)}
+                have["assist"] = have["point"] - have["goal"]
+                left = target - have[unit]
+            if got and left > 0:
+                out.append({"tag": tag, "score": 40,
+                            "text": f"{N[pid]} is now {num(left)} {unit}{'' if left == 1 else 's'} from {m.group(3)}."})
     return out
 
 
@@ -2490,7 +2690,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     gm = timeline.Game(goals=goals, winner=winner, loser=loser, home=home, away=away, end=end, W=W, name=name, last=last, said=said,
                        N=N, pk=pk, wiped=gone, reviews=storylines.reviews(gid, season), ps_stopped=[x for x in _ps_stopped(gid, season) if x["p1"] in N],
                        changes=changes, exits=exits, so=(so_pid, so_how, so_all), rally=rally, hat_ids=hat_ids,
-                       fights=[(sec, _star_fight(say, ps_, gid, season, r["date"], N, name)) for sec, ps_, say in fights])
+                       fights=[(sec, _star_fight(say, ps_, gid, season, r["date"], N, name)) for sec, ps_, say in fights],
+                       droughts=shot_droughts(gid, season, home, away))
     gm.attach, attached = timeline.attachments(gm, found, season_goals)
     # a goal streak rides on his goal ("..., his fifth straight game with a goal") instead of a Streak item below
     # (Sora's review, round 2: Jankowski's streak read as a separate fact after the goal was told)
@@ -2759,6 +2960,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if text:
             items.append({"tag": "Shorthanded", "text": text, "score": 52 if t == winner else 44})
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
+    items += _preview_followups(gid, r, season, P, tonight, N, W, winner, loser, home, away, bool(fights))
     items += _league_marks(G, r["date"], gid, season, W, winner, loser)
     league = []
     try:

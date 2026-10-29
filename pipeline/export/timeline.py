@@ -28,6 +28,9 @@ RUN_GAP = 300  # seconds between two goals by one team that read as one sentence
 RELATIVE = 300  # a goal this soon after the last one told is "x:xx later"
 LATE = 480  # the last eight minutes of the third read "with six minutes left" (outside notes, Oct 20: 6:22 left read "late in the third")
 HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty shot", "dp": " on a delayed penalty"}
+DROUGHT_PP = 90  # seconds of power play inside a stretch without a shot worth "even with a power play"
+DROUGHT_TAIL = 8  # the other team's shots on goal in it worth a clause
+KEEP = "\x01"  # a sentence _periods leaves as written
 PERIOD_END = 30  # a goal this close to the end of the first or second is told by the clock ("with 12 seconds left in the first")
 SEASON_MARKS = (20, 30, 40, 50, 60, 70)  # a scorer's nth goal of the season worth a clause
 
@@ -104,6 +107,7 @@ class Game:
     broke: bool = False  # something other than a goal was told since the last goal, so "x later" would mislead
     hat3: set = field(default_factory=set)  # indexes of goals that completed a hat trick
     naturals: set = field(default_factory=set)  # scorers of a natural hat trick (three straight goals of the game)
+    droughts: list = field(default_factory=list)  # stories.shot_droughts rows: a team's long stretch without a shot on goal
 
     def side(self, g: dict) -> str:
         return self.home if g["home"] else self.away
@@ -159,6 +163,8 @@ def paragraph(gm: Game) -> list[str]:
         events.append((x["sec"], 3, "exit", x))
     for sec, say in gm.fights:  # every fight, in its place among the goals (Sora's review, 2026-10-19)
         events.append((sec, 4, "fight", say))
+    for d in gm.droughts:  # told where it began, after anything at that second (the shot that began it)
+        events.append((d["start"], 5, "drought", d))
     events.sort(key=lambda e: (e[0], e[1]))
     stood = {(x["period"], x["sec"]): x for x in gm.reviews if x["kind"] == "stood"}
     scored_before: dict[int, int] = {}  # scorer -> goals already told
@@ -227,6 +233,8 @@ def paragraph(gm: Game) -> list[str]:
                 out.append((_change(gm, x), {"kind": "other"}))
             elif kind == "exit":
                 out.append((_exit(gm, x), {"kind": "other"}))
+            elif kind == "drought":
+                out += [(t_, {"kind": "other"}) for t_ in _drought(gm, x)]
             elif kind == "fight":
                 # "Johnston and Olivier opened the second period with a fight" when it came in the period's first
                 # minute with nothing before it (Sora's review, round 2)
@@ -426,6 +434,11 @@ def _periods(sentences: list[str]) -> list[str]:
     read like a list; Sora's review, round 2)."""
     out, last, part = [], (None, -9), (None, -9)
     for n, s in enumerate(sentences):
+        if s.startswith(KEEP):
+            out.append(s[1:])
+            last, part = (None, -9), (None, -9)
+            continue
+
         def swap(m):
             nonlocal last, part
             p, w = m.group(2), m.group(1)
@@ -844,6 +857,48 @@ def _change(gm: Game, c: tuple) -> str:
     if came.get("how") == "mid":
         return f"{who(f)} left the game{per}, and {who(rl)} finished it in net for {W.place(t)}."
     return f"{who(rl)} took over from {who(f)} in net for {W.place(t)}{rest}."
+
+
+def _stretch(s: int) -> str:
+    """"more than 20 minutes", "just over 16 minutes", "nearly 18 minutes": a long stretch said the way a fan says it."""
+    m, r = divmod(s, 60)
+    return f"{num(m)} minutes" if r == 0 else f"just over {num(m)} minutes" if r <= 10 else f"nearly {num(m + 1)} minutes" if r >= 50 else \
+        f"more than {num(m)} minutes"
+
+
+def _part(sec: int) -> str:
+    p, r = min(sec // 1200 + 1, 3), sec % 1200
+    return f"{'early in' if r < 480 else 'midway through' if r < 900 else 'late in'} the {PERIODS[p]}"
+
+
+def _drought(gm: Game, d: dict) -> list[str]:
+    """"The Bruins went more than 20 minutes without a shot on goal, from midway through the second to midway through
+    the third, while the Hurricanes put 12 on net." A stretch from puck drop reads "didn’t get their first shot on goal
+    until", one to the horn "didn’t get a shot on goal over the final 16 minutes"; a line on how rare it is when most
+    teams never go that long in a season (Sora, 2026-10-29)."""
+    W = gm.W
+    t = d["team"]
+    o = gm.home if t == gm.away else gm.away
+    who = _cap(W.the(t))
+    a, b, gap = d["start"], d["end"], d["gap"]
+    if a == 0:
+        text = f"{who} didn’t get their first shot on goal until {_part(b)}, {_stretch(gap)} into the game"
+    elif b >= 3600:
+        text = f"{who} didn’t get a shot on goal over the final {num(gap // 60)} minutes{' of regulation' if d['ot'] else ''}"
+    elif a // 1200 == (b - 1) // 1200:
+        text = f"{who} went {_stretch(gap)} of the {PERIODS[a // 1200 + 1]} period without a shot on goal"
+    else:
+        text = f"{who} went {_stretch(gap)} without a shot on goal, from {_part(a)} to {_part(b)}"
+    if d["pp"] >= DROUGHT_PP:
+        text += ", even with a power play in that stretch"
+    elif d["other"] >= DROUGHT_TAIL:
+        text += f", while {W.the(o)} put {num(d['other'])} on net"
+    out = [KEEP + text + "."]  # its periods stay named: "from midway through the period to ..." lost the reader
+    if d["rare"] == "never":
+        out.append("No team went that long without a shot on goal in any game of the three seasons before this one.")
+    elif d["rare"] == "season":
+        out.append("Most teams don’t go that long without a shot even once a season.")
+    return out
 
 
 def _exit(gm: Game, x: dict) -> str:

@@ -323,3 +323,30 @@ def test_star_line_needs_three_points_or_two_goals():
     assert stories._star_line(night, "CGY", last, {1, 2}) == "Farabee has a goal and two assists"
     assert stories._star_line(night.filter(pl.col("player_id") == 2), "CGY", last, {2}) is None
     assert stories._pts_words(2, 0) == "two goals" and stories._pts_words(0, 3) == "three assists"
+
+
+def test_post_game_follows_up_the_preview_storylines(monkeypatch):
+    """Sora, 2026-10-29: the post-game story should pick up what the preview said the teams and players brought in."""
+    import polars as pl
+    previews.NICKS.clear()
+    previews.NICKS.update({"BOS": "Bruins", "CAR": "Hurricanes"})
+    W = stories.Words({"BOS": "Boston", "CAR": "Carolina"})
+    previews.NICKS.clear()
+    N = {1: "Morgan Geekie", 2: "Jackson Blake", 3: "Seth Jarvis"}
+    monkeypatch.setattr(stories, "_saved_preview_items", lambda gid: [
+        ("Haunts them", "Morgan Geekie has six goals in eight games against Carolina since 2023-24."),
+        ("Hot streak", "Jackson Blake has a point in four straight games."),
+        ("Milestone", "Seth Jarvis is two goals from 100."),
+        ("Bad blood", "Last time these two met, there were two fights.")])
+    rows = [(1, "BOS", "CAR", f"2026-10-{d:02d}", g, g) for d, g in [(1, 1), (2, 0), (3, 1), (4, 2), (5, 0), (6, 1), (7, 1), (8, 0)]]
+    rows += [(2, "CAR", "BOS", f"2026-10-0{d}", 0, 1) for d in (1, 2, 3, 4)]
+    rows += [(1, "BOS", "CAR", "2026-10-27", 1, 1), (2, "CAR", "BOS", "2026-10-27", 0, 0), (3, "CAR", "BOS", "2026-10-27", 1, 1)]
+    P = pl.DataFrame(rows, schema=["player_id", "team", "opp", "date", "g", "pts"], orient="row").with_columns(
+        season=pl.lit(2026), game_id=pl.when(pl.col("date") == "2026-10-27").then(189).otherwise(0))
+    tonight = P.filter(pl.col("game_id") == 189)
+    got = {x["tag"]: x["text"] for x in stories._preview_followups(189, {"date": "2026-10-27"}, 2026, P, tonight, N, W,
+                                                                   "CAR", "BOS", "CAR", "BOS", fought=False)}
+    assert got["Haunts them"] == "Morgan Geekie scored again against Carolina, and has seven goals in nine games against them since 2023-24."
+    assert got["Streak over"] == "Jackson Blake’s point streak ended at four games."
+    assert got["Milestone"] == "Seth Jarvis is now one goal from 100."
+    assert "Bad blood" not in got  # no fight tonight, nothing to carry over
