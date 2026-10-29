@@ -148,10 +148,10 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
     </p>
     <div class="jpick">
       <span>Show</span>
-      <select id="sw-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
-      <span>highlighting</span>
+      <select id="sw-team" aria-label="Team"><option value="all">both teams</option>{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+      <span class="sw-hl" hidden>highlighting</span>
       {order.map((t) => (
-        <select class="sw-line" data-team={t} aria-label="Line or pair to highlight">
+        <select class="sw-line" data-team={t} aria-label="Line or pair to highlight" hidden>
           <option value="">no line</option>
           {units(t).map((u) => <option value={u.key}>{u.key} {u.ids.map((i) => last(byId.get(i))).join('–')}</option>)}
         </select>
@@ -165,6 +165,7 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
       us.forEach((u) => u.ids.forEach((i) => of.set(i, of.has(i) ? `${of.get(i)} ${u.key}` : u.key)));
       return (
         <div class:list={['sw-team card', `t-${side(t)}`, { pale: pale(t) }]} data-team={t}>
+          <p class="sw-th"><i></i>{place(t)}</p>
           {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
           <p class="sw-key" aria-hidden="true">{PARTS.map((p) => <span><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}</p>
           <ol class="sw-rows">
@@ -197,13 +198,13 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
 <script type="application/json" id="sw-parts" set:html={JSON.stringify(detail).replace(/</g, '\\u003c')}></script>
 
 <script is:inline>
-  // "Show [team] highlighting [line]": opens on the visitor's own team when it played. Picking a line or pair fades
-  // everyone else and names how long the group played together; pointing at a line tag does the same.
+  // "Show [both teams | team] highlighting [line]": opens on both teams, one card each (Sora, 2026-10-29). Picking one
+  // team adds the line menu; picking a line or pair fades everyone else and names how long the group played together.
+  // Pointing at a line tag does the same, in either view.
   (() => {
     const team = document.getElementById('sw-team');
     if (!team) return;
-    const mine = [...team.options].find((o) => o.value === window.lcPrefs?.get('team'));
-    if (mine) team.value = mine.value;
+    const hl = document.querySelector('.sw-hl');
     const lineFor = (t) => document.querySelector(`.sw-line[data-team="${t}"]`);
     const mark = (box, key) => {
       box.classList.toggle('lit', !!key);
@@ -211,11 +212,16 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
       box.querySelectorAll('.sw-unit').forEach((p) => { p.hidden = p.dataset.unit !== key; });
     };
     const show = () => {
-      document.querySelectorAll('.sw-team').forEach((b) => { b.hidden = b.dataset.team !== team.value; });
-      document.querySelectorAll('.sw-line').forEach((s) => { s.hidden = s.dataset.team !== team.value; });
-      const box = document.querySelector(`.sw-team[data-team="${team.value}"]`);
-      if (box) mark(box, lineFor(team.value)?.value);
+      const all = team.value === 'all';
+      document.querySelector('#swing')?.classList.toggle('sw-all', all);
+      if (hl) hl.hidden = all;
+      document.querySelectorAll('.sw-line').forEach((s) => { s.hidden = all || s.dataset.team !== team.value; });
+      document.querySelectorAll('.sw-team').forEach((b) => {
+        b.hidden = !all && b.dataset.team !== team.value;
+        if (!b.hidden) mark(b, lineFor(b.dataset.team)?.value);
+      });
     };
+    show();
     team.addEventListener('change', show);
     document.querySelectorAll('.sw-line').forEach((s) => s.addEventListener('change', show));
     document.querySelectorAll('.sw-team').forEach((box) => {
@@ -282,8 +288,12 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
   .sw-who i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; vertical-align: 1px; }
   .sw-lead-n { font: 700 15px var(--ui); color: var(--ink-2); }
   .jpick { margin-top: 18px; }
-  .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
+  .jpick select[hidden], .sw-hl[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
   .sw-team { margin-top: 18px; --sw-base: var(--sheet); }
+  /* Each card names its team only when both are shown; with one team the menu already says which. */
+  .sw-th { display: none; align-items: center; gap: 8px; font: 700 17px var(--ui); color: var(--ink); margin-bottom: 10px; }
+  .sw-th i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  :global(.sw-all) .sw-th { display: flex; }
   /* On the dark page the lighter parts fade toward the text colour instead, so they stay visible. */
   @media (prefers-color-scheme: dark) { .sw-team { --sw-base: var(--ink); } .sw-team.pale { --sw-base: var(--sheet); } }
   .sw-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 600 12px var(--ui); color: var(--ink-2); margin-bottom: 10px; }
