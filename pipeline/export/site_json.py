@@ -22,11 +22,15 @@ def run(season: int) -> dict:
     export_goal_sources(season)
     from pipeline.export import trend
     trend.run(season)  # team pages' season trend: history, two seasons game by game, then and now
+    from pipeline.export import behind
+    behind.run(season)  # what's behind each record: record against play, shooting, goalies, lines (reads goalies.json)
     from pipeline.export import xg_grid
     xg_grid.run()  # Methods page: average shot chance by spot and shot type
     (SITE_DATA / "xg_check.json").unlink(missing_ok=True)  # the Chance check page is gone; drop its data from restored copies
     from pipeline.export import roster
     roster.run(season)  # every club's full roster and who is out, from availability.parquet
+    from pipeline.metrics import war
+    war.run(season)  # wins above replacement for every skater, this season and last (player pages, Leaders)
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import similar
@@ -35,6 +39,8 @@ def run(season: int) -> dict:
     stats.run(season)  # the league's own counting stats: player and team pages, the Leaders page
     from pipeline.export import ledger
     ledger.run(season)  # player pages' career ledger: every season's line and his trophies
+    from pipeline.export import gamelog
+    gamelog.run(season)  # player pages' recent games: his last ten boxscore lines
     from pipeline.export import record_book
     record_book.run(season)  # player pages' "In the record books": NHL and club all-time lists (reads players/index.json)
     from pipeline.export import previews
@@ -168,7 +174,7 @@ def faced_out(x: dict | None) -> dict | None:
 
 def export_lines(season: int) -> int:
     """Usual lines and pairs for every team, how the last game differed, and notes on changed special-teams roles."""
-    from pipeline.metrics import units
+    from pipeline.metrics import line_order, units
 
     d = TABLES / str(season)
     if not (d / "game_units.parquet").exists():  # update, quick and publish build it before the export
@@ -291,7 +297,9 @@ def export_lines(season: int) -> int:
         g = info[e["last_game"]]
         usual_sets = {u["label"]: u["unit"] for u in e["units"]}
         last_sets = {u["unit"] for u in e["last"]}
-        fmt = lambda unit: [short.get(int(i), "?") for i in unit.split("-")]
+        # Forward lines are listed left wing, center, right wing (`line_order`); pairs as they come.
+        seq = lambda u: line_order.order(season, tid, u["unit"].split("-")) if u["label"][0] == "L" else [int(i) for i in u["unit"].split("-")]
+        fmt = lambda u: [short.get(i, "?") for i in seq(u)]
         if lineup_changes:
             notes = lineup_changes.get(place, []) + notes
         shuffle = shuffle_note(e)
@@ -305,12 +313,12 @@ def export_lines(season: int) -> int:
             "shape": e.get("shape"),
             "seventh": None if not e.get("seventh") else {"id": e["seventh"]["player"], "name": short.get(e["seventh"]["player"], "?"), "with": [short.get(q, "?") for q in e["seventh"]["with"]], "seconds": round(e["seventh"]["sec"])},
             "settled": {**{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e["settled"].items()}, "shuffled": shuffle is not None},
-            "units": [{"label": u["label"], "players": fmt(u["unit"]), "ids": [int(i) for i in u["unit"].split("-")], "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": None if u["sec_pg"] is None else round(u["sec_pg"] / 60, 1), "toi_sec": None if u["sec_pg"] is None else round(u["sec_pg"]), "gp": u["gp"], "new": u["new"],
+            "units": [{"label": u["label"], "players": fmt(u), "ids": seq(u), "minutes": u["minutes"], "seconds": round(u["sec"]), "toi": None if u["sec_pg"] is None else round(u["sec_pg"] / 60, 1), "toi_sec": None if u["sec_pg"] is None else round(u["sec_pg"]), "gp": u["gp"], "new": u["new"],
                        "xgf60": round(u["xgf60"], 2), "xga60": round(u["xga60"], 2), "share": round(u["share"], 1), "oz": None if u["oz"] is None else round(u["oz"]),
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets,
                        "shared": u.get("shared"), "faced": faced_out(u.get("faced"))} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
-                     "units": [{"label": u["label"], "players": fmt(u["unit"]), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
+                     "units": [{"label": u["label"], "players": fmt(u), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
             "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] not in ("eleven", "shuffle"), n["kind"] != "eleven", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
     pts = lambda x: None if x is None else round(100 * x)

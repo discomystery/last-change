@@ -1,0 +1,299 @@
+/* The Academy: lessons for people new to hockey. One reading column; each part of a lesson is a white sheet with its
+   rink and its words side by side (stacked on phones). Rink colours are the real paint, muted to sit on the page. */
+:root {
+  --ac-red: rgba(200, 16, 46, 0.78);
+  --ac-blue: rgba(31, 78, 158, 0.8);
+  --ac-crease: rgba(31, 78, 158, 0.12);
+  --ac-zone: rgba(15, 28, 43, 0.045);
+  --ac-lit: rgba(31, 78, 158, 0.13);
+  --ac-shadow: rgba(15, 28, 43, 0.16);
+  --ac-lamp: rgba(200, 16, 46, 0.5);
+  --boards: color-mix(in oklab, var(--ink-3) 55%, var(--sheet));
+  /* Sweaters: the home team in dark, the visitors in white. On the dark page the home team is a lighter navy, so it
+     still shows against the ice. */
+  --ac-home: #16273a;
+  --ac-home-line: #16273a;
+  --ac-away: #ffffff;
+  --ac-away-line: #6f7e8e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ac-red: rgba(238, 90, 112, 0.85);
+    --ac-blue: rgba(110, 160, 240, 0.85);
+    --ac-crease: rgba(110, 160, 240, 0.14);
+    --ac-zone: rgba(230, 237, 243, 0.05);
+    --ac-lit: rgba(110, 160, 240, 0.16);
+    --ac-shadow: rgba(0, 0, 0, 0.45);
+    --ac-lamp: rgba(238, 90, 112, 0.55);
+    --ac-home: #34506f;
+    --ac-home-line: #9fb1c4;
+    --ac-away: #f4f7fa;
+    --ac-away-line: #f4f7fa;
+  }
+}
+
+.ac { display: grid; gap: 28px; padding-bottom: 48px; }
+.ac-top { display: grid; gap: 4px; }
+.ac-top .lede { max-width: 62ch; font-size: 19px; }
+.ac-meta { margin: 8px 0 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.ac p { margin: 0; }
+.ac-part { background: var(--sheet); border-radius: 18px; padding: clamp(18px, 3vw, 32px); display: grid; gap: 20px; }
+.ac-part > header { display: grid; gap: 8px; }
+.ac-part h2 { font: 700 28px/1.15 var(--display); margin: 0; text-wrap: balance; }
+.ac-part > header p { font-size: 18px; color: var(--ink-2); max-width: 66ch; }
+.ac-stage { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: center; }
+.ac-stage.wide { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .ac-stage { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+.ac-view { display: grid; gap: 10px; min-width: 0; }
+.ac-cap { display: grid; gap: 10px; min-width: 0; align-content: start; }
+.ac-cap h3 { min-height: 1.15em; margin: 0; }
+.ac-cap p { font-size: 17.5px; color: var(--ink-2); }
+.ac-hint { font: 500 14px/1.45 var(--ui); color: var(--ink-3); }
+.ac-ctrl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ac .pill { font-size: 14px; padding: 10px 16px; }
+.ac .pill.primary { background: var(--ink); color: var(--sheet); }
+.ac .pill:disabled { opacity: 0.4; cursor: default; }
+.ac .pick { margin: 0; }
+@media (max-width: 600px) { .ac .pick { font-size: 17px; } }
+
+/* Step-through: a row of dots on a line, filled up to the step on show. */
+.ac-track { position: relative; height: 18px; }
+.ac-track::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: var(--rule); border-radius: 2px; }
+.ac-track .fill { position: absolute; left: 0; top: 8px; height: 2px; background: var(--ink); border-radius: 2px; transition: width 0.5s ease; }
+.ac-track button { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; border: 2px solid var(--rule); background: var(--sheet); padding: 0; cursor: pointer; transition: background 0.3s, border-color 0.3s; }
+.ac-track button.done { background: var(--ink); border-color: var(--ink); }
+.ac-scrub { width: 100%; margin: 4px 0; appearance: none; -webkit-appearance: none; background: transparent; height: 18px; cursor: pointer; }
+.ac-scrub::-webkit-slider-runnable-track { height: 2px; background: var(--rule); border-radius: 2px; }
+.ac-scrub::-moz-range-track { height: 2px; background: var(--rule); border-radius: 2px; }
+.ac-scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border-radius: 50%; background: var(--ink); border: 0; }
+.ac-scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 0; }
+
+/* ---------- The rink ---------- */
+svg.ac-rink { width: 100%; height: auto; display: block; overflow: hidden; touch-action: manipulation; }
+.ac-rink .ice { fill: var(--sheet); stroke: var(--boards); stroke-width: 0.5; }
+.ac-rink.seat .ice { stroke-width: 0.9; }
+.ac-rink .wall { fill: color-mix(in oklab, var(--boards) 22%, var(--sheet)); stroke: var(--boards); stroke-width: 0.25; }
+.ac-rink .zone { fill: var(--ac-zone); }
+.ac-rink .z-mid { fill: transparent; }
+.ac-rink .goal, .ac-rink .rl { fill: var(--ac-red); }
+.ac-rink .bl { fill: var(--ac-blue); }
+.ac-rink .crease { fill: var(--ac-crease); stroke: var(--ac-red); stroke-width: 0.25; }
+.ac-rink .net { fill: none; stroke: var(--ink-3); stroke-width: 0.45; stroke-linejoin: round; }
+.ac-rink .net-back { fill: color-mix(in oklab, var(--ink-3) 14%, transparent); stroke: var(--ink-3); stroke-width: 0.2; }
+.ac-rink .trap { stroke: var(--ac-red); stroke-width: 0.25; fill: none; }
+.ac-rink .ring-r { fill: none; stroke: var(--ac-red); stroke-width: 0.3; }
+.ac-rink .ring-b { fill: none; stroke: var(--ac-blue); stroke-width: 0.3; }
+.ac-rink .dot-r { fill: var(--ac-red); }
+.ac-rink .dot-b { fill: var(--ac-blue); }
+.ac-rink .bench, .ac-rink .box { fill: var(--track); stroke: var(--boards); stroke-width: 0.3; }
+.ac-rink .box-mid { fill: none; stroke: var(--boards); stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
+/* Labels keep one size on screen, whatever the view (--k, from fit()). */
+.ac-rink .lbl { font: 600 calc(3.4px * var(--k, 1)) var(--ui); letter-spacing: 0.06em; text-transform: uppercase; fill: var(--ink-3); }
+.ac-rink .zlbl { font: 600 calc(4px * var(--k, 1)) var(--ui); fill: var(--ink-2); }
+.ac-rink .vlbl { font: 700 calc(3.6px * var(--k, 1)) var(--ui); letter-spacing: 0.16em; text-transform: uppercase; }
+.ac-rink .vlbl.b { fill: var(--ac-blue); } .ac-rink .vlbl.r { fill: var(--ac-red); }
+@media (max-width: 600px) {
+  .ac-rink .lbl { font-size: calc(5.2px * var(--k, 1)); }
+  .ac-rink .zlbl { font-size: calc(6px * var(--k, 1)); }
+  .ac-rink .vlbl { font-size: calc(5.4px * var(--k, 1)); }
+  .ac-rink .wide-lbl { display: none; }
+}
+
+/* People: a dot from above, a small upright figure from a seat. Home team in dark sweaters, visitors in white,
+   officials in stripes. */
+.ac-rink .fig { cursor: pointer; }
+.ac-rink .fig:focus-visible { outline: none; }
+.ac-rink .fig .halo { fill: var(--ink); opacity: 0; transition: opacity 0.2s; }
+.ac-rink .fig:is(:hover, :focus-visible, .on) .halo { opacity: 0.12; }
+.ac-rink .fig .shadow { fill: var(--ac-shadow); }
+.ac-rink .home .disc, .ac-rink .home .head { fill: var(--ac-home); stroke: var(--ac-home-line); stroke-width: 0.3; }
+.ac-rink .away .disc, .ac-rink .away .head { fill: var(--ac-away); stroke: var(--ac-away-line); stroke-width: 0.45; }
+.ac-rink .ref .disc { fill: var(--ac-away); stroke: var(--ac-home); stroke-width: 0.9; stroke-dasharray: 0.9 0.7; }
+.ac-rink .ref .head { fill: var(--ink-2); }
+.ac-rink .fig :is(.body, .inner, .legs) { fill: none; stroke-linecap: round; }
+.ac-rink .home .body { stroke: var(--ac-home-line); }
+.ac-rink .home .inner { stroke: var(--ac-home); }
+.ac-rink .away .body { stroke: var(--ac-away-line); }
+.ac-rink .away .inner { stroke: var(--ac-away); }
+.ac-rink :is(.home, .away, .ref) .legs { stroke: var(--ink-2); }
+.ac-rink .ref .body { stroke: var(--ac-home); }
+.ac-rink .ref .inner { stroke: var(--ac-away); stroke-dasharray: 0.55 0.55; }
+.ac-rink .tag { font: 700 3px var(--ui); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.ac-rink .home .tag { fill: #fff; } .ac-rink :is(.away, .ref) .tag { fill: #16273a; }
+.ac-rink .puck { fill: var(--ink); stroke: var(--sheet); stroke-width: 0.25; pointer-events: none; }
+.ac-rink .lamp { fill: var(--ac-lamp); opacity: 0; transition: opacity 0.25s; }
+.ac-rink .lamp.on { opacity: 1; }
+html.motion .ac-rink .lamp.on { animation: ac-lamp 0.7s ease-in-out 3; }
+@keyframes ac-lamp { 50% { opacity: 0.35; } }
+
+/* Lighting up one part of the rink at a time (the step-through). Everything waits faint until its step comes round. */
+.ac-steps :is(.g-boards .ice, .g-goal, .g-crease, .g-blue, .g-red, .g-marks, .g-bench, .g-zlbl, .g-sum, .g-lbl > *) { transition: opacity 0.6s ease; }
+.ac-steps:not(.on-goal) .g-goal, .ac-steps:not(.on-crease) .g-crease, .ac-steps:not(.on-blue) :is(.g-blue, .g-zlbl),
+.ac-steps:not(.on-red) .g-red, .ac-steps:not(.on-marks) .g-marks, .ac-steps:not(.on-bench) .g-bench, .ac-steps:not(.on-sum) .g-sum { opacity: 0; }
+/* A line's label shows only on its own step, so labels never crowd each other. */
+.ac-steps .g-lbl > * { opacity: 0; }
+.ac-steps:is(.at-boards) .lbl-boards, .ac-steps.at-goal .lbl-goal, .ac-steps.at-crease .lbl-crease, .ac-steps.at-blue .lbl-blue,
+.ac-steps.at-red .lbl-red, .ac-steps.at-bench .lbl-bench { opacity: 1; }
+.ac-steps.at-boards .g-boards .ice { stroke: var(--ink); stroke-width: 1.2; }
+.ac-steps.at-boards .wall { fill: color-mix(in oklab, var(--ink-3) 30%, var(--sheet)); }
+.ac-steps.on-sum :is(.g-marks, .g-crease, .g-bench, .g-zlbl) { opacity: 0.3; }
+.ac-steps .z-left, .ac-steps .z-right { transition: fill 0.6s ease; }
+.ac-steps.at-blue :is(.z-left, .z-right) { fill: var(--ac-lit); }
+html.motion .ac-steps.on-sum .g-sum { animation: ac-pulse 1.6s ease-in-out 2; }
+@keyframes ac-pulse { 50% { opacity: 0.35; } }
+
+/* Zones you can tap (quizzes, whose zone). */
+.ac-rink .hit { fill: transparent; cursor: pointer; }
+.ac-rink .hit:hover { fill: var(--ac-lit); }
+.ac-rink .hit.right { fill: color-mix(in oklab, var(--ac-blue) 30%, transparent); }
+.ac-rink .hit.wrong { fill: color-mix(in oklab, var(--ink-3) 22%, transparent); }
+
+/* A mini scoreboard above a play. */
+.ac-board { display: inline-flex; align-items: center; gap: 16px; justify-self: start; font: 600 14px/1 var(--ui); background: var(--ice); color: var(--ink); border-radius: 10px; padding: 9px 14px; }
+.ac-board .tm { display: inline-flex; align-items: center; gap: 7px; }
+.ac-board .sw { width: 11px; height: 11px; border-radius: 50%; }
+.ac-board .sw.home { background: var(--ac-home); box-shadow: inset 0 0 0 1.5px var(--ac-home-line); }
+.ac-board .sw.away { background: var(--ac-away); box-shadow: inset 0 0 0 1.5px var(--ac-away-line); }
+.ac-board .sc { font: 700 20px/1 var(--display); min-width: 1ch; text-align: center; display: inline-block; }
+.ac-board .clk { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+html.motion .ac-board .sc.bump { animation: ac-bump 0.6s ease; }
+@keyframes ac-bump { 40% { transform: scale(1.35); } }
+.ac-pickout { font: 500 15px/1.45 var(--ui); color: var(--ink); background: var(--ice); border-radius: 12px; padding: 10px 14px; }
+
+/* Notes: small cards of plain facts. */
+.ac-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.ac-note { background: var(--ice); border-radius: 14px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+.ac-note p { font-size: 16.5px; color: var(--ink-2); }
+.ac-note svg { width: 64px; height: 40px; color: var(--ink); }
+
+/* Make the call. */
+.ac-quiz { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.ac-q { background: var(--ice); border-radius: 14px; padding: 18px; display: grid; gap: 12px; align-content: start; }
+.ac-q p { font-size: 17px; }
+.ac-q .ans { color: var(--ink-2); font-size: 16.5px; }
+.ac-q .pill { background: var(--sheet); }
+.ac-q .pill.on { background: var(--ink); color: var(--sheet); }
+
+/* Words you'll hear. */
+.ac-words dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; }
+.ac-words dt { font: 700 16px/1.3 var(--ui); }
+.ac-words dd { margin: 2px 0 0; font-size: 16px; color: var(--ink-2); }
+
+.ac-next { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.ac-to { font: 600 22px/1.2 var(--display); display: inline-block; margin-top: 4px; }
+.ac-sub { font-size: 16px; color: var(--ink-2); }
+
+/* Size comparison. */
+.ac-sizep { font-size: 17.5px; color: var(--ink-2); }
+.ac-size .field { fill: none; stroke: var(--ink-2); stroke-width: 1.2; stroke-dasharray: 3 2.4; }
+.ac-size .field-fill { fill: color-mix(in oklab, var(--ink-3) 8%, transparent); }
+.ac-size .flbl { font: 600 calc(3.6px * var(--k, 1)) var(--ui); fill: var(--ink-2); letter-spacing: 0.05em; text-transform: uppercase; }
+
+/* Lighting up players during a play: with .focus on the drawing, everyone not lit fades back. */
+.ac-rink .fig { transition: opacity 0.4s ease; }
+.ac-rink.focus .people .fig:not(.on) { opacity: 0.28; }
+.ac-rink .fig.on .halo { opacity: 0.16; }
+.ac-rink .fig.faded { opacity: 0.45; pointer-events: none; }
+/* A referee's orange armbands. */
+:root { --ac-orange: #e0782b; }
+.ac-rink .fig .arm { fill: none; stroke: var(--ac-orange); }
+.ac-rink .fig circle.arm { stroke-width: 0.7; }
+.ac-rink .fig path.arm { stroke-linecap: round; }
+
+/* Spot the positions: label chips above the rink, placed labels above each player. */
+.ac-tray { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-lbl { font: 600 14px/1 var(--ui); padding: 10px 14px; border-radius: 999px; border: 0; background: var(--ice); color: var(--ink); cursor: grab; touch-action: none; user-select: none; }
+.chip-lbl.on { background: var(--ink); color: var(--sheet); }
+.chip-lbl.used { opacity: 0.35; text-decoration: line-through; cursor: default; }
+.chip-lbl.ghost { position: fixed; z-index: 50; transform: translate(-50%, -130%); pointer-events: none; background: var(--ink); color: var(--sheet); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
+.ac-rink .ptag { font: 700 calc(3.6px * var(--k, 1)) var(--ui); fill: var(--ink); paint-order: stroke; stroke: var(--sheet); stroke-width: calc(1px * var(--k, 1)); }
+@media (max-width: 600px) { .ac-rink .ptag { font-size: calc(5.4px * var(--k, 1)); } }
+.ac-rink .fig.placed .halo { opacity: 0.14; }
+html.motion .ac-rink .fig.nope { animation: ac-nope 0.4s ease; }
+@keyframes ac-nope { 25% { opacity: 0.4; } 75% { opacity: 0.4; } }
+
+/* A real team's players, laid out like the positions: forwards, then defense, then the goalie. */
+.ac-six { display: grid; gap: 10px; }
+.ac-six .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ac-six .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 67%; margin: 0 auto; }
+.ac-six .row.one { grid-template-columns: minmax(0, 1fr); width: 33%; margin: 0 auto; }
+.ac-p { background: var(--ice); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; font: 600 16px/1.3 var(--ui); min-width: 0; }
+@media (max-width: 600px) {
+  .ac-six .row.two, .ac-six .row.one { width: 100%; }
+  .ac-six .row { grid-template-columns: minmax(0, 1fr); }
+  .ac-six .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ac-p { font-size: 15px; padding: 10px 12px; }
+}
+
+/* The whistle: a ring that spreads from the official who blew it. */
+.ac-rink .blow { fill: none; stroke: var(--ink); stroke-width: 0.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.ac-rink .blow.on { opacity: 0.7; }
+html.motion .ac-rink .blow.on { animation: ac-blow 0.9s ease-out 3; }
+@keyframes ac-blow { from { transform: scale(0.4); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
+.ac-board .stop { font: 600 12px/1 var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ac-red); }
+
+/* Shift clocks over players' heads. */
+.ac-rink .sclk { font: 700 calc(3px * var(--k, 1)) var(--ui); fill: var(--ink-2); paint-order: stroke; stroke: var(--sheet); stroke-width: calc(0.9px * var(--k, 1)); font-variant-numeric: tabular-nums; }
+.ac-rink .sclk.tired { fill: var(--ac-red); }
+@media (max-width: 600px) { .ac-rink .sclk { font-size: calc(4.4px * var(--k, 1)); } }
+.ac-cap .ac-big, .ac-big { font: 700 44px/1 var(--display); font-variant-numeric: tabular-nums; }
+.ac-meter { height: 8px; border-radius: 8px; background: var(--track); overflow: hidden; }
+.ac-meter span { display: block; height: 100%; width: 100%; background: var(--ink); border-radius: 8px; transition: width 0.3s linear; }
+
+/* A real team's lines and pairs. */
+.ac-lines { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; }
+.ac-lines .col { display: grid; gap: 10px; align-content: start; }
+.ac-unit { background: var(--ice); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; }
+.ac-unit p:last-child { font: 600 16px/1.4 var(--ui); }
+.ac-unit .sep { color: var(--ink-3); margin: 0 8px; }
+@media (max-width: 700px) { .ac-lines { grid-template-columns: minmax(0, 1fr); } }
+
+/* How a game is built: two clocks, the game timeline, the scoreboard to tap. */
+.ac-clocks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ac-clocks > div { background: var(--ice); border-radius: 14px; padding: 12px 16px; display: grid; gap: 4px; }
+.ac-clocks .ac-big { font-size: 36px; }
+svg.ac-tl { width: 100%; height: auto; display: block; overflow: visible; }
+.ac-tl .tl-per { fill: color-mix(in oklab, var(--ink) 34%, var(--sheet)); }
+.ac-tl .tl-int { fill: var(--track); }
+.ac-tl .tl-tv { fill: var(--ac-red); opacity: 0.35; }
+.ac-tl .tl-lbl { font: 600 13px var(--ui); fill: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; }
+.ac-tl .tl-head { stroke: var(--ac-red); stroke-width: 3; stroke-linecap: round; }
+@media (max-width: 600px) { .ac-tl .tl-lbl { font-size: 22px; } .ac-tl .tl-lbl:nth-of-type(even) { display: none; } }
+.ac-rink .zam rect { fill: var(--ink-2); }
+.ac-rink .zam .zam-cab { fill: var(--sheet); opacity: 0.8; }
+.ac-rink .sheen { fill: var(--ac-lit); opacity: 0; pointer-events: none; }
+.ac-sb { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px 10px; background: #0f1c2b; color: #f4f7fa; border-radius: 16px; padding: 16px; max-width: 560px; justify-self: center; width: 100%; box-sizing: border-box; }
+.ac-sb button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: 10px; padding: 8px; cursor: pointer; display: grid; justify-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.ac-sb button:hover, .ac-sb button.on { background: rgba(255, 255, 255, 0.12); }
+.ac-sb .sb-l { font: 600 11px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+.ac-sb .sb-n { font: 700 44px/1 var(--ui); }
+.ac-sb .sb-n.small { font-size: 22px; }
+.ac-sb .sb-mid { display: grid; gap: 4px; justify-items: center; }
+.ac-sb .sb-clock { font: 700 36px/1 var(--ui); color: #ffcf5a; }
+.ac-sb .sb-row { font: 700 18px var(--ui); }
+.ac-sb .sb-row.pen { color: #ffcf5a; font-size: 16px; }
+@media (max-width: 420px) { .ac-sb .sb-n { font-size: 34px; } .ac-sb .sb-clock { font-size: 28px; } .ac-sb { padding: 10px; gap: 4px; } }
+
+/* Goal or not: the goal line close up, in inches. */
+svg.ac-line { width: 100%; height: auto; display: block; border-radius: 14px; }
+.ac-line .gl-ice { fill: var(--sheet); }
+.ac-line .gl-crease { fill: var(--ac-crease); }
+.ac-line .gl-net { fill: url(#mesh); }
+.ac-line .mesh { stroke: var(--ink-3); stroke-width: 0.12; opacity: 0.5; fill: none; }
+.ac-line .gl-line { fill: var(--ac-red); }
+.ac-line .gl-lbl { font: 600 1.15px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink-3); }
+.ac-line .gl-puck circle { fill: var(--ink); stroke: var(--sheet); stroke-width: 0.15; }
+html.motion .ac-line .gl-puck { transition: transform 1.1s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.ac-line .gl-v { font: 700 2.4px var(--display); fill: var(--ink-2); }
+.ac-line .gl-v.yes { fill: var(--ac-red); }
+@media (max-width: 600px) { .ac-line .gl-lbl { font-size: 1.6px; } }
+
+/* A small table of real numbers. */
+.ac-table { width: 100%; border-collapse: collapse; font: 500 16px/1.3 var(--ui); font-variant-numeric: tabular-nums; }
+.ac-table th, .ac-table td { padding: 10px 8px; border-bottom: 1px solid var(--rule); text-align: right; }
+.ac-table thead th { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+.ac-table :is(th, td):first-child { text-align: left; }
+.ac-table :is(th, td):nth-child(2) { text-align: left; }
+.ac-table td:nth-child(2) { color: var(--ink-2); }
+.ac [hidden] { display: none !important; }
+.ac-unit a { white-space: nowrap; }

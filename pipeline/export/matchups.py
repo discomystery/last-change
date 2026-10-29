@@ -30,6 +30,7 @@ import polars as pl
 from pipeline.export.grammar import and_list
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.export import pending, wording
+from pipeline.metrics import line_order
 from pipeline.metrics import units as U
 
 OUT = SITE_DATA / "matchups"
@@ -290,7 +291,7 @@ def game(S: Season, gid: int, g: dict, recap: dict, history: dict) -> dict | Non
             return [nm(p) for p in base], False
         keep = [p for p in base if p in trio]
         new = [p for p in trio if p not in base]
-        return [nm(p) for p in new + keep], True
+        return [nm(p) for p in line_order.order(S.season, ids[h], new + keep, g.get("date"))], True  # left wing, center, right wing
 
     periods = ["all"] + (["before", "after"] if split else [])
     data = {}

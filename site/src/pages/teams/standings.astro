@@ -9,9 +9,23 @@ import TeamTabs from '../../components/TeamTabs.astro';
 import teams from '../../../public/data/teams.json';
 import { teamPaint } from '../../lib/teams';
 import '../../styles/blocks.css';
+import Section from '../../components/Section.astro';
+import { behind, pp3 } from '../../lib/behind';
 
 const paints = Object.fromEntries(teams.map((t) => [t.abbr, teamPaint(t.abbr)]));
 const anyClinch = teams.some((t: any) => t.clinch);
+// Record against play (pipeline/export/behind.py): every club with enough games, in three groups by the gap.
+const base = import.meta.env.BASE_URL;
+const BH_LO = 0.15, BH_HI = 0.85;
+const bhPos = (v: number) => Math.max(0, Math.min(100, (100 * (v - BH_LO)) / (BH_HI - BH_LO)));
+const WHY: Record<string, string> = { gk: 'Goaltending', fin: 'Shooting', en: 'Empty nets', close: 'Close games' };
+const bhRows = behind ? Object.entries(behind.teams).filter(([, t]) => t.checks).map(([abbr, t]) => ({ abbr, ...t })).sort((a, b) => b.gap - a.gap) : [];
+const bhGroups = behind ? [
+  ['Records ahead of their play', bhRows.filter((r) => r.gap >= behind!.gap)],
+  ['About where their play has them', bhRows.filter((r) => Math.abs(r.gap) < behind!.gap)],
+  ['Playing better than their record', bhRows.filter((r) => r.gap <= -behind!.gap)],
+].filter(([, rows]) => rows.length) as [string, typeof bhRows][] : [];
+const nick = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
 ---
 <Base section="teams" title="Standings" description="The full NHL standings: by division, conference, wild card or the whole league, with points percentage, regulation wins, goals, home and road records and streaks.">
   <header class="page-top"><h1>Standings</h1></header>
@@ -32,6 +46,38 @@ const anyClinch = teams.some((t: any) => t.clinch);
     The top three in each division and two wild cards in each conference make the playoffs; a line marks the cut when the table is in standings order.
     {anyClinch && ' x clinched a playoff spot, y the division, z the conference, p the Presidents’ Trophy, e eliminated.'}
   </p>
+  {bhRows.length > 0 && (
+    <Section id="record" title="Record against play" placeholder={false} takeaway="Each team’s points percentage beside what their chances at 5-on-5 and on special teams are worth, and the main reason when the two are far apart.">
+      <Fragment slot="explain">
+        <p>The dot is the record. The dotted mark is the points percentage a team with these chances usually ends up with, from every team-season of 2023-24 to 2025-26, and the bar between them is the gap. The tick is the league average.</p>
+        <p>A record {pp3(behind!.gap)} or more away from its chances gets its main reasons: goaltending or shooting that has run well above or below the chances, empty-net goals, or more than their share of one-goal and overtime results. Tested on the same seasons, a team’s chances after 15 games told us more about the rest of its season than its record did. Each team’s page has the full breakdown.</p>
+      </Fragment>
+      <div class="card bhs">
+        {bhGroups.map(([title, rows]) => (
+          <div class="bhs-group">
+            <p class="mini-h">{title}</p>
+            <ul>
+              {rows.map((r) => (
+                <li style={`--team:${paints[r.abbr]}`}>
+                  <a class="bhs-ab" href={`${base}team/${r.abbr}/#record`} data-tip={`${nick[r.abbr]}: a ${pp3(r.pp)} points percentage; their chances are worth about ${pp3(r.play)}.`}>{r.abbr}</a>
+                  <span class="bhs-lane" aria-hidden="true">
+                    <span class="bh-track"></span>
+                    <span class="bh-avg" style={`--v:${bhPos(behind!.fit.base)}`}></span>
+                    <span class="bh-gap" style={`--a:${bhPos(r.play)};--b:${bhPos(r.pp)}`}></span>
+                    <span class="bh-ref" style={`--v:${bhPos(r.play)}`}></span>
+                    <span class="bh-dot" style={`--v:${bhPos(r.pp)}`}></span>
+                  </span>
+                  <span class="bhs-gap">{r.gap > 0 ? '+' : r.gap < 0 ? '−' : ''}{pp3(Math.abs(r.gap))}</span>
+                  <span class="bhs-why">{(r.why ?? []).map((k) => <span class="chip">{WHY[k]}</span>)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <p class="bh-key"><span class="k-dot">Record</span><span class="k-ref">What their chances are worth</span><span class="k-avg">Average</span></p>
+      </div>
+    </Section>
+  )}
   <script type="application/json" id="st-teams" set:html={JSON.stringify(teams)}></script>
   <script type="application/json" id="st-paints" set:html={JSON.stringify(paints)}></script>
 </Base>
@@ -143,6 +189,24 @@ const anyClinch = teams.some((t: any) => t.clinch);
 </script>
 
 <style is:global>
+  .bhs { padding: 20px 24px; }
+  .bhs-group + .bhs-group { margin-top: 20px; }
+  .bhs .mini-h { margin: 0 0 8px; }
+  .bhs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .bhs li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) 3.4em minmax(0, 13em); gap: 12px; align-items: center; min-height: 26px; }
+  .bhs-ab { font: 700 14px var(--ui); color: var(--team); text-decoration: none; }
+  .bhs-ab:hover { text-decoration: underline; }
+  .bhs-lane { position: relative; height: 18px; margin: 0 7px; }
+  .bhs-gap { font: 600 13px var(--ui); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .bhs-why { display: flex; flex-wrap: wrap; gap: 4px; }
+  .bhs .bh-key { margin-top: 18px; }
+  @media (max-width: 620px) {
+    .bhs { padding: 16px; }
+    .bhs li { grid-template-columns: 2.8em minmax(0, 1fr) 3.2em; row-gap: 2px; }
+    .bhs-why { grid-column: 2 / -1; }
+    .bhs-why:empty { display: none; }
+  }
+
   .st-h { font: 600 22px/1.15 var(--display); margin: 30px 0 12px; }
   #st-out > .st-card:first-child { margin-top: 20px; }
   .st-card { padding: 8px 0 6px; margin-top: 12px; }
@@ -172,6 +236,14 @@ const anyClinch = teams.some((t: any) => t.clinch);
   /* The playoff cut: a firmer rule under the last team in. */
   .stbl.stand tbody tr.cut { border-bottom: 2px solid var(--ink-3); }
   .st-note { margin-top: 18px; }
+  /* Tablets standing up (iPad mini: 744 px): the full names push the last columns out of view, so they get the
+     abbreviations too, and every column fits without scrolling. */
+  @media (min-width: 720px) and (max-width: 1000px) {
+    .stbl.stand .who { width: auto; }
+    .stbl.stand th, .stbl.stand td { padding: 8px 7px; }
+    .st-tm .full { display: none; }
+    .st-tm .ab { display: inline; }
+  }
   @media (max-width: 719px) {
     .stbl.stand .rk { padding-left: 10px; width: 32px; min-width: 32px; max-width: 32px; }
     .stbl.stand .who { left: 32px; width: auto; }

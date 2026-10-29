@@ -15,8 +15,9 @@ import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
 from pipeline.export import carries
-from pipeline.ingest import careers, edge, official_stats, rosters
+from pipeline.ingest import careers, edge, names, official_stats, rosters
 from pipeline.metrics import players as rating
+from pipeline.metrics import war
 from pipeline.metrics.players import POOL_GAMES
 
 OUT = SITE_DATA / "players"
@@ -57,6 +58,21 @@ def area(x: float, y: float) -> str:
 
 
 AREAS = ["crease", "lowSlot", "netSideL", "netSideR", "highSlot", "circleL", "circleR", "behind", "cornerL", "cornerR", "outerL", "outerR", "point", "pointL", "pointR", "outside"]
+
+
+def _bio(landing: dict | None) -> dict | None:
+    """His basics from the NHL's player landing: height, weight, where he was born, his draft. None until a landing
+    saved with them (`careers.BIO_KEYS`) is on file. Birth cities use the accented spelling the NHL gives in his own
+    language, by the same rule as names; a state or province only for players born in the US or Canada."""
+    if not landing or not landing.get("bio"):
+        return None
+    country = landing.get("birthCountry")
+    out = {"ht": landing.get("heightInInches"), "cm": landing.get("heightInCentimeters"), "wt": landing.get("weightInPounds"),
+           "kg": landing.get("weightInKilograms"), "born": landing.get("birthDate"), "city": names.pick(landing.get("birthCity"), country),
+           "region": names.pick(landing.get("birthStateProvince"), country) if country in ("USA", "CAN") else None, "country": country}
+    d = landing.get("draftDetails")
+    out["draft"] = {"year": d.get("year"), "team": d.get("teamAbbrev"), "round": d.get("round"), "overall": d.get("overallPick")} if d else None
+    return {k: v for k, v in out.items() if v is not None} | {"draft": out["draft"]}
 
 
 def _seasons_frame(season: int, name: str) -> pl.DataFrame:
@@ -170,7 +186,12 @@ def run(season: int) -> int:
     lines = json.loads((SITE_DATA / "lines.json").read_text())["teams"]
     goalies = json.loads((SITE_DATA / "goalies.json").read_text())
     carried = carries.run(season, latest, lines, abbr, idle)
+    wins = war.load()["seasons"]
+    war_of = lambda pid: {k: v["players"][str(pid)] for k, v in (("now", wins.get(str(season))), ("last", wins.get(str(season - 1)))) if v and str(pid) in v["players"]} or None
     shift_table = _shift_table(season)
+    from pipeline.ingest import coaches
+    # The Role card's zone-start line names the head coach when he has run the bench all season (else the club).
+    whole_season = {t: c["coach"] for t, c in coaches.current(season).items() if c.get("coach") and not c.get("since")}
 
     # Team games played this season, and each skater's ice time rank among teammates at his position.
     team_games = pg.filter(pl.col("season") == season).group_by("team_id").agg(pl.col("game_id").n_unique().alias("n"))
@@ -254,10 +275,12 @@ def run(season: int) -> int:
         team = listed.get(pid) or abbr.get(tid)
         e_now = edge.read(season, pid) or edge.read(season - 1, pid) or {}
         bio = e_now.get("player") or {}
+        landing = (careers.read(pid) or {}).get("landing")
         if not bio.get("birthDate"):  # no tracking file yet (a player who has not dressed): his career landing has the birth date
-            bio = {**bio, "birthDate": ((careers.read(pid) or {}).get("landing") or {}).get("birthDate")}
+            bio = {**bio, "birthDate": (landing or {}).get("birthDate")}
         base = {"id": pid, "first": row["first"], "last": row["last"], "name": f'{row["first"]} {row["last"]}', "number": row["number"], "pos": row["pos"],
-                "team": team, "shoots": bio.get("shootsCatches"), "age": _age(bio.get("birthDate")), "generated_at": now_iso, "season": season,
+                "team": team, "shoots": bio.get("shootsCatches") or (landing or {}).get("shootsCatches"), "age": _age(bio.get("birthDate")),
+                "bio": _bio(landing), "generated_at": now_iso, "season": season,
                 "photo": photos.get(pid) or (f"{MUGS}/{season_id(season)}/{team}/{pid}.png" if team else None)}
         stats = {}
         for s, key in ((season, "season"), (season - 1, "last")):
@@ -286,9 +309,10 @@ def run(season: int) -> int:
                 continue
             if rec is None:
                 continue
-            base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"), "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
+            base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"),
+                     "zone_starts": {**rec["zone_starts"], "coach": whole_season.get(team)} if rec.get("zone_starts") else None, "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0), shift_table),
-                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid)}
+                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
                              for s_ in mine.select("x_norm", "y_norm", "xg", "type", "season").iter_rows(named=True)]

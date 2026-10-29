@@ -217,7 +217,11 @@ def game_lines(season: int, gu: pl.DataFrame, gid: int, team_id: int) -> list[tu
     weight = _player_weight(season, team_id, {g: len(window) - 1 - k for k, g in enumerate(window)})
     mine = gu.filter((pl.col("game_id") == gid) & (pl.col("team_id") == team_id))
     share = eleven(season, gid, team_id)
-    return [(kind, f"{tag}{i}", u) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
+    day = games["date"].max()
+    from pipeline.metrics import line_order
+    # A forward line's "unit" comes back written left wing, center, right wing (`line_order`) for the pages to list.
+    lw_c_rw = lambda kind, u: {**u, "unit": "-".join(map(str, line_order.order(season, team_id, u["unit"].split("-"), day)))} if kind == "F" else u
+    return [(kind, f"{tag}{i}", lw_c_rw(kind, u)) for kind, tag, count in (("F", "L", 4), ("D", "P", 3))
             for i, u in enumerate(_by_role(_pick(mine.filter(pl.col("kind") == kind), count, share=share and kind == "F"), weight), 1)]
 
 
@@ -953,3 +957,38 @@ def deployment_blend(season: int) -> dict[int, dict]:
     for o in out.values():
         o["blend_median"] = out_median
     return out
+
+
+@lru_cache(maxsize=4)
+def shift_starts(season: int) -> pl.DataFrame:
+    """Every 5-on-5 shift that began with a faceoff in either end (Role card, Sora 2026-10-28): one row per game,
+    team and skater with how many started in the attacking zone (`oz`) and the defensive zone (`dz`), and whether the
+    team was at home. A shift start is a skater who came on for the draw, i.e. was not on the ice just before it, so
+    it is his coach's choice; faceoffs his own play caused while he stayed out (his shot saved, an icing against him)
+    are not counted. Neutral-zone draws are left out. Tested 2024-26: the share repeats from one half of a season to
+    the other (see ZONE_MIN_STARTS)."""
+    d = TABLES / str(season)
+    games = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "home_id", "away_id")
+    fo = (pl.read_parquet(d / "events.parquet", columns=["game_id", "sec", "type", "zone", "is_home"])
+          .filter((pl.col("type") == "faceoff") & (pl.col("zone") != "N"))
+          .unique(["game_id", "sec"], keep="first")
+          .select("game_id", pl.col("sec").alias("start"), home_oz=(pl.col("zone") == "O") == pl.col("is_home")))  # zone is from the winner's side
+    st = pl.read_parquet(d / "stints.parquet").join(games.select("game_id"), on="game_id").sort("game_id", "start")
+    st = st.with_columns(
+        prev_h=pl.col("home_skaters").shift(1).over("game_id"), prev_a=pl.col("away_skaters").shift(1).over("game_id"),
+        prev_end=pl.col("end").shift(1).over("game_id"))
+    st = st.filter((pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null()).join(
+        fo, on=["game_id", "start"]).join(games, on="game_id")
+    rows = []
+    for r in st.iter_rows(named=True):
+        joined = r["prev_end"] == r["start"]
+        for side, team, oz in (("h", r["home_id"], r["home_oz"]), ("a", r["away_id"], not r["home_oz"])):
+            now = r["home_skaters" if side == "h" else "away_skaters"]
+            before = set((r[f"prev_{side}"] or []) if joined else [])
+            for p in now:
+                if p not in before:
+                    rows.append((r["game_id"], team, p, side == "h", int(oz), int(not oz)))
+    schema = {"game_id": pl.Int64, "team_id": pl.Int64, "player_id": pl.Int64, "home": pl.Boolean, "oz": pl.Int64, "dz": pl.Int64}
+    if not rows:
+        return pl.DataFrame(schema=schema)
+    return pl.DataFrame(rows, schema=schema, orient="row").group_by("game_id", "team_id", "player_id", "home").agg(pl.col("oz", "dz").sum())

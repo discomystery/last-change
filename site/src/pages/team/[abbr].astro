@@ -1,6 +1,7 @@
 ---
 import { srcInfo, srcPhrase } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
+import WorthKnowing from '../../components/WorthKnowing.astro';
 // Team page: next game, results and schedule, season trend, fingerprint, lines, special teams, goalies, goal sources.
 import Base from '../../layouts/Base.astro';
 import { teamOg } from '../../lib/og';
@@ -19,6 +20,7 @@ import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
 import { clashes, fullName, unitShort } from '../../lib/playerLinks';
+import NetUsage from '../../components/NetUsage.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import TeamStats from '../../components/TeamStats.astro';
@@ -49,6 +51,8 @@ import ShareTeam from '../../components/ShareTeam.astro';
 import ShareGoalies from '../../components/ShareGoalies.astro';
 import ShareButton from '../../components/ShareButton.astro';
 import { trendFor } from '../../lib/trend';
+import BehindRecord from '../../components/BehindRecord.astro';
+import { behind as behindData, behindFor, pp3 } from '../../lib/behind';
 
 export function getStaticPaths() {
   return teams.map((t) => ({ params: { abbr: t.abbr } }));
@@ -144,8 +148,9 @@ const srcSay = (side: SrcSide | undefined, which: 'for' | 'against') => {
   return `More than luck would explain: ${[more.length ? `more of ${whose} come from ${list(more)}` : '', fewer.length ? `${more.length ? 'fewer' : `fewer of ${whose} come`} from ${list(fewer)}` : ''].filter(Boolean).join('; ')}.`;
 };
 const trend = trendFor(abbr!);
+const bh = behindFor(abbr!);
 const hasTeamStats = statSeasons('teams').some((x) => statRows('teams', x).some((r) => r.team === abbr));
-const nav = [['next', 'Next game'], ['form', 'Results and schedule'], ...(hasTeamStats ? [['stats', 'Team stats']] : []), ...(trend ? [['trend', 'Season trend']] : []), ['style', 'Style'], ['players', 'Key players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['next', 'Next'], ['form', 'Schedule'], ...(hasTeamStats ? [['stats', 'Stats']] : []), ...(bh ? [['record', 'Record']] : []), ...(trend ? [['trend', 'Trends']] : []), ['style', 'Style'], ['players', 'Players'], ['lines', 'Lines'], ['matchups', 'Matchups'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 const _ = ordinal;
 const tiText = teamIntro(abbr)?.text ?? [];
 // The head coach from the club's latest game; a coach who took over this season says since when.
@@ -164,7 +169,6 @@ const coachSince = coach && (team as any).coach_since
         <h1>{team.name}</h1>
         <p class="rec">{team.w}-{team.l}-{team.otl}</p>
         {coach && <p class="coach">Head coach <span class="coach-name">{coach}</span>{coachSince && <span class="coach-since"> since {coachSince}</span>}</p>}
-        <a class="roster-link" href={`${base}players/#${abbr}`}>All {team.nick} players</a>
       </header>
     </div>
     <Intro text={tiText} colour={teamPaint(abbr)} class="tstory" />
@@ -184,6 +188,18 @@ const coachSince = coach && (team as any).coach_since
 
   <TeamStats abbr={abbr!} place={team.place} />
 
+  {bh && (
+    <Section id="record" title="Behind the record" placeholder={false} takeaway={`Whether ${team.place}’s record matches how they’ve played, and what makes up the difference.`}>
+      <Fragment slot="explain">
+        <p><strong>What their chances are worth.</strong> Every shot gets a chance of going in, based on where and how it was taken. Add up the chances for and against at 5-on-5 and on special teams, and you get the goal difference a team’s play would usually bring. Over every team-season from 2023-24 to 2025-26, each expected goal of difference a game was worth about {pp3(behindData!.fit.per_goal)} of points percentage, starting from {pp3(behindData!.fit.base)} for an even team. That is the dotted mark.</p>
+        <p><strong>Why it matters.</strong> Tested on the same seasons, a team’s chances after 15 games told us more about how the rest of its season would go than its record did, and records far from the chances mostly came back toward them.</p>
+        <p><strong>The parts.</strong> Goal difference splits exactly into the chances at 5-on-5, the chances on special teams, shooting (goals against the chances their shots had), goaltending (chances against minus goals allowed) and empty-net goals. Shooting and goaltending swing a lot from one stretch of a season to the next, so the sentences say what has happened, not what will.</p>
+        <p><strong>The checks.</strong> A record {pp3(behindData!.gap)} or more away from what the chances are worth gets a reason: the one or two parts that pushed it there, or more than their share of one-goal and overtime results. Shooting is called out at 4.5 goals under the chances or 6 over; goalies when one is 3 goals above expected and another 3 below; lines when one forward line has 58% or more of the 5-on-5 chances and the rest of the lineup 47% or less, or when the players beyond the top two lines are clearly winning or losing their minutes. A group counts as on the ice when two of its three forwards are.</p>
+      </Fragment>
+      <BehindRecord t={bh} colour={teamPaint(abbr!)} place={team.place} base={behindData!.fit.base} />
+    </Section>
+  )}
+
   {trend && (
     <Section id="trend" title="Season trend" placeholder={false} takeaway={`Where ${team.place} has come from, and whether this season’s team plays a new way.`}>
       <Fragment slot="explain">
@@ -197,7 +213,7 @@ const coachSince = coach && (team as any).coach_since
     </Section>
   )}
 
-  <Section id="style" title="Style fingerprint" placeholder={false} share="team" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
+  <Section id="style" title="Playing style" placeholder={false} share="team" takeaway={`How ${team.place} plays, trait by trait, against the rest of the league.`}>
     <Fragment slot="explain">
       <p class="note m-blend">Real numbers through {asOf}: {mine.games} games this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">Real numbers through {asOf}, from this season’s {mine.games} games only. Expect these to swing a lot this early, which is why the likely ranges are so wide.</p>
@@ -263,10 +279,7 @@ const coachSince = coach && (team as any).coach_since
           <span><span class="marker demo"><i style="--p:65"></i></span>How much, low to high (not good or bad)</span>
         </div>
         {ln.notes.length > 0 && (
-          <div class="card worth">
-            <p class="mini-h">Worth knowing</p>
-            <ul>{ln.notes.map((n) => <li><NoteText text={n.text} names={(n as any).names} /></li>)}</ul>
-          </div>
+          <WorthKnowing notes={ln.notes.map((n) => ({ text: n.text, names: (n as any).names }))} />
         )}
         <div class="two units2">
           {[ln.units.filter((u) => u.label[0] === 'L'), ln.units.filter((u) => u.label[0] === 'P')].map((group) => (
@@ -314,7 +327,7 @@ const coachSince = coach && (team as any).coach_since
     )}
   </Section>
 
-  <Section id="matchups" title="Who plays against whom" placeholder={false} takeaway={`Which opposing lines each ${team.place} group has actually been out against at 5-on-5.`}>
+  <Section id="matchups" title="Matchups" placeholder={false} takeaway={`Which opposing lines each ${team.place} group has actually been out against at 5-on-5.`}>
     <Fragment slot="explain">
       {mu && <p class="note">Each strip adds to 100%: it shows how one {team.place} group’s 5-on-5 time is split across the opponent’s four forward lines, numbered the same way as above. Sized by ice time, a wider box means more time against that line; even columns line the boxes up so you can compare groups straight down. At home the coach changes last and picks these matchups; on the road the other coach does. Faded rows have under ten minutes.</p>}
       {mu && <p class="note"><strong>What “with no line matching” means:</strong> if a coach just rolled his lines and took whoever was out there, each of his groups would face the opponent’s first line about as often as that line is on the ice. If opposing first lines play a third of the time against {team.place}, every {team.place} group would see them for about a third of its shifts. A number well above that means the coach is sending that group out against them on purpose; well below means he is keeping it away.</p>}
@@ -409,6 +422,7 @@ const coachSince = coach && (team as any).coach_since
     </Fragment>
     {goalies.length > 0 && (
       <>
+        <NetUsage team={abbr!} />
         <div class="pick"><span>Show</span>
           <select id="g-pick" aria-label="Goalie">{goalies.map((g) => <option value={String(g.id)}>{g.name}</option>)}</select>
           <ShareButton kind="goalie" label="Share this goalie" class="gshare" />
@@ -470,7 +484,7 @@ const coachSince = coach && (team as any).coach_since
     )}
   </Section>
 
-  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway={`How ${team.place}’s goals are scored and allowed, against the league average, and how much of any difference luck alone could explain.`}>
+  <Section id="sources" title="Goal sources" placeholder={false} takeaway={`How ${team.place}’s goals are scored and allowed, against the league average, and how much of any difference luck alone could explain.`}>
     <Fragment slot="explain">
       {how?.sources && <p class="note">Every goal counts once, in the first of these that applies: empty net, power play, shorthanded, goalie pulled, then rebound, turnover, faceoff win, and everyday play. These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last.</p>}
       {how?.sources && <p class="note">Each row has its own scale, so a small source is not squeezed against the left edge.</p>}

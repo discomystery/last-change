@@ -349,9 +349,13 @@ const base = import.meta.env.BASE_URL;
       if (!me) {
         const grid = document.getElementById('teamgrid');
         grid.replaceChildren(...teams.map((t) => {
-          const b = el('button', 'card row teambtn');
+          const b = el('button', 'card teambtn');
           b.type = 'button';
-          b.append(el('span', 'tb-abbr', t.abbr), el('span', 'tb-name', t.name));
+          // Place over nickname, so every button holds exactly two lines and the grid stays even.
+          const place = t.nick && t.name.endsWith(t.nick) ? t.name.slice(0, -t.nick.length).trim() : t.place;
+          const nm = el('span', 'tb-name');
+          nm.append(el('span', 'tb-place', place), el('span', 'tb-nick', t.nick || t.name));
+          b.append(el('span', 'tb-abbr', t.abbr), nm);
           b.addEventListener('click', () => window.lcPrefs.set('team', t.abbr));
           const li = el('li');
           li.append(b);
@@ -369,12 +373,14 @@ const base = import.meta.env.BASE_URL;
         const tickets = [];
         const last = [...mine].reverse().find((g) => g.final);
         if (last) {
-          const [ms, ts] = last.home === me ? [last.hs, last.as] : [last.as, last.hs];
-          const opp = last.home === me ? last.away : last.home;
           const head = home?.latest?.[me]?.id === last.id ? home.latest[me].head : null;
-          const sub = [`${ms > ts ? 'Beat' : 'Lost to'} ${byAbbr[opp]?.place ?? opp}.`];
-          if (head && !/ beat | roll past /.test(head)) sub.push(` ${head}.`);
-          tickets.push(window.lcTicket(last, { eyebrow: 'Last game', href: `${base}recap/${last.id}/`, sub, colour: colourOf }));
+          // The score already says who won, so just the story's headline (one line beside Next game, up to two
+          // on phones, cut with an ellipsis if longer), else the arena.
+          const line = head ?? last.venue;
+          const card = window.lcTicket(last, { eyebrow: 'Last game', href: `${base}recap/${last.id}/`, sub: line ? [line] : null, colour: colourOf });
+          const sp = card.querySelector('.tk-sub');
+          if (sp) { sp.classList.add('one'); sp.title = line; }
+          tickets.push(card);
         }
         // While the visitor's game is on (or just over), its live card sits above the two tickets.
         const on = next && L.get(next.id);
@@ -418,11 +424,21 @@ const base = import.meta.env.BASE_URL;
 <style is:global>
   #home .mine-meta { font: 600 13px var(--ui); color: var(--ink-2); margin: 24px 0 10px; }
   #home .mine-live:not([hidden]) { display: grid; gap: 6px; margin-bottom: 14px; }
-  .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 22px; }
-  .teambtn { width: 100%; display: flex; align-items: baseline; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+  .teamgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; margin-top: 22px; }
+  .teamgrid li { display: flex; }
+  .teamgrid .card.teambtn { border-radius: 14px; padding: 12px 14px; }
+  .teambtn { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
   .teambtn:hover { border-color: var(--ink); }
-  .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 46px; }
-  .tb-name { font: 400 14px var(--ui); color: var(--ink-2); }
+  .tb-abbr { font: 700 20px/1 var(--ui); letter-spacing: -0.03em; min-width: 44px; align-self: center; }
+  .tb-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .tb-place { font: 400 12.5px/1.25 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tb-nick { font: 500 14px/1.25 var(--ui); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 479px) {
+    .teamgrid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .teamgrid .card.teambtn { gap: 8px; padding: 11px 12px; }
+    .tb-abbr { font-size: 18px; min-width: 38px; }
+    .tb-nick { font-size: 13.5px; }
+  }
 
   /* Section titles use the site's label heading (Base.astro .sec-head); only the spacing is the home page's own. */
   #home .sec-head.band { margin: 52px 0 6px; }
@@ -432,7 +448,7 @@ const base = import.meta.env.BASE_URL;
 
   /* A featured game beside a condensed list */
   #home .split { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
-  @media (min-width: 820px) { #home .split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
+  @media (min-width: 900px) { #home .split { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); } }
   #home .feat { padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 12px; text-decoration: none; color: var(--ink); }
   #home a.feat:hover, #home a.row:hover { border-color: var(--ink-3); }
   #home .feat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -473,7 +489,7 @@ const base = import.meta.env.BASE_URL;
   /* Leaders */
   #home .lead-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
   /* Side by side, the two cards share rows (heading, list), so both lists start on the same line and the cards end level. */
-  @media (min-width: 820px) {
+  @media (min-width: 900px) {
     #home .lead-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; row-gap: 0; align-items: stretch; }
     #home .lead-grid > .card { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
   }

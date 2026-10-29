@@ -146,7 +146,7 @@ const srcRows = (side: 'for' | 'against', key: string) => {
 };
 const pc = (v: number, min: number, max: number) => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)).toFixed(1);
 
-const nav: [string, string][] = [['style', 'Team styles'], ['table', 'Every trait'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav: [string, string][] = [['style', 'Styles'], ['table', 'Traits'], ['lines', 'Lines'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 const _ = ordinal;
 ---
 <Base section="teams" title="Team rankings" description="All 32 NHL teams side by side: every style trait, every line, every goalie and where every team's goals come from.">
@@ -155,7 +155,7 @@ const _ = ordinal;
   <TeamTabs current="rankings" />
   <SectionNav items={nav} />
 
-  <Section id="style" title="Team styles" placeholder={false} takeaway="Every team on one scale at a time, from one end of the trait to the other.">
+  <Section id="style" title="Playing styles" placeholder={false} takeaway="Every team on one scale at a time, from one end of the trait to the other.">
     <Fragment slot="explain">
       <p class="note m-blend">Through {asOf}: {gamesRange[0]}–{gamesRange[1]} games a team this season, blended with last season. Traits that take longer to settle lean more on last season.</p>
       <p class="note m-season">Through {asOf}, from this season’s {gamesRange[0]}–{gamesRange[1]} games a team only. Expect big swings this early; the likely ranges show how big.</p>

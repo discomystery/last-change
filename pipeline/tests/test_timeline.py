@@ -43,7 +43,7 @@ def test_goals_are_told_in_order_and_runs_merge():
     gm = _game([(2, 130, False, 1, "ev"), (2, 234, False, 2, "ev"), (3, 500, True, 3, "ev"), (3, 785, True, 4, "ev"), (3, 832, False, 2, "ev")])
     out = timeline.paragraph(gm)
     assert out == ["Alex Newhook and Cole Caufield scored less than two minutes apart early in the second to put the Canadiens up 2-0.",
-                   "Adam Fox and Will Cuylle scored less than five minutes apart midway through the third to tie it 2-2, but that’s where the Rangers’ luck ran out.",
+                   "Adam Fox and Will Cuylle scored less than five minutes apart midway through the third to tie it 2-2.",  # no "luck ran out" when the go-ahead came right back
                    "Caufield struck again 47 seconds later to put the Canadiens ahead for good."]
 
 
@@ -103,3 +103,11 @@ def test_runs_stay_inside_one_period():
     gm = _game([(1, 1150, True, 3, "ev"), (2, 60, True, 4, "ev"), (2, 140, True, 5, "ev")])
     out = " ".join(timeline.paragraph(gm))
     assert "three goals" not in out and "late in the first" in out
+
+
+def test_return_rides_on_his_goal_unless_a_star():
+    base = {"kind": "return", "goals": 1, "weight": 60}
+    assert timeline.rides_on_goal(base)
+    assert not timeline.rides_on_goal({**base, "weight": 88})
+    assert not timeline.rides_on_goal({**base, "goals": 0})
+    assert not timeline.rides_on_goal({**base, "since": "2025-04-01"})

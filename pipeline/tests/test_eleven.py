@@ -2,7 +2,7 @@
 import polars as pl
 
 from pipeline.ingest import nhl_previews
-from pipeline.metrics import team_style, units
+from pipeline.metrics import line_order, team_style, units
 
 # Tampa Bay at home, 2026-10-15, by 5-on-5 time together (seconds): three separate trios, then Guentzel and Point with
 # Kucherov, who also plays on the Cirelli line. Seven defensemen: three pairs and Lilleberg rotating in.
@@ -25,6 +25,8 @@ def _tables(tmp_path, monkeypatch, n_fwd=11):
     dmen = list(range(31, 31 + 18 - n_fwd))
     pl.DataFrame([{"game_id": 1, "team_id": 14, "player_id": p, "pos": POS.get(p, "C")} for p in fwd + dmen]).write_parquet(d / "players.parquet")
     monkeypatch.setattr(units, "TABLES", tmp_path)
+    monkeypatch.setattr(line_order, "TABLES", tmp_path)
+    monkeypatch.setattr(line_order, "RAW", tmp_path / "raw")
     for f in (units.shapes, units._player_games, units._team_games):
         f.cache_clear()
 

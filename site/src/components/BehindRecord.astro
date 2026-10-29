@@ -1,0 +1,91 @@
+---
+// "Behind the record" on team pages (pipeline/export/behind.py, Sora 2026-10-27): the record against what the team's
+// chances are worth in points, the five parts of the goal difference, and the rule-based checks (shooting, goalies,
+// lines) in plain words. Shown from the team's eighth game.
+import PLink from './PLink.astro';
+import { PARTS, pp3, signed, type BehindTeam } from '../lib/behind';
+interface Props { t: BehindTeam; colour: string; place: string; base: number }
+const { t, colour, place, base } = Astro.props;
+// Record and chances on one lane: .150 to .850 covers every club this early, and the average sits at the fit's base.
+const LO = 0.15, HI = 0.85;
+const pos = (v: number) => Math.max(0, Math.min(100, (100 * (v - LO)) / (HI - LO)));
+const names = (t.names ?? []).filter((n) => n.name);
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const pattern = names.length ? new RegExp(`(${[...names].sort((a, b) => b.name.length - a.name.length).map((n) => esc(n.name)).join('|')})`) : null;
+const idOf = Object.fromEntries(names.map((n) => [n.name, n.id]));
+const split = (text: string) => (pattern ? text.split(pattern) : [text]);
+const [lead, ...rest] = t.checks ?? [];
+const tagOf: Record<string, string> = {
+  cold: 'Shooting', hot: 'Shooting', split: 'Goalies', covering: 'Goalies', costing: 'Goalies', carrying: 'Lines', depth_up: 'Lines', depth_down: 'Lines',
+};
+const parts = PARTS.map(([k, label, tip]) => ({ k, label, tip, v: t.parts[k] }));
+const max = Math.max(1, ...parts.map((p) => Math.abs(p.v)), Math.abs(t.parts.gd));
+const w = (v: number) => (50 * Math.abs(v)) / max;
+const gd = t.parts.gd;
+---
+<div class="bh" style={`--team:${colour}`}>
+  <div class="card bh-card">
+    <h3 class="bh-head">{t.head}</h3>
+    <div class="bh-lane" role="img" aria-label={`${place}: a ${pp3(t.pp)} points percentage; their chances are worth about ${pp3(t.play)}.`}>
+      <span class="bh-track"></span>
+      <span class="bh-avg" style={`--v:${pos(base)}`} data-tip={`League average: ${pp3(base)}`}></span>
+      <span class="bh-gap" style={`--a:${pos(t.play)};--b:${pos(t.pp)}`}></span>
+      <span class="bh-ref" style={`--v:${pos(t.play)}`}></span>
+      <span class="bh-dot" style={`--v:${pos(t.pp)}`}></span>
+    </div>
+    <p class="bh-key">
+      <span class="k-dot">Record <strong>{pp3(t.pp)}</strong></span>
+      <span class="k-ref term" tabindex="0" data-tip="The points percentage a team with these chances at 5-on-5 and on special teams usually ends up with, from every team-season of 2023-24 to 2025-26.">Chances worth <strong>{pp3(t.play)}</strong></span>
+      <span class="k-avg">Average</span>
+    </p>
+    {lead && <p class="bh-text">{split(lead.text).map((s, i) => (i % 2 ? <PLink id={idOf[s]} name={s} /> : s))}</p>}
+    {rest.length > 0 && (
+      <ul class="bh-checks">
+        {rest.map((c) => (
+          <li><span class="chip">{tagOf[c.kind] ?? 'Note'}</span><p>{split(c.text).map((s, i) => (i % 2 ? <PLink id={idOf[s]} name={s} /> : s))}</p></li>
+        ))}
+      </ul>
+    )}
+  </div>
+  <div class="card bh-card bh-parts">
+    <p class="mini-h">Where the goal difference comes from</p>
+    <ul class="bh-rows">
+      {parts.map((p) => (
+        <li>
+          <span class="bh-name term" tabindex="0" data-tip={p.tip}>{p.label}</span>
+          <span class="bh-bar"><i class:list={[p.v < 0 && 'neg']} style={`--w:${w(p.v)}%`}></i></span>
+          <span class="bh-v">{signed(p.v, p.k === 'en' ? 0 : 1)}</span>
+        </li>
+      ))}
+      <li class="bh-total">
+        <span class="bh-name">Goal difference</span>
+        <span class="bh-bar"><i class:list={[gd < 0 && 'neg']} style={`--w:${w(gd)}%`}></i></span>
+        <span class="bh-v">{signed(gd, 0)}</span>
+      </li>
+    </ul>
+    <p class="bh-foot">{t.gp} games. The five parts add up to the goal difference, shootouts left out.</p>
+  </div>
+</div>
+<style is:global>
+  .bh { display: grid; gap: 14px; }
+  @media (min-width: 900px) { .bh { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } }
+  .bh-card { padding: 22px 24px; }
+  .bh-head { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0 0 16px; text-wrap: balance; }
+  .bh-text { font: 400 17px/1.6 var(--body); color: var(--ink-2); margin: 18px 0 0; }
+  .bh-checks { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+  .bh-checks li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: baseline; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .bh-checks p { margin: 0; font: 400 16px/1.55 var(--body); color: var(--ink-2); }
+  @media (max-width: 520px) { .bh-checks li { grid-template-columns: 1fr; } .bh-checks .chip { justify-self: start; } }
+  .bh-parts .mini-h { margin: 0 0 14px; }
+  .bh-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .bh-rows li { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font: 500 14px/1.3 var(--ui); color: var(--ink-2); }
+  .bh-bar { position: relative; height: 12px; }
+  .bh-bar::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.25; }
+  .bh-bar i { position: absolute; top: 1px; height: 10px; border-radius: 3px; left: 50%; width: var(--w); background: var(--team); }
+  .bh-bar i.neg { left: auto; right: 50%; opacity: 0.45; }
+  .bh-v { text-align: right; font: 600 14px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bh-total { padding-top: 10px; border-top: 1px solid var(--rule); }
+  .bh-total .bh-name { color: var(--ink); font-weight: 700; }
+  .bh-foot { margin: 14px 0 0; font: 400 13px/1.45 var(--ui); color: var(--ink-3); }
+  @media (max-width: 420px) { .bh-rows li { grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr) 3em; font-size: 13px; } .bh-card { padding: 18px 16px; } }
+</style>

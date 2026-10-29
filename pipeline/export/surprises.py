@@ -24,6 +24,7 @@ Shot counts are the most common way a game strays, so they need a bigger departu
 """
 import math
 import re
+import zlib
 from functools import lru_cache
 from statistics import NormalDist
 
@@ -31,6 +32,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS
+from pipeline.export import grammar
 from pipeline.export.previews import a_pct
 from pipeline.ingest import history
 from pipeline.metrics import adjust, goalies, team_style
@@ -563,6 +565,9 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
     return [c for c in out if c is not None]
 
 
+SET_UP_XG = 0.10  # "rated low" for a goal that came off a pass (goal-tracking study, 2026-10-25)
+
+
 def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
     """A starting goalie far from what his shots were worth. He "stole one" only when he saved more goals above
     expected than his team won by, empty-net goals left out (Sora, 2026-10-12): with an average night in net they would
@@ -591,8 +596,17 @@ def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
             en = non_en[t] < goals[t]
             body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
     else:
-        head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
-        body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
+        # Most of the goals came off a pass and were rated low: credit the shooters, not blame the goalie. The chance
+        # model can't see the pass or the open man, so those goals are usually well-made plays (goal-tracking study,
+        # Sora approved 2026-10-25).
+        set_up = gl.get("_set_up", 0)
+        if set_up * 2 > gl["ga"]:
+            head = [f"{places[o]} kept finding open men against {N}", f"{places[o]} picked {N} apart"][zlib.crc32(N.encode()) % 2]
+            body = (f"{L} allowed {gl['ga']} goals on {shots}: {-gl['gsax']:.1f} more than expected, though {grammar.num(set_up)} "
+                    f"of them came off a pass that set up the shooter.")
+        else:
+            head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
+            body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
     n = every("gsax", gl["gsax"])
     body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n:,} starts."
     if n >= 100:  # a busy starter makes about 60 starts: at 1 in 100 a start, fewer than half see one in a season

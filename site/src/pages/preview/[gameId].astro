@@ -1,6 +1,7 @@
 ---
 import { srcInfo } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
+import WorthKnowing from '../../components/WorthKnowing.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
@@ -18,6 +19,7 @@ import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
 import UnitNames from '../../components/UnitNames.astro';
 import { clashes, fullName, unitShort } from '../../lib/playerLinks';
+import NetUsage from '../../components/NetUsage.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -73,6 +75,7 @@ const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T
 const colours = matchupPaint(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
+const isoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start);
 
 // Style fingerprints
@@ -103,6 +106,7 @@ const homeMu = LN[home]?.matchups?.home;
 // With a story at the top, the lineup notes move down into Lines (the faceoff note already shows in Special teams).
 const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })));
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
+const wkTeams = order.map((a) => ({ a, label: place(a), cls: `t-${side(a)}`, href: `${base}team/${a}/` }));
 
 // Special teams
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
@@ -151,7 +155,7 @@ const story = snap.story;
 type ProjSide = { lines: { id: number; name: string }[][]; pairs: { id: number; name: string }[][]; extra_d: { id: number; name: string }[]; f: number; d: number; eleven: boolean };
 const nhlLineup = ((snap as any).nhl_lineup?.teams && Object.keys((snap as any).nhl_lineup.teams).length ? (snap as any).nhl_lineup : null) as { teams: Record<string, ProjSide> } | null;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
-const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources']];
+const nav = [['watch', 'Overview'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
@@ -167,7 +171,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
+    <GameTrail id={snap.game_id} part="around" names={Object.fromEntries(order.map((a) => [a, { full: T[a]?.nick ?? full(a), rec: rec(a) }]))}><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.
@@ -195,15 +199,12 @@ import recapIndex from '../../../public/data/recaps/index.json';
       {snap.claims.map((c) => <CallCard c={c as any} side={side} />)}
     </ol>
     {!story && notes.length > 0 && (
-      <div class="card worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={notes} teams={wkTeams} />
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
 
-  <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
+  <Section id="style" title="Playing style" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">
       <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; anything that takes many games to show a real pattern leans more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
@@ -291,10 +292,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
     )}
 
     {story && lineNotes.length > 0 && (
-      <div class="card worth lines-worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{lineNotes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={lineNotes} teams={wkTeams} cls="lines-worth" />
     )}
 
     {((LN[away] as any)?.deploy || (LN[home] as any)?.deploy) && (
@@ -407,6 +405,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
         ))}
       </p>
     )}
+    <div class="nu2">{order.map((a) => <NetUsage team={a} before={isoDay} side={side(a)} title />)}</div>
     {gModes.map(([mode, words]) => (
       <div class={`gmode m-${mode}`}>
         <div class="g3">
@@ -469,7 +468,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
     ))}
   </Section>
 
-  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
+  <Section id="sources" title="Goal sources" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
     <Fragment slot="explain">
       <p class="note">These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last. Each team page shows how much luck alone can move each row.</p>
       <p class="note">Each row has its own scale, so a small source is not squeezed against the left edge.</p>
@@ -544,8 +543,8 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
-  .watch + .worth { margin-top: 16px; }
-  .lines-worth { margin: 20px 0 8px; }
+  .watch + :global(.worth) { margin-top: 16px; }
+  :global(.lines-worth) { margin: 20px 0 8px; }
   .nhl-proj { margin-bottom: 8px; }
   .proj-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .proj-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -553,6 +552,7 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .proj-rows li > span { display: flex; flex-wrap: wrap; gap: 4px 14px; }
   .proj-rows b { font: 700 12.5px var(--ui); letter-spacing: 0.05em; color: var(--ink-3); }
   .stpick { margin-top: 22px; }
+  .nu2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; margin: 14px 0 18px; }
   .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
   .projected .lbl { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 10px; }
   .projected i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 6px; }
@@ -567,6 +567,9 @@ import recapIndex from '../../../public/data/recaps/index.json';
   .st-h { display: flex; align-items: center; gap: 8px; }
   .g3 { display: grid; gap: 12px; margin-top: 18px; }
   @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
+  /* Smaller screens: the two goalies first (side by side on tablets), then the league chart that compares them (Sora, 2026-10-27). */
+  @media (max-width: 899px) { .g3 > .gmid { order: 1; } }
+  @media (min-width: 720px) and (max-width: 899px) { .g3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .g3 > .gmid { grid-column: 1 / -1; } .g3 > .gmid > :global(*) { width: 100%; max-width: 480px; margin-inline: auto; } }
   .g3 > [hidden], .gnights > [hidden], .fpc [hidden] { display: none; }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
   .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }

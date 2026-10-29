@@ -70,14 +70,14 @@ const shown = (v: string | null | undefined) => v && v !== '–';
 // Calibration scale: the favourite's chance runs from 50% up, results can fall below it.
 const LO = 30, HI = 100;
 const x = (p: number) => `${((100 * p - LO) / (HI - LO)) * 100}%`;
-const nav: [string, string][] = [['calls', 'The score'], ['kinds', 'By kind'], ['weeks', 'Week by week'], ['latest', 'Latest calls'], ['chances', 'Win chances']];
+const nav: [string, string][] = [['calls', 'Overall'], ['kinds', 'Types'], ['weeks', 'Weekly'], ['latest', 'Latest'], ['chances', 'Win chances']];
 ---
 <Base section="record" title="Track record" description="How often the previews’ calls hold up, all season, and how the win chances revealed after each game compare with the results.">
   <header class="team-top"><h1>Track record</h1></header>
   <p class="lede">Every preview makes a few calls before puck drop. After the game, each is checked by the rule written down with it. This is the running score.</p>
   <SectionNav items={nav} />
 
-  <Section id="calls" title="How the calls are doing" placeholder={false} takeaway="Every graded call this season, one puck each.">
+  <Section id="calls" title="Success rate" placeholder={false} takeaway="Every graded call this season, one puck each.">
     {n > 0 ? (
       <div class="card score">
         <div class="sc-main">

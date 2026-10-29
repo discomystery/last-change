@@ -196,6 +196,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["stats"] = stats.run(season)  # tonight's goals and assists in the season lines and the Leaders page
     from pipeline.export import ledger
     out["ledger"] = ledger.run(season)  # this season's line in each player's career ledger
+    from pipeline.export import gamelog
+    out["gamelog"] = gamelog.run(season)  # tonight's game in each player's recent games
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
 
@@ -234,7 +236,7 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 5  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 6  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
 # 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
 # 4 (2026-10-11): expected-goals model v2; earlier seasons' shots are rebuilt and re-rated

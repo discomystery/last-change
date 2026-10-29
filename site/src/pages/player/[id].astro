@@ -14,7 +14,9 @@ import Marker from '../../components/Marker.astro';
 import Histogram from '../../components/Histogram.astro';
 import Rank from '../../components/Rank.astro';
 import PlayerLoad from '../../components/PlayerLoad.astro';
+import PlayerValue from '../../components/PlayerValue.astro';
 import PlayerReport from '../../components/PlayerReport.astro';
+import PlayerGames from '../../components/PlayerGames.astro';
 import PlayerStats from '../../components/PlayerStats.astro';
 import RecordBook from '../../components/RecordBook.astro';
 import { ledgerOf } from '../../lib/ledger';
@@ -31,6 +33,7 @@ import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, mo
 import { goalieTraitInfo } from '../../lib/traits';
 import rosterData from '../../../public/data/roster.json';
 import { describe, type RosterPlayer } from '../../lib/roster';
+import { countryName, flagPath } from '../../lib/flags';
 import '../../styles/blocks.css';
 import { adjKind } from '../../lib/adjust';
 // Recorded twins read as better or worse (not more or fewer): faceoffs won, chances for and against with him on.
@@ -72,6 +75,29 @@ const words = isG ? 'goalies' : groupWord[s.group];
 const posName = posWord[p.pos] ?? p.pos;
 const shoots = p.shoots === 'L' ? (isG ? 'Catches left' : 'Shoots left') : p.shoots === 'R' ? (isG ? 'Catches right' : 'Shoots right') : null;
 const areaName = AREA_NAME;
+
+// ---- Bio line: height, weight, hand, birth, draft (from the NHL's player page; missing until it has been fetched) ----
+type Bio = { ht?: number; cm?: number; wt?: number; kg?: number; born?: string; city?: string; region?: string; country?: string; draft: { year: number; team: string; round: number; overall: number } | null };
+const bioData = p.bio as Bio | null | undefined;
+const bornDate = (iso: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`));
+const bioItems: { label: string; value: string; tip?: string; flag?: string | null; country?: string; nospell?: boolean }[] = [];
+if (bioData) {
+  const b = bioData;
+  if (b.ht) bioItems.push({ label: 'Height', value: `${Math.floor(b.ht / 12)}′${b.ht % 12}″`, tip: b.cm ? `${b.cm} cm` : undefined, nospell: true });
+  if (b.wt) bioItems.push({ label: 'Weight', value: `${b.wt} lb`, tip: b.kg ? `${b.kg} kg` : undefined, nospell: true });
+  if (shoots) bioItems.push({ label: isG ? 'Catches' : 'Shoots', value: p.shoots === 'L' ? 'Left' : 'Right' });
+  if (b.born) bioItems.push({ label: 'Born', value: `${bornDate(b.born)}${p.age ? ` (age ${p.age})` : ''}` });
+  if (b.city || b.country) {
+    // In the US and Canada the state or province names the place (the flag says the country); elsewhere, the country.
+    const where = [b.city, b.region ?? (b.country ? countryName(b.country) : null)].filter(Boolean).join(', ');
+    bioItems.push({ label: 'Birthplace', value: where, flag: b.country ? flagPath(b.country) : null, country: b.country ? countryName(b.country) : undefined });
+  }
+  const d = b.draft;
+  bioItems.push(d
+    ? { label: 'Drafted', value: `${d.year}, ${ordinal(d.overall)} overall (${d.team})`, tip: `Round ${d.round}, ${ordinal(d.overall)} pick overall, by ${(teams.find((t) => t.abbr === d.team)?.name) ?? d.team} in the ${d.year} NHL Draft.` }
+    : { label: 'Drafted', value: 'Undrafted', tip: 'Never picked in the NHL Draft.' });
+}
+const hasBio = bioItems.length > 0;
 
 // ---- Skater role sentences ----
 const role = isG ? null : s.role;
@@ -122,7 +148,7 @@ const shadeBy = (areas: Record<string, Area>) => {
   return (a: Area) => Math.sqrt(a.share / top);
 };
 const hasLine = !!ledgerOf(p.id)?.rows.length;
-const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Goalie card'], ['faced', 'Shots he faces']] : !s.traits ? [] : [['role', 'Role'], ...(p.carries ? [['carries', 'Carries']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Counted on'], ['recent', 'Recent games']] : []), ['standout', 'Stands out'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
+const nav = isG && !g ? [] : isG ? [['role', 'Role'], ['card', 'Card'], ['faced', 'Shots']] : !s.traits ? [] : [['role', 'Role'], ...((p as any).war ? [['value', 'Value']] : []), ...(p.carries ? [['carries', 'Offense']] : []), ...(cardsFor(p.id, p.team).length ? [['counted', 'Responsibilities'], ['recent', 'Recent']] : []), ['standout', 'Strengths'], ['ratings', 'Ratings'], ['shots', 'Shots'], ['edge', 'Skating']]
 // Season line: full words on wide screens, hockey's usual abbreviations on phones.
 const cols: [string, string, string?][] = [['Games', 'GP'], ['Goals', 'G'], ['Assists', 'A'], ['Points', 'P'], ['Shots', 'SOG'], ['Ice time', 'TOI', 'Average ice time per game, all situations.']];
 const statRow = (x: any) => (isG ? null : x);
@@ -138,9 +164,22 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
       {p.number !== null && <div class="pnum-box" aria-hidden="true"><span class="pnum">{p.number}</span></div>}
       <header class="team-top">
         <h1>{p.name}</h1>
-        <p class="rec">{p.number !== null && `#${p.number} · `}{posName} · <a href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
+        <p class="rec">{p.number !== null && `#${p.number} · `}{posName}<span class="rec-sep"> · </span><a class="rec-team" href={`${base}team/${p.team}/`}>{team?.name ?? p.team}</a></p>
       </header>
-      <p class="pmeta">{[shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{!isG && s.traits && <a class="pcmp" href={`${base}players/compare/#${p.id}`}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></svg><span>Compare with another player</span></a>}{unplayed && <>{(shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
+      {hasBio && (
+        <dl class="pbio">
+          {bioItems.map((x) => (
+            <div>
+              <dt>{x.label}</dt>
+              <dd data-nospell={x.nospell ? '' : undefined}>
+                {x.flag && <img class="flag" src={`${base}${x.flag}`} alt={x.country} title={x.country} width="20" height="15" loading="lazy" decoding="async" />}
+                {x.tip ? <span class="term" tabindex="0" data-tip={x.tip}>{x.value}</span> : x.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <p class:list={['pmeta', hasBio && 'links']}>{!hasBio && [shoots, p.age ? `${p.age} years old` : null].filter(Boolean).join(' · ')}{shareable && <ShareButton kind="player" label={isG ? 'Share this goalie' : 'Share this player'} class="pshare" />}{!isG && s.traits && <a class="pcmp" href={`${base}players/compare/#${p.id}`}><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></svg><span>Compare with another player</span></a>}{unplayed && <>{!hasBio && (shoots || p.age) && <br />}<span class="pout">Hasn’t played this season <span class="chip tag pout-tag" tabindex="0" data-tip={outTip}>{outTag}</span></span></>}</p>
       {!isG && hasStats && (
         <div class="pstats-in">
           <table class="pstats">
@@ -155,6 +194,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
     </div>
     <Intro text={intro?.text ?? []} next={intro?.next} nextLabel={introNext.label} nextHref={introNext.href} nextStart={introNext.start} colour={teamPaint(p.team)} class="pstory" />
     <RecordBook id={p.id} />
+    <PlayerGames p={p} goalie={isG} />
     {hasLine && <PlayerStats id={p.id} pos={p.pos} goalie={isG} />}
     <SectionNav items={nav as [string, string][]} />
 
@@ -249,6 +289,28 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   </dd>
                 </div>
               )}
+              {s.zone_starts && modes.some(([m]) => s.zone_starts![m]) && (
+                <div>
+                  <dt>Zone starts</dt>
+                  <dd>
+                    {modes.map(([m, mw]) => {
+                      const z = s.zone_starts![m];
+                      const place = team?.place ?? p.team;
+                      if (!z) return <div class={`gmode m-${m}`}><p class="n">Too few faceoff shifts with {place} yet to say.</p></div>;
+                      // This season: the head coach by name when he has run the bench all season. Blended: the club, since last season's bench may differ.
+                      const who = m === 'season' && s.zone_starts!.coach ? `${s.zone_starts!.coach} starts` : `${place} ${m === 'season' ? 'starts' : 'has started'}`;
+                      const pc = (x: number) => `${Math.round(100 * x)}%`;
+                      const split = [z.home != null && `home ${pc(z.home)}`, z.road != null && `road ${pc(z.road)}`].filter(Boolean);
+                      const tip = `Of the 5-on-5 shifts he began by coming on for a faceoff in one of the two ends, ${mw}: ${z.oz} in the offensive zone and ${z.dz} in his own (neutral-zone draws left out). Coaches send scorers out for draws in the offensive zone and trusted defensive players for draws in their own end, most of all at home, where they have the last change. It shows how he is used, not how good he is; his “Creating chances” and “Preventing chances” ratings already account for where his shifts start.`;
+                      return (
+                        <div class={`gmode m-${m}`}>
+                          <p>{who} him in the offensive zone on <strong class="term" tabindex="0" data-tip={tip}>{pc(z.share)}</strong> of his faceoff shifts{z.pct != null && <>, {compared(z.pct, 'more often than', 'less often than', groupWord[s.group], true)} <Marker pct={z.pct} tip={`${compared(z.pct, 'More offensive-zone starts than', 'Fewer offensive-zone starts than', groupWord[s.group])}, ${mw}. Not good or bad in itself: it is how his coach uses him.`} /></>}{split.length > 0 && <span class="n"> · {split.join(', ')}</span>}</p>
+                        </div>
+                      );
+                    })}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
           {role.notes.length > 0 && (
@@ -257,10 +319,11 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
         </Section>
         )}
 
+        <PlayerValue p={p} place={team?.place ?? p.team} />
         <PlayerLoad p={p} place={team?.place ?? p.team} moved={(p as Skater).moved_from ? (teams.find((t) => t.abbr === (p as Skater).moved_from)?.place ?? (p as Skater).moved_from) : undefined} />
         <PlayerReport p={p} place={team?.place ?? p.team} />
 
-        <Section id="standout" title="Where he stands out" placeholder={false} takeaway="What he does better or worse than most players at his position.">
+        <Section id="standout" title="Strengths and weaknesses" placeholder={false} takeaway="What he does better or worse than most players at his position.">
           <Fragment slot="explain">{modes.map(([m, mw]) => <p class={`note m-${m}`}>Listed only when we can be confident he is above or below average. Numbers {m === 'blend' ? 'blended with last season' : 'from this season'}, through {asOf}. Compared with {groupWord[s.group]} who have played at least {m === 'blend' ? 20 : 3} games{m === 'blend' ? ' over the two seasons' : ''}.</p>)}</Fragment>
           {modes.map(([m, mw]) => {
             const x = strengthsBy![m];
@@ -585,36 +648,62 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   .phead > :not(.pnum-box), .phead .team-top > * { position: relative; z-index: 1; }
   /* The number's frame covers the card down to the stats table's top line on phones (the whole card on computers),
      so the number stands on the same line as the photo and never runs into the table. Only its foot is clipped. */
-  .phead .pnum-box { position: relative; z-index: 0; grid-column: 1 / -1; grid-row: 1 / 4; align-self: stretch; margin: 0 -24px 0 -28px; clip-path: inset(-100vh -100vw 0 -100vw); pointer-events: none; }
+  .phead .pnum-box { position: relative; z-index: 0; grid-column: 1 / -1; grid-row: 1 / 5; align-self: stretch; margin: 0 -24px 0 -28px; clip-path: inset(-100vh -100vw 0 -100vw); pointer-events: none; }
   /* Painted under everything else in the card but above its background, big enough to fill the card's right side,
      its foot cut off by the bottom of its frame. */
   .phead .pnum { position: absolute; z-index: 0; right: 8px; bottom: -118px; font: 700 440px/1 var(--display); font-variation-settings: 'SOFT' 100, 'WONK' 0; letter-spacing: -0.04em; white-space: nowrap; color: color-mix(in oklab, var(--team) 20%, var(--sheet)); pointer-events: none; user-select: none; }
   .phead .team-top { grid-column: 1; grid-row: 1; margin-top: 26px; }
-  .phead .pmeta { grid-column: 1; grid-row: 2; }
-  .pstats-in { grid-column: 1; grid-row: 3; margin: 22px 0 16px; }
+  .phead .pbio { grid-column: 1; grid-row: 2; }
+  .phead .pmeta { grid-column: 1; grid-row: 3; }
+  .pstats-in { grid-column: 1; grid-row: 4; margin: 22px 0 16px; }
   .phead.no-stats .pmeta { padding-bottom: 26px; }
-  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 4; width: 290px; height: 290px; margin-right: 18px; }
+  .phead :global(.phead-photo) { grid-column: 2; grid-row: 1 / 5; width: 290px; height: 290px; margin-right: 18px; }
   .phead.no-stats :global(.phead-photo) { width: 210px; height: 210px; }
   .phead.no-stats .pnum { font-size: 340px; bottom: -88px; }
+  /* Tablets and narrow windows (iPad mini: 744 px standing up, up to about 960 px): the season table is too wide to sit
+     beside the photo, so it runs the full width under it, and the photo and number stand on its top line, as on phones. */
+  @media (min-width: 720px) and (max-width: 999px) {
+    .phead:not(.no-stats) .pnum-box { grid-row: 1 / 4; }
+    .phead:not(.no-stats) .pnum { font-size: 360px; bottom: -78px; }
+    .phead:not(.no-stats) :global(.phead-photo) { grid-row: 1 / 4; width: 240px; height: 240px; margin-right: 6px; }
+    .phead:not(.no-stats) .pmeta { padding-bottom: 18px; }
+    .pstats-in { grid-column: 1 / -1; grid-row: 5; margin: 0 0 12px; border-top: 1px solid var(--rule); }
+    .pstats { width: 100%; }
+  }
   @media (max-width: 719px) {
     /* Phones: the name runs the full width over the number; the photo stands on the stats table's top line. */
-    .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto; } /* the photo's extra height goes above the team line */
-    .phead .pnum-box { margin: 0 -16px; }
+    .phead { padding: 0 16px; column-gap: 8px; grid-template-rows: auto 1fr auto auto auto; } /* the photo's extra height goes above the team line */
+    .phead .pnum-box { grid-row: 1 / 4; margin: 0 -16px; } /* stands on the bio's top line, like the photo */
     .phead .pnum { font-size: 240px; right: 6px; bottom: -46px; }
     .phead .team-top { display: contents; }
     .phead h1 { grid-column: 1 / -1; grid-row: 1; margin-top: 20px; }
     .phead .rec { grid-column: 1; grid-row: 2; margin-top: 6px; align-self: end; }
+    /* The team gets a line of its own under the number and position. */
+    .rec-sep { display: none; }
+    .rec-team { display: block; }
     .phead .pmeta { grid-row: 3; padding-bottom: 18px; }
+    /* The bio runs the full width under the photo, which stands on its top line; two facts a row. */
+    .phead .pbio { grid-column: 1 / -1; grid-row: 4; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
+    .phead .pbio > div:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .phead :global(.phead-photo) { grid-row: 2 / 4; width: 112px; height: 112px; margin: 0 -6px 0 0; }
     .phead.unplayed :global(.phead-photo) { width: 140px; height: 140px; } /* the status lines make room for a bigger photo */
-    .pstats-in { grid-column: 1 / -1; grid-row: 4; margin-top: 0; border-top: 1px solid var(--rule); }
+    .pstats-in { grid-column: 1 / -1; grid-row: 5; margin-top: 0; border-top: 1px solid var(--rule); }
     .pstats { width: 100%; }
     .phead.no-stats .pmeta { padding-bottom: 22px; }
+    .phead.no-stats .pbio { padding-bottom: 22px; }
     .phead.no-stats :global(.phead-photo) { width: 112px; height: 112px; }
     .phead.no-stats .pnum { font-size: 240px; bottom: -46px; }
     .pout-tag { display: table; margin: 10px 0 0 !important; }
   }
   .pmeta { font: 400 15px var(--ui); color: var(--ink-2); margin-top: 6px; }
+  .pmeta.links { margin-top: 10px; }
+  .pmeta.links .pout { display: table; }
+  .pmeta.links :global(.pshare), .pmeta.links .pcmp:first-child { margin-left: 0; }
+  /* Bio: small caps labels over plain values, in a row that wraps. */
+  .pbio { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 14px 0 0; font: 500 15px var(--ui); color: var(--ink); }
+  .pbio dt { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px; }
+  .pbio dd { margin: 0; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .pbio .flag { flex: none; width: 20px; height: 15px; border-radius: 2px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 14%, transparent); object-fit: cover; }
   .pmeta :global(.pshare) { margin-left: 14px; vertical-align: baseline; }
   /* Compare: a quiet link beside Share, in the same style. */
   .pcmp { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; padding: 4px 2px; font: 500 14px var(--ui); color: var(--ink-2); text-decoration: underline 1px var(--rule); text-underline-offset: 5px; }
@@ -675,7 +764,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
   .sw-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 600 18px/1.2 var(--display); font-variation-settings: 'SOFT' 100; }
   .thin { opacity: 0.55; }
   .st2 { display: grid; gap: 14px; margin-top: 12px; align-items: start; }
-  @media (min-width: 820px) { .st2 { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+  @media (min-width: 720px) { .st2 { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
   .st2 .areamap { max-width: 460px; margin-inline: auto; }
   .mapcap { margin-top: 8px; text-align: center; }
   .gn-say { margin: -4px 0 18px; }
