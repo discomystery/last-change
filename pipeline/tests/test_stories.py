@@ -338,6 +338,7 @@ def test_post_game_follows_up_the_preview_storylines(monkeypatch):
         ("Hot streak", "Jackson Blake has a point in four straight games."),
         ("Milestone", "Seth Jarvis is two goals from 100."),
         ("Bad blood", "Last time these two met, there were two fights.")])
+    monkeypatch.setattr(stories, "_careers", lambda: {3: [("2026-10-01", 98, 150), ("2026-10-27", 1, 1)]})  # 99 goals after tonight
     rows = [(1, "BOS", "CAR", f"2026-10-{d:02d}", g, g) for d, g in [(1, 1), (2, 0), (3, 1), (4, 2), (5, 0), (6, 1), (7, 1), (8, 0)]]
     rows += [(2, "CAR", "BOS", f"2026-10-0{d}", 0, 1) for d in (1, 2, 3, 4)]
     rows += [(1, "BOS", "CAR", "2026-10-27", 1, 1), (2, "CAR", "BOS", "2026-10-27", 0, 0), (3, "CAR", "BOS", "2026-10-27", 1, 1)]
