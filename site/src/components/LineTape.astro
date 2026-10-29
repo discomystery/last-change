@@ -1,0 +1,398 @@
+---
+// Post-game shift tape (Sora, 2026-10-29, thread "Design post-game line matchup visuals"; she picked the tape with
+// goal cards and one player's night as taps). Every line and pair is a row in game time with its 5-on-5 shifts, both
+// teams on one axis, the power plays shaded and the goals cut across, as in the flow chart's "Show every shift". Tap a
+// goal: the two fives on the ice, how strong each was coming into the season, and whether the stronger one scored.
+// Tap a row: that group's time against each of the other team's lines and pairs as the site's split strips, with the
+// chances and goals. Below it, "Follow [player] through the game": his ice time at each strength, every shift with the
+// goals for and against, who he played with and who he played against.
+// Drawn in the browser from data/flow/{id}.json (pipeline/export/flow.py), fetched when the fold opens: the shifts give
+// who was on the ice at every moment, `r` each skater's 5-on-5 rating coming into the season, `cuts` the league's
+// quintiles for a trio, a pair and a five (pips). Group strength is never tuned to the result: ratings stop at the end
+// of last season.
+interface Props { id: number; away: string; home: string; awayPlace: string; homePlace: string }
+const { id, away, home, awayPlace, homePlace } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<div class="ltape" id="ltape" data-src={`${base}data/flow/${id}.json`} data-abbr={`${away},${home}`} data-place={`${awayPlace}|${homePlace}`} data-base={base}>
+  <div class="pick lt-pick"><span>Show the shifts over</span><select id="lt-when" aria-label="Part of the game"><option value="0">the whole game</option><option value="1">the first period</option><option value="2">the second period</option><option value="3">the third period</option><option value="4" hidden>overtime</option></select></div>
+  <div class="card lt-card">
+    <div class="lt-chart" id="lt-chart"><p class="lt-wait">Loading the shifts…</p></div>
+    <p class="lt-key"><span><i class="lt-k bar"></i>5-on-5 shifts</span><span><i class="lt-k pp"></i>Shaded = power play</span><span><i class="lt-k goal"></i>Goal</span><span class="term" tabindex="0" data-tip="How strong a line, pair or five is, from its players’ 5-on-5 ratings coming into the season (chances created plus chances prevented). More filled means stronger than more of the groups that have played at 5-on-5 this season. Players new to the NHL count as average.">Pips: how strong a group is</span></p>
+    <div class="lt-cap" id="lt-cap" aria-live="polite"></div>
+  </div>
+  <div class="pick lt-pick lt-pick2"><span>Follow</span><select id="lt-who" aria-label="Player"></select><span>through the game</span></div>
+  <div class="card lt-pl" id="lt-pl"></div>
+</div>
+
+<script>
+  type Sk = { id: number; n: string; h: number; grp: string; s: number[]; r?: number };
+  type Seg = { s: number; e: number; dur: number; str: string; on: number[][]; F: (string | null)[]; P: (string | null)[] };
+  type Shot = { t: number; h: number; xg: number; goal: boolean; who: number; en: boolean; seg?: Seg; score?: number[] };
+  const root = document.getElementById('ltape');
+  if (root) {
+    const ABBR = root.dataset.abbr!.split(','), PLACE = root.dataset.place!.split('|'), BASE = root.dataset.base!;
+    const SIDE = ['t-away', 't-home'];
+    const LAB = ['L1', 'L2', 'L3', 'L4', 'P1', 'P2', 'P3'];
+    const PER = ['', '1st', '2nd', '3rd', 'OT'];
+    const PIPWORD = ['', 'weaker than most', 'below average', 'about average', 'above average', 'stronger than most'];
+    const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+    const per = (t: number) => Math.min(4, Math.floor(Math.max(t - 1, 0) / 1200) + 1);
+    const when = (t: number) => `${clock(t - (per(t) - 1) * 1200)} of the ${PER[per(t)] === 'OT' ? 'overtime' : PER[per(t)]}`;
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const poss = (p: string) => (p.endsWith('s') ? `${p}’` : `${p}’s`);
+    const an = (n: number) => (/^(8|11|18)/.test(String(n)) ? 'an' : 'a');
+    const vb = (p: string) => (p.startsWith('NY ') ? 'lead' : 'leads');
+    let D: any = null, P = new Map<number, Sk>(), sets: Record<string, Set<number>>[] = [{}, {}], segs: Seg[] = [], shots: Shot[] = [], goals: Shot[] = [], END = 3600;
+    let sel: { type: 'goal'; i: number } | { type: 'row'; k: number; lab: string } | null = null;
+
+    const isD = (id: number) => { const g = P.get(id)?.grp ?? ''; return g[0] === 'P' || g === 'XD'; };
+    const link = (id: number) => `<a class="plink" href="${BASE}player/${id}/">${esc(P.get(id)?.n ?? '?')}</a>`;
+    function labelOf(k: number, ids: number[], kind: 'L' | 'P') {
+      let best: string | null = null, n = 0;
+      for (const [lab, mem] of Object.entries(sets[k])) {
+        if (lab[0] !== kind) continue;
+        const c = ids.filter((i) => mem.has(i)).length;
+        if (c > n) { best = lab; n = c; }
+      }
+      return n >= (kind === 'L' ? 2 : 1) ? best : null;
+    }
+    const sideStr = (str: string, h: number) => (str === '5v5' ? 'ev' : str === `PP${h}` ? 'pp' : str === `PP${1 - h}` ? 'pk' : 'oth');
+    const rate = (ids: number[]) => ids.reduce((a, i) => a + (P.get(i)?.r ?? 0), 0);
+    const pipsOf = (v: number, cuts: number[]) => 1 + cuts.filter((c) => v > c).length;
+    const members = (k: number, lab: string) => D.players.filter((p: Sk) => sets[k][lab]?.has(p.id)) as Sk[];
+    const groupPips = (k: number, lab: string) => pipsOf(rate(members(k, lab).map((p) => p.id)), lab[0] === 'L' ? D.cuts.trio : D.cuts.pair);
+    const pips = (n: number, what: string) => {
+      const tip = `${what}: ${PIPWORD[n]}, by its players’ 5-on-5 ratings coming into the season`;
+      return `<span class="pips" role="img" tabindex="0" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+    };
+    const names = (k: number, lab: string) => members(k, lab).map((p) => esc(p.n)).join(' · ');
+    const CH = '<span class="term" tabindex="0" data-tip="Chances for and against while they were on the ice at 5-on-5, in expected goals: how many goals shots like those usually produce.">Chances</span>';
+    const how = (sec: number, xf: number, xa: number, gf: number, ga: number, tail = 'at 5-on-5') =>
+      `<strong>${clock(sec)}</strong> ${tail} · ${CH} <strong>${xf.toFixed(1)}–${xa.toFixed(1)}</strong>${gf || ga ? ` · Goals <strong>${gf}–${ga}</strong>` : ''}`;
+
+    // Who was on the ice at every moment, from the merged shifts: cut the game at every change.
+    function build() {
+      P = new Map(D.players.map((p: Sk) => [p.id, p]));
+      sets = [{}, {}];
+      for (const p of D.players as Sk[]) if (/^[LP]\d$/.test(p.grp)) (sets[p.h][p.grp] ??= new Set()).add(p.id);
+      const cuts = new Set<number>([0]);
+      const spans = (s: number[]) => { const out: [number, number][] = []; for (let i = 0; i < s.length; i += 2) out.push([s[i], s[i + 1]]); return out; };
+      const sk = (D.players as Sk[]).map((p) => ({ p, sp: spans(p.s) }));
+      const gk = (D.goalies as Sk[]).map((p) => ({ p, sp: spans(p.s) }));
+      for (const x of [...sk, ...gk]) for (const [a, b] of x.sp) { cuts.add(a); cuts.add(b); }
+      const ts = [...cuts].sort((a, b) => a - b);
+      END = Math.max(D.len, ts[ts.length - 1]);
+      segs = [];
+      for (let i = 0; i < ts.length - 1; i++) {
+        const s = ts[i], e = ts[i + 1];
+        if (e <= s) continue;
+        const on: number[][] = [[], []], g = [false, false];
+        for (const { p, sp } of sk) if (sp.some(([a, b]) => a <= s && e <= b)) on[p.h].push(p.id);
+        for (const { p, sp } of gk) if (sp.some(([a, b]) => a <= s && e <= b)) g[p.h] = true;
+        const str = !g[0] || !g[1] ? 'EN' : on[0].length === on[1].length ? `${on[0].length}v${on[1].length}` : `PP${on[1].length > on[0].length ? 1 : 0}`;
+        segs.push({ s, e, dur: e - s, str, on, F: [0, 1].map((k) => labelOf(k, on[k].filter((x) => !isD(x)), 'L')), P: [0, 1].map((k) => labelOf(k, on[k].filter(isD), 'P')) });
+      }
+      const segAt = (t: number) => segs.find((g) => g.s < t && t <= g.e) ?? segs.find((g) => g.s <= t && t < g.e);
+      shots = D.shots.map((s: any[]) => ({ t: s[0], h: s[1], xg: s[2], goal: !!s[3], who: s[6], en: !!s[7], seg: segAt(s[0]) }));
+      let sc = [0, 0];
+      goals = shots.filter((s) => s.goal && s.seg).map((g) => { sc = [...sc]; sc[g.h]++; return { ...g, score: sc }; });
+      (document.querySelector('#lt-when option[value="4"]') as HTMLOptionElement).hidden = END <= 3600;
+    }
+
+    // ---- the tape ----
+    const chart = document.getElementById('lt-chart')!, cap = document.getElementById('lt-cap')!;
+    type Iv = { s: number; e: number };
+    let rows: Record<string, Iv[]>[] = [{}, {}], ppBands: Iv[][] = [[], []];
+    function intervals() {
+      rows = [{}, {}]; ppBands = [[], []];
+      const push = (list: Iv[], s: number, e: number) => { const last = list[list.length - 1]; if (last && last.e === s) last.e = e; else list.push({ s, e }); };
+      for (const g of segs) for (const k of [0, 1]) {
+        if (g.str === '5v5') for (const lab of [g.F[k], g.P[k]]) if (lab) push(rows[k][lab] ??= [], g.s, g.e);
+        if (sideStr(g.str, k) === 'pp') push(ppBands[k], g.s, g.e);
+      }
+    }
+    const range = (): [number, number] => {
+      const v = +(document.getElementById('lt-when') as HTMLSelectElement).value;
+      return v === 0 ? [0, END] : [(v - 1) * 1200, v === 4 ? END : v * 1200];
+    };
+    function lit(k: number, lab: string) {
+      if (!sel) return true;
+      if (sel.type === 'goal') { const g = goals[sel.i].seg!; return g.F[k] === lab || g.P[k] === lab; }
+      return sel.k !== k || sel.lab === lab;
+    }
+    function draw() {
+      const W = chart.clientWidth, wide = W > 640;
+      const [t0, t1] = range();
+      const LW = wide ? 272 : 0, RH = wide ? 12 : 10, NAME = wide ? 0 : 20, STEP = wide ? 20 : NAME + RH + 10, SPLIT = 10, TEAM = 26, HD = 20, GB = 22;
+      const x = (t: number) => LW + ((Math.min(Math.max(t, t0), t1) - t0) / (t1 - t0)) * (W - LW);
+      const block = (k: number) => HD + GB + k * (TEAM + 7 * STEP + SPLIT + 14);
+      const rowY = (k: number, i: number) => block(k) + TEAM + i * STEP + (i >= 4 ? SPLIT : 0) + NAME;
+      const H = block(2) - 14;
+      let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Every line and pair’s 5-on-5 shifts through the game, with the goals">`;
+      for (const k of [0, 1]) for (const b of ppBands[k]) if (b.e > t0 && b.s < t1)
+        s += `<rect class="lt-ppb ${SIDE[k]}" x="${x(b.s).toFixed(1)}" y="${block(k) + TEAM - 6}" width="${Math.max(2, x(b.e) - x(b.s)).toFixed(1)}" height="${7 * STEP + SPLIT + 4}"/>`;
+      // A picked row: the moments it was out, as a column over the other team.
+      if (sel?.type === 'row') for (const iv of rows[sel.k][sel.lab] ?? []) if (iv.e > t0 && iv.s < t1)
+        s += `<rect class="lt-col" x="${x(iv.s).toFixed(1)}" y="${block(1 - sel.k) + TEAM - 6}" width="${Math.max(1, x(iv.e) - x(iv.s)).toFixed(1)}" height="${7 * STEP + SPLIT + 4}"/>`;
+      // Period ends as the rink's lines, as in the flow chart.
+      for (const [t, c] of [[1200, 'blue'], [2400, 'red'], [3600, 'blue']] as const) if (t > t0 && t < t1 && t < END)
+        s += `<line x1="${x(t)}" x2="${x(t)}" y1="${HD}" y2="${H}" stroke="var(--line-${c})" stroke-width="3"/>`;
+      for (const k of [0, 1]) LAB.forEach((lab, i) => {
+        const y = rowY(k, i), on = sel?.type === 'row' && sel.k === k && sel.lab === lab;
+        s += `<g class="lt-row ${SIDE[k]}${lit(k, lab) ? '' : ' dim'}${on ? ' on' : ''}" data-k="${k}" data-lab="${lab}" tabindex="0" role="button" aria-label="${esc(`${PLACE[k]} ${lab}: ${names(k, lab)}`)}">`;
+        s += `<rect class="lt-hit" x="0" y="${y - NAME - 4}" width="${W}" height="${STEP}"/><rect class="lt-track" x="${LW}" y="${y}" width="${W - LW}" height="${RH}" rx="2"/>`;
+        for (const iv of rows[k][lab] ?? []) if (iv.e > t0 && iv.s < t1) s += `<rect class="lt-bar" x="${x(iv.s).toFixed(1)}" y="${y}" width="${Math.max(1, x(iv.e) - x(iv.s)).toFixed(1)}" height="${RH}" rx="1.5"/>`;
+        s += '</g>';
+      });
+      goals.forEach((g, i) => {
+        if (g.t < t0 || g.t > t1) return;
+        const gx = x(g.t).toFixed(1), on = sel?.type === 'goal' && sel.i === i;
+        const tip = `${P.get(g.who)?.n ?? ''}, ${when(g.t)}. ${ABBR[0]} ${g.score![0]}, ${ABBR[1]} ${g.score![1]}.`;
+        s += `<g class="lt-goal ${SIDE[g.h]}${on ? ' on' : ''}${sel && !on ? ' dim' : ''}" data-g="${i}" tabindex="0" role="button" aria-label="${esc(`Goal, ${PLACE[g.h]}: ${tip}`)}" data-tip="${esc(tip)}">`;
+        s += `<rect class="lt-hit" x="${+gx - 9}" y="${HD}" width="18" height="${H - HD}"/><line x1="${gx}" x2="${gx}" y1="${HD + GB / 2}" y2="${H}"/><circle cx="${gx}" cy="${HD + GB / 2}" r="6"/></g>`;
+      });
+      for (let p = 1; p <= (END > 3600 ? 4 : 3); p++) {
+        const a = (p - 1) * 1200, b = p === 4 ? END : p * 1200;
+        if (b <= t0 || a >= t1) continue;
+        s += `<text class="lt-ax" x="${x(Math.max(a, t0)) + (a > t0 ? 6 : 0)}" y="12">${p === 4 ? 'OT' : wide || t1 - t0 < 1300 ? `${PER[p]} period` : PER[p]}</text>`;
+      }
+      if (t1 - t0 <= 1300) for (let m = t0 + 300; m < t1; m += 300) s += `<text class="lt-ax lt-min" x="${x(m)}" y="12" text-anchor="middle">${clock(m - t0)}</text>`;
+      s += '</svg>';
+      let html = '';
+      for (const k of [0, 1]) {
+        html += `<p class="lt-team ${SIDE[k]}" style="top:${block(k) + 2}px"><i class="lt-dot"></i>${esc(PLACE[k])}</p>`;
+        LAB.forEach((lab, i) => {
+          const y = rowY(k, i);
+          html += `<p class="lt-lbl${wide ? '' : ' narrow'}${lit(k, lab) ? '' : ' dim'}" style="top:${wide ? y + RH / 2 : y - NAME - 1}px;width:${wide ? LW - 12 : W}px"><b>${lab}</b><span class="lt-names">${names(k, lab)}</span>${pips(groupPips(k, lab), `${poss(PLACE[k])} ${lab}`)}</p>`;
+        });
+      }
+      chart.innerHTML = `<div class="lt-wrap" style="height:${H}px">${s}${html}</div>`;
+      chart.querySelectorAll<SVGGElement>('.lt-goal').forEach((el) => on(el, () => pick({ type: 'goal', i: +el.dataset.g! })));
+      chart.querySelectorAll<SVGGElement>('.lt-row').forEach((el) => on(el, () => pick({ type: 'row', k: +el.dataset.k!, lab: el.dataset.lab! })));
+    }
+    const on = (el: Element, f: () => void) => {
+      el.addEventListener('click', f);
+      el.addEventListener('keydown', (e) => { const k = (e as KeyboardEvent).key; if (k === 'Enter' || k === ' ') { e.preventDefault(); f(); } });
+    };
+    function pick(s: typeof sel) {
+      sel = sel && s && JSON.stringify(sel) === JSON.stringify(s) ? null : s;
+      draw(); caption();
+    }
+
+    // ---- what a group did at 5-on-5, against each of the other team's lines and pairs ----
+    type Acc = { sec: number; xf: number; xa: number; gf: number; ga: number };
+    const acc = (): Acc => ({ sec: 0, xf: 0, xa: 0, gf: 0, ga: 0 });
+    function against(k: number, test: (g: Seg) => boolean) {
+      const all = acc(), vs: Record<string, Acc> = {};
+      const keys = (g: Seg) => [g.F[1 - k] ?? 'xF', g.P[1 - k] ?? 'xD'];
+      for (const g of segs) if (g.str === '5v5' && test(g)) { all.sec += g.dur; for (const key of keys(g)) (vs[key] ??= acc()).sec += g.dur; }
+      for (const sh of shots) if (sh.seg?.str === '5v5' && test(sh.seg)) for (const a of [all, ...keys(sh.seg).map((key) => (vs[key] ??= acc()))]) {
+        if (sh.h === k) { a.xf += sh.xg; a.gf += +sh.goal; } else { a.xa += sh.xg; a.ga += +sh.goal; }
+      }
+      return { all, vs };
+    }
+    // The site's split strip: one box per opposing line (or pair), sized by the share of this group's time against it.
+    function strip(k: number, vs: Record<string, Acc>, kind: 'L' | 'P', who: string) {
+      const o = 1 - k, labs = kind === 'L' ? ['L1', 'L2', 'L3', 'L4'] : ['P1', 'P2', 'P3'];
+      const set = labs.reduce((t, l) => t + (vs[l]?.sec ?? 0), 0), mixed = vs[kind === 'L' ? 'xF' : 'xD']?.sec ?? 0;
+      if (!set) return '';
+      const boxes = labs.map((l) => {
+        const v = vs[l] ?? acc(), p = Math.round((100 * v.sec) / set);
+        const tip = `${who} spent ${clock(v.sec)} at 5-on-5 against ${poss(PLACE[o])} ${l} (${names(o, l)}), ${p}% of that time. Chances ${v.xf.toFixed(2)}–${v.xa.toFixed(2)}${v.gf || v.ga ? `, goals ${v.gf}–${v.ga}` : ''}.`;
+        return `<span class="${p >= 46 ? 'hot hotter' : p >= 36 ? 'hot' : ''}" style="--f:${Math.max(p, 1)};--h:${p}" tabindex="0" data-tip="${esc(tip)}"><i>${l}${v.gf || v.ga ? ` · ${v.gf}–${v.ga}` : ''}</i>${p}%</span>`;
+      }).join('');
+      return `<p class="mini-h lt-sh">Against ${poss(PLACE[o])} ${kind === 'L' ? 'forward lines' : 'defense pairs'}</p><div class="strip">${boxes}</div>${mixed >= 30 ? `<p class="lt-mixed">Plus ${clock(mixed)} against mixed ${kind === 'L' ? 'lines' : 'pairs'}.</p>` : ''}`;
+    }
+
+    function fiveBox(g: Shot, k: number) {
+      const seg = g.seg!, ids = seg.on[k], kind = sideStr(seg.str, k);
+      const tag = kind === 'pp' ? 'Power play' : kind === 'pk' ? 'Penalty kill' : seg.str === '3v3' ? '3-on-3' : seg.str === 'EN' ? (ids.length > 5 ? 'Extra attacker' : 'Empty net') : `${seg.F[k] ?? 'Mixed line'} + ${seg.P[k] ?? 'mixed pair'}`;
+      const even = ['5v5', '4v4', '3v3'].includes(seg.str);
+      const f = ids.filter((x) => !isD(x)).map(link).join(' · '), d = ids.filter(isD).map(link).join(' · ');
+      return `<div class="lt-five ${SIDE[k]}${k === g.h ? ' sc' : ''}"><p class="lt-fh"><i class="lt-dot"></i><b>${esc(PLACE[k])}</b><span>${tag}</span>${even ? pips(pipsOf(rate(ids), D.cuts.five), `${poss(PLACE[k])} five`) : ''}</p><p class="lt-fn">${f}</p>${d ? `<p class="lt-fn lt-d">${d}</p>` : ''}</div>`;
+    }
+    const gapOf = (g: Shot) => rate(g.seg!.on[g.h]) - rate(g.seg!.on[1 - g.h]);
+    const evenGoal = (g: Shot) => ['5v5', '4v4', '3v3'].includes(g.seg!.str);
+    function goalCard(g: Shot) {
+      const [a, h] = g.score!, hi = a > h ? 0 : 1, tied = a === h;
+      const state = tied ? `It’s tied ${a}–${h}.` : `${PLACE[hi]} ${g.t > 3600 ? (PLACE[hi].startsWith('NY ') ? 'win' : 'wins') : vb(PLACE[hi])} ${Math.max(a, h)}–${Math.min(a, h)}.`;
+      const kind = sideStr(g.seg!.str, g.h);
+      const strW = kind === 'pp' ? 'Power play' : kind === 'pk' ? 'Shorthanded' : g.seg!.str === 'EN' ? (g.en ? 'Empty net' : 'Extra attacker') : g.seg!.str.replace('v', '-on-');
+      let verdict = '';
+      if (evenGoal(g)) { const gap = gapOf(g); verdict = gap <= -0.35 ? 'Scored against a stronger group' : gap >= 0.35 ? 'The stronger group scored' : 'Evenly matched'; }
+      const pct = Math.round(g.xg * 100);
+      return `<div class="lt-gh"><span class="lt-score">${a}–${h}</span><p class="mini-h"><i class="lt-dot ${SIDE[g.h]}"></i>${esc(PLACE[g.h])} goal · ${when(g.t)}</p><span class="chip phrase">${strW}</span>${verdict ? `<span class="chip phrase">${verdict}</span>` : ''}</div>
+        <p class="lt-say">${link(g.who)} scored on ${an(pct)} ${pct}% chance. ${state}</p>
+        <div class="lt-fives">${fiveBox(g, g.h)}${fiveBox(g, 1 - g.h)}</div>`;
+    }
+    function caption() {
+      if (!sel) {
+        const big = goals.map((g, i) => ({ g, i })).filter(({ g }) => evenGoal(g)).sort((x, y) => gapOf(x.g) - gapOf(y.g))[0];
+        cap.innerHTML = `<p class="lt-hint">Tap a goal to see who was on the ice for it, or a row to see who that group played against.${big && gapOf(big.g) <= -0.35 ? ` The biggest mismatch: <button type="button" class="lt-jump" data-g="${big.i}">${esc(poss(PLACE[big.g.h]))} goal at ${when(big.g.t)}</button>.` : ''}</p>`;
+        const b = cap.querySelector<HTMLButtonElement>('.lt-jump');
+        if (b) on(b, () => pick({ type: 'goal', i: +b.dataset.g! }));
+        return;
+      }
+      if (sel.type === 'goal') { cap.innerHTML = goalCard(goals[sel.i]); return; }
+      const { k, lab } = sel, r = against(k, (g) => (lab[0] === 'L' ? g.F[k] : g.P[k]) === lab), who = `${poss(PLACE[k])} ${lab}`;
+      cap.innerHTML = `<div class="lt-grp ${SIDE[k]}"><p class="lt-fh"><i class="lt-dot"></i><b>${esc(who)}</b><span>${members(k, lab).map((p) => link(p.id)).join(' · ')}</span>${pips(groupPips(k, lab), who)}</p>
+        <p class="how lt-how">${how(r.all.sec, r.all.xf, r.all.xa, r.all.gf, r.all.ga)}</p>
+        <div class="lt-strips">${strip(k, r.vs, 'L', who)}${strip(k, r.vs, 'P', who)}</div>
+        <p class="note">Each box is a share of this group’s 5-on-5 time against the other team’s set lines or pairs; darker means more. Goals for and against appear beside the label.</p></div>`;
+    }
+
+    // ---- one player through the game ----
+    const who = document.getElementById('lt-who') as HTMLSelectElement, pl = document.getElementById('lt-pl')!;
+    const toi = (id: number) => segs.reduce((a, g) => a + (g.on[P.get(id)!.h].includes(id) ? g.dur : 0), 0);
+    function fillWho() {
+      const order = (g: string) => (/^[LP]\d$/.test(g) ? LAB.indexOf(g) : g === 'XF' ? 3.5 : 6.5);
+      who.innerHTML = [0, 1].map((k) => `<optgroup label="${esc(PLACE[k])}">${(D.players as Sk[]).filter((p) => p.h === k).sort((a, b) => order(a.grp) - order(b.grp) || toi(b.id) - toi(a.id))
+        .map((p) => `<option value="${p.id}">${esc(p.n)}${/^[LP]\d$/.test(p.grp) ? ` (${p.grp})` : ''}</option>`).join('')}</optgroup>`).join('');
+      // Opens on the most-used skater on the wrong end of the biggest mismatch, if there was one.
+      const big = goals.filter(evenGoal).sort((x, y) => gapOf(x) - gapOf(y))[0];
+      if (big) who.value = String([...big.seg!.on[1 - big.h]].sort((a, b) => toi(b) - toi(a))[0]);
+    }
+    function player() {
+      const id = +who.value, p = P.get(id)!, k = p.h, me = (g: Seg) => g.on[k].includes(id), mine = SIDE[k];
+      const t: Record<string, number> = { ev: 0, pp: 0, pk: 0, oth: 0 };
+      for (const g of segs) if (me(g)) t[sideStr(g.str, k)] += g.dur;
+      const tot = t.ev + t.pp + t.pk + t.oth;
+      const parts = ([['ev', '5-on-5'], ['pp', 'power play'], ['pk', 'penalty kill'], ['oth', 'other']] as const).filter(([key]) => t[key] >= 1);
+      // Every shift, shaded by strength like the split bar; goals for above the shifts, against below.
+      const W = pl.clientWidth - 36, Hs = 66, y0 = 22, bh = 20;
+      const x = (s: number) => (s / END) * W;
+      let svg = `<svg class="${mine}" viewBox="0 0 ${W} ${Hs}" width="${W}" height="${Hs}" role="img" aria-label="${esc(`${p.n}’s shifts through the game`)}"><rect class="lt-track" x="0" y="${y0}" width="${W}" height="${bh}" rx="2"/>`;
+      for (const [tt, c] of [[1200, 'blue'], [2400, 'red'], [3600, 'blue']] as const) if (tt < END) svg += `<line x1="${x(tt)}" x2="${x(tt)}" y1="4" y2="${Hs - 4}" stroke="var(--line-${c})" stroke-width="3"/>`;
+      const runs: { s: number; e: number; kind: string }[] = [];
+      for (const g of segs) if (me(g)) { const kind = sideStr(g.str, k), last = runs[runs.length - 1]; if (last && last.e === g.s && last.kind === kind) last.e = g.e; else runs.push({ s: g.s, e: g.e, kind }); }
+      for (const r of runs) svg += `<rect class="lt-shift ${r.kind}" x="${x(r.s).toFixed(1)}" y="${y0}" width="${Math.max(1, x(r.e) - x(r.s)).toFixed(1)}" height="${bh}" rx="1.5"/>`;
+      for (const g of goals) if (me(g.seg!)) {
+        const up = g.h === k, tip = `${up ? 'Goal for' : 'Goal against'}: ${P.get(g.who)?.n ?? ''}, ${when(g.t)}`;
+        svg += `<circle class="lt-pg ${SIDE[g.h]}" cx="${x(g.t).toFixed(1)}" cy="${up ? y0 - 10 : y0 + bh + 10}" r="6" tabindex="0" data-tip="${esc(tip)}" aria-label="${esc(tip)}"/>`;
+      }
+      svg += '</svg>';
+      // With whom: his forward linemates (or his partner), and the pair behind him (or the line in front of him).
+      const mates: Record<string, Acc> = {}, other: Record<string, Acc> = {};
+      const kM = (g: Seg) => g.on[k].filter((y) => y !== id && isD(y) === isD(id)).sort().join('-'), kO = (g: Seg) => (isD(id) ? g.F[k] : g.P[k]) ?? 'x';
+      for (const g of segs) if (me(g) && g.str === '5v5') { (mates[kM(g)] ??= acc()).sec += g.dur; (other[kO(g)] ??= acc()).sec += g.dur; }
+      for (const sh of shots) if (sh.seg && me(sh.seg) && sh.seg.str === '5v5') for (const a of [mates[kM(sh.seg)], other[kO(sh.seg)]]) {
+        if (sh.h === k) { a.xf += sh.xg; a.gf += +sh.goal; } else { a.xa += sh.xg; a.ga += +sh.goal; }
+      }
+      const list = (m: Record<string, Acc>, label: (key: string) => string) => Object.entries(m).filter(([, v]) => v.sec >= 30).sort((a, b) => b[1].sec - a[1].sec).slice(0, 3)
+        .map(([key, v]) => `<li class="${v.sec < 60 ? 'thin' : ''}"><span class="lt-with">${label(key)}</span><span class="how">${how(v.sec, v.xf, v.xa, v.gf, v.ga, '')}</span></li>`).join('');
+      const withM = list(mates, (key) => (key ? key.split('-').map((y) => link(+y)).join(' · ') : 'Mixed'));
+      const withO = list(other, (key) => (/^[LP]\d$/.test(key) ? `<b>${key}</b> ${names(k, key)}` : 'Mixed'));
+      const r = against(k, me);
+      pl.innerHTML = `<p class="how lt-how">${clock(tot)} on the ice · ${how(r.all.sec, r.all.xf, r.all.xa, r.all.gf, r.all.ga)}</p>
+        <div class="nsplit ${mine} lt-split"><div class="ns-bar">${parts.map(([key, w]) => `<span class="lt-s-${key}" style="flex-grow:${t[key]}" tabindex="0" data-tip="${clock(t[key])} ${w === 'other' ? 'at other strengths: 4-on-4, 3-on-3 or with a goalie pulled' : `on the ${w}`.replace('on the 5-on-5', 'at 5-on-5')}"></span>`).join('')}</div>
+        <p class="ns-lab lt-ns">${parts.map(([key, w]) => `<span><b>${clock(t[key])}</b> ${w}</span>`).join('')}</p></div>
+        <p class="mini-h lt-sh">Every shift</p>${svg}<p class="note lt-note">Shaded like the bar above. Dots above the shifts are goals for while he was on the ice, below are goals against.</p>
+        <div class="lt-cols"><div><p class="mini-h lt-sh">${isD(id) ? 'His partners' : 'His linemates'} at 5-on-5</p><ul class="lt-list">${withM}</ul></div><div><p class="mini-h lt-sh">${isD(id) ? 'Forwards in front of him' : 'Defense behind him'}</p><ul class="lt-list">${withO}</ul></div></div>
+        <div class="lt-cols"><div>${strip(k, r.vs, 'L', p.n)}</div><div>${strip(k, r.vs, 'P', p.n)}</div></div>`;
+    }
+
+    const redraw = () => { if (!D) return; draw(); caption(); player(); };
+    async function load() {
+      if (D) return;
+      try { D = await (await fetch(root!.dataset.src!)).json(); } catch { chart.innerHTML = '<p class="lt-wait">The shifts could not be loaded.</p>'; return; }
+      if (!D.cuts) { chart.innerHTML = '<p class="lt-wait">The shifts for this game are still being prepared.</p>'; return; }
+      build(); intervals(); fillWho(); redraw();
+    }
+    document.getElementById('lt-when')!.addEventListener('change', () => { draw(); });
+    who.addEventListener('change', player);
+    let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(redraw, 150); });
+    // Fetched when its fold opens (or straight away if it isn't in one).
+    const fold = root.closest('details');
+    if (fold && !fold.open) fold.addEventListener('toggle', () => { if (fold.open) load().then(redraw); }, { once: true }); else load();
+  }
+</script>
+
+<style is:global>
+  .ltape { --even: 0; }
+  .lt-pick { margin-top: 18px; }
+  .lt-pick2 { margin-top: 28px; }
+  .lt-card { padding: 18px 18px 16px; }
+  .lt-wait { font: 500 14px var(--ui); color: var(--ink-3); padding: 40px 0; text-align: center; margin: 0; }
+  .lt-wrap { position: relative; }
+  .lt-wrap svg { display: block; overflow: visible; }
+  .lt-ppb { fill: var(--team); fill-opacity: 0.1; }
+  .lt-col { fill: var(--ink); fill-opacity: 0.07; }
+  .lt-hit { fill: transparent; cursor: pointer; }
+  .lt-track { fill: var(--track); opacity: 0.5; }
+  .lt-bar { fill: var(--team); }
+  .lt-row, .lt-lbl, .lt-goal { transition: opacity 0.2s; }
+  .lt-row.dim { opacity: 0.22; }
+  .lt-lbl.dim { opacity: 0.5; }
+  .lt-row:focus-visible { outline: none; }
+  .lt-row:focus-visible .lt-track, .lt-row.on .lt-track { opacity: 1; stroke: var(--ink-3); stroke-width: 1; }
+  .lt-goal { cursor: pointer; }
+  .lt-goal line { stroke: var(--team); stroke-width: 1.5; stroke-dasharray: 3 2; }
+  .lt-goal circle { fill: var(--team); stroke: var(--sheet); stroke-width: 2; }
+  .lt-goal.on line { stroke-width: 2.5; stroke-dasharray: none; }
+  .lt-goal.dim { opacity: 0.3; }
+  .lt-goal:focus-visible { outline: none; }
+  .lt-goal:focus-visible circle { stroke: var(--ink); }
+  .lt-ax { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; fill: var(--ink-3); }
+  .lt-min { letter-spacing: 0.02em; }
+  .lt-team { position: absolute; left: 0; margin: 0; font: 600 14px var(--ui); color: var(--ink); white-space: nowrap; }
+  .lt-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 7px; vertical-align: 0; }
+  .lt-lbl { position: absolute; left: 0; margin: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; font: 500 13px var(--ui); color: var(--ink-2); pointer-events: none; white-space: nowrap; }
+  .lt-lbl b { flex: none; width: 22px; font-weight: 700; color: var(--ink); }
+  .lt-lbl .lt-names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .lt-lbl .pips { pointer-events: auto; }
+  .lt-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; margin: 16px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .lt-k { display: inline-block; vertical-align: -1px; margin-right: 7px; }
+  .lt-k.bar { width: 18px; height: 10px; border-radius: 2px; background: var(--ink-2); }
+  .lt-k.pp { width: 18px; height: 12px; border-radius: 2px; background: color-mix(in oklab, var(--ink) 10%, transparent); }
+  .lt-k.goal { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); }
+  .lt-cap { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  .lt-hint { font: 400 17px/1.5 var(--body); color: var(--ink-2); margin: 0; }
+  .lt-jump { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; text-decoration: underline 1px var(--ink-3); text-underline-offset: 5px; cursor: pointer; }
+  .lt-gh { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .lt-gh .mini-h { margin: 0; }
+  .lt-score { font: 600 26px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); margin-right: 2px; }
+  .lt-say { font: 400 17px/1.5 var(--body); color: var(--ink); margin: 10px 0 12px; }
+  .lt-fives { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .lt-five { border-radius: 12px; padding: 12px 14px; background: var(--ice); }
+  .lt-five.sc { background: color-mix(in oklab, var(--team) 10%, var(--sheet)); }
+  .lt-fh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font: 500 14px var(--ui); color: var(--ink-2); }
+  .lt-fh b { color: var(--ink); font-weight: 700; }
+  .lt-fh .lt-dot { margin-right: 0; }
+  .lt-fh .pips { margin-left: auto; }
+  .lt-fn { font: 500 14px/1.5 var(--ui); color: var(--ink); margin: 8px 0 0; }
+  .lt-fn.lt-d { margin-top: 2px; }
+  .lt-how { margin: 8px 0 0; font: 400 14px/1.5 var(--ui); color: var(--ink-2); }
+  .lt-how strong, .lt-list .how strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .lt-sh { margin: 18px 0 8px; }
+  .lt-strips .note, .lt-grp > .note { margin: 14px 0 0; }
+  /* blocks.css sets the box captions at 10px; the tape keeps every label at the 11px floor. */
+  .ltape .strip i { font-size: 11px; }
+  .lt-mixed { font: 400 13px var(--ui); color: var(--ink-3); margin: 6px 0 0; }
+  .lt-pl { padding: 18px; }
+  .lt-pl > .lt-how { margin-top: 0; }
+  .lt-split { margin-top: 14px; }
+  .lt-ns { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+  .lt-ns span:nth-child(n) { text-align: left; }
+  .lt-s-ev, .lt-shift.ev { background: var(--team); fill: var(--team); }
+  .lt-s-pp, .lt-shift.pp { background: color-mix(in oklab, var(--team) 52%, var(--sheet)); fill: color-mix(in oklab, var(--team) 52%, var(--sheet)); }
+  .lt-s-pk, .lt-shift.pk { background: color-mix(in oklab, var(--team) 22%, var(--sheet)); fill: color-mix(in oklab, var(--team) 22%, var(--sheet)); }
+  .lt-s-oth, .lt-shift.oth { background: color-mix(in oklab, var(--ink-3) 45%, var(--sheet)); fill: color-mix(in oklab, var(--ink-3) 45%, var(--sheet)); }
+  .lt-pl svg { display: block; overflow: visible; margin-top: 4px; }
+  .lt-pg { fill: var(--team); stroke: var(--sheet); stroke-width: 2; cursor: help; }
+  .lt-note { margin: 6px 0 0; }
+  .lt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  .lt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .lt-list li { display: grid; gap: 1px; }
+  .lt-list li.thin { opacity: 0.55; }
+  .lt-with { font: 500 14px var(--ui); color: var(--ink); }
+  .lt-with b { margin-right: 4px; }
+  .lt-list .how { font: 400 13px var(--ui); color: var(--ink-2); }
+  @media (max-width: 719px) {
+    .lt-fives, .lt-cols { grid-template-columns: 1fr; }
+    .lt-lbl.narrow { transform: none; height: 19px; }
+    /* The goal and period lines run through the name line on phones; the words sit on the card's own colour. */
+    .lt-lbl.narrow > * { background: var(--sheet); padding-right: 4px; }
+    .lt-lbl.narrow .pips { padding: 0 0 0 4px; }
+  }
+</style>

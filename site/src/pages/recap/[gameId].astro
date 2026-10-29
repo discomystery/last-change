@@ -272,7 +272,7 @@ import GameSwitch from '../../components/GameSwitch.astro';
   {hasFlow && (
     <Section id="flow" title="Game flow" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
       <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
-      <LineMatchups id={r.game_id} awayPlace={place(away)} homePlace={place(home)} />
+      <LineMatchups id={r.game_id} away={away} home={home} awayPlace={place(away)} homePlace={place(home)} />
     </Section>
   )}
 

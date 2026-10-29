@@ -13,6 +13,12 @@ home goalie in]; and the shootout, if any, as attempts in order [side, shooter, 
 shot type], read from the raw play-by-play because the event table leaves shootouts out (no chance figures for them).
 Lines and pairs are tonight's: the trios and pairs that played most together at 5-on-5 in this game,
 picked the same way as the Swing section's line tags.
+
+For the shift tape under "Who played against whom" (Sora, 2026-10-29, thread "Design post-game line matchup visuals"):
+each skater's `r`, his 5-on-5 rating coming into the season (creating plus preventing chances, expected goals per 60,
+`rapm.chained(season - 1)`, so a game is never judged with ratings that already know how it went; a player with no
+earlier NHL games rates 0, average), and `cuts`, the quintiles of a forward trio's, a defense pair's and a five's summed
+rating over every stretch of 5-on-5 this season, weighted by time, so the page can show a group as one to five pips.
 """
 import json
 
@@ -21,6 +27,7 @@ import polars as pl
 from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
 from pipeline.export import pending
 from pipeline.ingest import nhl
+from pipeline.metrics import rapm
 from pipeline.metrics import units as U
 
 OUT = SITE_DATA / "flow"
@@ -109,7 +116,8 @@ def clips(pbp: dict) -> dict[int, str]:
 
 
 def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame, gu: pl.DataFrame | None, roster: pl.DataFrame,
-         so: list[list] | None = None, season: int = CURRENT_SEASON, clips: dict[int, str] | None = None) -> dict:
+         so: list[list] | None = None, season: int = CURRENT_SEASON, clips: dict[int, str] | None = None,
+         ratings: dict[int, float] | None = None, cuts: dict | None = None) -> dict:
     ev = ev.filter(pl.col("period_type") != "SO").sort("sort")
     length = int(ev["sec"].max() or 0)
     shots = []
@@ -165,14 +173,52 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
     for pid, spans in skaters.items():
         pos = info.get(pid, {}).get("pos")
         grp = group.get(pid) or ("XD" if pos == "D" else "XF")
-        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans), **({"o": slot[pid]} if pid in slot else {})})
+        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans), **({"o": slot[pid]} if pid in slot else {}),
+                        **({"r": round(ratings.get(pid, 0.0), 3)} if ratings is not None else {})})
     gks = [{"id": pid, "n": name(pid), "h": side_of[pid], "s": merge(spans)} for pid, spans in goalies.items()]
     # Shooters, passers, penalty takers and shootout shooters not on a shift chart still need a name.
     ids = {s[i] for s in shots for i in (6, 10, 11)} | {b[i] for b in blocks for i in (4, 5)} | {p[i] for p in pens for i in (2, 3, 7)}
     ids |= {a[i] for a in (so or []) for i in (1, 2)}
     names = {pid: name(pid) for pid in ids if pid is not None and pid not in skaters and pid not in goalies}
     return {"game_id": gid, "len": length, "shots": shots, "pp": pp, "players": players, "goalies": gks, "blocks": blocks, "pens": pens,
-            "str": skaters_on(st), **({"so": so} if so else {}), **({"names": names} if names else {})}
+            "str": skaters_on(st), **({"so": so} if so else {}), **({"names": names} if names else {}), **({"cuts": cuts} if cuts else {})}
+
+
+def ratings(season: int) -> dict[int, float]:
+    """Each skater's 5-on-5 rating coming into the season: creating plus preventing chances, xG per 60."""
+    try:
+        r = rapm.chained(season - 1)
+    except FileNotFoundError:
+        return {}
+    return {int(p): float(o + d) for p, o, d in zip(r["player_id"].to_list(), r["off"].to_list(), r["def"].to_list())}
+
+
+def cuts(st: pl.DataFrame, pos: dict[int, str], rated: dict[int, float]) -> dict:
+    """Quintiles of a trio's, a pair's and a five's summed rating over this season's 5-on-5, weighted by time."""
+    groups: dict[str, list[tuple[float, int]]] = {"trio": [], "pair": [], "five": []}
+    five = st.filter((pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null())
+    for hs, as_, d in zip(five["home_skaters"].to_list(), five["away_skaters"].to_list(), five["duration"].to_list()):
+        for ps in (hs or [], as_ or []):
+            f = [rated.get(p, 0.0) for p in ps if pos.get(p) != "D"]
+            dd = [rated.get(p, 0.0) for p in ps if pos.get(p) == "D"]
+            if len(f) == 3:
+                groups["trio"].append((sum(f), d))
+            if len(dd) == 2:
+                groups["pair"].append((sum(dd), d))
+            groups["five"].append((sum(f) + sum(dd), d))
+    out = {}
+    for k, xs in groups.items():
+        if not xs:
+            return {}
+        xs.sort()
+        total, run_, q, marks = sum(w for _, w in xs), 0, [], [0.2, 0.4, 0.6, 0.8]
+        for v, w in xs:
+            run_ += w
+            while marks and run_ >= marks[0] * total:
+                q.append(round(v, 3))
+                marks.pop(0)
+        out[k] = q
+    return out
 
 
 def run(season: int = CURRENT_SEASON) -> dict:
@@ -185,6 +231,9 @@ def run(season: int = CURRENT_SEASON) -> dict:
     st = pl.read_parquet(d / "stints.parquet").filter(pl.col("game_id").is_in(ids))
     gu = pl.read_parquet(d / "game_units.parquet").filter(pl.col("game_id").is_in(ids)) if (d / "game_units.parquet").exists() else None
     roster = pl.read_parquet(d / "players.parquet").filter(pl.col("game_id").is_in(ids))
+    rated = ratings(season)
+    pos = {r["player_id"]: r["pos"] for r in pl.read_parquet(d / "players.parquet", columns=["player_id", "pos"]).unique("player_id").iter_rows(named=True)}
+    league = cuts(pl.read_parquet(d / "stints.parquet"), pos, rated) if rated else {}
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
         old.unlink()
@@ -198,7 +247,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         so = shootout(raw) if g.get("last_period") == "SO" else None
         out = game(gid, g, ev.filter(pl.col("game_id") == gid), xg.filter(pl.col("game_id") == gid).drop("game_id"), sub,
                    gu.filter(pl.col("game_id") == gid) if gu is not None else None, roster.filter(pl.col("game_id") == gid), so, season,
-                   clips(raw))
+                   clips(raw), rated if rated else None, league)
         (OUT / f"{gid}.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
         n += 1
     return {"games": n}
