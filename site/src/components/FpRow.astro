@@ -3,6 +3,7 @@
 // Tapping the row opens the stat in words. One side on team pages, two on previews (a lane per team).
 // `c` carries the trait's label, tip, scale ends and `say`, plus each side's blended and season-only estimates keyed by abbreviation.
 import { ordinal, rawWords, scoreTraits } from '../lib/traits';
+import { adjKind } from '../lib/adjust';
 interface Props { c: any; sides: { abbr: string; cls: string; place: string }[] }
 const { c, sides } = Astro.props;
 // Score traits (100 is league average) say so in words, since a row has no room for the card's corner note.
@@ -12,7 +13,7 @@ const has = (e: any) => e && e.pct !== null && e.pct !== undefined && !(e.raw !=
 // Rank text for one side in one mode, with the raw ranking alongside for arena-adjusted traits.
 const rank = (e: any) => !has(e) ? '–' : e.raw === undefined ? ordinal(e.rank) : null;
 ---
-<details class="fpr">
+<details class="fpr" data-adj={adjKind(c.key)}>
   <summary>
     <span class="fpr-name">{c.label}</span>
     <span class="fpr-rk">
@@ -47,6 +48,7 @@ const rank = (e: any) => !has(e) ? '–' : e.raw === undefined ? ordinal(e.rank)
     {sides.map((s) => (
       <div class:list={['fpr-side', s.cls]}>
         {two && <i></i>}
+        {c[s.abbr].note && <p class="fpc-line fpr-note"><span>{two && <b>{s.place}: </b>}{c[s.abbr].note}</span></p>}
         {(['blend', 'season'] as const).map((mode) => {
           const e = c[s.abbr][mode];
           const who = two ? <b>{s.place}: </b> : null;

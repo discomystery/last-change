@@ -176,3 +176,24 @@ def test_the_outlook_names_the_goalie_it_needs_a_big_night_from():
     from pipeline.export import outlook
     assert outlook._in_goal("The Jets’ best hope is shooting, plus a big night in goal.", "Connor Hellebuyck").endswith("a big night from Connor Hellebuyck.")
     assert outlook._in_goal("They need shots and a goalie who steals the show.", None).endswith("a goalie who steals the show.")
+
+
+def test_penalty_context():
+    """Power-play calls say how many power plays to expect from penalties taken and drawn; other calls say nothing."""
+    from pipeline.export.previews import penalty_context
+
+    def team(taken, t_pct, drawn, d_pct):
+        return {"dims": {"taken": {"blend": {"v": taken, "pct": t_pct}}, "drawn": {"blend": {"v": drawn, "pct": d_pct}}}}
+
+    fp = {"AAA": team(2.5, 70, 3.2, 90), "BBB": team(3.2, 10, 2.5, 40), "CCC": team(2.6, 60, 2.6, 50), "DDD": team(2.7, 50, 2.7, 50)}
+    places = {"AAA": "Aville", "BBB": "Btown", "CCC": "Ccity", "DDD": "Dburg"}
+    clash = {"kind": "clash", "metric": "pp", "team": "AAA", "opp": "BBB"}
+    s = penalty_context(clash, fp, places)
+    assert s and "should get its chances" in s and s.count("Aville") <= 1
+    # a power-play call that expects FEWER power plays says nothing: the context must point the call's way (2026-10-17)
+    assert penalty_context({**clash, "team": "BBB", "opp": "AAA"}, fp, places) is None
+    # a penalty-kill clash (BBB's kill against AAA's power play) is helped by few power plays
+    assert penalty_context({**clash, "metric": "pk", "team": "BBB", "opp": "AAA"}, fp, places).endswith("may not get many chances.")
+    assert penalty_context({**clash, "team": "CCC", "opp": "DDD"}, fp, places) is None  # nothing out of the ordinary
+    assert penalty_context({**clash, "metric": "volume"}, fp, places) is None
+    assert penalty_context(clash, {"AAA": {"dims": {}}, "BBB": {"dims": {}}}, places) is None  # older fingerprints

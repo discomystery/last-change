@@ -23,9 +23,11 @@ entry becomes a report dated when ESPN last changed it:
   suspended   suspended (also ESPN's non-roster entries given the reason "Suspension")
   personal    away for personal reasons
   cleared     on one day's list and gone from the next (dated that next day): no longer reported injured
-Contract disputes (unsigned restricted free agents) are skipped: not an injury, and the club's roster listing already
-leaves them off. Players are matched by full name on the club's roster listing or game rosters, then by a full name
-that belongs to one player only.
+  unsigned    a contract dispute: an unsigned restricted free agent whose rights the club holds (never an injury; ESPN
+              moves these between "Out" and the injured non-roster list as bookkeeping, as it did with Nikishin and
+              Edvinsson on 2026-10-14); availability.py keeps it from reading as an injury
+Players are matched by full name on the club's roster listing or game rosters, then by a full name that belongs to one
+player only.
 """
 import gzip
 import json
@@ -43,7 +45,6 @@ from pipeline.ingest.transactions import ESPN_ABBR
 URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries"
 PAGE = "https://www.espn.com/nhl/injuries"  # stored as each report's url, so pages can credit the source
 MIN_ENTRIES = 40  # a list shorter than this is treated as a failed load: no "cleared" reports are read from it
-SKIP = {"contract dispute"}
 
 
 def raw_dir(season: int):
@@ -101,8 +102,8 @@ def _injury(e: dict) -> str | None:
 def classify(e: dict, season: int) -> tuple[str, str | None] | None:
     """(status, timeline) for one entry, or None when it is skipped."""
     kind, st, fan = (e.get("type") or "").lower(), (e.get("status") or "").lower(), (e.get("fantasy") or "").upper()
-    if kind in SKIP:
-        return None
+    if kind == "contract dispute":
+        return "unsigned", None
     if kind == "suspension" or st == "suspension":
         return "suspended", None
     if kind == "personal":
@@ -122,26 +123,38 @@ def classify(e: dict, season: int) -> tuple[str, str | None] | None:
     return None
 
 
+def _group(pos: str) -> str:
+    return {"D": "D", "G": "G"}.get(pos, "F")
+
+
 def _matcher(season: int):
     """(club, folded name) -> player, from the club's roster listings and game rosters this season, plus names that
     belong to one player only."""
     by_club: dict[tuple[str, str], set[int]] = {}
     by_last: dict[tuple[str, str], set[tuple[int, str]]] = {}
+    group: dict[int, str] = {}
     for f in ("rosters.parquet", "game_rosters.parquet", "availability.parquet"):
         t = TABLES / str(season) / f
         if t.exists():
             for pid, team, first, last in pl.read_parquet(t, columns=["player_id", "team", "first", "last"]).drop_nulls().unique().iter_rows():
                 by_club.setdefault((team, _fold(f"{first} {last}")), set()).add(pid)
                 by_last.setdefault((team, _fold(last)), set()).add((pid, _fold(first)))
+    r = TABLES / str(season) / "rosters.parquet"
+    if r.exists():
+        group = {pid: _group(p) for pid, p in pl.read_parquet(r, columns=["player_id", "pos"]).drop_nulls().unique().iter_rows()}
     unique = known_names(season)
 
-    def find(team: str | None, name: str | None) -> int | None:
+    def find(team: str | None, name: str | None, pos: str | None = None) -> int | None:
         if not name:
             return None
         n = _fold(name)
         ids = by_club.get((team, n), set())
+        if len(ids) > 1 and pos:  # two players with one name on the club (Vancouver's Elias Petterssons): by position
+            ids = {i for i in ids if group.get(i) == _group(pos)}
         if len(ids) == 1:
             return next(iter(ids))
+        if len(ids) > 1:
+            return None
         if n in unique:
             return unique[n]
         # "Sam" for Samuel, "Joe" for Joseph: one player on the club with that last name and the same first initial
@@ -161,7 +174,7 @@ def build(season: int) -> dict:
             entries = json.load(fh)
         now = {}
         for e in entries:
-            pid = find(e.get("team"), e.get("name"))
+            pid = find(e.get("team"), e.get("name"), e.get("pos"))
             if pid is None:
                 unmatched.add(e.get("name"))
                 continue
@@ -170,7 +183,7 @@ def build(season: int) -> dict:
                 continue
             now[pid] = e
             rows.append({"date": min(e.get("date") or day, day), "player_id": pid, "name": e.get("name"), "section": e.get("team"),
-                         "status": kind[0], "injury": _injury(e) if kind[0] not in ("suspended", "personal") else None,
+                         "status": kind[0], "injury": _injury(e) if kind[0] not in ("suspended", "personal", "unsigned") else None,
                          "timeline": kind[1], "note": None, "url": PAGE})
         if len(entries) >= MIN_ENTRIES:
             if prev is not None:

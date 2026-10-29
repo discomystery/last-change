@@ -8,6 +8,7 @@ export type Misses = { n: number; wide: number; high: number; post: number; shor
 export type Unit = { label: string; role?: string | null; both?: boolean; share?: number; mates: { id: number; name: string }[] };
 export type Role = {
   team_games: number; gp?: number; toi_rank?: number; toi_of?: number; toi?: { toi: number; toi5: number; toi_pp: number; toi_pk: number };
+  shifts?: { tps: number; per_game: number; avg: number | null; rank?: number; of?: number } | null;
   line?: { label: string; mates: { id: number; name: string }[]; toi_sec: number | null; share: number; pct: number | null };
   pp?: Unit; pk?: PkRole | null; faceoff?: string; notes: string[];
 };
@@ -19,10 +20,13 @@ export const pkRoleTip = {
   second: 'Second wave: kills often, but usually comes on after the first change rather than at the start.',
   spot: 'Spot duty: used in some kills (10% to 40% of them), for at least 20 seconds at a time.',
 } as const;
+/** Where his current club starts his 5-on-5 shifts that begin with a faceoff in either end (attacking-zone share). */
+export type ZoneShare = { share: number; oz: number; dz: number; home: number | null; road: number | null; pct: number | null };
+export type ZoneStarts = Partial<Record<Mode, ZoneShare>> & { coach: string | null };
 export type Stats = { gp: number; g: number; a: number; p: number; sog: number; toi: number };
 export type Skater = {
   id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
-  group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
+  group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; zone_starts?: ZoneStarts | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
 };
@@ -71,8 +75,10 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'How much better his team’s power play gets with him on it, in expected goals per 60 of 5-on-4 time, whoever takes the shot. It separates him from the rest of his unit and the penalty killers by comparing every power play since 2023-24, and starts each player from how well he creates chances at 5-on-5, so a few minutes of power-play time cannot make a rating on their own. Only rated for players with real power-play time.' },
   offImpact: { group: 'Driving play at 5-on-5', short: (v) => `${sign(v)} expected goals /60`, label: 'Creating chances', lo: 'Along for the ride', hi: 'Drives play',
     say: (v) => `adds ${sign(v)} expected goals per 60 to his team’s chances at 5-on-5`,
+    rawShort: (v) => `${v.toFixed(2)} expected goals for /60`, raw: (v) => `his team creates ${v.toFixed(2)} expected goals per 60 at 5-on-5 with him on the ice, whoever he plays with or against`,
     tip: 'How much better his team’s chances get at 5-on-5 when he is on the ice, in expected goals per 60. It separates him from his linemates and opponents by comparing every shift since 2023-24, each player starting from where he stood at the end of last season, and allows for where shifts start and the score.' },
   defImpact: { group: 'Driving play at 5-on-5', short: (v) => (Math.abs(v) < 0.01 ? 'no measurable change' : `${v > 0 ? '−' : '+'}${Math.abs(v).toFixed(2)} expected goals against /60`), label: 'Preventing chances', lo: 'Chances against rise', hi: 'Shuts it down',
+    rawShort: (v) => `${v.toFixed(2)} expected goals against /60`, raw: (v) => `opponents create ${v.toFixed(2)} expected goals per 60 at 5-on-5 with him on the ice, whoever he plays with or against`,
     say: (v) => (Math.abs(v) < 0.01 ? 'about average: no measurable change in the opponent’s chances at 5-on-5' : v > 0 ? `takes ${v.toFixed(2)} expected goals per 60 off the opponent’s chances at 5-on-5` : `opponents get ${Math.abs(v).toFixed(2)} more expected goals per 60 at 5-on-5 with him out there`),
     tip: 'How much he cuts the opponent’s chances at 5-on-5, in expected goals per 60, after accounting for his linemates, the opponents he faces (so facing top lines is not held against him), where his shifts start and the score. It sees chances, not the quality of defensive plays that public data does not record.' },
   shThreat: { group: 'Special teams', short: (v) => `${v.toFixed(2)} expected goals for /60`, label: 'Shorthanded threat', lo: 'Pure defense', hi: 'Power kill', say: (v) => `his team creates ${v.toFixed(2)} expected goals per 60 while killing penalties with him on the ice`,
@@ -87,8 +93,8 @@ export const TRAITS: Record<string, TraitInfo> = {
     tip: 'Minor and major penalties called on opponents against him, per 60 minutes in all situations.' },
   discipline: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(2)} penalties taken /60`, label: 'Staying out of the box', lo: 'Often penalized', hi: 'Clean', say: (v) => `${v.toFixed(2)} penalties taken per 60`,
     tip: 'Minor and major penalties he takes per 60 minutes in all situations. Fewer is better. Misconducts and bench minors are left out.' },
-  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `${v.toFixed(1)}% won`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
-    tip: 'Share of faceoffs he wins, in all situations. Only rated for players who take faceoffs regularly.' },
+  faceoffs: { group: 'Penalties and faceoffs', short: (v) => `faceoff score ${Math.round(v)}`, rawShort: (v) => `${v.toFixed(1)}% won`, label: 'Faceoffs', lo: 'Loses draws', hi: 'Wins draws', say: (v) => `a faceoff score of ${Math.round(v)}`, raw: (v) => `wins ${v.toFixed(1)}% of his faceoffs`,
+    tip: 'How often he wins the draw, as a score (100 is the average forward who takes faceoffs), adjusted for who he faces and when: a penalty killer’s draws are harder than a power-play man’s, and some centers keep drawing against the league’s best. Recorded shows the plain share he wins. Only rated for players who take faceoffs regularly.' },
 };
 export const GROUPS = ['Driving play at 5-on-5', 'Scoring', 'Special teams', 'Physical and puck', 'Penalties and faceoffs'];
 

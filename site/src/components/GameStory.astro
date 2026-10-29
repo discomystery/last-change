@@ -6,9 +6,10 @@
 export type Story = { kicker: string; head: string; paras: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
 interface Props { story: Story; sides?: Record<string, 'away' | 'home'>; kicker?: boolean }
 const { story, sides = {}, kicker = true } = Astro.props;
+const band = Astro.slots.has('band');
 const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
 ---
-<div class="card story">
+<div class={`card story${band ? ' has-band' : ''}`}>
   <div class="s-head">
     {kicker && <p class="mini-h">{story.kicker}</p>}
     <h3>{story.head}</h3>
@@ -22,6 +23,7 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
     ) : story.paras.map((p) => <p class="para">{p}</p>)}
     <slot />
   </div>
+  {band && <div class="s-band"><slot name="band" /></div>}
   {story.items.length > 0 && (
     <div class="s-list">
       <h4 class="list-h box-h">{story.list_head}</h4>
@@ -36,9 +38,12 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
     grid-template-columns: minmax(0, 64ch) minmax(270px, 1fr); grid-template-areas: 'head list' 'text list'; grid-template-rows: auto 1fr; }
   .s-head { grid-area: head; }
   .s-text { grid-area: text; align-self: start; }
+  /* Post-game numbers: a band across the bottom of the card, under both the story and the side box. */
+  .story.has-band { grid-template-areas: 'head list' 'text list' 'band band'; grid-template-rows: auto 1fr auto; }
+  .s-band { grid-area: band; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--rule); }
   .s-list { grid-area: list; background: var(--ice); border-radius: 12px; padding: 16px 18px; align-self: start; }
   .story h3 { font: 600 28px/1.15 var(--display); margin: 6px 0 12px; }
-  .story .para { font: 400 18px/1.6 var(--body); margin: 0 0 12px; }
+  .story .para { font: 400 18px/1.6 var(--body); color: var(--ink-2); margin: 0 0 12px; }
   .list-h { margin: 0 0 4px;
     padding-bottom: 8px; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.12)); }
   .story ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 12px; }
@@ -46,6 +51,8 @@ const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
   .story .tag { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
   @media (max-width: 900px) {
     .story { grid-template-columns: 1fr; grid-template-areas: 'head' 'text' 'list'; grid-template-rows: auto; }
+    .story.has-band { grid-template-areas: 'head' 'text' 'band' 'list'; }
+    .s-band { border-top: 0; padding-top: 4px; }
     /* Stacked, the side box sits under the story (or the post-game bars), never touching it. */
     .s-text > :global(:last-child) { margin-bottom: 0; }
     .s-list { margin-top: 22px; }

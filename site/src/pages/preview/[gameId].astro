@@ -1,6 +1,7 @@
 ---
 import { srcInfo } from '../../lib/goalSources';
 import NoteText from '../../components/NoteText.astro';
+import WorthKnowing from '../../components/WorthKnowing.astro';
 // Real preview, one page per upcoming game. Everything comes from the same JSON as the team pages, set side by side;
 // the "What to watch" calls come from the game's snapshot, which the pipeline freezes at puck drop.
 import Base from '../../layouts/Base.astro';
@@ -16,6 +17,9 @@ import Quadrant from '../../components/Quadrant.astro';
 import Histogram from '../../components/Histogram.astro';
 import Pips from '../../components/Pips.astro';
 import Portrait from '../../components/Portrait.astro';
+import UnitNames from '../../components/UnitNames.astro';
+import { clashes, fullName, unitShort } from '../../lib/playerLinks';
+import NetUsage from '../../components/NetUsage.astro';
 import PLink from '../../components/PLink.astro';
 import SectionNav from '../../components/SectionNav.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
@@ -26,6 +30,7 @@ import Deployment from '../../components/Deployment.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
+import { doublesNote } from '../../lib/lineShape';
 import { twoColumns } from '../../lib/masonry';
 import { clock as mmss, compared } from '../../lib/format';
 import { matchupPaint } from '../../lib/teams';
@@ -36,7 +41,7 @@ import linesAll from '../../../public/data/lines.json';
 import goalieAll from '../../../public/data/goalies.json';
 import srcAll from '../../../public/data/goal_sources.json';
 import schedule from '../../../public/data/schedule.json';
-import { fpInfo, fpGroups, ordinal, goalieTraitInfo } from '../../lib/traits';
+import { fpInfo, fpGroups, ordinal, goalieTraitInfo, elevenNote } from '../../lib/traits';
 
 type Claim = { id: string; kind: string; head: string; body: string; call?: string; nums?: string; cite: string; check: object | null };
 // `pregame` holds the slice of each data file the page reads, as it stood when the preview was made, so a preview can
@@ -57,9 +62,11 @@ const linesData = pre?.lines ?? linesAll;
 const goalieData = pre?.goalies ?? goalieAll;
 const srcData = pre?.goal_sources ?? srcAll;
 const played = schedule.games.find((g) => g.id === snap.game_id && g.final);
+const hasRecap = recapIndex.games.some((g) => g.id === snap.game_id);
 const base = import.meta.env.BASE_URL;
 const { away, home } = snap;
 const order = [away, home] as const;
+const clash = clashes([away, home]);
 const side = (a: string) => (a === away ? 'away' : 'home');
 const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
 const place = (a: string) => T[a]?.place ?? a;
@@ -68,14 +75,18 @@ const rec = (a: string) => pre?.records?.[a] ?? (T[a] ? `${T[a].w}-${T[a].l}-${T
 const colours = matchupPaint(away, home);
 const start = new Date(snap.start);
 const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(start);
+const isoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(start);
 const timeStr = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(start);
 
 // Style fingerprints
 type Est = { v: number; pct: number; lo: number; hi: number; rank: number; index: number; raw?: number; raw_rank?: number };
-const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }> }>;
+const fpT = fpData.teams as unknown as Record<string, { games: number; dims: Record<string, { blend: Est; season: Est }>; lineup?: { eleven: number; games: number; habit: boolean } }>;
+// A club that dresses 11 forwards most nights: its depth row says so rather than ranking the habit.
+const eleven = (a: string) => (fpT[a].lineup?.habit ? elevenNote(fpT[a].lineup!) : null);
 // Older frozen snapshots can carry a retired trait (point shots); show only traits the site still describes.
-const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key], [away]: fpT[away].dims[key], [home]: fpT[home].dims[key] })) as any[];
-const gap = (c: any) => Math.abs(c[away].blend.pct - c[home].blend.pct);
+const traits = fpData.ready.filter((key) => fpInfo[key]).map((key) => ({ key, ...fpInfo[key],
+  [away]: { ...fpT[away].dims[key], note: key === 'depth' ? eleven(away) : null }, [home]: { ...fpT[home].dims[key], note: key === 'depth' ? eleven(home) : null } })) as any[];
+const gap = (c: any) => (c.key === 'depth' && (c[away].note || c[home].note) ? -1 : Math.abs(c[away].blend.pct - c[home].blend.pct));
 const fpSides = order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, place: place(a) }));
 const biggest = [...traits].sort((x, y) => gap(y) - gap(x)).slice(0, 6);
 
@@ -86,7 +97,6 @@ type SUnit = { label: string; players: { id: number; name: string; role: string 
 type LT = { games: number; settled?: { shuffled?: boolean }; units: Unit[]; notes: { text: string }[]; matchups?: Record<'all' | 'home' | 'road', { games: number; rows: MRow[] }>; special?: { pp: SUnit[]; pk: SUnit[]; faceoff: { text: string } | null; shots: { x: number; y: number; xg: number; p?: number }[] } };
 const LN = linesData.teams as unknown as Record<string, LT>;
 const peer: Record<string, string> = { L1: 'first lines', L2: 'second lines', L3: 'third lines', L4: 'fourth lines', P1: 'top defense pairs', P2: 'second defense pairs', P3: 'third defense pairs' };
-const lastName = (n: string) => n.split(' ').slice(1).join(' ');
 const awayLine = (j: number) => LN[away]?.units.find((u) => u.label === `L${j + 1}`);
 const homeUnit = (label: string) => LN[home]?.units.find((u) => u.label === label);
 // Box shading lives in blocks.css (it differs between light and dark mode); the page only passes the share.
@@ -96,6 +106,7 @@ const homeMu = LN[home]?.matchups?.home;
 // With a story at the top, the lineup notes move down into Lines (the faceoff note already shows in Special teams).
 const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })));
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
+const wkTeams = order.map((a) => ({ a, label: place(a), cls: `t-${side(a)}`, href: `${base}team/${a}/` }));
 
 // Special teams
 const stPanels = order.map((pp) => ({ pp, pk: pp === away ? home : away }));
@@ -140,26 +151,31 @@ const lgSrc = srcData.league_sources as Record<string, number>;
 const srcMax = (k: string, mode: 'blend' | 'season', side: 'for' | 'against') => Math.max(lgSrc[k] * 2, ...order.map((a) => SR[a]?.sources?.[mode]?.[side]?.sources[k]?.share ?? 0)) * 1.08;
 
 const story = snap.story;
+// NHL.com's projected lines and pairs from its game-day preview, when it was up before this snapshot.
+type ProjSide = { lines: { id: number; name: string }[][]; pairs: { id: number; name: string }[][]; extra_d: { id: number; name: string }[]; f: number; d: number; eleven: boolean };
+const nhlLineup = ((snap as any).nhl_lineup?.teams && Object.keys((snap as any).nhl_lineup.teams).length ? (snap as any).nhl_lineup : null) as { teams: Record<string, ProjSide> } | null;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
-const nav = [['watch', 'Short version'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Goal sources'], ['notes', 'Data notes']];
+const nav = [['watch', 'Overview'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
 const _ = ordinal;
 import SharePreview from '../../components/SharePreview.astro';
 import ShareButton from '../../components/ShareButton.astro';
+import GameSwitch from '../../components/GameSwitch.astro';
+import recapIndex from '../../../public/data/recaps/index.json';
 ---
-<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)}>
+<Base section="games" title={`${away} at ${home} preview`} description={snap.story?.head ? `${snap.story.head}. What to watch when the ${full(away)} visit the ${full(home)}.` : `What to watch when the ${full(away)} visit the ${full(home)}.`} og={previewOg(snap as any)} gameStart={snap.start}>
   <AreaShapes />
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Matchup">
     <GameTrail id={snap.game_id} part="crumbs" />
     <Rink sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: full(a), rec: rec(a), home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={snap.game_id} part="around"><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p>{!played && <p><ShareButton kind="preview" label="Share this preview" /></p>}</GameTrail>
+    <GameTrail id={snap.game_id} part="around" names={Object.fromEntries(order.map((a) => [a, { full: T[a]?.nick ?? full(a), rec: rec(a) }]))}><p class="when-day" data-local="day">{dateStr}</p><p><strong data-local="time">{timeStr}</strong> · {snap.venue}</p><p class="gamelinks">{played && hasRecap && <GameSwitch id={snap.game_id} on="preview" />}{!played && <ShareButton kind="preview" label="Share" />}</p></GameTrail>
     {played && (
       <p class="card banner">
         This is the preview as it stood at puck drop.
-        Final: {played.away} {played.as}, {played.home} {played.hs}{played.end && played.end !== 'REG' ? ` (${played.end})` : ''}. <a href={`${base}recap/${snap.game_id}/`}>See how it held up</a>.
+        Final: {played.away} {played.as}, {played.home} {played.hs}{played.end && played.end !== 'REG' ? ` (${played.end})` : ''}.
       </p>
     )}
   </section>
@@ -183,17 +199,14 @@ import ShareButton from '../../components/ShareButton.astro';
       {snap.claims.map((c) => <CallCard c={c as any} side={side} />)}
     </ol>
     {!story && notes.length > 0 && (
-      <div class="card worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{notes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={notes} teams={wkTeams} />
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
 
-  <Section id="style" title="Style fingerprints" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
+  <Section id="style" title="Playing style" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">
-      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; traits that take longer to settle lean more on last season.</p>
+      <p class="note m-blend">Each scale runs from the league’s lowest team on the left to its highest on the right. Numbers blend last season with the {fpT[away].games} and {fpT[home].games} games played so far; anything that takes many games to show a real pattern leans more on last season.</p>
       <p class="note m-season">This season only: {fpT[away].games} games for {place(away)}, {fpT[home].games} for {place(home)}. Expect these to swing a lot, which is why the likely ranges are so wide.</p>
       <p class="note">Shot volume, shots against and pace are weighted for the score and home ice, and forecheck pressure and physicality for each arena’s scorer, so all five are shown as scores; switch “Adjusted stats” to Recorded in the settings to see the numbers as recorded. <a href={`${base}methods/`}>How the arena adjustment works</a>.</p>
     </Fragment>
@@ -241,12 +254,13 @@ import ShareButton from '../../components/ShareButton.astro';
                   <span class="unit-label">{u.label}</span>
                   <UnitToi toi_sec={u.toi_sec} seconds={u.seconds} gp={u.gp} isNew={u.new} games={LN[a].games} pct={u.pct.sec_pg} peers={peer[u.label]} />
                 </div>
-                <p class="unit-names">{u.players.map((n, i) => <PLink id={(u as any).ids?.[i]} name={n} />)}</p>
+                <UnitNames players={u.players} ids={(u as any).ids} clash={clash} />
+                {doublesNote(LN[a].units as any, u as any) && <p class="unit-two">{doublesNote(LN[a].units as any, u as any)}</p>}
                 <dl class="stats">
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals for per 60: how much offense the team creates with this group on the ice.">Creates</span></dt><dd>{u.xgf60.toFixed(2)}</dd><Pips pct={u.pct.xgf60 ?? 50} tip={`${compared(u.pct.xgf60 ?? 50, 'creates more than', 'creates less than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="Expected goals against per 60: how much the team gives up with this group on the ice. Lower is better.">Allows</span></dt><dd>{u.xga60.toFixed(2)}</dd><Pips pct={u.pct.xga60 ?? 50} tip={`${compared(u.pct.xga60 ?? 50, 'stingier than', 'leakier than', peer[u.label])}.`} /></div>
                   <div><dt><span class="term" tabindex="0" data-tip="This group’s share of all expected goals while on the ice. Above 50% means they out-chance opponents.">Share</span></dt><dd>{u.share.toFixed(1)}%</dd><Pips pct={u.pct.share ?? 50} tip={`${compared(u.pct.share ?? 50, 'a better share than', 'a worse share than', peer[u.label])}.`} /></div>
-                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone.">Off. zone draws</span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
+                  <div><dt><span class="term" tabindex="0" data-tip="Of the faceoffs this group is on the ice for at either end, the share in the offensive zone."><span class="lab-long">Off. zone draws</span><span class="lab-short">O-zone draws</span></span></dt><dd>{u.oz === null ? '–' : `${u.oz}%`}</dd>{u.oz !== null && <Marker pct={u.pct.oz ?? 50} tip={`${compared(u.pct.oz ?? 50, 'more offensive-zone faceoffs than', 'fewer offensive-zone faceoffs than', peer[u.label])}.`} />}</div>
                 </dl>
               </li>
             ))}
@@ -255,11 +269,30 @@ import ShareButton from '../../components/ShareButton.astro';
       ))}
     </div>
 
+    {nhlLineup && (
+      <>
+        <h3 class="sub">NHL.com projection</h3>
+        <p class="note">The lines and pairs NHL.com expects tonight, from its game-day preview. It is a projection, posted a few hours before puck drop, and coaches can still change their minds.</p>
+        <div class="two nhl-proj">
+          {order.filter((a) => nhlLineup.teams[a]).map((a) => {
+            const t = nhlLineup.teams[a];
+            return (
+              <div class={`card proj t-${side(a)}`}>
+                <p class="proj-h"><span class="mini-h">{place(a)}</span>{t.eleven && <span class="chip phrase" data-tip="One forward takes shifts on two lines, and the seventh defenseman rotates in.">11 forwards, 7 defensemen</span>}</p>
+                <ol class="proj-rows">
+                  {t.lines.map((x, i) => <li><b>L{i + 1}</b><span>{x.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>)}
+                  {t.pairs.map((x, i) => <li><b>P{i + 1}</b><span>{x.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>)}
+                  {t.extra_d.length > 0 && <li><b>7th D</b><span>{t.extra_d.map((y) => <PLink id={y.id} name={y.name} />)}</span></li>}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    )}
+
     {story && lineNotes.length > 0 && (
-      <div class="card worth lines-worth">
-        <p class="mini-h">Worth knowing</p>
-        <ul>{lineNotes.map((n) => <li><a class={`teampill t-${side(n.a)}`} href={`${base}team/${n.a}/`}>{place(n.a)}</a> <NoteText text={n.text} names={n.names} /></li>)}</ul>
-      </div>
+      <WorthKnowing notes={lineNotes} teams={wkTeams} cls="lines-worth" />
     )}
 
     {((LN[away] as any)?.deploy || (LN[home] as any)?.deploy) && (
@@ -276,19 +309,19 @@ import ShareButton from '../../components/ShareButton.astro';
       <>
         {LN[away]?.settled?.shuffled && <p class="note">{place(away)} keeps changing their forward lines, so the four named here (from their latest games) may not be the ones they send out tonight.</p>}
         <div class="card stripcard">
-          <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {(awayLine(j)?.players ?? []).map(lastName).join(' · ') || '–'}</span>)}</p>
+          <p class="opp-key t-away"><span class="mini-h">{place(away)}’s lines tonight</span>{[0, 1, 2, 3].map((j) => <span><b>L{j + 1}</b> {unitShort(awayLine(j) as any, clash).join(' · ') || '–'}</span>)}</p>
           {[['L', 'Forward lines'], ['P', 'Defense pairs']].map(([kind, title]) => (
             <>
               <h4 class="mini-h">{place(home)} {title.toLowerCase()} against {place(away)} forward lines</h4>
               <ul class="strips">
                 {homeMu.rows.filter((r) => r.label[0] === kind).map((r) => {
-                  const mine = (homeUnit(r.label)?.players ?? []).map(lastName);
+                  const mine = unitShort(homeUnit(r.label) as any, clash);
                   return (
                     <li class:list={{ thin: r.minutes < 10 }}>
-                      <span class="lab t-home" data-tip={`${(homeUnit(r.label)?.players ?? []).join(', ')}. ${mmss(r.seconds)} of 5-on-5 at home.`}><b>{r.label}</b>{mine.join(' · ')}</span>
+                      <span class="lab t-home" data-tip={`${(homeUnit(r.label)?.players ?? []).map((n, i) => fullName((homeUnit(r.label) as any)?.ids?.[i], n)).join(', ')}. ${mmss(r.seconds)} of 5-on-5 at home.`}><b>{r.label}</b>{mine.join(' · ')}</span>
                       <span class="strip">
                         {r.share.map((v, j) => {
-                          const opp = (awayLine(j)?.players ?? []).map(lastName);
+                          const opp = unitShort(awayLine(j) as any, clash);
                           return <span class:list={hot(v)} style={`--f:${Math.max(v ?? 0, 1)};${heat(v)}`} data-tip={v === null ? 'No ice time yet.' : `At home, ${mine.join(', ')} (${r.label}) have spent ${v}% of their 5-on-5 time against opponents’ ${['first', 'second', 'third', 'fourth'][j]} lines. With no line matching it would be about ${r.expected[j]}%. Tonight that line is ${opp.join(', ') || `${place(away)}’s L${j + 1}`}.`}><i>{away} L{j + 1}</i>{v === null ? '–' : `${v}%`}</span>;
                         })}
                       </span>
@@ -372,6 +405,7 @@ import ShareButton from '../../components/ShareButton.astro';
         ))}
       </p>
     )}
+    <div class="nu2">{order.map((a) => <NetUsage team={a} before={isoDay} side={side(a)} title />)}</div>
     {gModes.map(([mode, words]) => (
       <div class={`gmode m-${mode}`}>
         <div class="g3">
@@ -434,7 +468,7 @@ import ShareButton from '../../components/ShareButton.astro';
     ))}
   </Section>
 
-  <Section id="sources" title="Where the goals come from" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
+  <Section id="sources" title="Goal sources" placeholder={false} takeaway="How each team’s goals are scored, or allowed, against the league average.">
     <Fragment slot="explain">
       <p class="note">These mixes are mostly luck: over three seasons, teams’ goals came from much the same places, and most of the differences here didn’t last. Each team page shows how much luck alone can move each row.</p>
       <p class="note">Each row has its own scale, so a small source is not squeezed against the left edge.</p>
@@ -481,17 +515,14 @@ import ShareButton from '../../components/ShareButton.astro';
     ))}
   </Section>
 
-  <Section id="notes" title="Data notes" placeholder={false}>
-    <ul class="notes">
-      <li><strong>Sources.</strong> Game data from the NHL; expected goals from this site’s own model.</li>
-      <li><strong>Early season.</strong> {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}, so most numbers blend this season with last. The season switch at the top shows this season alone.</li>
-      <li><strong>Percentiles and ranks</strong> compare a team or player with the rest of the league: 90 means better than 90% of the league at that thing.</li>
-      <li><strong>Blind spots.</strong> Public game data doesn’t record passes before a shot, where defenders are standing, or rushes up the ice, so the site shows none of those.</li>
-      <li><strong>Hits, giveaways and takeaways</strong> depend on each arena’s scorer; anything built on them is arena-adjusted. <a href={`${base}methods/`}>How it works</a>.</li>
-      <li><strong>Key players</strong> for each side are on the team pages.</li>
-    </ul>
-    <p class="note">Team pages: <a href={`${base}team/${away}/`}>{full(away)}</a> · <a href={`${base}team/${home}/`}>{full(home)}</a></p>
-  </Section>
+  <aside class="card about" id="notes" aria-labelledby="notes-h">
+    <h2 class="box-h" id="notes-h">About these numbers</h2>
+    <div class="about-cols">
+      <p class="m-blend"><strong>Blended with last season.</strong> A few games can say a lot about a team or almost nothing, so most numbers mix this season with last. {place(away)} has played {fpT[away].games} games and {place(home)} {fpT[home].games}; anything that takes many games to show a real pattern leans more on last season. Pick “This season” under Seasons in the settings to see this season alone. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p class="m-season"><strong>This season only.</strong> These numbers use only {place(away)}’s {fpT[away].games} games and {place(home)}’s {fpT[home].games}, so expect them to swing. Pick “Blended” under Seasons in the settings to mix in last season, which steadies anything that takes many games to show a real pattern. <a href={`${base}methods/#blend`}>How blending works</a></p>
+      <p><strong>Adjusted for the arena.</strong> Hits, giveaways, takeaways and blocked shots are counted by each arena’s scorer, and some buildings count far more than others. Those numbers, and anything built on them, are corrected for the arena and shown as a score where 100 is league average. Pick “Recorded” under Adjusted stats to see the counts as they were written down. <a href={`${base}methods/#arena`}>How the arena correction works</a></p>
+    </div>
+  </aside>
   {!played && <SharePreview snap={snap as any} records={{ [away]: rec(away), [home]: rec(home) }} />}
 </Base>
 
@@ -512,15 +543,21 @@ import ShareButton from '../../components/ShareButton.astro';
   .watch { display: grid; gap: 16px; margin-top: 22px; }
   @media (min-width: 720px) { .watch { grid-template-columns: 1fr 1fr; } }
   .cite { font: 400 12px var(--ui); color: var(--ink-3); }
-  .watch + .worth { margin-top: 16px; }
-  .lines-worth { margin: 20px 0 8px; }
-  .stpick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; font: 600 20px var(--display); }
+  .watch + :global(.worth) { margin-top: 16px; }
+  :global(.lines-worth) { margin: 20px 0 8px; }
+  .nhl-proj { margin-bottom: 8px; }
+  .proj-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .proj-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .proj-rows li { font: 500 15px var(--ui); display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: baseline; }
+  .proj-rows li > span { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .proj-rows b { font: 700 12.5px var(--ui); letter-spacing: 0.05em; color: var(--ink-3); }
+  .stpick { margin-top: 22px; }
+  .nu2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; margin: 14px 0 18px; }
   .projected { margin: 12px 0 0; font: 400 15px/1.6 var(--ui); color: var(--ink); }
   .projected .lbl { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 10px; }
   .projected i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 6px; }
   .projected .term { color: var(--ink-2); }
   .projected > span:not(.lbl) { white-space: nowrap; }
-  .stpick select { font: 600 17px var(--ui); color: var(--ink); background: var(--sheet); border: 0; border-bottom: 3px solid var(--ink); border-radius: 8px 8px 0 0; padding: 8px 10px; max-width: 100%; cursor: pointer; }
   .stblock .sub { margin-top: 26px; }
   .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin: 14px 0 12px; }
   .tile { display: grid; gap: 6px; }
@@ -530,6 +567,9 @@ import ShareButton from '../../components/ShareButton.astro';
   .st-h { display: flex; align-items: center; gap: 8px; }
   .g3 { display: grid; gap: 12px; margin-top: 18px; }
   @media (min-width: 900px) { .g3 { grid-template-columns: 1fr 1.15fr 1fr; } }
+  /* Smaller screens: the two goalies first (side by side on tablets), then the league chart that compares them (Sora, 2026-10-27). */
+  @media (max-width: 899px) { .g3 > .gmid { order: 1; } }
+  @media (min-width: 720px) and (max-width: 899px) { .g3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .g3 > .gmid { grid-column: 1 / -1; } .g3 > .gmid > :global(*) { width: 100%; max-width: 480px; margin-inline: auto; } }
   .g3 > [hidden], .gnights > [hidden], .fpc [hidden] { display: none; }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
   .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
@@ -541,7 +581,13 @@ import ShareButton from '../../components/ShareButton.astro';
   .two-n { gap: 14px; }
   .two-n > span { display: inline-flex; align-items: center; gap: 5px; min-width: 52px; font-weight: 600; }
   .two-n i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  .notes { margin-top: 14px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
+  .about { margin-top: 48px; padding: 18px 22px; }
+  .about .box-h { margin: 0 0 10px; }
+  .about-cols { display: grid; gap: 12px 32px; font: 400 15px/1.55 var(--ui); color: var(--ink-2); }
+  .about-cols p { margin: 0; }
+  .about-cols strong { color: var(--ink); }
+  :global(html[data-mode='season']) .about-cols .m-season { display: block; }
+  @media (min-width: 720px) { .about-cols { grid-template-columns: 1fr 1fr; } }
   .team-h { margin-top: 8px; }
   .units { display: grid; gap: 14px; }
   .opp-key { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; font: 400 14px var(--ui); margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
@@ -571,9 +617,11 @@ import ShareButton from '../../components/ShareButton.astro';
     let pinned = null;
     const show = (el) => {
       const id = el?.dataset.shooter;
-      map.classList.toggle('focus', !!id);
-      map.querySelectorAll('[data-p]').forEach((d) => d.classList.toggle('on', d.dataset.p === id));
-      const n = id ? map.querySelectorAll(`[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
+      // The map's own styles fade the rest and show only his dots under `.picking` / `.hl` (ShotMap.astro).
+      map.querySelector('.shotmap')?.classList.toggle('picking', !!id);
+      map.querySelectorAll('.shot[data-p]').forEach((d) => d.classList.toggle('hl', d.dataset.p === id));
+      panel.querySelectorAll('[data-shooter]').forEach((x) => x.classList.toggle('on', !!id && x === el));
+      const n = id ? map.querySelectorAll(`.shot[data-p="${id}"]`).length / (map.querySelectorAll('svg').length || 1) : 0;
       who.textContent = id ? `${el.textContent}: ${n} of these shots` : ' ';
     };
     panel.querySelectorAll('[data-shooter]').forEach((el) => {

@@ -29,6 +29,7 @@ from functools import lru_cache
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.config import FULL_SEASONS, REGULAR, TABLES
 
 CALLED = ["MIN", "MAJ", "BEN", "MAT"]
@@ -38,15 +39,6 @@ FEW_SHARE, MANY_SHARE = 0.05, 0.03
 LINE_BRAWL, BRAWL_PLAYERS, BRAWL_ROUGHING = 3, 6, 4
 BUSY_PLAYER, QUIET_GAME = 3, 3
 PERIODS = {1: "first", 2: "second", 3: "third"}
-WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
-
-
-def num(n: int) -> str:
-    return WORDS[n] if 0 <= n < len(WORDS) else str(n)
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:]
 
 
 @lru_cache(maxsize=None)
@@ -119,7 +111,7 @@ def _when(period: int, sec: int) -> str:
         return f"at the end of the {PERIODS[period]}" if period < 3 else "at the final horn"
     if period == 3 and s >= 1080:
         return "in the final minutes"
-    part = "early in" if s < 400 else "midway through" if s < 800 else "late in"
+    part = "early in" if s < 400 else "midway through" if s < 900 else "late in"
     return f"{part} the {PERIODS[period]}"
 
 
@@ -131,7 +123,30 @@ def _coach(gid: int, season: int, team: str) -> str | None:
     return c["coach"][0] if c.height else None
 
 
-def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[str]:
+def fight_events(gid: int, season: int, name) -> list[tuple[int, list[int], object]]:
+    """Fights that weren't part of a brawl or scrum, for the chronology (Sora's review, 2026-10-19: a fight belongs
+    among the goals, in the order it happened): (game second, fighters, a function giving the sentence when the story
+    reaches it, so names follow the story's full-name-once rule). Pairs are named only when certain, as below."""
+    p = rows(season).filter(pl.col("game_id") == gid)
+    if p.is_empty():
+        return []
+    ws = whistles(p)
+    big = {w["sec"] for w in ws if w["fights"] >= LINE_BRAWL or w["players"] >= BRAWL_PLAYERS or w["roughing"] >= BRAWL_ROUGHING}
+    out = []
+    for n, w in enumerate(x for x in ws if x["fights"] and x["sec"] not in big):
+        pair = _pair(w)
+        when = _when(w["period"], w["sec"])
+        if pair:
+            verb = ["dropped the gloves", "squared off", "fought"][(zlib.crc32(str(gid).encode()) + n) % 3]
+            say = (lambda opened=None, a=pair[0], b=pair[1], v=verb, t=when:
+                   f"{name(a)} and {name(b)} opened {opened} with a fight." if opened else f"{name(a)} and {name(b)} {v} {t}.")
+        else:
+            say = (lambda opened=None, w=w, t=when: f"{_cap(num(w['fights']))} fights broke out at once {t}, and {_and([name(x) for x in _fighters(w)])} all got five for fighting.")
+        out.append((w["sec"], _fighters(w), say))
+    return out
+
+
+def recap_notes(gid: int, season: int, teams: dict[int, str], W, name, fights_told: bool = False) -> list[str]:
     """At most two sentences about a finished game's penalties, only when something stood out.
 
     teams maps team id to abbreviation; W is stories.Words; name(pid) gives a player's name the way the story is
@@ -189,6 +204,11 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
     # The play-by-play doesn't say who fought whom, so pairs are named only when a whistle had one fight; when
     # several started at once, everyone who got five is listed together (Sora: never risk saying something untrue).
     rest = [w for w in ws if w["fights"] and w["sec"] not in brawls]
+    if fights_told:  # the chronology told them (fight_events); they still count as "something happened" below
+        told.update(p for w in rest for p in _fighters(w))
+        must_fight, rest = bool(rest), []
+    else:
+        must_fight = False
     pairs = [_pair(w) for w in rest]
     if len(rest) == 1 and pairs[0]:
         w, (a, b) = rest[0], pairs[0]
@@ -205,7 +225,7 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
     # how many penalties were called, and who took them
     per = c.filter(pl.col("p1").is_not_null()).group_by("p1").agg(n=pl.len()).sort("n", descending=True)
     busy = per.row(0, named=True) if per.height else None
-    if total <= N["few"] and not must:  # "only two penalties" reads wrong beside a fight (eye test on 2025-26, 2026-10-13)
+    if total <= N["few"] and not must and not must_fight:  # "only two penalties" reads wrong beside a fight (eye test on 2025-26, 2026-10-13)
         if total == 0:
             notes.append((75, "Not a single penalty was called all night."))
         elif busy and busy["n"] >= 2 and busy["n"] == total:
@@ -219,11 +239,16 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name) -> list[s
         tail = f", a total the league sees {_every(rare)}" if rare > 0 else ", more than any game since 2023-24"
         notes.append((65, f"The officials called {num(total)} penalties{tail}."))
     if busy and busy["p1"] not in told:
-        if busy["n"] >= 2 and total <= QUIET_GAME and not must:
+        if busy["n"] >= 2 and total <= QUIET_GAME and not must and not must_fight:
             notes.append((78, f"Only {num(total)} penalties were called, and {num(busy['n'])} of them were {name(busy['p1'])}’s."))
         elif busy["n"] >= BUSY_PLAYER:
-            share = f" of the game’s {num(total)}" if busy["n"] * 2 > total else ""
-            notes.append((68, f"{name(busy['p1'])} took {num(busy['n'])} penalties{share} on his own."))
+            # both Tkachuks took three for Florida (FLA at OTT, Oct 21): a tie names everyone in it, in a stable order
+            tied = sorted(r["p1"] for r in per.iter_rows(named=True) if r["n"] == busy["n"] and r["p1"] not in told)
+            if len(tied) > 1:
+                notes.append((68, f"{_and([name(x) for x in tied])} each took {num(busy['n'])} penalties."))
+            else:
+                share = f" of the game’s {num(total)}" if busy["n"] * 2 > total else ""
+                notes.append((68, f"{name(busy['p1'])} took {num(busy['n'])} penalties{share} on his own."))
     # ten-minute misconducts not already part of a scrum or an ejection
     tens = p.filter((pl.col("pen_desc") == "misconduct") & pl.col("p1").is_not_null() & ~pl.col("sec").is_in(list(scrum_secs))
                     & ~pl.col("p1").is_in(list(told)))
@@ -257,8 +282,6 @@ def _tangled(w: dict, name) -> str:
     return f"{_and([name(p) for p in _fighters(w)])} all got five for fighting"
 
 
-def _and(xs: list[str]) -> str:
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
 def bad_blood(gid: int, season: int, N: dict[int, str]) -> dict | None:

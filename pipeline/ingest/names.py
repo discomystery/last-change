@@ -241,6 +241,23 @@ def _fill_countries(limit: int = 150) -> int:
     return min(len(todo), limit)
 
 
+def fill_countries(ids: list[int], limit: int = 150) -> int:
+    """Birth country for these players (retired scorers on the all-time lists, for "most by a U.S.-born player"), from
+    their landing pages; ones already known cost nothing."""
+    if OFFLINE:
+        return 0
+    from pipeline.ingest.client import get
+
+    known = countries()
+    todo = [i for i in ids if str(i) not in known][:limit]
+    for pid in todo:
+        try:
+            note_country(int(pid), get(f"{NHL_WEB}/v1/player/{pid}/landing").json().get("birthCountry"))
+        except Exception as e:
+            print(f"no country for {pid}: {e!r}")
+    return len(todo)
+
+
 def spellings(seasons: list[int], again: tuple[int, ...] = ()) -> dict[int, tuple[str | None, str | None]]:
     """Every player seen in a game: id -> (first, last) as he spells them (for most, the NHL's plain spelling)."""
     read_seasons(seasons, again)

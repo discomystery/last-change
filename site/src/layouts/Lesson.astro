@@ -1,0 +1,64 @@
+---
+// One Academy lesson: where it sits, its title and blurb, the lesson itself (the slot), the words it introduced and
+// the way on to the next one. Reaching the end marks the lesson done on this device (localStorage lc-academy-done).
+import Base from './Base.astro';
+import { lessonAt } from '../lib/academy/lessons';
+import '../styles/academy.css';
+interface Props { slug: string }
+const { slug } = Astro.props;
+const at = lessonAt(slug);
+const { lesson, track, next } = at;
+const base = import.meta.env.BASE_URL;
+const ofTrack = track.lessons.filter((l) => !l.extra).length;
+---
+<Base title={`${lesson.title} · Academy`} description={lesson.blurb}>
+  <article class="ac" data-lesson={slug}>
+    <nav class="crumbs" aria-label="Where you are">
+      <a href={`${base}academy/`}>Academy</a><span aria-hidden="true">›</span><span>{track.title}</span><span aria-hidden="true">›</span>
+      <span aria-current="page">{lesson.extra ? 'Extra credit' : `Lesson ${at.index + 1} of ${ofTrack}`}</span>
+    </nav>
+    <header class="ac-top">
+      <h1>{lesson.title}</h1>
+      <p class="lede">{lesson.blurb}</p>
+      {lesson.minutes && <p class="ac-meta"><span class="chip">About {lesson.minutes} minutes</span></p>}
+    </header>
+    <slot />
+    {lesson.words && (
+      <section class="ac-part ac-words" aria-labelledby="words-h">
+        <p class="box-h" id="words-h">Words you’ll hear</p>
+        <dl>
+          {lesson.words.map((w) => <div><dt>{w.word}</dt><dd>{w.means}</dd></div>)}
+        </dl>
+        <p class="ac-hint">Every word from every lesson is in the <a href={`${base}academy/words/`}>Academy glossary</a>.</p>
+      </section>
+    )}
+    <nav class="ac-next" aria-label="Next lesson">
+      {next ? (
+        <div>
+          <p class="eyebrow">Next lesson</p>
+          {next.ready ? <a class="ac-to" href={`${base}academy/${next.slug}/`}>{next.title}</a> : <p class="ac-to">{next.title}</p>}
+          <p class="ac-sub">{next.ready ? next.blurb : `${next.blurb} Coming soon.`}</p>
+        </div>
+      ) : <div><p class="ac-to">That’s every lesson so far.</p></div>}
+      <a class="pill" href={`${base}academy/`}>All lessons</a>
+    </nav>
+  </article>
+</Base>
+
+<script>
+  // Reaching the bottom of the lesson counts as done.
+  const art = document.querySelector<HTMLElement>('.ac[data-lesson]');
+  const end = document.querySelector('.ac-next');
+  if (art && end && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((es) => {
+      if (!es[0].isIntersecting) return;
+      io.disconnect();
+      try {
+        const done = new Set(JSON.parse(localStorage.getItem('lc-academy-done') || '[]'));
+        done.add(art.dataset.lesson);
+        localStorage.setItem('lc-academy-done', JSON.stringify([...done]));
+      } catch {}
+    });
+    io.observe(end);
+  }
+</script>

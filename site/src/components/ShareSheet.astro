@@ -66,7 +66,10 @@ const data: Omit<GameData, 'id'> & { id: number } = {
   onShare('game', () => openShare({ title: 'Share this game', file: file(game), key: 'game',
     make: async (t: Theme) => { const { gameCard, render } = await lib(); return render(gameCard(g, t)); } }));
   onShare('swing', () => {
-    const team = (document.getElementById('sw-team') as HTMLSelectElement | null)?.value ?? g.away;
+    // With both teams shown, the card is the visitor's own team's when it played, else the visitors'.
+    const picked = (document.getElementById('sw-team') as HTMLSelectElement | null)?.value;
+    const mine = (window as { lcPrefs?: { get(k: string): string | null } }).lcPrefs?.get('team');
+    const team = picked && g.teams[picked] ? picked : mine && g.teams[mine] ? mine : g.away;
     const nick = g.teams[team].nick;
     openShare({ title: `Share the ${nick}${nick.endsWith('s') ? '’' : '’s'} Swing`, file: file(`${game}-swing-${team}`), key: `swing:${team}`,
       make: async (t) => { const { swingCard, render, load } = await lib(); return render(swingCard(g, await load(g, 'scores'), team, t)); } });

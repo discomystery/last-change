@@ -48,7 +48,7 @@ def update(season: int) -> dict:
 
     from pipeline.build import games, join_xg, shot_features
     from pipeline.export import site_json
-    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, rosters
+    from pipeline.ingest import careers, coaches, edge, game_stats, history, moneypuck, names, nhl, nhl_previews, records, rosters
     from pipeline.metrics import player_game, team_game, units, xg_model
 
     out = {"ingest": nhl.ingest_season(season, refresh_schedule=season == CURRENT_SEASON)}
@@ -66,6 +66,7 @@ def update(season: int) -> dict:
         from pipeline.ingest import standings_daily
         out["standings_days"] = standings_daily.update(season)  # the table after each game day, for the playoff race
         out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
+        out["official_stats"] = official_stats_update(season)
         out["availability"] = availability_update(season)
     if MONEYPUCK_CHECK:
         out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # shots_xg.parquet, for xg_model.evaluate
@@ -80,6 +81,8 @@ def update(season: int) -> dict:
     if season == CURRENT_SEASON:
         out["careers"] = careers.update(season)  # NHL career history for the page intros, a capped batch per run
         out["history"] = history.update()  # team standings and playoff brackets since 1997-98, fetched once
+        out["records"] = records.update()  # franchise all-time scoring lists from records.nhl.com, weekly
+        out["league_lists"] = records.league_update(season)  # NHL all-time lists, a snapshot each update, for post-game stories
         out["nhl_previews"] = nhl_previews.update(season)  # NHL.com's projected starting goalies for today's games
     out["export"] = site_json.run(season)
     if season == CURRENT_SEASON:
@@ -152,6 +155,7 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["names"] = respell(season)
     out["game_stats"] = game_stats.update(season)  # the league's own power-play line, for post-game pages
     out["standings_days"] = standings_daily.update(season)  # the table after tonight's games, for the playoff race
+    out["official_stats"] = official_stats_update(season)
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
     team_game.build(season)
@@ -182,12 +186,29 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["jobs"] = jobs.run(season, only=todo)
     out["scores"] = game_scores.run(season, only=todo)
     out["flow"] = flow.run(season)
+    from pipeline.export import matchups
+    out["matchups"] = matchups.run(season)  # post-game line-against-line time, after the recaps (it reads their exits)
     out["stories"] = stories.run_recaps(season)
     track.run(season)
     from pipeline.export import home
     out["home"] = home.run(season)  # last night's results and today's games change on game nights
+    from pipeline.export import stats
+    out["stats"] = stats.run(season)  # tonight's goals and assists in the season lines and the Leaders page
+    from pipeline.export import ledger
+    out["ledger"] = ledger.run(season)  # this season's line in each player's career ledger
+    from pipeline.export import gamelog
+    out["gamelog"] = gamelog.run(season)  # tonight's game in each player's recent games
     out["waiting_on_shift_charts"] = sorted(pending.games(season))
     return out
+
+
+def official_stats_update(season: int) -> dict:
+    """The league's own season totals (goals, power-play goals, wins, PP%...): this season every run, last season once,
+    and every finished season's shifts and ice time by strength once (career ledger)."""
+    from pipeline.ingest import official_stats
+
+    return {season: official_stats.update(season), season - 1: official_stats.update(season - 1, current=False),
+            "ice_history": official_stats.ice_history()}
 
 
 def respell(season: int) -> dict:
@@ -215,7 +236,7 @@ def availability_update(season: int) -> dict:
     return out
 
 
-TABLE_RULES = 5  # bump when a change to how these tables are built must also reach seasons saved earlier
+TABLE_RULES = 6  # bump when a change to how these tables are built must also reach seasons saved earlier
 # 2 (2026-10-10): penalty shots are no longer counted as 5-on-5 or on-ice play
 # 3 (2026-10-11): a shot that hits the shooter's own teammate is no longer a block for the other team
 # 4 (2026-10-11): expected-goals model v2; earlier seasons' shots are rebuilt and re-rated

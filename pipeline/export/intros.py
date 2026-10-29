@@ -15,9 +15,10 @@ from datetime import date
 
 import polars as pl
 
+from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _ordinal
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, REGULAR, SITE_DATA, TABLES
 from pipeline.ingest import history
-from pipeline.export import wording
+from pipeline.export import absences, wording
 from pipeline.metrics import adjust
 
 HISTORY = 4  # seasons of team history to describe (we hold full tables from 2022-23)
@@ -28,20 +29,6 @@ HISTORY = 4  # seasons of team history to describe (we hold full tables from 202
 def _pick(pool: list[str], *key) -> str:
     """Stable choice from a wording pool (same text every run, varied across teams and players)."""
     return pool[zlib.crc32("|".join(map(str, key)).encode()) % len(pool)]
-
-
-def _cap(t: str) -> str:
-    return t[:1].upper() + t[1:] if t else t
-
-
-def _and(xs: list[str]) -> str:
-    xs = [x for x in xs if x]
-    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1] if xs else ""
-
-
-def _ordinal(n: int) -> str:
-    s = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{s}"
 
 
 WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
@@ -194,7 +181,8 @@ def _extremes(fp: dict, keys, cut: int) -> list[tuple[str, str, int]]:
 def team_style(fp: dict) -> tuple[list[str], list[str]]:
     """Phrases for the team's two most extreme 5-on-5 traits (pairs read as one thought), and the clauses for special
     teams and goaltending at the far ends. Returns (phrases, trait keys used)."""
-    ext = [(k, end, d) for k, end, d in _extremes(fp, STYLE, 20) if STYLE[k][0 if end == "hi" else 1]]
+    eleven = bool((fp.get("lineup") or {}).get("habit"))  # 11 forwards most nights: depth is a choice, not a ranking
+    ext = [(k, end, d) for k, end, d in _extremes(fp, STYLE, 20) if STYLE[k][0 if end == "hi" else 1] and not (eleven and k == "depth")]
     phrases, used = [], []
     for k, end, _ in ext:
         if k in used or any({k, u} <= pair for u in used for pair in OPPOSED):
@@ -209,6 +197,9 @@ def team_style(fp: dict) -> tuple[list[str], list[str]]:
             used.append(k)
         if len(phrases) == 2:
             break
+    if eleven and len(phrases) < 2:
+        phrases.append("dress eleven forwards and seven defensemen")
+        used.append("depth")
     return phrases, used
 
 
@@ -237,7 +228,8 @@ def _run_streak(recent: list[dict]) -> tuple[int, bool]:
 # Voice (user, 2026-10-10: the first drafts read "stiff"): written the way a fan would tell a friend about a team.
 # Lead with a verdict that ties the past to the present, then whether the play backs up the record, then how they
 # play, then special teams. Vary the openings; no two sentences start the same way.
-def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict], full: list[dict] | None = None) -> dict:
+def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict], full: list[dict] | None = None,
+               absent: str | None = None) -> dict:
     """`full` is the franchise's NHL history since 1997-98 (ingest/history.py); droughts and playoff runs are counted
     over it when it is there, so a ten-year drought is not told as four."""
     X, nick = _the(t), _nick(t)
@@ -312,6 +304,10 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
         if gp < 10 and "though" not in say and "write them off" not in say:
             say += " " + _pick(["Early days, of course.", "It’s early, mind you.", "Small sample, sure."], *key, "early")
         out.append(say)
+
+    # 2b. Regulars missing, only when the league rank stands out (absences.py; Sora, 2026-10-19).
+    if absent and gp:
+        out.append(absent)
 
     # 3. How they play.
     phrases, used = team_style(fp)
@@ -497,6 +493,10 @@ def player_intro(p: dict, career: dict | None, teams: dict, next_game: dict | No
         elif lp >= 45 or (p["pos"] == "D" and lp >= 35):
             out.append(f"He had {lp} points last season.")
 
+    cs = conn_smythe(career)
+    if cs:
+        out.append(cs)
+
     stories = []
     if career and next_game and not p.get("unplayed"):  # next-game storylines assume he plays
         p = {**p, "draft_team": (career["landing"].get("draftDetails") or {}).get("teamAbbrev")}
@@ -511,7 +511,8 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
     out = []
     o = teams.get(opp, {"place": opp, "nick": opp})
     O = f"the {_nick(o)}"
-    when = "tonight" if tonight else "next time out"
+    # "tonight" is rewritten in the browser to the visitor's own day ("tomorrow", "on Saturday", "next time out"; Base.astro).
+    when = "tonight"
     reg = [g for g in games if g["type"] == REGULAR]
     vs = [g for g in reg if g["opponentAbbrev"] == opp and g["teamAbbrev"] != opp]
     former = [s for s in stints[:-1] if s["team"] == opp]
@@ -523,7 +524,7 @@ def opponent_notes(p: dict, games: list[dict], stints: list[dict], opp: str, tea
             out.append(f"This one’s personal. {p['last']} spent {_num(spell)} season{'s' if spell != 1 else ''} {wording.at(o['place'])}"
                        f"{', the team that drafted him,' if drafted else ''} and faces {O} {when} for the first time since leaving.")
         elif spell >= 2:
-            out.append(f"{_cap(when)} is a date with his old team: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
+            out.append(f"He has a date with his old team {when}: he spent {_num(spell)} season{'s' if spell != 1 else ''} with {O}.")
     if len(vs) >= 3:
         gn, _ = _streak(vs, "goals")
         pn, pts = _streak(vs, "points")
@@ -557,6 +558,18 @@ def reunions(stints: list[dict], games: list[dict], opp_players: list[dict]) -> 
                 if hi >= lo and _seasons_span(lo, hi) >= 4:
                     return [f"He’ll also see an old friend: {q['name']}, his teammate for {_num(_seasons_span(lo, hi))} seasons, is on the other side for the first time."]
     return []
+
+
+def conn_smythe(career: dict | None) -> str | None:
+    """A sentence for a Conn Smythe winner (Sora, 2026-10-16), named by the spring it was won in."""
+    springs = sorted({y // 10000 + 1 for a in ((career or {}).get("landing") or {}).get("awards") or []
+                      if "Conn Smythe" in (a.get("trophy") or "") for y in a.get("seasons", [])})
+    if not springs:
+        return None
+    if len(springs) == 1:
+        return f"He won the Conn Smythe as the playoffs’ most valuable player in {springs[0]}."
+    times = {2: "twice", 3: "three times"}.get(len(springs), f"{len(springs)} times")
+    return f"He’s won the Conn Smythe as the playoffs’ most valuable player {times}, in {_and([str(y) for y in springs])}."
 
 
 def _nhl_seasons(career: dict) -> list[dict]:
@@ -639,7 +652,10 @@ def run(today: str | None = None) -> dict:
         if not g["final"] and g["date"] >= today:
             for t, o in ((g["home"], g["away"]), (g["away"], g["home"])):
                 nxt.setdefault(t, {"date": g["date"], "opp": o, "id": g["id"], "home": t == g["home"]})
-    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts(), history.franchise_history(a))
+    missing = absences.table(CURRENT_SEASON, today)
+    the = lambda a: _the(teams[a]) if a in teams else a
+    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts(), history.franchise_history(a),
+                              absences.intro_line(missing.get(a), the(a), the))
                 for a in teams if a in fp}
 
     careers = _careers()

@@ -1,0 +1,255 @@
+---
+// Teams > Standings (Sora, 2026-10-16): the full NHL standings, by division, conference, wild card or the whole league,
+// with tiebreakers, goals, home and road records, last ten and streak. Any column sorts, within each group; "#" puts
+// the NHL's own order back. Drawn in the browser from teams.json (pipeline/export/site_json.py `_team_row`), so the
+// view and sort can change without a reload. A teams.json saved before the standings fields existed still draws: the
+// missing columns read "–" and the order falls back to points.
+import Base from '../../layouts/Base.astro';
+import TeamTabs from '../../components/TeamTabs.astro';
+import teams from '../../../public/data/teams.json';
+import { teamPaint } from '../../lib/teams';
+import '../../styles/blocks.css';
+import Section from '../../components/Section.astro';
+import { behind, pp3 } from '../../lib/behind';
+
+const paints = Object.fromEntries(teams.map((t) => [t.abbr, teamPaint(t.abbr)]));
+const anyClinch = teams.some((t: any) => t.clinch);
+// Record against play (pipeline/export/behind.py): every club with enough games, in three groups by the gap.
+const base = import.meta.env.BASE_URL;
+const BH_LO = 0.15, BH_HI = 0.85;
+const bhPos = (v: number) => Math.max(0, Math.min(100, (100 * (v - BH_LO)) / (BH_HI - BH_LO)));
+const WHY: Record<string, string> = { gk: 'Goaltending', fin: 'Shooting', en: 'Empty nets', close: 'Close games' };
+const bhRows = behind ? Object.entries(behind.teams).filter(([, t]) => t.checks).map(([abbr, t]) => ({ abbr, ...t })).sort((a, b) => b.gap - a.gap) : [];
+const bhGroups = behind ? [
+  ['Records ahead of their play', bhRows.filter((r) => r.gap >= behind!.gap)],
+  ['About where their play has them', bhRows.filter((r) => Math.abs(r.gap) < behind!.gap)],
+  ['Playing better than their record', bhRows.filter((r) => r.gap <= -behind!.gap)],
+].filter(([, rows]) => rows.length) as [string, typeof bhRows][] : [];
+const nick = Object.fromEntries(teams.map((t) => [t.abbr, t.name]));
+---
+<Base section="teams" title="Standings" description="The full NHL standings: by division, conference, wild card or the whole league, with points percentage, regulation wins, goals, home and road records and streaks.">
+  <header class="page-top"><h1>Standings</h1></header>
+  <p class="lede">Where all 32 teams stand, with the numbers the NHL breaks ties on. Tap a column to sort by it.</p>
+  <TeamTabs current="standings" />
+  <div class="pick" id="st-pick">
+    <span>Show standings</span>
+    <select id="st-view" aria-label="How to group the standings">
+      <option value="division">by division</option>
+      <option value="wildcard">with wild cards</option>
+      <option value="conference">by conference</option>
+      <option value="league">for the whole league</option>
+    </select>
+  </div>
+  <div id="st-out"></div>
+  <p class="note st-note">
+    The order is the NHL’s own, ties broken its way: points percentage, then regulation wins, then regulation and overtime wins, then total wins.
+    The top three in each division and two wild cards in each conference make the playoffs; a line marks the cut when the table is in standings order.
+    {anyClinch && ' x clinched a playoff spot, y the division, z the conference, p the Presidents’ Trophy, e eliminated.'}
+  </p>
+  {bhRows.length > 0 && (
+    <Section id="record" title="Record against play" placeholder={false} takeaway="Each team’s points percentage beside what their chances at 5-on-5 and on special teams are worth, and the main reason when the two are far apart.">
+      <Fragment slot="explain">
+        <p>The dot is the record. The dotted mark is the points percentage a team with these chances usually ends up with, from every team-season of 2023-24 to 2025-26, and the bar between them is the gap. The tick is the league average.</p>
+        <p>A record {pp3(behind!.gap)} or more away from its chances gets its main reasons: goaltending or shooting that has run well above or below the chances, empty-net goals, or more than their share of one-goal and overtime results. Tested on the same seasons, a team’s chances after 15 games told us more about the rest of its season than its record did. Each team’s page has the full breakdown.</p>
+      </Fragment>
+      <div class="card bhs">
+        {bhGroups.map(([title, rows]) => (
+          <div class="bhs-group">
+            <p class="mini-h">{title}</p>
+            <ul>
+              {rows.map((r) => (
+                <li style={`--team:${paints[r.abbr]}`}>
+                  <a class="bhs-ab" href={`${base}team/${r.abbr}/#record`} data-tip={`${nick[r.abbr]}: a ${pp3(r.pp)} points percentage; their chances are worth about ${pp3(r.play)}.`}>{r.abbr}</a>
+                  <span class="bhs-lane" aria-hidden="true">
+                    <span class="bh-track"></span>
+                    <span class="bh-avg" style={`--v:${bhPos(behind!.fit.base)}`}></span>
+                    <span class="bh-gap" style={`--a:${bhPos(r.play)};--b:${bhPos(r.pp)}`}></span>
+                    <span class="bh-ref" style={`--v:${bhPos(r.play)}`}></span>
+                    <span class="bh-dot" style={`--v:${bhPos(r.pp)}`}></span>
+                  </span>
+                  <span class="bhs-gap">{r.gap > 0 ? '+' : r.gap < 0 ? '−' : ''}{pp3(Math.abs(r.gap))}</span>
+                  <span class="bhs-why">{(r.why ?? []).map((k) => <span class="chip">{WHY[k]}</span>)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <p class="bh-key"><span class="k-dot">Record</span><span class="k-ref">What their chances are worth</span><span class="k-avg">Average</span></p>
+      </div>
+    </Section>
+  )}
+  <script type="application/json" id="st-teams" set:html={JSON.stringify(teams)}></script>
+  <script type="application/json" id="st-paints" set:html={JSON.stringify(paints)}></script>
+</Base>
+
+<script>
+  type Rec = [number, number, number];
+  type T = {
+    abbr: string; name: string; w: number; l: number; otl: number; gp: number; pts: number; conference: string; division: string; div_rank: number;
+    conf_rank?: number; league_rank?: number; wc_rank?: number; pt_pct?: number; rw?: number; row?: number; gf?: number; ga?: number;
+    home?: Rec; road?: Rec; l10?: Rec; streak?: string | null; clinch?: string | null;
+  };
+  const base = import.meta.env.BASE_URL;
+  const $ = (id: string) => document.getElementById(id) as any;
+  const all: T[] = JSON.parse($('st-teams').textContent);
+  const paints: Record<string, string> = JSON.parse($('st-paints').textContent);
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const dash = '–';
+
+  // Standings order when the feed did not give one: points, then points %, regulation wins, fewer games.
+  const pct = (t: T) => t.pt_pct ?? (t.gp ? t.pts / (2 * t.gp) : 0);
+  const fallback = (a: T, b: T) => b.pts - a.pts || pct(b) - pct(a) || (b.rw ?? 0) - (a.rw ?? 0) || a.gp - b.gp || a.name.localeCompare(b.name);
+  const leagueOrder = [...all].sort((a, b) => (a.league_rank ?? 99) - (b.league_rank ?? 99) || fallback(a, b));
+  const pos = new Map(leagueOrder.map((t, i) => [t.abbr, i]));
+  const std = (a: T, b: T) => pos.get(a.abbr)! - pos.get(b.abbr)!;
+  // Division top three, then the conference's wild cards in order (the feed's wildcardSequence, else standings order).
+  const divTop = (t: T) => t.div_rank <= 3;
+  const confs = [...new Set(all.map((t) => t.conference))].sort();
+  const divs = (c: string) => [...new Set(all.filter((t) => t.conference === c).map((t) => t.division))].sort();
+
+  const rec = (r?: Rec) => (r ? r.join('-') : dash);
+  const recPts = (r?: Rec) => (r ? 2 * r[0] + r[2] : -1);
+  const streakVal = (s?: string | null) => { if (!s) return -99; const n = Number(s.slice(1)); return s[0] === 'W' ? n : s[0] === 'O' ? -n / 2 : -n; };
+  const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0');
+  type Col = { k: string; short: string; tip: string; show: (t: T) => string; val: (t: T) => number; low?: boolean; cls?: string };
+  const COLS: Col[] = [
+    { k: 'gp', short: 'GP', tip: 'Games played.', show: (t) => String(t.gp), val: (t) => t.gp, low: true },
+    { k: 'w', short: 'W', tip: 'Wins, in regulation, overtime or a shootout.', show: (t) => String(t.w), val: (t) => t.w },
+    { k: 'l', short: 'L', tip: 'Losses in regulation.', show: (t) => String(t.l), val: (t) => t.l, low: true },
+    { k: 'otl', short: 'OT', tip: 'Losses in overtime or a shootout, worth one point.', show: (t) => String(t.otl), val: (t) => t.otl, low: true },
+    { k: 'pts', short: 'PTS', tip: 'Points: two for a win, one for an overtime or shootout loss.', show: (t) => String(t.pts), val: (t) => t.pts, cls: 'b' },
+    { k: 'pct', short: 'P%', tip: 'Points percentage: points out of the most they could have had. The first tiebreaker, and fairer than points when teams have played different numbers of games.', show: (t) => (t.gp ? pct(t).toFixed(3).replace(/^0/, '') : dash), val: pct },
+    { k: 'rw', short: 'RW', tip: 'Regulation wins: wins in 60 minutes. The second tiebreaker.', show: (t) => (t.rw ?? dash) + '', val: (t) => t.rw ?? -1 },
+    { k: 'row', short: 'ROW', tip: 'Regulation and overtime wins: every win except shootout wins. The third tiebreaker.', show: (t) => (t.row ?? dash) + '', val: (t) => t.row ?? -1 },
+    { k: 'gf', short: 'GF', tip: 'Goals for. Shootout winners count as one goal, as the NHL counts them.', show: (t) => (t.gf ?? dash) + '', val: (t) => t.gf ?? -1 },
+    { k: 'ga', short: 'GA', tip: 'Goals against.', show: (t) => (t.ga ?? dash) + '', val: (t) => t.ga ?? 999, low: true },
+    { k: 'diff', short: 'DIFF', tip: 'Goal difference: goals for minus goals against.', show: (t) => (t.gf == null || t.ga == null ? dash : signed(t.gf - t.ga)), val: (t) => (t.gf ?? 0) - (t.ga ?? 0) },
+    { k: 'home', short: 'Home', tip: 'Record at home: wins, losses, overtime losses.', show: (t) => rec(t.home), val: (t) => recPts(t.home), cls: 'rc' },
+    { k: 'road', short: 'Away', tip: 'Record on the road: wins, losses, overtime losses.', show: (t) => rec(t.road), val: (t) => recPts(t.road), cls: 'rc' },
+    { k: 'l10', short: 'L10', tip: 'Record in their last ten games.', show: (t) => rec(t.l10), val: (t) => recPts(t.l10), cls: 'rc' },
+    { k: 'strk', short: 'STRK', tip: 'Current streak: W wins, L regulation losses, OT overtime or shootout losses.', show: (t) => t.streak ?? dash, val: (t) => streakVal(t.streak), cls: 'rc' },
+  ];
+
+  const sel = $('st-view');
+  let view = 'division', sortKey = '', flip = false;
+  try { view = localStorage.getItem('lc-standings-view') || 'division'; } catch {}
+  if (![...sel.options].some((o: HTMLOptionElement) => o.value === view)) view = 'division';
+  sel.value = view;
+
+  type Group = { h?: string; sub?: string; teams: T[]; cut?: number };
+  const groups = (): Group[] => {
+    const out: Group[] = [];
+    if (view === 'league') return [{ teams: [...all].sort(std) }];
+    for (const c of confs) {
+      const inConf = all.filter((t) => t.conference === c).sort(std);
+      if (view === 'conference') { out.push({ h: `${c} Conference`, teams: inConf }); continue; }
+      divs(c).forEach((d, i) => out.push({ h: i === 0 ? `${c} Conference` : undefined, sub: d, teams: inConf.filter((t) => t.division === d && (view === 'division' || divTop(t))), cut: view === 'division' ? 3 : undefined }));
+      if (view === 'wildcard') {
+        const wc = inConf.filter((t) => !divTop(t)).sort((a, b) => (a.wc_rank || 99) - (b.wc_rank || 99) || std(a, b));
+        out.push({ sub: 'Wild card', teams: wc, cut: 2 });
+      }
+    }
+    return out;
+  };
+
+  const head = () => {
+    const th = (c: Col) => `<th class="${c.k === sortKey ? 'on' : ''}"><button type="button" data-sort="${c.k}" data-tip="${esc(c.tip)}" aria-label="Sort by ${esc(c.tip.split(':')[0].replace(/\.$/, ''))}">${c.short}${c.k === sortKey ? `<i aria-hidden="true">${flip ? '▲' : '▼'}</i>` : ''}</button></th>`;
+    return `<thead><tr><th class="rk"><button type="button" data-sort="" data-tip="Standings order. Tap to put it back." aria-label="Standings order">#${!sortKey ? '<i aria-hidden="true">▼</i>' : ''}</button></th><th class="who">Team</th>${COLS.map(th).join('')}</tr></thead>`;
+  };
+
+  const paint = () => {
+    const mine = (window as any).lcPrefs?.get('team');
+    const col = COLS.find((c) => c.k === sortKey);
+    const order = (xs: T[]) => {
+      if (!col) return xs;
+      const dir = (col.low ? 1 : -1) * (flip ? -1 : 1);
+      return [...xs].sort((a, b) => dir * (col.val(a) - col.val(b)) || std(a, b));
+    };
+    $('st-out').innerHTML = groups().map((g) => {
+      const rows = order(g.teams).map((t, i) => {
+        const place = col ? i + 1 : g.teams.indexOf(t) + 1;
+        const cut = !col && g.cut && i === g.cut - 1 && g.teams.length > g.cut ? ' cut' : '';
+        const clinch = t.clinch ? `<span class="cl" data-tip="${esc({ x: 'Clinched a playoff spot', y: 'Clinched the division', z: 'Clinched the conference', p: 'Clinched the Presidents’ Trophy', e: 'Eliminated from the playoffs' }[t.clinch] ?? '')}">${esc(t.clinch)}</span>` : '';
+        return `<tr class="${t.abbr === mine ? 'mine' : ''}${cut}"><td class="rk">${place}</td><th class="who" scope="row"><a class="st-tm" href="${base}team/${t.abbr}/" style="--c:${paints[t.abbr] ?? 'var(--ink-3)'}"><i aria-hidden="true"></i><span class="full">${esc(t.name)}</span><span class="ab">${esc(t.abbr)}</span></a>${clinch}</th>${COLS.map((c) => `<td class="${[c.k === sortKey ? 'on' : '', c.cls ?? ''].join(' ').trim()}">${esc(c.show(t))}</td>`).join('')}</tr>`;
+      }).join('');
+      return `${g.h ? `<h2 class="st-h">${esc(g.h)}</h2>` : ''}<div class="card st-card">${g.sub ? `<p class="mini-h st-sub">${esc(g.sub)}</p>` : ''}<div class="st-wrap"><table class="stbl stand">${head()}<tbody>${rows}</tbody></table></div></div>`;
+    }).join('');
+  };
+
+  sel.addEventListener('change', () => { view = sel.value; try { localStorage.setItem('lc-standings-view', view); } catch {} paint(); });
+  $('st-out').addEventListener('click', (e: Event) => {
+    const b = (e.target as HTMLElement).closest('button[data-sort]') as HTMLElement | null;
+    if (!b) return;
+    const k = b.dataset.sort!;
+    flip = k && k === sortKey ? !flip : false;
+    sortKey = k;
+    paint();
+  });
+  paint();
+</script>
+
+<style is:global>
+  .bhs { padding: 20px 24px; }
+  .bhs-group + .bhs-group { margin-top: 20px; }
+  .bhs .mini-h { margin: 0 0 8px; }
+  .bhs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .bhs li { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) 3.4em minmax(0, 13em); gap: 12px; align-items: center; min-height: 26px; }
+  .bhs-ab { font: 700 14px var(--ui); color: var(--team); text-decoration: none; }
+  .bhs-ab:hover { text-decoration: underline; }
+  .bhs-lane { position: relative; height: 18px; margin: 0 7px; }
+  .bhs-gap { font: 600 13px var(--ui); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .bhs-why { display: flex; flex-wrap: wrap; gap: 4px; }
+  .bhs .bh-key { margin-top: 18px; }
+  @media (max-width: 620px) {
+    .bhs { padding: 16px; }
+    .bhs li { grid-template-columns: 2.8em minmax(0, 1fr) 3.2em; row-gap: 2px; }
+    .bhs-why { grid-column: 2 / -1; }
+    .bhs-why:empty { display: none; }
+  }
+
+  .st-h { font: 600 22px/1.15 var(--display); margin: 30px 0 12px; }
+  #st-out > .st-card:first-child { margin-top: 20px; }
+  .st-card { padding: 8px 0 6px; margin-top: 12px; }
+  .st-sub { margin: 8px 16px 2px; }
+  .st-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+  .stbl.stand { width: 100%; }
+  .stbl.stand th, .stbl.stand td { padding: 8px 9px; }
+  .stbl.stand thead th { vertical-align: bottom; padding-top: 10px; }
+  .stbl.stand thead button { all: unset; cursor: pointer; display: inline-flex; gap: 3px; align-items: baseline; }
+  .stbl.stand thead button:hover, .stbl.stand thead button:focus-visible { color: var(--ink); text-decoration: underline dotted; text-underline-offset: 3px; }
+  .stbl.stand thead th.on, .stbl.stand thead th.on button { color: var(--ink); }
+  .stbl.stand thead i { font-style: normal; font-size: 8px; }
+  .stbl.stand td.on { font-weight: 700; background: color-mix(in oklab, var(--track) 55%, var(--sheet)); }
+  .stbl.stand td.b { font-weight: 700; }
+  .stbl.stand td.rc { color: var(--ink-2); }
+  /* Place and team stay put while the numbers scroll sideways. */
+  .stbl.stand .rk { position: sticky; left: 0; z-index: 1; background: var(--sheet); padding-left: 16px; width: 44px; min-width: 44px; max-width: 44px; text-align: right; color: var(--ink-3); font-weight: 600; font-size: 12px; }
+  .stbl.stand thead .rk { text-align: right; }
+  .stbl.stand .who { position: sticky; left: 44px; z-index: 1; background: var(--sheet); text-align: left; font-weight: 600; box-shadow: 1px 0 0 var(--rule); width: 34%; }
+  .st-tm { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; }
+  .st-tm:hover .full, .st-tm:hover .ab { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+  .st-tm i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+  .st-tm .ab { display: none; }
+  .stbl.stand .cl { margin-left: 6px; font: 600 11px var(--ui); color: var(--ink-3); cursor: help; }
+  .stbl.stand td:last-child, .stbl.stand thead th:last-child { padding-right: 16px; }
+  .stbl.stand tr.mine .rk, .stbl.stand tr.mine .who, .stbl.stand tr.mine td { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); }
+  /* The playoff cut: a firmer rule under the last team in. */
+  .stbl.stand tbody tr.cut { border-bottom: 2px solid var(--ink-3); }
+  .st-note { margin-top: 18px; }
+  /* Tablets standing up (iPad mini: 744 px): the full names push the last columns out of view, so they get the
+     abbreviations too, and every column fits without scrolling. */
+  @media (min-width: 720px) and (max-width: 1000px) {
+    .stbl.stand .who { width: auto; }
+    .stbl.stand th, .stbl.stand td { padding: 8px 7px; }
+    .st-tm .full { display: none; }
+    .st-tm .ab { display: inline; }
+  }
+  @media (max-width: 719px) {
+    .stbl.stand .rk { padding-left: 10px; width: 32px; min-width: 32px; max-width: 32px; }
+    .stbl.stand .who { left: 32px; width: auto; }
+    .stbl.stand th, .stbl.stand td { padding: 8px 7px; }
+    .st-tm .full { display: none; }
+    .st-tm .ab { display: inline; }
+    .st-sub { margin-inline: 10px; }
+  }
+</style>

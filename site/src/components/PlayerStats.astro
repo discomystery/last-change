@@ -1,0 +1,160 @@
+---
+// The career ledger (Sora, 2026-10-15, after mock-ups): every NHL season he has played, every stat the league keeps,
+// regular season or playoffs. A season split by a trade gets a total line with each club underneath. His career
+// high in each column is bold in the color of the club he set it with. Trophies are written as pills at the far end
+// of the row, with a small marker by the club (a diamond and a count, and the Cup) so the stats columns keep their place.
+// It opens from a fold at the bottom of the player's name card (Sora, 2026-10-15).
+import { SKATER, GOALIE, seasons as statSeasons, seasonName, type Stat } from '../lib/stats';
+import { ledgerOf, seasons, combine, awardsIn, type Season } from '../lib/ledger';
+import { teamPaint } from '../lib/teams';
+
+interface Props { id: number; goalie?: boolean; pos?: string }
+const { id, goalie = false, pos } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const l = ledgerOf(id);
+const cur = statSeasons(goalie ? 'goalies' : 'skaters')[0];
+const S = goalie ? GOALIE : SKATER;
+// Faceoffs only for centers: the NHL gives a share without the draws, and a winger's few draws make wild shares.
+const keys = goalie ? ['gp', 'gs', 'w', 'l', 'otl', 'sa', 'sv', 'ga', 'svpct', 'gaa', 'so']
+  : ['gp', 'g', 'a', 'p', 'pm', 'pim', 'ppg', 'ppp', 'shg', 'shp', 'gwg', 'otg', 's', 'spct', 'toi', 'evtoi', 'pptoi', 'shtoi', 'shifts', 'tps', ...(pos === 'C' ? ['fopct'] : [])];
+const GROUPS: Record<string, string[]> = { sc: ['gp', 'g', 'a', 'p', 'pm', 'pim'], sp: ['gp', 'ppg', 'ppp', 'shg', 'shp', 'pptoi', 'shtoi'], sh: ['gp', 's', 'spct', 'gwg', 'otg', 'toi', 'evtoi', 'shifts', 'tps', 'fopct'] };
+const inGroups = (k: string) => Object.entries(GROUPS).filter(([, ks]) => ks.includes(k)).map(([g]) => g).join(' ');
+// No career high for how much he played or what he gave up: those follow ice time more than how well he did.
+const NO_HIGH = new Set(['gp', 'pim', 'toi', 'evtoi', 'pptoi', 'shtoi', 'shifts', 'tps', 'gs', 'l', 'otl', 'sa', 'ga']);
+const RATES = new Set(['spct', 'toi', 'evtoi', 'pptoi', 'shtoi', 'shifts', 'tps', 'fopct', 'svpct', 'gaa']);
+const better = (st: Stat, a: number, b: number) => (st.low ? a < b : a > b);
+
+const CUP = (w: number) => `<svg width="${w}" height="${Math.round(w * 2.15)}" viewBox="0 0 28 60" aria-hidden="true"><g fill="currentColor"><path d="M4.4 1.4C9 .5 19 .5 23.6 1.4c.5 4.8-1.6 8-6.3 8.6h-6.6C6 9.4 3.9 6.2 4.4 1.4z"/><rect x="11.2" y="9" width="5.6" height="3"/><rect x="8" y="11.2" width="12" height="5" rx="1.6"/><rect x="7.3" y="15.2" width="13.4" height="5.4" rx="1.4"/><rect x="6.5" y="19.6" width="15" height="6" rx="1.4"/><rect x="5.4" y="24.4" width="17.2" height="3" rx="1.2"/><rect x="1.6" y="26" width="24.8" height="32.5" rx="3"/><rect x="0" y="56.6" width="28" height="3" rx="1.2"/></g></svg>`;
+const DIAMOND = '<svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .5L9.5 5 5 9.5.5 5z" fill="currentColor"/></svg>';
+
+// Career line: counts from the club lines; ice time by strength and shifts from the season lines, which carry them.
+const ICE = ['evtoi', 'pptoi', 'shtoi', 'shifts', 'tps'];
+const careerOf = (rows: Season[]) => {
+  const c = combine(rows.flatMap((r) => (r.parts.length ? r.parts : [r])), goalie);
+  if (goalie) return c;
+  const ice = combine(rows, goalie);
+  return { ...c, ...Object.fromEntries(ICE.map((k) => [k, ice[k] ?? null])) };
+};
+type View = { gt: 2 | 3; rows: Season[]; best: Record<string, number>; anyAw: boolean; career: Record<string, any>; per82: boolean };
+const views: View[] = !l ? [] : ([2, 3] as const).map((gt) => {
+  const rows = seasons(l, gt, goalie);
+  const minGp = gt === 2 ? 20 : 5;
+  const best: Record<string, number> = {};
+  for (const k of keys) {
+    if (NO_HIGH.has(k)) continue;
+    const pool = rows.filter((r) => r[k] != null && (!RATES.has(k) || r.gp >= minGp));
+    if (pool.length > 1) best[k] = pool.reduce((b, r) => (better(S[k], r[k], b[k]) ? r : b))[k];
+  }
+  const anyAw = rows.some((r) => { const a = awardsIn(l, r.yr, gt); return a.cup || a.other.length > 0; });
+  return { gt, rows, best, anyAw, career: careerOf(rows), per82: !goalie && gt === 2 };
+}).filter((v) => v.rows.length);
+
+const fmt = (k: string, v: any) => (k === 'fopct' && !v ? '–' : S[k].fmt(v));
+const isBest = (v: View, k: string, r: Season) => v.best[k] != null && r[k] === v.best[k] && (!RATES.has(k) || r.gp >= (v.gt === 2 ? 20 : 5));
+const per82 = (row: Record<string, any>, k: string) => {
+  if (k === 'gp') return '82';
+  if (RATES.has(k) || row[k] == null || !row.gp) return '';
+  const v = Math.round((row[k] * 82) / row.gp);
+  return k === 'pm' ? S.pm.fmt(v) : String(v);
+};
+const tag = (t: string) => `<span class="chip tm" style="--team:${teamPaint(t)}">${t}</span>`;
+const n = (x: number, w: string) => `${x} ${w}${x === 1 ? '' : 's'}`;
+const awardTotal = (v: View) => v.rows.reduce((t, r) => { const a = awardsIn(l!, r.yr, v.gt); return t + a.other.length + (a.cup ? 1 : 0); }, 0);
+const group = goalie ? 'G' : pos === 'D' ? 'D' : 'F';
+---
+{views.length > 0 && (
+  <details class="fold phfold" id="stats">
+    <summary><span class="closed">Show his career stats</span><span class="opened">Hide his career stats</span></summary>
+    <div class="ldg-card">
+      <p class="pick ldg-pick">
+        {!goalie && <><span>Show</span>
+        <select class="ldg-g" aria-label="Which stats"><option value="all">every stat</option><option value="sc">scoring</option><option value="sp">power play and shorthanded</option><option value="sh">shooting and ice time</option></select></>}
+        {views.length > 1 ? <><span>{goalie ? 'Show the' : 'from the'}</span>
+        <select class="ldg-t" aria-label="Season type"><option value="2">regular season</option><option value="3">playoffs</option></select></> : !goalie && <span>from the regular season</span>}
+      </p>
+      {views.map((v, vi) => (
+        <div class="ldg-wrap" data-gt={v.gt} hidden={vi > 0}>
+          <table class="stbl ldg" data-g="all">
+            <thead><tr>
+              <th class="yr">Season</th><th class="tm-h">Team</th>
+              {keys.map((k) => <th data-in={inGroups(k)}><span class="term" tabindex="0" data-tip={`${S[k].name}: ${S[k].tip}`}>{S[k].short}</span></th>)}
+              {v.anyAw && <th class="aw">Awards</th>}
+            </tr></thead>
+            <tbody>
+              {v.rows.map((r) => {
+                const { cup, other } = awardsIn(l!, r.yr, v.gt);
+                const tip = [...other.map((a) => a.name), ...(cup ? ['Stanley Cup'] : [])].join(', ');
+                const now = v.gt === 2 && r.yr === cur;
+                return <>
+                  <tr class={now ? 'now' : undefined}>
+                    <th class="yr" scope="row">{seasonName(r.yr)}</th>
+                    <td class="tm-c"><Fragment set:html={[...new Set(r.teams)].map(tag).join('<span class="sep">·</span>')} />{(cup || other.length > 0) && <span class="mk" tabindex="0" data-tip={`${tip}, ${seasonName(r.yr)}. Listed at the end of the row.`}>{other.length > 0 && <><Fragment set:html={DIAMOND} />{other.length}</>}{cup && <span class="mk-cup"><Fragment set:html={CUP(7)} /></span>}</span>}</td>
+                    {keys.map((k) => isBest(v, k, r)
+                      ? <td data-in={inGroups(k)} class="hi" style={`color:${teamPaint(r.main)}`}><span tabindex="0" data-tip="Career high">{fmt(k, r[k])}</span></td>
+                      : <td data-in={inGroups(k)}>{fmt(k, r[k])}</td>)}
+                    {v.anyAw && <td class="aw">{other.map((a) => <span class="chip" tabindex="0" data-tip={`${a.name}, ${seasonName(r.yr)}`}>{a.short}</span>)}{cup && <span class="chip" tabindex="0" data-tip={`Stanley Cup, ${seasonName(r.yr)}`}>Cup</span>}</td>}
+                  </tr>
+                  {r.parts.map((p) => {
+                    const c = combine([p], goalie);
+                    return <tr class="club"><th class="yr" scope="row"><span class="sr">{seasonName(r.yr)}</span></th><td class="tm-c">with {p.team}</td>{keys.map((k) => <td data-in={inGroups(k)}>{fmt(k, c[k])}</td>)}{v.anyAw && <td class="aw"></td>}</tr>;
+                  })}
+                </>;
+              })}
+            </tbody>
+            <tfoot>
+              <tr><th class="yr" scope="row"><span tabindex="0" data-tip={`${n(v.rows.length, v.gt === 3 ? 'playoff year' : 'season')} in the NHL`}>Career</span></th><td class="tm-c"></td>{keys.map((k) => <td data-in={inGroups(k)}>{fmt(k, v.career[k])}</td>)}{v.anyAw && <td class="aw">{awardTotal(v) ? `${awardTotal(v)} in all` : ''}</td>}</tr>
+              {v.per82 && <tr class="p82"><th class="yr" scope="row">Per 82 games</th><td class="tm-c"></td>{keys.map((k) => <td data-in={inGroups(k)}>{per82(v.career, k)}</td>)}{v.anyAw && <td class="aw"></td>}</tr>}
+            </tfoot>
+          </table>
+        </div>
+      ))}
+      {!l!.complete && <p class="note">Seasons before last are still being collected and will appear here within a few nights.</p>}
+      <p class="note"><a href={`${base}players/leaders/?k=${goalie ? 'g' : 's'}&g=${group}&p=${id}`}>See where he ranks among every {goalie ? 'goalie' : 'skater'} this season →</a></p>
+    </div>
+  </details>
+)}
+
+<script is:inline>
+  // A link to #stats opens the fold.
+  const openStats = () => { const f = document.getElementById('stats'); if (location.hash === '#stats' && f?.tagName === 'DETAILS') f.open = true; };
+  openStats(); addEventListener('hashchange', openStats);
+  document.querySelectorAll('.ldg-card').forEach((card) => {
+    const g = card.querySelector('.ldg-g'), t = card.querySelector('.ldg-t');
+    g?.addEventListener('change', () => card.querySelectorAll('.ldg').forEach((tb) => { tb.dataset.g = g.value; }));
+    t?.addEventListener('change', () => card.querySelectorAll('.ldg-wrap').forEach((w) => { w.hidden = w.dataset.gt !== t.value; }));
+  });
+</script>
+
+<style>
+  /* The fold is the name card's last strip: a soft bar across its bottom that opens the table below it. */
+  .phfold { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; }
+  .phfold > summary { border-radius: 0 0 17px 17px; background: color-mix(in oklab, var(--track) 70%, var(--sheet)); border-top: 1px solid var(--rule); cursor: pointer; }
+  .phfold[open] > summary { border-radius: 0; margin-bottom: 0; }
+  .ldg-card { padding: 16px 28px 20px; }
+  .ldg-card .note { margin: 12px 0 0; }
+  @media (max-width: 719px) { .ldg-card { padding: 14px 16px 16px; } }
+  .ldg-pick { margin: 0 0 12px; }
+  .ldg-wrap { overflow: auto; max-height: 620px; }
+  .ldg { min-width: 100%; }
+  @media (min-width: 720px) { .ldg :global(:is(th, td)) { padding-left: 8px; padding-right: 8px; } .ldg :global(:is(th, td)):first-child { padding-left: 0; } }
+  .ldg :global(:is(th, td)) { white-space: nowrap; }
+  .ldg thead th { position: sticky; top: 0; z-index: 2; background: var(--sheet); }
+  .ldg .yr { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; }
+  .ldg thead .yr { z-index: 3; }
+  .ldg .tm-c, .ldg .tm-h { text-align: left; }
+  .ldg .tm-c :global(.sep) { margin: 0 4px; color: var(--ink-3); }
+  .ldg tr.now > * { background: color-mix(in oklab, var(--track) 55%, var(--sheet)); }
+  .ldg tfoot tr:first-child > * { border-top: 1.5px solid var(--ink-3); }
+  .ldg tr.club > * { color: var(--ink-3); font-size: 13px; padding-top: 3px; padding-bottom: 3px; }
+  .ldg .hi { font-weight: 700; }
+  .ldg .mk { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; height: 14px; vertical-align: middle; font: 600 11.5px/1 var(--ui); color: var(--ink-2); cursor: help; }
+  .ldg .mk-cup { display: inline-flex; margin-left: 4px; }
+  .ldg .mk-cup:first-child { margin-left: 0; }
+  .ldg .aw { text-align: left; }
+  .ldg .aw .chip { margin-right: 4px; }
+  .ldg tfoot > tr > * { font-weight: 700; }
+  .ldg tfoot .p82 > * { font-weight: 400; color: var(--ink-2); }
+  .ldg[data-g='sc'] [data-in]:not([data-in~='sc']),
+  .ldg[data-g='sp'] [data-in]:not([data-in~='sp']),
+  .ldg[data-g='sh'] [data-in]:not([data-in~='sh']) { display: none; }
+</style>

@@ -1,0 +1,86 @@
+---
+// The post-game numbers band (Sora picked layout C1, 2026-10-16): the score by period in a pale panel like "What it
+// means", and the four tug-of-war bars beside it in two short columns, stretched to the panel's height so both sides
+// start and end together. On phones the panel sits above the bars.
+// periods: from pipeline/export/recaps.py `periods` (goals and shots on goal per period; a shootout column has goals only).
+export type Period = { label: string; goals: Record<string, number>; shots: Record<string, number> | null };
+export type Row = { name: string; tip: string; vals: [string, string]; g: [number, number] };
+interface Props { order: [string, string]; cls: [string, string]; score: Record<string, number>; periods?: Period[]; rows: Row[] }
+const { order, cls, score, periods = [], rows } = Astro.props;
+const win = score[order[0]] > score[order[1]] ? 0 : 1;
+const shotTot = (a: string) => periods.reduce((n, p) => n + (p.shots?.[a] ?? 0), 0);
+---
+<div class:list={['gnum', { solo: !periods.length }]}>
+  {periods.length > 0 && (
+    <div class="ls-box">
+      <table class="ls">
+        <caption class="sr-only">Goals and shots on goal by period</caption>
+        <thead><tr><th scope="col" class="ls-h">Score</th>{periods.map((p) => <th scope="col">{p.label}</th>)}<th scope="col">Final</th></tr></thead>
+        <tbody>
+          {order.map((a, i) => (
+            <>
+              <tr class:list={[i === 0 && 'first', i === win ? 'win' : 'lose']}>
+                <th scope="row" class={cls[i]}><i aria-hidden="true"></i>{a}</th>
+                {periods.map((p) => <td class="gl">{p.goals[a]}</td>)}
+                <td class="tot">{score[a]}</td>
+              </tr>
+              <tr class="shots">
+                <th scope="row"><span class="sr-only">{a} </span>shots</th>
+                {periods.map((p) => <td>{p.shots ? p.shots[a] : ''}</td>)}
+                <td>{shotTot(a)}</td>
+              </tr>
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+  <div class="tug">
+    <p class="tug-head">{order.map((a, i) => <span class={cls[i]}><i></i>{a}</span>)}</p>
+    {rows.map((r) => (
+      <div class="tug-row">
+        <p class="tug-top"><strong>{r.vals[0]}</strong><span class="term" tabindex="0" data-tip={r.tip}>{r.name}</span><strong>{r.vals[1]}</strong></p>
+        <div class="rope" aria-hidden="true"><b class={cls[0]} style={`--g:${r.g[0]}`}></b><b class={cls[1]} style={`--g:${r.g[1]}`}></b></div>
+      </div>
+    ))}
+  </div>
+</div>
+<style>
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gnum { display: grid; grid-template-columns: minmax(300px, 0.8fr) 1.2fr; gap: 36px; align-items: stretch; }
+  .gnum.solo { grid-template-columns: 1fr; }
+  .ls-box { background: var(--ice); border-radius: 12px; padding: 16px 18px 12px; }
+  .ls { width: 100%; border-collapse: collapse; font: 500 15px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .ls th, .ls td { padding: 5px 0; text-align: center; }
+  .ls thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding: 2px 0 9px; vertical-align: bottom; border-bottom: 1px solid var(--rule); }
+  .ls thead th.ls-h { text-align: left; font: 700 12.5px var(--ui); letter-spacing: 0.08em; color: var(--ink); }
+  .ls tbody th { text-align: left; font: 700 15px var(--ui); color: var(--ink); white-space: nowrap; }
+  .ls tbody th i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 8px; vertical-align: 1px; }
+  .ls td.gl { color: var(--ink); font-weight: 700; width: 2.6em; }
+  .ls td.tot { font: 600 22px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--ink); width: 3.2em; }
+  .ls tr.lose td.tot { color: var(--ink-3); }
+  .ls tr.first > * { padding-top: 10px; }
+  .ls tr.shots > * { font-size: 13px; }
+  .ls tr.shots th { font: 500 13px var(--ui); color: var(--ink-3); padding-left: 17px; }
+  .tug { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; align-content: space-between; padding: 16px 0 12px; }
+  .solo .tug { grid-template-columns: 1fr; padding: 0; }
+  .tug-head { grid-column: 1 / -1; display: flex; justify-content: space-between; font: 600 14px var(--ui); margin: 0; }
+  .tug-head span { display: inline-flex; align-items: center; gap: 7px; }
+  .tug-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .tug-row { display: grid; gap: 6px; }
+  .tug-top { display: grid; grid-template-columns: 4.4em 1fr 4.4em; align-items: baseline; margin: 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .tug-top span { justify-self: center; text-align: center; }
+  .tug-top strong { font: 700 18px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tug-top strong:last-child { text-align: right; }
+  .rope { position: relative; display: flex; gap: 3px; height: 8px; }
+  .rope b { flex: var(--g) 1 0; min-width: 4px; border-radius: 4px; background: var(--team); transition: flex-grow 1s cubic-bezier(0.3, 0.9, 0.25, 1); }
+  .rope::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.6; }
+  .rope:global(.mid) b { flex-grow: 1; }
+  @media (max-width: 900px) {
+    .gnum { grid-template-columns: 1fr; gap: 20px; }
+    .tug { padding: 0; }
+  }
+  @media (max-width: 560px) {
+    .tug { grid-template-columns: 1fr; }
+  }
+</style>

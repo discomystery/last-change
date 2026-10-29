@@ -41,7 +41,7 @@ LONG_OUT = 20  # games missed after which only a star is still listed as out
 
 
 def _name(r: dict) -> str:
-    return f'{(r["first"] or "?")[0]}. {r["last"]}' if r.get("first") else (r.get("last") or "?")
+    return f'{r["first"]} {r["last"]}' if r.get("first") else (r.get("last") or "?")
 
 
 def _team_ids(season: int) -> dict[str, int]:
@@ -68,20 +68,22 @@ def _roles(season: int, before: str | None = None) -> dict[int, dict[int, dict]]
         if f.exists():
             g = pl.read_parquet(TABLES / str(s) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date")
             frames.append(pl.read_parquet(f).filter(pl.col("pos") != "G").join(g, on="game_id").with_columns(season=pl.lit(s))
-                          .select("season", "date", "team_id", "player_id", "pos", "sec", "sec5"))
+                          .select("season", "date", "team_id", "player_id", "pos", "sec", "sec5", "sec_pp"))
     pg = pl.concat(frames)
     if before:
         pg = pg.filter((pl.col("season") < season) | (pl.col("date") < before))
-    now = pg.filter(pl.col("season") == season).group_by("team_id", "player_id").agg(pl.len().alias("gp"), pl.col("sec").mean(), pl.col("sec5").mean(), pl.col("pos").last())
+    now = pg.filter(pl.col("season") == season).group_by("team_id", "player_id").agg(pl.len().alias("gp"), pl.col("sec").mean(), pl.col("sec5").mean(), pl.col("sec_pp").mean(), pl.col("pos").last())
     old = (pg.filter(pl.col("season") == season - 1).sort("date").group_by("team_id", "player_id")
-           .agg(pl.len().alias("gp"), pl.col("sec").tail(25).mean(), pl.col("sec5").tail(25).mean(), pl.col("pos").last()))
+           .agg(pl.len().alias("gp"), pl.col("sec").tail(25).mean(), pl.col("sec5").tail(25).mean(), pl.col("sec_pp").tail(25).mean(), pl.col("pos").last()))
     old = old.filter(pl.col("gp") >= 20)
     both = pl.concat([now.filter(pl.col("gp") >= 3), old.join(now.filter(pl.col("gp") >= 3), on=["team_id", "player_id"], how="anti")])
     out: dict[int, dict[int, dict]] = {}
     for (tid,), t in both.group_by(["team_id"]):
         rows = t.with_columns(grp=pl.when(pl.col("pos") == "D").then(pl.lit("D")).otherwise(pl.lit("F")),
                               worth=pl.col("player_id").replace_strict(rate, default=0.0, return_dtype=pl.Float64) * pl.col("sec5") / 3600)
-        rows = rows.with_columns(toi_rank=pl.col("sec").rank("ordinal", descending=True).over("grp"),
+        # Ranked by 5-on-5 plus power-play time, as lines are numbered (metrics/units._player_weight): all-situations time
+        # lifted penalty killers and dropped Taylor Hall, on Carolina's second line, to 10th (Sora, 2026-10-15).
+        rows = rows.with_columns(toi_rank=(pl.col("sec5") + pl.col("sec_pp")).rank("ordinal", descending=True).over("grp"),
                                  worth_rank=pl.col("worth").rank("ordinal", descending=True))
         out[tid] = {r["player_id"]: r for r in rows.iter_rows(named=True)}
     return out
@@ -105,7 +107,7 @@ def _matters(role: dict | None, team_size: int) -> str | None:
 def _injury(text: str | None) -> str:
     if not text or "undisclosed" in text:
         return ""
-    return f" ({text})" if text.endswith(("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue")) else f" ({text} injury)"
+    return f" ({text})" if text.endswith(("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear")) else f" ({text} injury)"
 
 
 def _status_text(r: dict, now_games: int) -> str:
@@ -129,11 +131,16 @@ def _status_text(r: dict, now_games: int) -> str:
     return "has not played this season" if never else f"has not dressed for the last {n} {games}"
 
 
+def _usual(tid: int, pid: int, kind: str, units_now, units_old, games_with: list[int], old_games: list[int]):
+    """His usual linemates (or partner): this season's when he has played 2+ games, else last season's."""
+    usual = patterns._mates(units_now, tid, games_with, pid, kind) if len(games_with) >= 2 else None
+    return usual or patterns._mates(units_old, tid, old_games, pid, kind)
+
+
 def _cover(tid: int, pid: int, kind: str, units_now, units_old, games_with: list[int], games_without: list[int], old_games: list[int], names: dict,
            away: set[int]) -> str | None:
     """Who has played beside his usual linemates since he last played."""
-    usual = patterns._mates(units_now, tid, games_with, pid, kind) if len(games_with) >= 2 else None
-    usual = usual or patterns._mates(units_old, tid, old_games, pid, kind)
+    usual = _usual(tid, pid, kind, units_now, units_old, games_with, old_games)
     if usual is None or not games_without:
         return None
     partners = usual[0]
@@ -170,7 +177,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         if f.exists():
             for r in pl.read_parquet(f).select("player_id", "first", "last").unique("player_id").iter_rows(named=True):
                 names[r["player_id"]] = _name(r)
-    names |= wording.number_clashes(season, wording.initials)  # "A. Johansson (#47)" when two teammates match
+    names |= wording.number_clashes(season, wording.full)  # "Albert Johansson (#47)" when two teammates match
     moves = pl.read_parquet(moves_path) if moves_path.exists() else None
     since = (Date.fromisoformat(day) - timedelta(days=NEW_DAYS)).isoformat()
 
@@ -213,9 +220,11 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             with_ids = [g for g in game_ids if g in played.get(pid, set())]
             without = [g for g, d in zip(game_ids, game_dates) if g not in played.get(pid, set()) and (r["last_played"] is None or d > r["last_played"])]
             cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
+            usual = _usual(tid, pid, kind, u_now, u_old, with_ids, old_games)
             if cover:
                 text += " " + cover
             found.append({"pid": pid, "last_played": r["last_played"], "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
+                          "grp": kind, "partners": list(usual[0]) if usual else [],
                           "status": r["report_status"] if reported else None, "text": text, "order": ro["worth_rank"] if ro else 0})
         found = sorted(found, key=lambda n: n["order"])[:MAX_OUT]
 
@@ -239,7 +248,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 continue
             if n >= 3:
                 text += " Their recent numbers were built mostly without him."
-            found.append({"player": who, "kind": "back", "change": "back", "now": 100, "before": 0, "games": n, "text": text, "order": ro["worth_rank"]})
+            found.append({"player": who, "pid": pid, "kind": "back", "change": "back", "now": 100, "before": 0, "games": n, "text": text, "order": ro["worth_rank"]})
 
         # New: joined in the last two weeks and has dressed.
         if moves is not None:
@@ -255,7 +264,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 kind = "D" if (role.get(pid) or {}).get("grp") == "D" else "F"
                 mates = patterns._mates(u_now, tid, sorted(played[pid]), pid, kind)
                 text += f" and has played beside {' and '.join(names.get(x, '?') for x in mates[0])}." if mates and mates[0] else "."
-                found.append({"player": who, "kind": "new", "change": "new", "now": 100, "before": 0, "games": gp, "text": text, "order": 50})
+                found.append({"player": who, "pid": pid, "kind": "new", "change": "new", "now": 100, "before": 0, "games": gp, "text": text, "order": 50})
         if found:
             out[team] = found
     return out

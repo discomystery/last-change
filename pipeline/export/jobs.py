@@ -135,7 +135,7 @@ def box_extras(season: int) -> dict[tuple[int, int], dict]:
                 continue
             ag, ask, hsk, hg = (int(c) for c in code)
             mine, theirs, my_g, their_g = (hsk, ask, hg, ag) if det.get("eventOwnerTeamId") == home else (ask, hsk, ag, hg)
-            kind = "sh" if mine < theirs and my_g else "pp" if mine > theirs and my_g and their_g else "ev"
+            kind = "sh" if mine < theirs and my_g and their_g else "pp" if mine > theirs and my_g and their_g else "ev"
             out[(d["id"], det["scoringPlayerId"])][kind] += 1
     return dict(out)
 
@@ -313,6 +313,15 @@ def scoring_odds(goals_before: float, games_before: int, group_avg: float) -> fl
     return 1 - math.exp(-lam)
 
 
+def _value(trait: str, s: np.ndarray) -> np.ndarray:
+    """A player's level as the cards read it. Faceoffs stay the plain share of draws won (not the adjusted score on
+    player pages), because a night is graded on the draws he actually won."""
+    if trait != "faceoffs":
+        return P._value(trait, s)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return P._faceoffs_recorded(s)
+
+
 def shrink(n: float, v: float, k: float, prior: float) -> float:
     return (n * v + k * prior) / (n + k)
 
@@ -355,9 +364,9 @@ class Reference:
             base = "D" if g == "D" else "F"
             self.mu[g], self.pool[g] = {}, {}
             for t in self.stab[base]:
-                self.mu[g][t] = float(P._value(t, tot))
+                self.mu[g][t] = float(_value(t, tot))
                 k = self.stab[base][t]["k"]
-                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(P._value(t, s))), k, self.mu[g][t])
+                self.pool[g][t] = np.array([shrink(float(P._weight(t, s)), float(np.nan_to_num(_value(t, s))), k, self.mu[g][t])
                                             for s in (sums[p].sum(axis=0) for p in members if len(sums[p]) >= REF_GAMES)])
 
     def usual(self, trait: str, g: str, sb: str, prev: np.ndarray | None, before: np.ndarray) -> tuple[float, float, float, str]:
@@ -367,8 +376,8 @@ class Reference:
         k = self.stab[g][trait]["k"]
         prior = self.mu[peer][trait]
         if prev is not None and P._weight(trait, prev) > 0:
-            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(P._value(trait, prev))), k, prior)
-        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(P._value(trait, before))), k, prior)
+            prior = shrink(float(P._weight(trait, prev)), float(np.nan_to_num(_value(trait, prev))), k, prior)
+        v = shrink(float(P._weight(trait, before)), float(np.nan_to_num(_value(trait, before))), k, prior)
         return v, self.mu[peer][trait], P._pct(v, self.pool[peer][trait], P.TRAITS[trait][2]), peer
 
 
@@ -389,6 +398,75 @@ def impact_pcts(season: int) -> dict[int, dict[str, float]]:
     return out
 
 
+# Tonight's opponent (the Competition switch): shot attempts and chances are graded against a typical night that
+# allows for how many the other team usually gives up. Their rate going into the game is this season's 5-on-5 rate
+# pulled toward last season's (itself halfway to the league) with OPP_K games' weight. Tested on 2023-24 and
+# 2024-25 (each player's pace from the season before): scaling a player's typical night one for one with this
+# factor predicted his shot attempts and chances better in both seasons than ignoring the opponent, and better
+# than scaling by half or one and a half as much.
+OPP_K = {"shooting": 9, "chances": 12}  # games; how quickly a team's shots against and chances against settle
+OPP_SEC_PER_GAME = 2900.0
+OPP_COL = {"shooting": "ca", "chances": "xga"}
+OPP_NOTE = 0.05  # say so on the card when the opponent moves a typical night by 5% or more
+
+
+def opponent_factors(season: int) -> dict[tuple[int, int], dict]:
+    """(game_id, team_id) -> how much the other team usually gives up at 5-on-5, against the league, per job, plus
+    where that ranks among the 32 clubs going into the game (1 = stingiest)."""
+    def five(s: int) -> pl.DataFrame:
+        d = TABLES / str(s)
+        g = pl.read_parquet(d / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id", "date", "home_id", "away_id")
+        t = pl.read_parquet(d / "team_game.parquet").filter(pl.col("strength") == "5v5").group_by("game_id", "team_id").agg(pl.col("sec", "ca", "xga").sum())
+        return t.join(g, on="game_id")
+
+    last, now = five(season - 1), five(season)
+    lg = {c: last[c].sum() / last["sec"].sum() for c in ("ca", "xga")}
+    prior = {tid: {c: lg[c] + 0.5 * (r[c] / r["sec"] - lg[c]) for c in ("ca", "xga")}
+             for tid, r in ((r["team_id"], r) for r in last.group_by("team_id").agg(pl.col("sec", "ca", "xga").sum()).iter_rows(named=True))}
+    teams = set(now["team_id"].to_list())
+    out: dict[tuple[int, int], dict] = {}
+    for date in sorted(set(now["date"].to_list())):
+        before = {r["team_id"]: r for r in now.filter(pl.col("date") < date).group_by("team_id").agg(pl.col("sec", "ca", "xga").sum()).iter_rows(named=True)}
+        f = {}
+        for tid in teams:
+            b = before.get(tid, {"sec": 0.0, "ca": 0.0, "xga": 0.0})
+            f[tid] = {}
+            for job, c in OPP_COL.items():
+                k = OPP_K[job] * OPP_SEC_PER_GAME
+                pr = prior.get(tid, lg)[c]
+                f[tid][job] = (b[c] + k * pr) / (b["sec"] + k) / lg[c]
+        rank = {job: {tid: 1 + sum(f[o][job] < f[tid][job] for o in teams) for tid in teams} for job in OPP_COL}
+        for r in now.filter(pl.col("date") == date).unique("game_id").iter_rows(named=True):
+            for us, them in ((r["home_id"], r["away_id"]), (r["away_id"], r["home_id"])):
+                out[(r["game_id"], us)] = {job: {"f": f[them][job], "rank": rank[job][them], "of": len(teams)} for job in OPP_COL}
+    return out
+
+
+def opp_note(job: str, o: dict, place: str) -> str:
+    """"Against one of the stingiest defenses" and the like, from where the opponent ranks going into the game."""
+    what = "shot attempts" if job == "shooting" else "chances"
+    if o["rank"] <= 5 and o["f"] <= 0.93:
+        head = "Against one of the stingiest defenses"
+    elif o["rank"] > o["of"] - 5 and o["f"] >= 1.07:
+        head = "Against one of the leakiest defenses"
+    elif o["f"] < 1:
+        head = "Against a stingier defense than most"
+    else:
+        head = "Against a leakier defense than most"
+    pct = abs(round(100 * (o["f"] - 1)))
+    return f"{head}: {place} gives up about {pct}% {'fewer' if o['f'] < 1 else 'more'} {what} than an average team."
+
+
+def full_names(rows) -> dict:
+    """{(game_id, player_id): "First Last"} for the cards; "Elias Pettersson (#40)" when two players in one game share
+    a full name."""
+    by = defaultdict(dict)
+    for r in rows:
+        by[(r["game_id"], wording.full(r))][r["player_id"]] = r
+    return {(gid, r["player_id"]): f"{name} (#{r['number']})" if len(rs) > 1 and r.get("number") is not None else name
+            for (gid, name), rs in by.items() for r in rs.values()}
+
+
 def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     """Report cards for every finished game, or only for the games in `only` (the quick game-night pass: cards are
     judged from earlier games alone, so one game's cards come out the same either way). Games whose shift chart the
@@ -400,13 +478,14 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     abbr = {**dict(zip(games["home_id"], games["home"])), **dict(zip(games["away_id"], games["away"]))}
     tj = SITE_DATA / "teams.json"
     places = wording.places({t["abbr"]: t["place"] for t in json.loads(tj.read_text())}) if tj.exists() else {}
-    names = {r["player_id"]: f'{r["first"][0]}. {r["last"]}' for r in pl.read_parquet(d / "players.parquet").sort("game_id").iter_rows(named=True)}
+    names = full_names(pl.read_parquet(d / "players.parquet").iter_rows(named=True))  # "Sebastian Aho"; numbers for namesakes
     last = _table(season - 1).join(pl.read_parquet(TABLES / str(season - 1) / "games.parquet").filter(pl.col("game_type") == REGULAR).select("game_id"), on="game_id")
     now = _table(season).join(games.select("game_id", "date", "home_id"), on="game_id").sort("player_id", "date", "game_id")
 
     ref = Reference(season, last)
     impact = impact_pcts(season)
     typical = typical_ratios(last)
+    opp = opponent_factors(season)
     fac = {r["team_id"]: r for r in rink_bias.factors().iter_rows(named=True)}
     hr = rink_bias.home_road()
     special_cols = ["sec_pp", "pp_xgf", "sec_pk", "sh_xga", "fow", "fol", "g"]
@@ -437,19 +516,21 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
             before_sp = {c: prev_sp[c] + cum_sp[j][k] for k, c in enumerate(special_cols)}
             if e["game_id"] not in wanted:
                 continue
+            g = info[e["game_id"]]
+            us = abbr[e["team_id"]]
+            them = g["away"] if us == g["home"] else g["home"]
             card = player_card(e, grp.get(pid, P.GROUP.get(e["pos"], "F")), sub.get(pid, P.SUB.get(e["pos"], "W")), prev, cum[j], m[i], n_prev + j, before_sp,
-                               ref, impact.get(pid, {}), fac, hr, league, typical)
+                               ref, impact.get(pid, {}), fac, hr, league, typical, opp.get((e["game_id"], e["team_id"])), places.get(them, them))
             if card:
                 card["id"] = pid
                 card["box"] |= extras.get((e["game_id"], pid), {"pm": 0, "ev": 0, "pp": 0, "sh": 0})
                 f, a = float(m[i][P.C["on_xgf_adj"]]), float(m[i][P.C["on_xga_adj"]])
                 share = f / (f + a) if m[i][P.C["sec5"]] >= 600 and f + a > 0 else None
                 card["box"] |= {"xgf": round(f, 2), "xga": round(a, 2)}  # 5-on-5, during his shifts, score-and-venue adjusted
-                g = info[e["game_id"]]
-                us = abbr[e["team_id"]]
-                them = g["away"] if us == g["home"] else g["home"]
                 card["night"], card["night_why"] = scoresheet(card["box"], share, card.pop("odds"), places.get(us, us), places.get(them, them))
                 card["pill"] = GRID[card["night"]][card["summary"]]
+                if "summary_rec" in card:  # graded without allowing for the opponent (Competition off)
+                    card["pill_rec"] = GRID[card["night"]][card["summary_rec"]]
                 cards[e["game_id"]].append(card)
 
     for gid, card in goalie_cards(season, wanted):
@@ -461,7 +542,7 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     for gid, cs in cards.items():
         g = info[gid]
         for c in cs:
-            c["name"] = names.get(c["id"], "?")
+            c["name"] = names.get((gid, c["id"]), "?")
             c["team"] = abbr.get(c.pop("team_id"))
         out = {"game_id": gid, "away": g["away"], "home": g["home"], "players": [], "stood_out": []}
         for t in (g["away"], g["home"]):
@@ -480,7 +561,8 @@ def run(season: int = CURRENT_SEASON, only: set[int] | None = None) -> dict:
     return {"games": len(cards)}
 
 
-def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, before_sp: dict, ref: Reference, imp: dict, fac: dict, hr: dict, league: dict, typical: dict) -> dict | None:
+def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, before_sp: dict, ref: Reference, imp: dict, fac: dict, hr: dict, league: dict, typical: dict,
+                opp: dict | None = None, opp_place: str = "") -> dict | None:
     T = lambda c: float(tonight[P.C[c]])
     sec, sec5 = T("sec"), T("sec5")
     if sec < 60:
@@ -533,24 +615,42 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
         shown = float(e[RAW_COL[t]]) if t in RAW_COL else actual
         if pct >= STRONG:
             job = {"key": t, "label": LABEL[t], "why": "strength", "pct": round(pct), "vs": peer}
+            o = (opp or {}).get(t)
+            of = o["f"] if o else 1.0  # tonight's opponent, for shot attempts and chances
             if not enough:
                 job |= {"verdict": "na", "text": f"Only {clock(sec5)} at 5-on-5, too little to judge."}
             elif many is None:
-                typ_u, typ_a = exp_u * typical[t], exp_a * typical[t]
-                job |= {"verdict": grade(actual, typ_u, typ_a), "tonight": f"{actual:.2f}", "usual": f"{typ_u:.2f}", "bench": f"{typ_a:.2f}", "bench_is": "Average",
-                        "text": f"His shots were worth {actual:.2f} expected goals in {clock(time_)}{where}. Typical for him in that time: {typ_u:.2f}. "
-                                f"Average {word(peer)}: {typ_a:.2f}."}
+                def graded(f: float) -> dict:
+                    typ_u, typ_a = exp_u * typical[t] * f, exp_a * typical[t] * f
+                    against = f" against {opp_place}" if f != 1.0 else ""
+                    return {"verdict": grade(actual, typ_u, typ_a), "tonight": f"{actual:.2f}", "usual": f"{typ_u:.2f}", "bench": f"{typ_a:.2f}", "bench_is": "Average",
+                            "text": f"His shots were worth {actual:.2f} expected goals in {clock(time_)}{where}. Typical for him in that time{against}: {typ_u:.2f}. "
+                                    f"Average {word(peer)}: {typ_a:.2f}."}
+                job |= graded(of)
+                if o and abs(of - 1) >= OPP_NOTE:
+                    rec = graded(1.0)
+                    job["opp"] = {"note": opp_note(t, o, opp_place), "f": round(of, 3), "rec": {k: rec[k] for k in ("verdict", "usual", "bench", "text")}}
             else:
                 # Counts are graded against a typical night for that much ice time (in this arena's scoring, for
-                # hits, blocks and takeaways), since a count can't reach a fractional average.
+                # hits, blocks and takeaways; against tonight's opponent, for shot attempts), since a count can't
+                # reach a fractional average.
                 n = round(shown)
-                typ_u, typ_a = poisson_median(exp_u * mult), poisson_median(exp_a * mult)
-                if typ_u < 1:
-                    continue  # a typical night is none at all, so one game can't show the strength
                 arena_note = " Both allow for this arena’s scorer." if t in RAW_COL else ""
-                job |= {"verdict": grade(n, typ_u, typ_a), "tonight": str(n), "usual": str(typ_u), "bench": str(typ_a), "bench_is": "Average",
-                        "text": f"{count(n, one, many)}{where} in {clock(time_)}. Typical for him in that time: {typ_u}. "
-                                f"Average {word(peer)}: {typ_a}.{arena_note}"}
+
+                def graded(f: float) -> dict | None:
+                    typ_u, typ_a = poisson_median(exp_u * mult * f), poisson_median(exp_a * mult * f)
+                    if typ_u < 1:
+                        return None
+                    against = f" against {opp_place}" if f != 1.0 else ""
+                    return {"verdict": grade(n, typ_u, typ_a), "tonight": str(n), "usual": str(typ_u), "bench": str(typ_a), "bench_is": "Average",
+                            "text": f"{count(n, one, many)}{where} in {clock(time_)}. Typical for him in that time{against}: {typ_u}. "
+                                    f"Average {word(peer)}: {typ_a}.{arena_note}"}
+                adj, rec = graded(of), graded(1.0)
+                if rec is None:
+                    continue  # a typical night is none at all, so one game can't show the strength
+                job |= adj or rec
+                if o and adj and (adj["usual"] != rec["usual"] or adj["verdict"] != rec["verdict"]):
+                    job["opp"] = {"note": opp_note(t, o, opp_place), "f": round(of, 3), "rec": {k: rec[k] for k in ("verdict", "usual", "bench", "text")}}
             jobs.append(job)
         elif enough and pct < 50:
             if many is None:
@@ -598,6 +698,7 @@ def player_card(e: dict, g: str, sb: str, prev, before, tonight, n_before: int, 
     return {"team_id": e["team_id"], "pos": e["pos"], "toi_sec": round(sec), "toi": clock(sec), "toi5": clock(sec5), "toi_pp": clock(T("sec_pp")), "toi_pk": clock(T("sec_pk")),
             "box": {"g": int(e["g"]), "a": int(e["a1"] + e["a2"]), "sog": int(e["sog"]), "hits": int(e["hits"]), "blocks": int(e["blocks"])},
             "jobs": jobs, "summary": summary([(j["key"], j["verdict"]) for j in jobs]),
+            **({"summary_rec": summary([(j["key"], j.get("opp", {}).get("rec", j)["verdict"]) for j in jobs])} if any("opp" in j for j in jobs) else {}),
             "odds": odds, "standouts": outs}
 
 

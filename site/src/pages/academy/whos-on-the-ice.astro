@@ -1,0 +1,320 @@
+---
+// Academy 1.3: the six players a side and their jobs. A short play spreads one team into its spots and lights each
+// position in turn; notes on the gear, the backup goalie, captains and who dresses; "Spot the positions" (put the six
+// labels on the right players, from a seat or from above); a real team's usual six from the site's data; a quiz.
+// Leans on 1.1 (skater, goalie) and 1.2 (zones, blue line, bench).
+import Lesson from '../../layouts/Lesson.astro';
+import { teamLines, example } from '../../lib/academy/real';
+const real = { teams: teamLines(), example: example() };
+---
+<Lesson slug="whos-on-the-ice">
+  <section class="ac-part" aria-labelledby="six-h">
+    <header>
+      <h2 id="six-h">Six players, six spots</h2>
+      <p>Each team puts five skaters and a goalie on the ice. They aren’t all doing the same thing: every one of them has a position, and each position has a job. Watch one team find its spots.</p>
+    </header>
+    <div class="ac-stage" id="play3">
+      <div class="ac-view">
+        <p class="pick">See it <select data-view aria-label="Viewpoint">
+          <option value="above">from above</option>
+          <option value="center">from a seat at center ice</option>
+        </select></p>
+        <svg class="ac-rink" id="rink3" role="img" aria-label="One team of six spreading out on the rink: a goalie in the net, two defensemen in front of him, and three forwards ahead of them"></svg>
+        <input class="ac-scrub" type="range" min="0" value="0" data-scrub aria-label="Move through the play" />
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" data-step></p>
+        <h3 data-h></h3>
+        <p data-p></p>
+        <div class="ac-ctrl"><button class="pill primary" type="button" data-play>Play</button></div>
+        <p class="ac-pickout" data-pick hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="more-h">
+    <header>
+      <h2 id="more-h">A few more things you’ll notice</h2>
+      <p>Once you know the six positions, these are the next questions people ask.</p>
+    </header>
+    <div class="ac-notes">
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><rect x="22" y="4" width="20" height="30" rx="5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M26 12h12M26 18h12M26 24h12" stroke="currentColor" stroke-width="1.2" opacity="0.6"/><path d="M8 34l10-6M56 34l-10-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <p class="box-h">The goalie’s gear</p>
+        <p>Goalies look bigger because they are: big leg pads, a glove for catching, a flat blocker on the other hand, a mask and a wider stick. All of it is there to stop pucks moving faster than highway speed.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M6 30h52" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="20" r="5" fill="currentColor"/><circle cx="30" cy="20" r="5" fill="currentColor"/><circle cx="48" cy="20" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M41 15h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <p class="box-h">The backup goalie</p>
+        <p>Each team brings a second goalie, who sits at the end of the bench, often in a cap, ready in case the starter gets hurt or has a rough night. Most nights he never goes on.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><path d="M18 6h28l6 8-6 4v18H18V18l-6-4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><text x="25" y="20" font-size="10" font-weight="700" fill="currentColor" font-family="var(--ui)">C</text></svg>
+        <p class="box-h">The C and the A</p>
+        <p>One player has a C sewn on his sweater: the captain. Up to two others wear an A, for alternate captain. They lead the team, and they’re the ones allowed to talk to the officials about a call.</p>
+      </div>
+      <div class="ac-note">
+        <svg viewBox="0 0 64 40" aria-hidden="true"><g fill="currentColor">{Array.from({ length: 12 }, (_, i) => <circle cx={8 + (i % 6) * 9.6} cy={i < 6 ? 9 : 19} r="3"/>)}{Array.from({ length: 6 }, (_, i) => <circle cx={8 + i * 9.6} cy="29" r="3" opacity="0.55"/>)}</g><circle cx="28" cy="37" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="36" cy="37" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <p class="box-h">Twenty dress for a game</p>
+        <p>Only six are on the ice at once, but each team dresses 20: usually 12 forwards, 6 defensemen and 2 goalies. The rest wait on the bench for their turn. Lesson 5 is about how they take turns.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="spot-h">
+    <header>
+      <h2 id="spot-h">Spot the positions</h2>
+      <p>Here’s a moment from a game, with the home team (dark) attacking the net on the right. Put each label on the player who plays that position: tap a label, then tap the player, or drag it straight on.</p>
+    </header>
+    <p class="pick">See it <select id="spotView" aria-label="Viewpoint">
+      <option value="center">from a seat at center ice</option>
+      <option value="above">from above</option>
+    </select></p>
+    <div class="ac-tray" id="tray" role="group" aria-label="Position labels"></div>
+    <svg class="ac-rink" id="spot" role="group" aria-label="A moment from a game. The home team’s six players can be tapped to place a label on them."></svg>
+    <p class="ac-pickout" id="spotSay" aria-live="polite">Pick a label to start.</p>
+    <div class="ac-ctrl"><button class="pill" type="button" id="spotReset">Start over</button></div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="real-h">
+    <header>
+      <h2 id="real-h">A real team’s six</h2>
+      <p>Here’s who usually lines up for a real team: its first line of forwards, its top pair of defensemen and the goalie who started its last game. These come from the site’s data and change as the season goes.</p>
+    </header>
+    <p class="pick">Show the <select id="realTeam" aria-label="Team"></select></p>
+    <div class="ac-six" id="six"></div>
+    <p class="ac-hint" id="realHint"></p>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" data-q>
+        <p>How many forwards does a team usually have on the ice?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. That’s the defensemen. Up front there’s a center and two wingers.">Two</button>
+          <button class="pill" type="button" data-right data-say="Right. A center and two wingers.">Three</button>
+          <button class="pill" type="button" data-say="Not quite. Five is all the skaters together: three forwards and two defensemen.">Five</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>Which forward takes most of the faceoffs, plays the middle and helps out near his own net?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-right data-say="Right. The center works the middle of the ice at both ends.">The center</button>
+          <button class="pill" type="button" data-say="Not quite. Wingers mostly stay on their side of the ice. The middle belongs to the center.">A winger</button>
+          <button class="pill" type="button" data-say="Not quite. A defenseman isn’t a forward. The middle belongs to the center.">A defenseman</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>A player has a C on his sweater. What does it mean?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. Centers don’t get a letter. The C is for captain.">He’s a center</button>
+          <button class="pill" type="button" data-right data-say="Right. He’s the team’s captain. Alternate captains wear an A.">He’s the captain</button>
+          <button class="pill" type="button" data-say="Not quite. Coaches stand behind the bench in suits. The C is for captain.">He’s the coach</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+  <script type="application/json" id="realData" set:html={JSON.stringify(real)} />
+</Lesson>
+
+<script>
+  import { VIEWS, el, fit, drawRink, figure, puck, label, sortDepth, toSvg, whenSeen } from '../../lib/academy/rink';
+  import { playerUI, lit } from '../../lib/academy/play';
+  import { wireQuiz } from '../../lib/academy/quiz';
+  const $ = (id: string) => document.getElementById(id) as any;
+
+  // ---------- Six players, six spots ----------
+  // One team (home, dark) bunched at center, then out to its spots, attacking the net on the right.
+  const H = (id: string, tag: string, keys: number[][], extra = {}) => ({ id, kind: 'home', tag, keys, ...extra });
+  const def = {
+    length: 20,
+    actors: [
+      H('G', 'G', [[0, 96, 40], [1.2, 96, 40], [4, 15, 42.5], [17.4, 15, 42.5], [19, 16, 44], [20, 15.5, 43]], { goalie: true }),
+      H('LD', 'D', [[0, 95, 45], [1.2, 95, 45], [3.6, 78, 26], [17.4, 78, 26], [19, 92, 22], [20, 96, 22]]),
+      H('RD', 'D', [[0, 98, 47], [1.2, 98, 47], [3.6, 78, 59], [17.4, 78, 59], [19, 84, 60], [20, 86, 60]]),
+      H('LW', 'LW', [[0, 101, 39], [1.2, 101, 39], [3.6, 112, 19], [17.4, 112, 19], [19, 130, 16], [20, 136, 17]]),
+      H('C', 'C', [[0, 102, 43], [1.2, 102, 43], [3.6, 112, 42.5], [17.4, 112, 42.5], [19, 126, 50], [20, 131, 52]]),
+      H('RW', 'RW', [[0, 99, 44], [1.2, 99, 44], [3.6, 112, 66], [17.4, 112, 66], [19, 122, 70], [20, 126, 69]]),
+    ],
+    puck: [[0, 100, 42.5], [17.4, 100, 42.5], [19, 128, 49], [20, 132, 51]],
+    beats: [
+      { t: 0, h: 'One team of six', p: 'Here’s one team, the home team in dark sweaters. They’re about to attack the net on the right.' },
+      { t: 1.2, h: 'Everyone has a spot', p: 'Each player has a position, and the positions spread the team across the ice: three up front, two behind them, and one in the net.' },
+      { t: 4.4, h: 'Three forwards', p: 'The forwards play closest to the other team’s net. Most goals come from them. They come back to help when the other team has the puck.' },
+      { t: 7.0, h: 'The center', p: 'The center (C) plays the middle of the ice at both ends. He takes most of the faceoffs, the restarts you met in lesson 2.' },
+      { t: 9.6, h: 'Two wingers', p: 'The left wing (LW) and right wing (RW) mostly stay on their side of the ice. Left and right mean the side as the team attacks.' },
+      { t: 12.2, h: 'Two defensemen', p: 'The defensemen (D) play behind the forwards. They protect their own net and get the puck moving the other way, and they shoot from the blue line when their team attacks.' },
+      { t: 14.8, h: 'One goalie', p: 'The goalie (G) stays in front of his own net all game and stops shots. The only player allowed to hold the puck, as you saw in lesson 1.' },
+      { t: 17.4, h: 'Spots, not fences', p: 'Once play starts, players move all over: a defenseman can join the attack, a winger can chase the puck into the corner. The positions say where each player usually is and what he looks after.' },
+    ],
+    events: [
+      ...lit(['LW', 'C', 'RW'], 4.4, 7.0), ...lit(['C'], 7.0, 9.6), ...lit(['LW', 'RW'], 9.6, 12.2),
+      ...lit(['LD', 'RD'], 12.2, 14.8), ...lit(['G'], 14.8, 17.4),
+      ...lit(null, 4.4, 17.4, 'focus'),
+    ],
+  };
+  const NAMES: Record<string, string> = {
+    G: 'The goalie. He guards the net and is the only one who can hold the puck.',
+    LD: 'A defenseman. Two of them play behind the forwards and protect their own net.',
+    RD: 'A defenseman. Two of them play behind the forwards and protect their own net.',
+    LW: 'The left wing, a forward. He mostly plays the left side as his team attacks.',
+    C: 'The center, a forward. He plays the middle and takes most faceoffs.',
+    RW: 'The right wing, a forward. He mostly plays the right side as his team attacks.',
+  };
+  const root = $('play3');
+  const viewSel = root.querySelector('[data-view]');
+  const ui = playerUI(root, $('rink3'), def, () => (VIEWS as any)[viewSel.value], (a: any) => NAMES[a.id]);
+  viewSel.addEventListener('change', () => { root.classList.toggle('wide', viewSel.value !== 'above'); ui.rebuild(); });
+  whenSeen($('rink3'), () => ui.play());
+
+  // ---------- Spot the positions ----------
+  // The home team attacks the right net; the visitors defend it (faded, not part of the puzzle).
+  const SPOTS: [string, number, number][] = [['G', 14.5, 42.5], ['D', 127, 22], ['D', 130, 63], ['C', 160, 44], ['LW', 176, 18], ['RW', 171, 69]];
+  const AWAY: [number, number, boolean?][] = [[185.5, 42.5, true], [177, 35], [175, 55], [157, 53], [150, 25], [152, 64]];
+  const LABELS: [string, string][] = [['C', 'Center'], ['LW', 'Left wing'], ['RW', 'Right wing'], ['D', 'Defenseman'], ['D', 'Defenseman'], ['G', 'Goalie']];
+  const WHY: Record<string, string> = {
+    C: 'The center plays the middle. Look for the forward nearest the middle of the ice, in front of their net.',
+    LW: 'The left wing plays the left side as his team attacks. Facing the net on the right, that’s the far side of the ice.',
+    RW: 'The right wing plays the right side as his team attacks. Facing the net on the right, that’s the near side of the ice.',
+    D: 'The defensemen hang back. Look for the two players near the blue line.',
+    G: 'The goalie is the one in the net, here all the way back on the left.',
+  };
+  const RIGHT: Record<string, string> = {
+    C: 'Right: the center, in the middle in front of the net.',
+    LW: 'Right: the left wing, on the far side as they attack.',
+    RW: 'Right: the right wing, on the near side as they attack.',
+    D: 'Right: a defenseman, back at the blue line, ready to shoot or to get back.',
+    G: 'Right: the goalie, back in his own net at the other end.',
+  };
+  const placed = new Set<number>();
+  const used = new Set<number>();
+  let chosen: number | null = null;
+  const tray = $('tray'), say = $('spotSay'), spot = $('spot');
+  const chips = LABELS.map(([key, name], i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip-lbl'; b.textContent = name; b.dataset.key = key;
+    b.addEventListener('click', () => choose(i));
+    b.addEventListener('pointerdown', (e) => drag(e, i));
+    tray.appendChild(b); return b;
+  });
+  function choose(i: number | null) {
+    if (i != null && used.has(i)) return;
+    chosen = i;
+    chips.forEach((c, j) => c.classList.toggle('on', j === i));
+    if (i != null) say.textContent = `Now tap the ${LABELS[i][1].toLowerCase()}.`;
+  }
+  let figs: any[] = [];
+  function buildSpot() {
+    spot.replaceChildren();
+    const V = (VIEWS as any)[$('spotView').value];
+    fit(spot, V, [0, 0, 200, 85], V.top ? [2, 2, 2, 2] : [3, 2, 3, 2]);
+    drawRink(spot, V, {});
+    const g = el(spot, 'g', { class: 'people' });
+    const away = AWAY.map(([x, y, gk]) => { const f = figure(g, V, 'away', { goalie: !!gk }); f.set(x, y); f.g.classList.add('faded'); return f; });
+    figs = SPOTS.map(([key, x, y], i) => {
+      const f = figure(g, V, 'home', { goalie: key === 'G' }); f.set(x, y);
+      f.g.dataset.i = String(i);
+      f.g.setAttribute('tabindex', '0'); f.g.setAttribute('role', 'button');
+      f.g.setAttribute('aria-label', placed.has(i) ? `${key}, placed` : 'A home player');
+      f.g.addEventListener('click', () => drop(i));
+      f.g.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drop(i); } });
+      return f;
+    });
+    const pk = puck(g, V); pk.set(178, 20.5);
+    sortDepth(V, g, [...away, ...figs, pk]);
+    const L = el(spot, 'g', { class: 'g-tags' });
+    for (const i of placed) tagOn(L, V, i);
+  }
+  function tagOn(L: any, V: any, i: number) {
+    const [key, x, y] = SPOTS[i];
+    const t = V.top ? label(L, V, 'ptag', x, y - 4.6, key) : label(L, V, 'ptag', x, y, key, 9.6);
+    figs[i].g.classList.add('placed');
+    return t;
+  }
+  function drop(i: number, at: number | null = chosen) {
+    if (at == null) { say.textContent = placed.has(i) ? 'That one’s done. Pick another label.' : 'Pick a label first, then tap a player.'; return; }
+    if (placed.has(i)) { say.textContent = 'That player already has a label. Try another one.'; return; }
+    const key = LABELS[at][0];
+    if (SPOTS[i][0] !== key) {
+      figs[i].g.classList.remove('nope'); void figs[i].g.getBBox(); figs[i].g.classList.add('nope');
+      say.textContent = `Not that one. ${WHY[key]}`;
+      return;
+    }
+    placed.add(i); used.add(at);
+    chips[at].classList.add('used'); chips[at].disabled = true;
+    choose(null);
+    tagOn(spot.querySelector('.g-tags'), (VIEWS as any)[$('spotView').value], i);
+    say.textContent = placed.size === SPOTS.length ? 'All six. That’s a hockey team: three forwards, two defensemen and a goalie.' : RIGHT[key];
+  }
+  // Dragging a label straight onto a player: a copy of the label follows the finger, and letting go over a player places it.
+  function drag(e: PointerEvent, i: number) {
+    if (used.has(i) || e.button > 0) return;
+    const sx = e.clientX, sy = e.clientY;
+    let ghost: HTMLElement | null = null;
+    const move = (m: PointerEvent) => {
+      if (!ghost && Math.hypot(m.clientX - sx, m.clientY - sy) < 6) return;
+      if (!ghost) { ghost = chips[i].cloneNode(true) as HTMLElement; ghost.classList.add('ghost'); document.body.appendChild(ghost); choose(i); }
+      ghost.style.left = m.clientX + 'px'; ghost.style.top = m.clientY + 'px';
+    };
+    const up = (u: PointerEvent) => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      if (!ghost) return;
+      ghost.remove();
+      const hit = (document.elementFromPoint(u.clientX, u.clientY) as Element | null)?.closest('#spot .fig[data-i]') as HTMLElement | null;
+      if (hit) drop(Number(hit.dataset.i), i);
+      else nearest(u, i);
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }
+  // A drop just beside a player (fingers are wide) counts for the nearest one within a few feet.
+  function nearest(u: PointerEvent, i: number) {
+    const r = spot.getBoundingClientRect();
+    if (u.clientX < r.left || u.clientX > r.right || u.clientY < r.top || u.clientY > r.bottom) return;
+    const p = toSvg(spot, u);
+    const V = (VIEWS as any)[$('spotView').value];
+    let best = -1, d = Infinity;
+    figs.forEach((f, j) => { const q = V.P(f.x, f.y, V.top ? 0 : 3); const dd = Math.hypot(q[0] - p.x, q[1] - p.y) / (V.top ? 1 : q[2]); if (dd < d) { d = dd; best = j; } });
+    if (best >= 0 && d < 9) drop(best, i);
+  }
+  // On a phone the seat view is a thin strip, so start from above there.
+  if (matchMedia('(max-width: 600px)').matches) $('spotView').value = 'above';
+  // A tap near a player (not right on him) counts for the nearest one too.
+  spot.addEventListener('click', (e: MouseEvent) => { if (chosen != null && !(e.target as Element).closest('.fig')) nearest(e as PointerEvent, chosen); });
+  $('spotView').addEventListener('change', buildSpot);
+  $('spotReset').addEventListener('click', () => {
+    placed.clear(); used.clear(); chips.forEach((c) => { c.classList.remove('used', 'on'); c.disabled = false; });
+    chosen = null; say.textContent = 'Pick a label to start.'; buildSpot();
+  });
+  buildSpot();
+
+  // ---------- A real team's six ----------
+  const real = JSON.parse($('realData').textContent);
+  const sel = $('realTeam');
+  const mine = document.documentElement.dataset.team || '';
+  for (const t of real.teams) sel.add(new Option(t.nick, t.abbr));
+  sel.value = real.teams.some((t: any) => t.abbr === mine) ? mine : real.example;
+  const poss = (n: string) => (n.endsWith('s') ? `${n}’` : `${n}’s`);
+  const who = (p: any, role: string) => `<div class="ac-p"><span class="eyebrow">${role}</span>${p.href ? `<a class="plink" href="${p.href}">${p.name}</a>` : `<span>${p.name}</span>`}</div>`;
+  function showReal() {
+    const t = real.teams.find((x: any) => x.abbr === sel.value);
+    if (!t) return;
+    const line = t.lines[0], pair = t.pairs[0];
+    $('six').innerHTML =
+      `<div class="row">${line.map((p: any) => who(p, p.pos || 'Forward')).join('')}</div>` +
+      `<div class="row two">${pair.map((p: any) => who(p, 'Defenseman')).join('')}</div>` +
+      (t.goalie ? `<div class="row one">${who(t.goalie, 'Goalie')}</div>` : '');
+    $('realHint').textContent = mine && mine === t.abbr
+      ? `The ${poss(t.nick)} first line and top pair are the forwards and defensemen who have played together most lately.`
+      : `${mine ? '' : 'Pick your team in the settings and it shows up here first. '}The first line and top pair are the ones who have played together most lately.`;
+  }
+  sel.addEventListener('change', showReal);
+  showReal();
+  wireQuiz(document);
+</script>

@@ -22,7 +22,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
 <Base section="players" title="Skater rankings" description="Every NHL skater ranked on every rating: who creates the most chances, shoots the most, kills penalties best, skates fastest.">
   <header class="page-top"><h1>Skater rankings</h1></header>
   <p class="lede">Who leads the league on each rating. Pick a rating to see every regular ranked, or start from the leaders below.</p>
-  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`} aria-current="page">Rankings</a></nav>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`} aria-current="page">Rankings</a><a class="ptab pill" href={`${base}players/leaders/`}>Leaders</a><a class="ptab pill" href={`${base}players/compare/`}>Compare</a></nav>
 
   <div class="pick" id="pick">
     <span>Rank</span>
@@ -89,7 +89,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l');
     const mode = () => (root.dataset.mode === 'season' ? 'season' : 'blend');
-    const raw = () => root.dataset.arena === 'raw';
+    const raw = () => window.lcRaw(rating.value);
     const pname = (p) => `<a class="plink" href="${base}player/${p.id}/">${esc(p.n)}</a>`;
     const tname = (abbr) => `<a class="tlink lteam" href="${base}team/${abbr}/">${abbr}</a>`;
     const params = new URLSearchParams(location.search);
@@ -187,7 +187,7 @@ const asOf = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', 
 </script>
 
 <style is:global>
-  .ptabs { display: flex; gap: 6px; margin: 14px 0 0; }
+  .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
   .on-team[hidden] { display: none; }
   .lb-group { margin-top: 40px; }
   /* Group names use the same serif sub-heading as the player page's All ratings. */

@@ -12,7 +12,7 @@ const { abbr, place } = Astro.props;
 const list = keyPlayers(abbr, place);
 const goalie = keyGoalie(abbr, place);
 const modes: Mode[] = ['blend', 'season'];
-const sayOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.info.raw(it.est.raw) : it.info.say(it.est?.raw !== undefined ? it.est.index ?? 100 : it.v));
+const sayOf = (it: any, raw: boolean) => (raw && it.est?.raw !== undefined ? it.info.raw(it.est.raw) : it.info.say(it.est?.raw !== undefined ? it.est.index ?? it.est.v : it.v));
 // The rank or percentile opens the skater rankings for that rating, with this player picked out.
 const base = import.meta.env.BASE_URL;
 const vsKey = Object.fromEntries(Object.entries(peerWord).map(([k, w]) => [w, k]));

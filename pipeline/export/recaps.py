@@ -5,17 +5,19 @@ The preview is never rewritten: grading reads the snapshot exactly as it was sav
 power play that barely happened, a line that was hardly on the ice) are marked "na" and left out of the tally.
 Reads the site JSON written earlier in `export` (snapshots, fingerprints, lines), so it runs after `previews`.
 """
+import gzip
 import json
+from functools import lru_cache
 from collections import defaultdict
 from datetime import datetime, timezone
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON, REGULAR, SITE_DATA, TABLES
+from pipeline.config import CURRENT_SEASON, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import grades, pending, previews, wording
 from pipeline.ingest import game_stats
 from pipeline.export import surprises as surprise_rules
-from pipeline.metrics import adjust, goalies, replays, team_style
+from pipeline.metrics import adjust, goalies, line_order, replays, team_style
 
 # A call on a game whose shift chart the NHL is still filling in: graded on a later run (see pending.py).
 PENDING = {"verdict": "pending", "happened": "Checked once the NHL finishes filling in who was on the ice."}
@@ -92,12 +94,22 @@ class Season:
         self.name = {r["player_id"]: f"{r['first'][0]}. {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
         self.name |= wording.number_clashes(season, wording.initials)  # "E. Pettersson (#40)" when two teammates match
         self.full = {r["player_id"]: f"{r['first']} {r['last']}" for r in players.sort("game_id").iter_rows(named=True)}
+        self.full |= wording.number_clashes(season, wording.full)
+        # lists on the page (the goalie table): "Andersen", "M. Tkachuk" when both brothers play
+        self.gshort = wording.short_names(players.iter_rows(named=True), key=lambda r: r["game_id"])
         self.dressed = {(r["game_id"], r["player_id"]) for r in players.select("game_id", "player_id").iter_rows(named=True)}
         self.first_game = {(t, p): g for t, p, g in players.group_by("team_id", "player_id").agg(pl.col("game_id").min()).iter_rows()}
+        self._pg, self._av = None, None
         self.stints = pl.read_parquet(d / "stints.parquet")
         self.units = pl.read_parquet(d / "game_units.parquet")
         self.goalies = goalies.per_game(season)
-        ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period_type"])
+        ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "sec", "team_id", "period", "period_type"])
+        # Goals and shots on goal by period, for the score table (shootout left out; their sum equals team_game's sf).
+        self.by_period = {}
+        for gid, tid, per, ptype, n, gl in (ev.filter(pl.col("type").is_in(["shot-on-goal", "goal"]) & (pl.col("period_type") != "SO"))
+                                            .group_by("game_id", "team_id", "period", "period_type")
+                                            .agg(pl.len(), (pl.col("type") == "goal").sum()).iter_rows()):
+            self.by_period[(gid, tid, per)] = (ptype, int(gl), int(n))
         pen = pl.read_parquet(d / "events.parquet", columns=["game_id", "p1", "pen_type"]) if "pen_type" in pl.read_parquet_schema(d / "events.parquet") else None
         self.ejected = set() if pen is None else {(g, p) for g, p in pen.filter(pl.col("pen_type").is_in(["GAM", "MAT"])).select("game_id", "p1").iter_rows()}
         self.goal_times = {}
@@ -148,8 +160,33 @@ class Season:
             ejected = (gid, p) in self.ejected
             if not ejected and nxt and (nxt, p) in self.dressed and gone < BENCHED_SEC:
                 continue
-            out.append({"id": p, "name": self.full.get(p, self.name.get(p, "?")), "pos": self.pos.get((gid, p)), "sec": int(at), "ejected": ejected})
+            out.append({"id": p, "name": self.full.get(p, self.name.get(p, "?")), "pos": self.pos.get((gid, p)), "sec": int(at), "ejected": ejected,
+                        "regular": self.regular(gid, tid, p), "confirmed": self.confirmed_out(gid, tid, p, nxt)})
         return sorted(out, key=lambda x: x["sec"])
+
+    def regular(self, gid: int, tid: int, pid: int) -> bool:
+        """A top-nine forward or top-four defenseman by average ice time in the club's earlier games this season (three
+        games needed). A depth forward who stops playing mid-game is as likely a coach's choice as anything else (Sora,
+        2026-10-16: MacEwen, a healthy scratch for six games, was told as having left; McKenna's was the coach's call)."""
+        if self._pg is None:
+            self._pg = pl.read_parquet(TABLES / str(self.season) / "player_game.parquet", columns=["game_id", "player_id", "team_id", "pos", "sec"])
+        mine = self._pg.filter((pl.col("team_id") == tid) & (pl.col("game_id") < gid)).group_by("player_id", "pos").agg(
+            pl.col("sec").mean().alias("avg"), pl.len().alias("n")).filter(pl.col("n") >= 3)
+        pos = self.pos.get((gid, pid))
+        d = pos == "D"
+        pool = mine.filter((pl.col("pos") == "D") if d else (pl.col("pos") != "D") & (pl.col("pos") != "G")).sort("avg", descending=True)
+        return pid in pool["player_id"].head(4 if d else 9).to_list()
+
+    def confirmed_out(self, gid: int, tid: int, pid: int, nxt: int | None) -> bool:
+        """Whether something besides the shift chart says he was out: he sat out the club's next game, or the daily
+        availability table (NHL.com Status Report, ESPN injuries, roster moves) has a report on him after this game."""
+        if nxt and (nxt, pid) not in self.dressed:
+            return True
+        if self._av is None:
+            f = TABLES / str(self.season) / "availability.parquet"
+            self._av = pl.read_parquet(f, columns=["date", "player_id", "report_status", "report_date"]).drop_nulls("report_status") if f.exists() else pl.DataFrame()
+        day = self.games[gid]["date"]
+        return bool(self._av.height and self._av.filter((pl.col("player_id") == pid) & (pl.col("report_date") >= day)).height)
 
     def pp_goals(self, gid: int, tid: int) -> int:
         return self.goals.filter((pl.col("game_id") == gid) & (pl.col("team_id") == tid) & pl.col("strength").is_in(list(PP_STRENGTHS))).height
@@ -184,7 +221,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if m == "volume":
             v = r["cf_adj"] / r["sec5"] * 3600
             txt = f"{team} took {v:.1f} shot attempts per 60 at 5-on-5 (adjusted for score and venue), against their usual {base:.1f}."
-            fmt = lambda x: f"{x:.1f} per 60"
+            fmt = lambda x: f"{x:.1f} attempts per 60"
         elif m == "quality":
             v = r["xgf_adj"] / r["ff_adj"] if r["ff_adj"] else 0.0
             txt = f"{team}’s average shot had {previews.a_pct(v)} chance of going in, against their usual {100 * base:.1f}%." if v else f"{team} barely got a shot away at 5-on-5."
@@ -201,7 +238,7 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             g = S.pp_record(gid, chk["team"])[0]
             txt = (f"{team}’s power play created {v:.1f} expected goals per 60 in {clock(r.get('pp_clock', r['pp_sec']))} of power-play time, against their usual {base:.1f}, "
                    f"and scored {g} {'goal' if g == 1 else 'goals'}.")
-            fmt = lambda x: f"{x:.1f} per 60"
+            fmt = lambda x: f"{x:.1f} expected goals per 60"
         if claim["kind"] == "duel":  # graded against the league average alone: which side of it the attack landed on
             usual = chk.get("usual", base)
             what = {"volume": "5-on-5 shot attempts", "quality": "chance quality", "pp": "the power play", "turnover": "chances off turnovers"}[m]
@@ -254,6 +291,13 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
                     "usual": f"{base}%", "tonight": "–"}
         sec = matchup_seconds(S, gid, chk)
         total = sum(sec.values())
+        whole, part = unit_together(S, gid, chk)
+        if part and whole < BROKEN_SHARE * part and whole < BROKEN_SEC:
+            # The coach broke the group up (eye test, 2026-10-14: Washington's "L1 (Wilson, Tuch, Strome)" was graded
+            # missed while the same page said Tuch and Strome had moved to a new line with Kyrou)
+            return {"verdict": "na", "happened": f"{team} broke up that {'pair' if len(chk['unit_ids']) == 2 else 'line'} tonight: {names} were together for only "
+                                                 f"{clock(whole)} at 5-on-5, so the matchup this call described never really happened.",
+                    "usual": f"{base}%", "tonight": "–"}
         if total < MIN_MATCHUP_SEC:
             return {"verdict": "na", "happened": f"{team}’s {chk['unit']} ({names}) spent only {clock(total)} against {opp_place}’s usual lines, too little to judge.",
                     "usual": f"{base}%", "tonight": "–"}
@@ -289,6 +333,8 @@ def measure_edge(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> di
         if not chk.get("league"):
             return {"verdict": "na", "happened": "There was no league average to score this against."}
         tv, bv = 100 * tv / chk["league"], 100 * bv / chk["league"]
+    if k == "depth" and (tv != tv or bv != bv):  # an 11-forward lineup: its bottom six is five players (team_style._depth)
+        return {"verdict": "na", "happened": "One of the teams dressed 11 forwards and 7 defensemen, so their bottom six was only five players and the share can’t be compared."}
     if tv != tv or bv != bv:  # NaN: nothing this trait counts happened
         return {"verdict": "na", "happened": "Too little of what this call counts happened to judge it."}
     d = (tv - bv) if chk["higher"] else (bv - tv)
@@ -335,8 +381,29 @@ def measure_history(claim: dict, glines: list) -> dict:
     sv = g["saves"] / g["shots"]
     verdict = "held" if abs(sv - chk["baseline"]) < abs(sv - chk["record"]) else "missed"
     return {"verdict": verdict,
-            "happened": f"{g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
+            "happened": f"{g.get('full') or g['name']} stopped {g['saves']} of {g['shots']} shots ({fmt(sv)}), against his usual {fmt(chk['baseline'])} and his {fmt(chk['record'])} against this team before tonight.",
             "usual": fmt(chk["baseline"]), "tonight": fmt(sv), "league": None, "_v": sv, "_name": g["name"]}
+
+
+BROKEN_SHARE = 0.4  # a group whose players were all out together for under this share of the time it was counted ...
+BROKEN_SEC = 300  # ... and under five minutes in all was broken up for the night
+
+
+def unit_together(S: Season, gid: int, chk: dict) -> tuple[float, float]:
+    """5v5 seconds (all of the home group together, at least the matchup's share of it together) in this game."""
+    g = S.games[gid]
+    unit = set(chk["unit_ids"])
+    need = 2 if len(unit) == 3 else 1
+    st = S.stints.filter((pl.col("game_id") == gid) & (pl.col("n_home") == 5) & (pl.col("n_away") == 5) & pl.col("home_goalie").is_not_null() & pl.col("away_goalie").is_not_null())
+    side = "home_skaters" if chk["team"] == g["home"] else "away_skaters"
+    whole = part = 0.0
+    for mine, d in st.select(side, "duration").iter_rows():
+        n = len(unit & set(mine))
+        if n >= need:
+            part += d
+        if n == len(unit):
+            whole += d
+    return whole, part
 
 
 def matchup_seconds(S: Season, gid: int, chk: dict) -> dict[str, float]:
@@ -368,11 +435,76 @@ def team_numbers(S: Season, gid: int, abbr: str) -> dict:
             "pp_goals": ppg, "pp_opps": ppo}
 
 
+def periods(S: Season, gid: int, g: dict) -> list[dict]:
+    """The score table: goals and shots on goal for each team in each period played (overtime as "OT"), then a
+    shootout column ("SO", goals only) when the game went to one: the shootout winner's goal is the difference between
+    the final score and the goals in play."""
+    teams = {g["away"]: g["away_id"], g["home"]: g["home_id"]}
+    last = max([p for (x, _, p) in S.by_period if x == gid] + [4 if g["last_period"] in ("OT", "SO") else 3])
+    out = []
+    for per in range(1, last + 1):
+        label = ("1st", "2nd", "3rd")[per - 1] if per <= 3 else "OT" if per == 4 else f"{per - 3}OT"
+        cell = {a: S.by_period.get((gid, t, per), (None, 0, 0)) for a, t in teams.items()}
+        out.append({"label": label, "goals": {a: c[1] for a, c in cell.items()}, "shots": {a: c[2] for a, c in cell.items()}})
+    if g["last_period"] == "SO":
+        play = {a: sum(p["goals"][a] for p in out) for a in teams}
+        out.append({"label": "SO", "goals": {g["away"]: g["away_score"] - play[g["away"]], g["home"]: g["home_score"] - play[g["home"]]}, "shots": None})
+    return out
+
+
+def official(season: int, gid: int) -> dict:
+    """The league's own shots on goal and goalie saves from the saved boxscore (refetched once after the game, when the
+    NHL settles its counts). The play-by-play is one shot short of the box in a few games a season, and fans check our
+    saves against NHL.com (outside notes, Oct 21: Schmid 24 of 29 here, 25 of 30 there). Empty when no box is saved."""
+    f = RAW / str(season) / "box" / f"{gid}.json.gz"
+    try:
+        b = json.load(gzip.open(f))
+    except (OSError, ValueError):
+        return {}
+    sog = {b[s]["abbrev"]: b[s]["sog"] for s in ("awayTeam", "homeTeam") if isinstance(b.get(s, {}).get("sog"), int)}
+    gk = {}
+    for side in ("awayTeam", "homeTeam"):
+        for x in (b.get("playerByGameStats") or {}).get(side, {}).get("goalies", []):
+            if isinstance(x.get("shotsAgainst"), int) and isinstance(x.get("saves"), int) and x["shotsAgainst"]:
+                gk[x["playerId"]] = (x["shotsAgainst"], x["saves"])
+    return {"sog": sog, "goalies": gk}
+
+
+def use_official(nums: dict, glines: list[dict], off: dict) -> None:
+    """Shots on goal and goalie saves as the league counts them; goals and chances (xG) stay ours."""
+    for t, n in (off.get("sog") or {}).items():
+        if t in nums:
+            nums[t]["shots"] = n
+    for g in glines:
+        sa_sv = (off.get("goalies") or {}).get(g["id"])
+        if sa_sv:
+            sa, sv = sa_sv
+            g.update(shots=sa, saves=sv, sv=round(sv / sa, 3))  # goals against stay ours: they match the box, which can
+            # count a goal with no shot (Lankinen, Oct 9: 8 against on 20 shots and 13 saves)
+
+
+@lru_cache(maxsize=4)
+def _set_up_goals(season: int) -> dict:
+    """(game_id, goalie_id) -> goals he allowed that came off a pass (assisted) and that our chance model rated low.
+    A private study of the NHL's goal-tracking files (2026-10-25, project files goal-tracking/before-goals.md) found
+    the goals the model rates lowest mostly follow a pass or have an open shooter, which the model cannot see, so
+    these are usually well-made plays, not a goalie's fault. Used only to choose wording, never shown."""
+    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "event_id", "type", "p2", "goalie_id", "period_type"])
+    ev = ev.filter((pl.col("type") == "goal") & (pl.col("period_type") != "SO") & pl.col("p2").is_not_null() & pl.col("goalie_id").is_not_null())
+    gp = TABLES / str(season) / "goals.parquet"
+    if not gp.exists():
+        return {}
+    xg = pl.read_parquet(gp, columns=["game_id", "event_id", "xg"])
+    low = ev.join(xg, on=["game_id", "event_id"]).filter(pl.col("xg") < surprise_rules.SET_UP_XG)
+    return {(r["game_id"], r["goalie_id"]): r["len"] for r in low.group_by("game_id", "goalie_id").len().iter_rows(named=True)}
+
+
 def goalie_lines(S: Season, gid: int, abbr_of: dict) -> list[dict]:
     out = []
     for r in S.goalies.filter(pl.col("game_id") == gid).sort("team_id", "sec", descending=[False, True]).iter_rows(named=True):
         sv = (r["sa"] - r["ga"]) / r["sa"] if r["sa"] else None
-        out.append({"id": r["goalie_id"], "name": S.name.get(r["goalie_id"], "?"), "team": abbr_of[r["team_id"]], "started": r["started"],
+        out.append({"id": r["goalie_id"], "name": S.gshort.get((gid, r["goalie_id"])) or S.name.get(r["goalie_id"], "?"),
+                    "full": S.full.get(r["goalie_id"]) or S.name.get(r["goalie_id"], "?"), "team": abbr_of[r["team_id"]], "started": r["started"],
                     "toi": clock(r["sec"]), "shots": r["sa"], "saves": r["sa"] - r["ga"], "ga": r["ga"], "xga": round(r["xga"], 2),
                     "gsax": round(r["xga"] - r["ga"], 2), "sv": round(sv, 3) if sv is not None else None,
                     "high": {"shots": r["sa_high"], "goals": r["ga_high"]}})
@@ -407,9 +539,9 @@ def surprises(S: Season, gid: int, nums: dict, places: dict, fp: dict, usual_lin
         for r in units.iter_rows(named=True):
             ids = {int(x) for x in r["unit"].split("-")}
             if ids not in usual:
-                trios.append((t, ", ".join(S.name.get(i, "?") for i in sorted(ids, key=lambda i: S.name.get(i, ""))), int(r["sec"]), ids))
+                trios.append((t, (lambda xs: ", ".join(xs[:-1]) + " and " + xs[-1])([S.full.get(i, "?") for i in line_order.order(S.season, S.team_id[(gid, t)], sorted(ids), g["date"])]), int(r["sec"]), ids))
                 break
-    left = {t: S.exits(gid, S.team_id[(gid, t)]) for t in (a, h)}
+    left = {t: [x for x in S.exits(gid, S.team_id[(gid, t)]) if x["regular"]] for t in (a, h)}
     cands = surprise_rules.candidates(rows, a, h, score, fp, places, glines, trios, replay, S.season)
     absent = {t: [{"id": p, "name": S.full.get(p, S.name.get(p, "?"))} for p in sorted({p for u in usual_lines.get(t, []) for p in u})
                   if (gid, p) not in S.dressed and S.first_game.get((S.team_id[(gid, t)], p), gid) < gid] for t in (a, h)}
@@ -461,6 +593,7 @@ def run(season: int = CURRENT_SEASON) -> dict:
         abbr_of = {g["home_id"]: g["home"], g["away_id"]: g["away"]}
         nums = {t: team_numbers(S, gid, t) for t in (g["away"], g["home"])}
         glines = goalie_lines(S, gid, abbr_of)
+        use_official(nums, glines, official(season, gid))
         snap = snaps.get(gid)
         rebuilt = bool((snap or {}).get("rebuilt"))
         pre = (snap or {}).get("pregame") or {}
@@ -482,7 +615,12 @@ def run(season: int = CURRENT_SEASON) -> dict:
             if res.get("verdict") in ("held", "partly", "missed"):
                 tally[res["verdict"]] += 1  # rebuilt previews count like live ones (user decision)
                 by_kind[c["kind"]][res["verdict"]] += 1
+        su = _set_up_goals(season)
+        for gl_ in glines:
+            gl_["_set_up"] = su.get((gid, gl_["id"]), 0)
         surp, beyond = ([], {}) if waiting else surprises(S, gid, nums, places, fp_pre, lines_pre, glines, rb, graded_claims)
+        for gl_ in glines:
+            gl_.pop("_set_up", None)  # wording only: not exported
         for c in calls:  # heads and bodies are the frozen preview's own words
             for k in ("happened", "title", "plain", "saw"):
                 if c.get(k):
@@ -495,10 +633,10 @@ def run(season: int = CURRENT_SEASON) -> dict:
         rec = {"game_id": gid, "date": g["date"], "start": g["start_utc"], "away": g["away"], "home": g["home"], "venue": g["venue"],
                "score": {g["away"]: g["away_score"], g["home"]: g["home_score"]}, "end": g["last_period"],
                "preview": snap is not None, "rebuilt": rebuilt, "preview_page": bool((snap or {}).get("pregame")), "snapshot_at": snap["snapshot_at"] if snap else None, "calls": calls,
-               "reveal": reveals.get(gid), "numbers": nums, "goalies": glines, "surprises": surp,
+               "reveal": reveals.get(gid), "numbers": nums, "periods": periods(S, gid, g), "goalies": glines, "surprises": surp,
                "replays": rb, **({"pending": True} if waiting else {})}
         if not waiting:  # skaters who left and didn't come back, for the story (never why; ejections are the penalty notes')
-            gone = [{"id": x["id"], "team": t, "sec": x["sec"]} for t in (g["away"], g["home"])
+            gone = [{"id": x["id"], "team": t, "sec": x["sec"], "regular": x["regular"], "confirmed": x["confirmed"]} for t in (g["away"], g["home"])
                     for x in S.exits(gid, S.team_id[(gid, t)]) if not x["ejected"]]
             if gone:
                 rec["left"] = sorted(gone, key=lambda x: x["sec"])

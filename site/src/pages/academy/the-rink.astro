@@ -1,0 +1,261 @@
+---
+// Academy 1.2: the rink. A step-through that paints the rink one part at a time, from above or from three seats;
+// whose end is whose; how big a rink is next to other fields; then a quiz. Leans on 1.1 (goal, goalie, net).
+// Offside and icing appear only as a teaser here: lesson 1.8 teaches them.
+import Lesson from '../../layouts/Lesson.astro';
+---
+<Lesson slug="the-rink">
+  <section class="ac-part" aria-labelledby="paint-h">
+    <header>
+      <h2 id="paint-h">The paint, one line at a time</h2>
+      <p>Every NHL rink is marked the same way, and nearly every rule you’ll learn later points back to one of these marks. Let it play, or step through at your own pace. At a game you’ll be watching from a seat, not from above, so try a few seats too.</p>
+    </header>
+    <p class="pick">See it <select id="pView" aria-label="Viewpoint">
+      <option value="above">from above</option>
+      <option value="center">from a seat at center ice</option>
+      <option value="corner">from a corner seat</option>
+      <option value="end">from behind the net</option>
+    </select></p>
+    <div class="ac-stage" id="pStage">
+      <div class="ac-view">
+        <svg class="ac-rink ac-steps" id="paint" role="img" aria-label="An NHL rink with its boards, goal lines and nets, creases, blue lines, center red line, faceoff circles and dots, benches and penalty boxes"></svg>
+      </div>
+      <div class="ac-cap" aria-live="polite">
+        <p class="eyebrow" id="capStep"></p>
+        <h3 id="capH"></h3>
+        <p id="capP"></p>
+        <div class="ac-track" id="track"><span class="fill"></span></div>
+        <div class="ac-ctrl">
+          <button class="pill" id="back" type="button">Back</button>
+          <button class="pill primary" id="next" type="button">Next</button>
+          <button class="pill" id="replay" type="button">Watch again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ac-part" aria-labelledby="whose-h">
+    <header>
+      <h2 id="whose-h">Whose end is it?</h2>
+      <p>The same piece of ice has different names depending on which team you’re following. One team’s defending zone is the other team’s attacking zone. That’s the first thing to sort out when a friend says “they can’t get out of their own end.”</p>
+    </header>
+    <p class="pick">Show the zones for <select id="wTeam" aria-label="Team">
+      <option value="home">the home team (dark)</option>
+      <option value="away">the visitors (white)</option>
+    </select></p>
+    <svg class="ac-rink" id="whose" role="img" aria-label="The rink split into three zones, named for the team you picked"></svg>
+    <p class="ac-hint">Teams switch ends after every period, so the zones swap too. Lesson 6 covers periods.</p>
+  </section>
+
+  <section class="ac-part" aria-labelledby="size-h">
+    <header>
+      <h2 id="size-h">How big is it?</h2>
+      <p>An NHL rink is 200 feet long and 85 feet wide. On TV it can look tiny; in person it’s bigger than people expect, and players cross it in a few seconds.</p>
+    </header>
+    <p class="pick">Put the rink next to <select id="sField" aria-label="Field">
+      <option value="court">a basketball court</option>
+      <option value="soccer">a soccer field</option>
+      <option value="football">a football field</option>
+    </select></p>
+    <svg class="ac-rink ac-size" id="size" role="img" aria-label="An NHL rink drawn to scale next to another playing field"></svg>
+    <p class="ac-sizep" id="sizeP" aria-live="polite"></p>
+  </section>
+
+  <section class="ac-part" aria-labelledby="call-h">
+    <header>
+      <h2 id="call-h">Make the call</h2>
+      <p>Three quick ones. Tap the rink for the first two. Nothing is saved or scored.</p>
+    </header>
+    <div class="ac-quiz">
+      <div class="ac-q" id="q1">
+        <svg class="ac-rink" id="q1r" role="group" aria-label="A rink you can tap: left end, middle, right end"></svg>
+        <p>Tap the neutral zone.</p>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" id="q2">
+        <svg class="ac-rink" id="q2r" role="group" aria-label="A rink you can tap: left end, middle, right end. The home goalie stands in the left net."></svg>
+        <p>The home team’s goalie is in the net on the left. Tap the home team’s attacking zone.</p>
+        <p class="ans" hidden></p>
+      </div>
+      <div class="ac-q" data-q>
+        <p>A player breaks a rule. Where does he usually go?</p>
+        <div class="ac-ctrl">
+          <button class="pill" type="button" data-say="Not quite. The bench is where players wait to go on. Rule breakers go across the ice.">His team’s bench</button>
+          <button class="pill" type="button" data-right data-say="Right. He sits in the penalty box, across the ice from the benches. Lesson 9 explains how long and what happens meanwhile.">The penalty box</button>
+          <button class="pill" type="button" data-say="Not quite. Only big offenses send a player off for good. Most of the time he sits in the penalty box for a while.">The dressing room</button>
+        </div>
+        <p class="ans" hidden></p>
+      </div>
+    </div>
+  </section>
+</Lesson>
+
+<script>
+  import { VIEWS, el, r2, fit, drawRink, label, figure, pathOf, rectPts, whenSeen, BENCHES, BOXES } from '../../lib/academy/rink';
+  import { wireQuiz } from '../../lib/academy/quiz';
+
+  const $ = (id: string) => document.getElementById(id) as any;
+  const viewOf = () => (VIEWS as any)[$('pView').value];
+
+  // ---------- The paint ----------
+  const paint = $('paint');
+  function buildPaint() {
+    paint.replaceChildren();
+    const V = viewOf();
+    fit(paint, V, V.top ? [0, -14, 200, 99] : [0, -7, 200, 94], V.top ? [1, 2, 1, 2] : [3, 2, 4, 2]);
+    drawRink(paint, V, { off: true });
+    const L = el(paint, 'g', { class: 'g-lbl' });
+    if (V.top) {
+      for (const x of [11, 189]) label(L, V, 'lbl lbl-goal', x, -9, 'Goal line');
+      for (const x of [75.5, 124.5]) label(L, V, 'lbl lbl-blue', x, -9, 'Blue line');
+      label(L, V, 'lbl lbl-red', 100, -9, 'Center red line');
+      for (const x of [17.5, 182.5]) label(L, V, 'lbl lbl-crease wide-lbl', x, 51.5, 'Crease');
+      label(L, V, 'lbl lbl-boards', 100, 97, 'The boards, all the way round');
+    } else {
+      label(L, V, 'lbl lbl-boards', 100, 96, 'The boards, all the way round');
+    }
+    label(L, V, 'lbl lbl-bench', (BENCHES.home[0] + BENCHES.away[1]) / 2, -2.5, 'Team benches', V.top ? 0 : 4.5);
+    label(L, V, 'lbl lbl-bench', (BOXES.home[0] + BOXES.away[1]) / 2, V.top ? 95 : 93, 'Penalty boxes');
+    const Z = el(paint, 'g', { class: 'g-zlbl' });
+    const zy = V.top ? 8 : 15;
+    label(Z, V, 'zlbl', 43, zy, 'End zone');
+    label(Z, V, 'zlbl', 100, zy, 'Neutral zone');
+    label(Z, V, 'zlbl', 157, zy, 'End zone');
+    const S = el(paint, 'g', { class: 'g-sum' });
+    const v = (x: number, cls: string, s: string) => {
+      if (V.top) return el(S, 'text', { class: `vlbl ${cls}`, x, y: 42.5, 'text-anchor': 'middle', transform: `rotate(-90 ${x} 42.5)` }, s);
+      return label(S, V, `vlbl ${cls}`, x, 80, s);
+    };
+    v(V.top ? 72.2 : 75.5, 'b', 'Offside'); v(V.top ? 128.8 : 124.5, 'b', 'Offside');
+    v(V.top ? 96.8 : 100, 'r', 'Icing');
+    if (V.top) { v(14.6, 'r', 'Icing'); v(185.4, 'r', 'Icing'); }
+    show(step);
+  }
+  const STEPS = [
+    { on: [], at: 'ice', h: 'A sheet of ice', p: 'An NHL rink is 200 feet long and 85 feet wide, with rounded corners. Everything painted on it means something.' },
+    { on: [], at: 'boards', h: 'The boards and the glass', p: 'A waist-high wall called the boards runs all the way round, with clear glass on top. The puck bounces off the boards and play just keeps going: there’s no out of bounds.' },
+    { on: ['goal'], at: 'goal', h: 'Goal lines and nets', p: 'A thin red line crosses each end, and the net sits on it. A goal counts once the whole puck is over this line, inside the net. There’s ice behind each net too, and players chase the puck back there all the time.' },
+    { on: ['goal', 'crease'], at: 'crease', h: 'The crease', p: 'The light blue half circle in front of each net is the crease. It’s the goalie’s space, and other players are supposed to stay out of his way there.' },
+    { on: ['goal', 'crease', 'blue'], at: 'blue', h: 'Blue lines make three zones', p: 'Two thick blue lines split the rink into three parts: an end zone at each end and the neutral zone in the middle. The end zones are where the goals happen.' },
+    { on: ['goal', 'crease', 'blue', 'red'], at: 'red', h: 'The center red line', p: 'A thick red line cuts the rink in half. The game starts on the dot right in its middle.' },
+    { on: ['goal', 'crease', 'blue', 'red', 'marks'], at: 'marks', h: 'Circles and dots', p: 'There are nine dots: one at center, four in the neutral zone and four in the end zones, inside the big circles. When play stops, it starts again on one of them. Lesson 4 shows how. The short lines behind the nets matter much later.' },
+    { on: ['goal', 'crease', 'blue', 'red', 'marks', 'bench'], at: 'bench', h: 'Benches and penalty boxes', p: 'Along one side, the two teams’ benches sit next to each other. Across the ice are two penalty boxes, where a player sits for a while after breaking a rule. Lesson 9 is about penalties.' },
+    { on: ['goal', 'crease', 'blue', 'red', 'marks', 'bench', 'sum'], at: 'sum', h: 'Blue for offside, red for icing', p: 'A handy way to remember the lines: the blue lines are for offside and the red lines are for icing. They’re the two whistles you’ll hear most, and lesson 8 explains both.' },
+  ];
+  const ALL = ['goal', 'crease', 'blue', 'red', 'marks', 'bench', 'sum'];
+  const track = $('track'), fill = track.querySelector('.fill');
+  const dots = STEPS.map((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.left = (i / (STEPS.length - 1) * 100) + '%';
+    b.setAttribute('aria-label', `Step ${i + 1}: ${s.h}`);
+    b.addEventListener('click', () => { stopAuto(); show(i); });
+    track.appendChild(b); return b;
+  });
+  let step = STEPS.length - 1, auto: any = null;
+  function show(i: number) {
+    step = Math.max(0, Math.min(STEPS.length - 1, i));
+    const s = STEPS[step];
+    paint.classList.remove(...ALL.map((k) => 'on-' + k), ...STEPS.map((x) => 'at-' + x.at));
+    paint.classList.add(...s.on.map((k) => 'on-' + k), 'at-' + s.at);
+    $('capStep').textContent = `Step ${step + 1} of ${STEPS.length}`;
+    $('capH').textContent = s.h;
+    $('capP').textContent = s.p;
+    dots.forEach((d, j) => d.classList.toggle('done', j <= step));
+    fill.style.width = (step / (STEPS.length - 1) * 100) + '%';
+    $('back').disabled = step === 0;
+    $('next').disabled = step === STEPS.length - 1;
+  }
+  const stopAuto = () => { clearInterval(auto); auto = null; };
+  function play() {
+    stopAuto(); show(0);
+    auto = setInterval(() => { if (step >= STEPS.length - 1) return stopAuto(); show(step + 1); }, 4200);
+  }
+  $('back').onclick = () => { stopAuto(); show(step - 1); };
+  $('next').onclick = () => { stopAuto(); show(step + 1); };
+  $('replay').onclick = () => (document.documentElement.classList.contains('motion') ? play() : show(0));
+  $('pView').addEventListener('change', () => {
+    $('pStage').classList.toggle('wide', $('pView').value !== 'above');
+    buildPaint();
+  });
+  buildPaint();
+  whenSeen(paint, play);
+
+  // ---------- Whose end ----------
+  const whose = $('whose');
+  function buildWhose() {
+    whose.replaceChildren();
+    const V = VIEWS.above, home = $('wTeam').value === 'home';
+    fit(whose, V, [0, -8, 200, 85], [1, 2, 2, 2]);
+    drawRink(whose, V, { zones: false });
+    const g = el(whose, 'g');
+    // The team you follow: its goalie in its own net, and the zones named from its side.
+    const own = home ? [0, 75.5] : [124.5, 200], att = home ? [124.5, 200] : [0, 75.5];
+    el(g, 'path', { class: 'zone', d: pathOf(V, rectPts(own[0], 0, own[1] - own[0], 85)), style: 'fill: var(--ac-lit)' });
+    const gk = figure(g, V, home ? 'home' : 'away', { goalie: true, tag: 'G' }); gk.set(home ? 14.5 : 185.5, 42.5);
+    gk.g.setAttribute('tabindex', '-1');
+    label(g, V, 'zlbl', (own[0] + own[1]) / 2, -3, 'Defending zone');
+    label(g, V, 'zlbl', 100, -3, 'Neutral zone');
+    label(g, V, 'zlbl', (att[0] + att[1]) / 2, -3, 'Attacking zone');
+    label(g, V, 'lbl', (own[0] + own[1]) / 2, 81, 'Their own end');
+    label(g, V, 'lbl', (att[0] + att[1]) / 2, 81, home ? 'Shooting this way →' : '← Shooting this way');
+  }
+  $('wTeam').addEventListener('change', buildWhose);
+  buildWhose();
+
+  // ---------- How big ----------
+  const FIELDS: Record<string, { w: number; h: number; name: string; say: string }> = {
+    court: { w: 94, h: 50, name: 'Basketball court', say: 'An NBA court is 94 by 50 feet. You could fit more than three of them on the ice.' },
+    soccer: { w: 344, h: 223, name: 'Soccer field', say: 'A full-size soccer field is about 344 by 223 feet. It would take four or five rinks to cover one.' },
+    football: { w: 360, h: 160, name: 'Football field', say: 'An American football field, end zones included, is 360 by 160 feet. That’s more than three rinks.' },
+  };
+  const size = $('size');
+  function buildSize() {
+    size.replaceChildren();
+    const f = FIELDS[$('sField').value], V = VIEWS.above;
+    const W = Math.max(200, f.w), Hh = Math.max(85, f.h);
+    const x0 = 100 - W / 2, y0 = 42.5 - Hh / 2;
+    fit(size, V, [x0, y0 - 12, x0 + W, y0 + Hh], [2, 2, 2, 2]);
+    size.style.setProperty('--k', r2(W / 200));
+    drawRink(size, V, { walls: false });
+    const fx = 100 - f.w / 2, fy = 42.5 - f.h / 2;
+    el(size, 'path', { class: 'field-fill', d: pathOf(V, rectPts(fx, fy, f.w, f.h)) });
+    el(size, 'path', { class: 'field', d: pathOf(V, rectPts(fx, fy, f.w, f.h)) });
+    label(size, V, 'flbl', 100, Math.min(-4, fy - 4), `${f.name} · ${f.w} × ${f.h} ft`);
+    label(size, V, 'flbl', 100, 42.5 + (f.h < 85 ? 33 : 3), 'NHL rink · 200 × 85 ft');
+    $('sizeP').textContent = f.say;
+  }
+  $('sField').addEventListener('change', buildSize);
+  buildSize();
+
+  // ---------- Make the call: tap a zone ----------
+  function tapRink(svgId: string, box: HTMLElement, right: 'left' | 'mid' | 'right', says: Record<string, string>, goalie = false) {
+    const s = $(svgId), V = VIEWS.above;
+    fit(s, V, [0, 0, 200, 85], [2, 2, 2, 2]);
+    drawRink(s, V, { zones: false });
+    if (goalie) { const gk = figure(s, V, 'home', { goalie: true, tag: 'G' }); gk.set(14.5, 42.5); gk.g.style.pointerEvents = 'none'; }
+    const out = box.querySelector<HTMLElement>('.ans')!;
+    const zones: [string, number, number, string][] = [['left', 0, 75.5, 'The left end'], ['mid', 75.5, 124.5, 'The middle'], ['right', 124.5, 200, 'The right end']];
+    const hits = zones.map(([k, a, b, name]) => {
+      const p = el(s, 'path', { class: 'hit', d: pathOf(V, rectPts(a, 0, b - a, 85)), tabindex: '0', role: 'button', 'aria-label': name });
+      const go = () => {
+        hits.forEach((h) => h.classList.remove('right', 'wrong'));
+        p.classList.add(k === right ? 'right' : 'wrong');
+        out.hidden = false; out.textContent = says[k];
+      };
+      p.addEventListener('click', go);
+      p.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      return p;
+    });
+  }
+  tapRink('q1r', $('q1'), 'mid', {
+    left: 'Not quite: that’s an end zone. The neutral zone is the middle, between the two blue lines.',
+    mid: 'Right. The neutral zone is the middle third, between the blue lines.',
+    right: 'Not quite: that’s an end zone. The neutral zone is the middle, between the two blue lines.',
+  });
+  tapRink('q2r', $('q2'), 'right', {
+    left: 'Not quite: that’s where their goalie is, so it’s their defending zone. They attack the other end.',
+    mid: 'Not quite: that’s the neutral zone. They attack the end with the other team’s net.',
+    right: 'Right. Their goalie defends the left net, so they attack the right end.',
+  }, true);
+  wireQuiz(document);
+</script>

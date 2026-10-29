@@ -41,7 +41,8 @@ export function describe(p: RosterPlayer): { tag: string; tip: string; out: bool
     case 'personal': return { tag: 'Personal leave', out: true, tip: `Away for personal or family reasons.${missed}${said}` };
     case 'scratched': return { tag: 'Scratched', out: true, tip: `On the game-day roster but did not dress. The league does not say why, and no injury has been reported.${missed}` };
     case 'off_roster': return { tag: 'Not in the lineup', out: true, tip: `Listed by the club but left off the game-day roster. No injury has been reported.${missed}` };
-    case 'not_listed': if (minors) return { tag: /\(AHL\)/.test(minors) ? 'In the AHL' : 'In the minors', out: true, tip: `Assigned to ${minors} on ${day(r!.date)}.${missed}` };
+    case 'not_listed': if (r?.status === 'unsigned') return { tag: 'Unsigned', out: true, tip: `An unsigned restricted free agent: the club holds his rights, but he can't play until he signs a contract. Not an injury.${missed}${said}` };
+      if (minors) return { tag: /\(AHL\)/.test(minors) ? 'In the AHL' : 'In the minors', out: true, tip: `Assigned to ${minors} on ${day(r!.date)}.${missed}` };
       return { tag: 'Off the NHL roster', out: true, tip: `The club holds his rights but their NHL roster does not list him: usually in the minors, sometimes a long-term injury. Nothing has been reported.${missed}` };
     case 'no_club': return { tag: 'No NHL club', out: false, tip: 'A regular here last season. No NHL club lists him now, and he has not played this season. The data cannot say why (unsigned, retired or playing abroad).' };
     default: return { tag: '', out: false, tip: '' };

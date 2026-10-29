@@ -7,13 +7,12 @@
   .team-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-top: 22px; }
   .crumbs + .team-top { margin-top: 0; }
   .team-top .rec { font: 600 16px var(--ui); color: var(--ink-2); }
-  .team-top .roster-link { font: 600 14px var(--ui); margin-left: auto; align-self: center; }
-  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 6px; scrollbar-width: none; }
+  .jump { font-family: var(--ui); display: flex; gap: 6px; overflow-x: auto; margin: 14px calc(-1 * var(--gut)) 0; padding: 2px var(--gut) 6px; scrollbar-width: none; }
   .jump a { flex: none; font-size: 13px; font-weight: 500; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--sheet); transition: border-color 0.15s ease; }
   .jump a:hover { border-color: var(--ink); }
   .next { margin-top: 18px; }
   .cols { display: grid; gap: 0 28px; }
-  @media (min-width: 820px) { .cols { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
   .cols .sub { margin-top: 22px; }
   .games { display: grid; gap: 8px; }
   .game { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
@@ -105,7 +104,8 @@
   html[data-mode='season'] .gmode.m-season { display: block; }
   html[data-mode='season'] .gmode.m-blend { display: none; }
   .g2 { display: grid; gap: 12px; margin-top: 12px; }
-  @media (min-width: 900px) { .g2 { grid-template-columns: 1fr 1fr; } }
+  /* Goalie card beside the league chart from tablet width up, so the chart is never a whole screen on its own. */
+  @media (min-width: 720px) { .g2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   .gmid { display: flex; flex-direction: column; justify-content: center; }
   .gname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font: 700 22px/1.1 var(--display); margin-bottom: 14px; }
   .gbig { font: 400 14px var(--ui); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
@@ -151,6 +151,13 @@
 
   .st3 { display: grid; gap: 12px; margin-top: 16px; }
   @media (min-width: 900px) { .st3 { grid-template-columns: 1fr 0.8fr 1fr; } }
+  /* Tablets: power play and penalty kill side by side as on a computer, the shot map under both (Sora, 2026-10-27). */
+  @media (min-width: 720px) and (max-width: 899px) {
+    .st3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .st3 > .mapcard { grid-column: 1 / -1; grid-row: 2; }
+    .st3 > .mapcard > * { width: 100%; max-width: 440px; margin-inline: auto; }
+    .st3 .stunit { flex: none; }
+  }
   .st3 > .card { display: flex; flex-direction: column; }
   .st3 .stunit { flex: 1; }
   .mapcard { justify-content: center; }
@@ -192,9 +199,27 @@
   .unit-toi strong { font-size: 15px; color: var(--ink); }
   .unit-gp { color: var(--ink-3); }
   .unit-names { font-weight: 600; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
-  @media (min-width: 480px) { .stats { grid-template-columns: repeat(4, 1fr); } }
-  .stats > div { display: grid; gap: 3px; justify-items: start; }
+  .unit-p { display: inline-flex; align-items: baseline; gap: 4px; }
+  .unit-no { font: 500 11px var(--ui); color: var(--ink-3); opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .unit-two { font: 400 14px var(--ui); color: var(--ink-3); margin-top: 4px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .stats .lab-short { display: none; }
+  /* Line and pair cards switch to the short labels by their own width, so two narrow cards side by side on a tablet
+     keep every label on one line. */
+  .card.unit { container-type: inline-size; }
+  @container (max-width: 400px) {
+    .stats dt { white-space: nowrap; }
+    .stats .lab-long { display: none; }
+    .stats .lab-short { display: inline; }
+  }
+  @media (max-width: 479px) {
+    .stats { gap: 12px 6px; }
+    .stats dt { font-size: 11.5px; white-space: nowrap; }
+    .stats .lab-long { display: none; }
+    .stats .lab-short { display: inline; }
+    .unit-names { font-size: 16px; gap: 4px 10px; }
+  }
+  .stats > div { display: grid; gap: 3px; justify-items: start; align-content: end; }
   .stats dt { font-size: 12px; color: var(--ink-2); }
   .stats dd { font-weight: 600; font-size: 15px; }
   .mini-h { margin-bottom: 8px; }
@@ -210,3 +235,24 @@
   .lt tbody tr:last-child > * { border-bottom: 0; }
   .todo { margin-top: 16px; display: grid; gap: 10px; font: 400 15px/1.5 var(--ui); }
 
+/* Counting-stat tables (player Stats, Leaders, team stats): numbers in tabular figures, headings in the small caps label. */
+  .stbl { border-collapse: collapse; font: 400 14px var(--ui); font-variant-numeric: tabular-nums; }
+  .stbl th, .stbl td { padding: 8px 10px; text-align: right; white-space: nowrap; }
+  .stbl th:first-child { padding-left: 0; text-align: left; }
+  .stbl td:last-child, .stbl thead th:last-child { padding-right: 0; }
+  .stbl thead th { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .stbl tbody th { font-weight: 600; }
+  .stbl tbody tr { border-top: 1px solid var(--rule); }
+  @media (max-width: 719px) { .stbl { font-size: 13px; } .stbl th, .stbl td { padding: 8px 6px; } }
+  .stbl .sr, .stsr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Behind the record (team pages, Standings): Record (dot) against what the chances are worth (dotted mark), the gap as a 6px bar; the average as a tick. */
+  .bh-lane { position: relative; height: 18px; margin: 0 7px; }
+  .bh-track { position: absolute; left: -7px; right: -7px; top: 7px; height: 4px; border-radius: 2px; background: var(--track); }
+  .bh-avg { position: absolute; top: 1px; height: 16px; width: 2px; margin-left: -1px; left: calc(var(--v) * 1%); background: var(--ink); opacity: 0.5; border-radius: 1px; }
+  .bh-gap { position: absolute; top: 6px; height: 6px; border-radius: 3px; left: calc(min(var(--a), var(--b)) * 1%); width: calc((max(var(--a), var(--b)) - min(var(--a), var(--b))) * 1%); background: color-mix(in oklab, var(--team) 50%, var(--track)); }
+  .bh-ref { position: absolute; top: -1px; height: 20px; left: calc(var(--v) * 1%); border-left: 2px dotted var(--ink); margin-left: -1px; z-index: 1; }
+  .bh-dot { position: absolute; top: 2px; left: calc(var(--v) * 1%); width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--team); box-shadow: 0 0 0 2px var(--sheet); z-index: 2; }
+  .bh-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 0 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .bh-key strong { color: var(--ink); font-weight: 700; }
+  .bh-key .k-ref::before { border-left-color: var(--ink); }

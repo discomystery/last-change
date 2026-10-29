@@ -11,12 +11,14 @@ import PLink from '../../components/PLink.astro';
 import PlayerJobs from '../../components/PlayerJobs.astro';
 import GameSwing from '../../components/GameSwing.astro';
 import GameFlow from '../../components/GameFlow.astro';
+import LineMatchups from '../../components/LineMatchups.astro';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
 import CallCard from '../../components/CallCard.astro';
 import ShareSheet from '../../components/ShareSheet.astro';
 import GameStory, { type Story } from '../../components/GameStory.astro';
+import GameNumbers, { type Period } from '../../components/GameNumbers.astro';
 import Explain from '../../components/Explain.astro';
 import Gloss from '../../components/Gloss.astro';
 import ChanceStory, { type Beat } from '../../components/ChanceStory.astro';
@@ -30,7 +32,7 @@ type Call = { id: string; kind: string; head: string; body: string; call?: strin
 type Nums = { shots: number; xg: number; cf5: number | null; pp_goals: number; pp_opps: number };
 type Goalie = { id: number; name: string; team: string; started: boolean; toi: string; shots: number; saves: number; ga: number; xga: number; gsax: number; sv: number | null; high: { shots: number; goals: number } };
 type Replays = { share: Record<string, number>; regulation: Record<string, number>; xg: Record<string, number>; chances: Record<string, number> };
-type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
+type Recap = { game_id: number; date: string; start: string; away: string; home: string; venue: string; score: Record<string, number>; end: string; preview: boolean; rebuilt?: boolean; preview_page?: boolean; snapshot_at: string | null; calls: Call[]; numbers: Record<string, Nums>; periods?: Period[]; goalies: Goalie[]; surprises: { kind?: string; tag?: string; mild?: boolean; head: string; body: string; flipped?: string }[]; replays?: Replays | null; story?: Story; pending?: boolean;
   reveal?: { p_home: number; p_home_puck: number | null; steps: { input: string; label: string; shift: number }[]; sides: Record<string, { head: string; chance: number }>;
     inputs?: Record<string, { xgd: number; b2b: number; roster?: number; lineup?: number }>;
     players?: Record<string, { missing: Named[]; out: Named[]; in: Named[]; stars?: Star[] } | null> } | null };
@@ -166,6 +168,10 @@ const rows: [string, string, (n: Nums) => string, (n: Nums) => number][] = [
   ['Shot attempts at 5-on-5', 'Every attempt at even strength with both goalies in: on goal, missed or blocked. The bar splits them between the teams.', (n) => (n.cf5 === null ? '…' : String(n.cf5)), (n) => n.cf5 ?? 0],
   ['Power plays', 'Power-play goals, out of times on the power play. The bar splits the times on the power play.', (n) => `${n.pp_goals} of ${n.pp_opps}`, (n) => n.pp_opps],
 ];
+const numRows = rows.map(([name, tip, f, v]) => {
+  const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
+  return { name, tip, vals: order.map((a) => f(r.numbers[a])) as [string, string], g: (x + y > 0 ? [x, y] : [1, 1]) as [number, number] };
+});
 // Run it back: 100 replays of the game's chances, split by largest remainder so the dots always add to 100.
 const dw = r.replays ?? null;
 const replays = (() => {
@@ -200,17 +206,18 @@ const story = r.story;
 // How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
 const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'How it unfolded']] : []), ['preview', 'Preview vs result'],
-  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'In net'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'Flow']] : []), ['preview', 'Preview review'],
+  ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'Goalies'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
+import GameSwitch from '../../components/GameSwitch.astro';
 ---
 <Base section="games" title={`${away} at ${home}, final`} description={r.story?.head ? `${r.story.head}. How the preview’s calls held up, the Swing and every report card.` : 'How the preview’s calls held up, the Swing and every report card.'} og={finalOg(r as any)}>
   <style is:inline set:html={colourCss + povCss}></style>
   <section class="hero" aria-label="Final score">
     <GameTrail id={r.game_id} part="crumbs" />
     <Rink centre="final" sides={order.map((a) => ({ abbr: a, cls: `t-${side(a)}`, full: T[a]?.name ?? a, score: r.score[a], home: a === home, href: `${import.meta.env.BASE_URL}team/${a}/` }))} />
-    <GameTrail id={r.game_id} part="around"><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p><p><button type="button" class="share-btn" data-share="game"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg><span>Share this game</span></button></p></GameTrail>
+    <GameTrail id={r.game_id} part="around" names={Object.fromEntries(order.map((a) => [a, { full: T[a]?.nick ?? T[a]?.name ?? a }]))}><p class="when-day">{dateStr}</p><p><strong>{endWord}</strong> · {r.venue}</p><p class="gamelinks">{r.preview_page && <GameSwitch id={r.game_id} on="recap" />}<button type="button" class="share-btn" data-share="game"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.3 8 2.3l3 3M3.5 8.5v4.5h9V8.5"/></svg><span>Share</span></button></p></GameTrail>
   </section>
 
   <SectionNav items={nav as [string, string][]} />
@@ -224,36 +231,12 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
     )}
     {story ? (
       <GameStory story={story} kicker={false}>
-        <div class="tug">
-          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
-          {rows.map(([name, tip, f, v]) => {
-            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
-            const g = x + y > 0 ? [x, y] : [1, 1];
-            return (
-              <div class="tug-row">
-                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
-                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
-              </div>
-            );
-          })}
-        </div>
+        <Fragment slot="band"><GameNumbers order={order as [string, string]} cls={order.map((a) => `t-${side(a)}`) as [string, string]} score={r.score} periods={r.periods} rows={numRows} /></Fragment>
         {r.end === 'SO' && <p class="note small">The shootout decides the result but is left out of every other number on this site.</p>}
       </GameStory>
     ) : (
       <div class="card">
-        <div class="tug">
-          <p class="tug-head">{order.map((a) => <span class={`t-${side(a)}`}><i></i>{a}</span>)}</p>
-          {rows.map(([name, tip, f, v]) => {
-            const [x, y] = order.map((a) => Math.max(0, v(r.numbers[a])));
-            const g = x + y > 0 ? [x, y] : [1, 1];
-            return (
-              <div class="tug-row">
-                <p class="tug-top"><strong>{f(r.numbers[order[0]])}</strong><span class="term" tabindex="0" data-tip={tip}>{name}</span><strong>{f(r.numbers[order[1]])}</strong></p>
-                <div class="rope" aria-hidden="true"><b class="t-away" style={`--g:${g[0]}`}></b><b class="t-home" style={`--g:${g[1]}`}></b></div>
-              </div>
-            );
-          })}
-        </div>
+        <GameNumbers order={order as [string, string]} cls={order.map((a) => `t-${side(a)}`) as [string, string]} score={r.score} periods={r.periods} rows={numRows} />
       </div>
     )}
 
@@ -287,12 +270,13 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   </section>
 
   {hasFlow && (
-    <Section id="flow" title="How it unfolded" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
+    <Section id="flow" title="Game flow" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
       <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
+      <LineMatchups id={r.game_id} awayPlace={place(away)} homePlace={place(home)} />
     </Section>
   )}
 
-  <Section id="preview" title="What the preview said" placeholder={false} takeaway={takeaway} lead>
+  <Section id="preview" title="Preview review" placeholder={false} takeaway={takeaway} lead>
     <Fragment slot="explain">
       <p class="note">Each call is checked by a rule set before the game. <strong>Called it</strong>: the team reached their usual level. <strong>Close</strong>: they fell short of their usual level but still beat the league average. When a call says one team will come out ahead, called it means they won by at least half their usual gap, and partly means they won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     </Fragment>
@@ -320,7 +304,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
     {r.surprises.length > 0 && (
       <>
-        <Explain id="surprises" title="What it didn’t see coming">
+        <Explain id="surprises" title="Surprises">
           <p class="note"><strong>Broke the pattern</strong>: a team did the opposite of their usual habit. <strong>Bad to worse</strong> and <strong>Good to better</strong>: a team known for a weakness or a strength (or facing one) went further even than that. <strong>Further than usual</strong>: a usual habit, taken much further. <strong>Closer than usual</strong>: a usual strength or weakness that mostly disappeared. <strong>Out of character</strong>: two teams who usually land about average here, far from it. Each is measured against what both teams’ numbers before the game predicted, and special teams also against five seasons of real power-play and penalty-kill conversion.</p>
         </Explain>
         <ul class="two surp">{r.surprises.map((s) => <li class:list={['card', { mild: s.mild }]}><p class="eyebrow">{s.flipped ? 'Flipped a call' : s.mild && s.kind !== 'form' ? `Smaller twist · ${s.tag}` : s.tag}</p><h3 class="h">{s.head}</h3>{s.flipped && <p class="flipped">The preview said “{s.flipped}.”</p>}<p>{s.body}</p></li>)}</ul>
@@ -332,7 +316,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
 
   <PlayerJobs gameId={r.game_id} place={place} side={side} />
 
-  <Section id="goalies" title="In net" placeholder={false} takeaway={hasGoalieCards ? "Each goalie’s night: the goals he stopped beyond what the shots were worth, and the dangerous and routine saves." : "How many goals each goalie stopped beyond what the shots he faced were worth."}>
+  <Section id="goalies" title="Goalies" placeholder={false} takeaway={hasGoalieCards ? "Each goalie’s night: the goals he stopped beyond what the shots were worth, and the dangerous and routine saves." : "How many goals each goalie stopped beyond what the shots he faced were worth."}>
     <Fragment slot="explain">
       {!hasGoalieCards && <p class="note">Empty-net shots are left out. Expected-goal models can’t see passes before a shot, so a goalie beaten by cross-ice passes looks worse here than he really was.</p>}
     </Fragment>
@@ -427,7 +411,7 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .nums { margin-top: 6px; font: 400 13px/1.45 var(--ui); color: var(--ink-3); }
   .top { margin-top: 28px; }
   .small { font-size: 13px; color: var(--ink-3); }
-  .sub { font: 600 22px/1.2 var(--display); margin: 40px 0 0; }
+  .sub { margin: 40px 0 0; }
   .hero { margin-top: 0; }
   .claims { display: grid; gap: 16px; margin-top: 22px; }
   .eyebrow { margin-bottom: 4px; }
@@ -439,21 +423,9 @@ const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.ti
   .compare div { display: grid; gap: 2px; }
   .compare dd { font: 700 22px/1.1 var(--display); }
   .compare span { font: 400 12px var(--ui); color: var(--ink-3); }
-  .tug { display: grid; gap: 14px; margin-top: 12px; }
-  .tug-head { display: flex; justify-content: space-between; font: 600 14px var(--ui); margin: 0; }
-  .tug-head span { display: inline-flex; align-items: center; gap: 7px; }
-  .tug-head i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
-  .tug-row { display: grid; gap: 6px; }
-  .tug-top { display: grid; grid-template-columns: 4.5em 1fr 4.5em; align-items: baseline; margin: 0; font: 500 14px var(--ui); color: var(--ink-2); }
-  .tug-top span { justify-self: center; text-align: center; }
-  .tug-top strong { font: 700 20px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tug-top strong:last-child { text-align: right; }
-  .rope { position: relative; display: flex; gap: 3px; height: 10px; }
-  .rope b { flex: var(--g) 1 0; min-width: 4px; border-radius: 5px; background: var(--team); transition: flex-grow 1s cubic-bezier(0.3, 0.9, 0.25, 1); }
-  .rope::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--ink-3); opacity: 0.6; }
-  .rope.mid b { flex-grow: 1; }
   .surp, .gl { margin-top: 18px; }
   .surp .eyebrow { margin-bottom: 6px; }
+  .surp p:not(.eyebrow, .flipped) { color: var(--ink-2); }
   .surp .mild .h { font-size: 20px; }
   .call { margin-top: 10px; font: 500 15px/1.45 var(--ui); }
   .call span { display: block; font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 2px; }

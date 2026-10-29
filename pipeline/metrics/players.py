@@ -14,7 +14,7 @@ Z80 = 1.2816
 
 COLS = ["sec", "sec5", "sec_pp", "icf5", "ixg5", "ixg_pp", "ixg_net", "iff_net", "g_net", "a1_5", "a1_pp", "on_xgf_adj", "on_xga_adj",
         "t_xgf_adj", "t_xga_adj", "t_sec5", "hits", "hits_adj", "takes", "takes_adj", "blocks", "blocks_adj", "gives", "gives_adj", "fow", "fol",
-        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf"]
+        "pen_taken", "pen_drawn", "sec_pk", "sh_xgf", "fo_xw", "on_xgf", "on_xga"]
 C = {c: i for i, c in enumerate(COLS)}
 GROUP = {"C": "F", "L": "F", "R": "F", "D": "D"}
 SUB = {"C": "C", "L": "W", "R": "W", "D": "D"}
@@ -36,6 +36,12 @@ def _rate(num: str, den: str, mult: float = 3600.0):
 
 
 def _faceoffs(s):
+    """Share of draws he would win against average opposition in even spots: 50 plus his wins above what an average
+    faceoff man would have won against the same opponents, at the same manpower and end of the ice (faceoffs.py)."""
+    return 50 + 100 * (s[..., C["fow"]] - s[..., C["fo_xw"]]) / (s[..., C["fow"]] + s[..., C["fol"]])
+
+
+def _faceoffs_recorded(s):
     return 100 * s[..., C["fow"]] / (s[..., C["fow"]] + s[..., C["fol"]])
 
 
@@ -62,7 +68,8 @@ TRAITS = {
     "discipline": (_rate("pen_taken", "sec"), "sec", False, None),
     "faceoffs": (_faceoffs, _faceoff_weight, True, {"blend": 200, "season": 40}),
 }
-RAW = {"hits": _rate("hits", "sec"), "blocks": _rate("blocks", "sec"), "takeaways": _rate("takes", "sec")}  # as recorded, for the Raw switch
+# As recorded, for the Recorded switch. Faceoffs: the plain share of draws won, as NHL.com shows it.
+RAW = {"hits": _rate("hits", "sec"), "blocks": _rate("blocks", "sec"), "takeaways": _rate("takes", "sec"), "faceoffs": _faceoffs_recorded}
 INDEXED = set(RAW)
 
 
@@ -145,6 +152,34 @@ def _pct(v: float, pool: np.ndarray, higher: bool) -> float:
     return float(np.clip(100 * p, 1, 99))
 
 
+ZONE_MIN_STARTS = 30  # faceoff shift starts before the share is shown; half its spread is habit at about 55 (split-half r 0.72, 2024-26)
+
+
+def _zone_starts(season: int, team_now: dict[int, int]) -> dict[int, dict]:
+    """Where his current club starts his 5-on-5 shifts when they begin with a faceoff in either end (units.shift_starts):
+    the attacking-zone share this season and over this season and last, overall, at home (where his coach has the last
+    change) and on the road. Only games with his current club count, so it describes how this coach uses him."""
+    from pipeline.metrics import units
+
+    parts = [units.shift_starts(s).with_columns(pl.lit(s).alias("season")) for s in (season - 1, season) if (TABLES / str(s) / "stints.parquet").exists()]
+    if not parts:
+        return {}
+    z = pl.concat(parts)
+    z = z.filter(pl.col("team_id") == pl.col("player_id").replace_strict(team_now, default=None, return_dtype=pl.Int64))
+    out: dict[int, dict] = {}
+    for mode, rows in (("blend", z), ("season", z.filter(pl.col("season") == season))):
+        agg = rows.group_by("player_id", "home").agg(pl.col("oz", "dz").sum())
+        for pid, g in agg.group_by("player_id"):
+            by = {r["home"]: (r["oz"], r["dz"]) for r in g.iter_rows(named=True)}
+            oz = sum(v[0] for v in by.values())
+            dz = sum(v[1] for v in by.values())
+            if oz + dz < ZONE_MIN_STARTS:
+                continue
+            side = lambda h: None if h not in by or sum(by[h]) < ZONE_MIN_STARTS else round(by[h][0] / sum(by[h]), 3)
+            out.setdefault(pid[0], {})[mode] = {"share": round(oz / (oz + dz), 3), "oz": int(oz), "dz": int(dz), "home": side(True), "road": side(False)}
+    return out
+
+
 def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dict:
     """Ratings for everyone who has dressed this season. `idle` (player id -> current team id) adds players a club
     holds who have not dressed yet (injured, in the minors): rated from last season alone, with no games this season."""
@@ -219,6 +254,7 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
                 pool = np.array([players[pid]["est"]["blend"][t] for pid in members if ok_ref(players[pid])])
                 mean = float(pool.mean()) if len(pool) else float("nan")
                 raw_pool = np.array([float(RAW[t](both(players[pid], "blend"))) for pid in members if ok_ref(players[pid])]) if t in RAW else None
+                raw_mean = float(raw_pool.mean()) if raw_pool is not None and len(raw_pool) else 0.0
                 for pid in members:
                     p = players[pid]
                     v = p["est"][mode][t]
@@ -228,7 +264,10 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
                            "rank": int((pool > v).sum() + 1 if higher else (pool < v).sum() + 1)}
                     if t in RAW:
                         s_ = both(p, mode)
-                        raw = float(RAW[t](s_)) if s_[C["sec"]] > 0 else 0.0
+                        with np.errstate(divide="ignore", invalid="ignore"):
+                            raw = float(RAW[t](s_)) if s_[C["sec"]] > 0 else 0.0
+                        if not np.isfinite(raw):
+                            raw = raw_mean  # never took a draw: shown at the average, greyed out like the rating
                         rec |= {"index": round(100 * v / mean) if mean else None, "raw": round(raw, 2), "raw_pct": round(_pct(raw, raw_pool, higher))}
                     out[pid]["traits"].setdefault(t, {})[mode] = rec
 
@@ -239,15 +278,25 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
     for mode, fit_ in fits.items():
         est = {r["player_id"]: r for r in fit_.iter_rows(named=True)}
         for key, col in (("offImpact", "off"), ("defImpact", "def")):
+            # As recorded (the Competition switch): his team's chances for or against per 60 with him on the ice at
+            # 5-on-5, whoever he played with or against.
+            on, higher_raw = ("on_xgf", True) if key == "offImpact" else ("on_xga", False)
+            on_rate = lambda s_: 3600 * float(s_[C[on]]) / float(s_[C["sec5"]]) if s_[C["sec5"]] > 0 else float("nan")
             for g in ("F", "D"):
                 members = [pid for pid, p in players.items() if p["group"] == g and pid in est]
                 ref = {r["player_id"]: r[col] for r in fits["blend"].iter_rows(named=True)}
                 pool = np.array([ref[pid] for pid in members if pid in ref and regular(players[pid], "blend")])
+                raw_pool = np.array([on_rate(both(players[pid], "blend")) for pid in members if regular(players[pid], "blend")])
+                raw_pool = raw_pool[np.isfinite(raw_pool)]
                 for pid in members:
                     v, sd = est[pid][col], est[pid][f"{col}_sd"]
                     a, b = sorted((_pct(v - Z80 * sd, pool, True), _pct(v + Z80 * sd, pool, True)))
-                    out[pid]["traits"].setdefault(key, {})[mode] = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": regular(players[pid], mode),
-                                                                     "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
+                    rec = {"v": round(v, 3), "pct": round(_pct(v, pool, True)), "lo": round(a), "hi": round(b), "ok": regular(players[pid], mode),
+                           "of": int(len(pool)), "vs": g, "rank": int((pool > v).sum() + 1), "sd": round(sd, 3)}
+                    raw = on_rate(both(players[pid], mode))
+                    if np.isfinite(raw) and len(raw_pool):
+                        rec |= {"raw": round(raw, 2), "raw_pct": round(_pct(raw, raw_pool, higher_raw))}
+                    out[pid]["traits"].setdefault(key, {})[mode] = rec
         # Power-play impact: the same idea on 5-on-4 play (rapm.power_play), for players with real power-play time.
         pp = rapm.power_play(list(range(rapm.FIRST_SEASON, season + 1)) if mode == "blend" else [season], fit_)
         est_pp = {r["player_id"]: r for r in pp.iter_rows(named=True)}
@@ -271,6 +320,16 @@ def run(season: int = CURRENT_SEASON, idle: dict[int, int] | None = None) -> dic
             pools = {k: np.array([c[pid][k] for pid in members if regular(players[pid], mode) and c[pid][k] is not None]) for k in ("all", "home", "road")}
             for pid in members:
                 out[pid].setdefault("competition", {})[mode] = {k: None if c[pid][k] is None else {"v": round(c[pid][k], 3), "pct": round(_pct(c[pid][k], pools[k], True))} for k in ("all", "home", "road")}
+    for pid, z in _zone_starts(season, team_now).items():
+        if pid in out:
+            out[pid]["zone_starts"] = z
+    for mode in ("blend", "season"):
+        for g in ("F", "D"):
+            have = [pid for pid, p in players.items() if p["group"] == g and (out[pid].get("zone_starts") or {}).get(mode)]
+            pool = np.array([out[pid]["zone_starts"][mode]["share"] for pid in have if regular(players[pid], mode)])
+            for pid in have:
+                z = out[pid]["zone_starts"][mode]
+                z["pct"] = round(_pct(z["share"], pool, True)) if len(pool) else None
     for pid, p in players.items():
         out[pid]["totals"] = {"season": {c_: float(p["sums"]["season"][i]) for c_, i in C.items()},
                               "last": None if p["sums"]["last"] is None else {c_: float(p["sums"]["last"][i]) for c_, i in C.items()}}

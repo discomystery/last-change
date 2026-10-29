@@ -24,6 +24,7 @@ Shot counts are the most common way a game strays, so they need a bigger departu
 """
 import math
 import re
+import zlib
 from functools import lru_cache
 from statistics import NormalDist
 
@@ -31,15 +32,17 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS
+from pipeline.export import grammar
 from pipeline.export.previews import a_pct
 from pipeline.ingest import history
 from pipeline.metrics import adjust, goalies, team_style
 
-BIG, SMALL = 1.75, 1.0  # scores for a surprise and for a smaller twist
+BIG, SMALL = 1.75, 1.65  # scores for a surprise and for a smaller twist (SMALL: about one team-game in twenty, Sora's review 2026-10-17)
 KNOWN_BONUS = 0.25  # "bad to worse" and "good to better" are a story of their own (Sora, 2026-10-12)
 SHOT_WEIGHT = 0.75  # shot share has to stray further (2.3 spreads) to count as a surprise
 DEPTH_WEIGHT = 0.85  # bottom-six minutes swing with penalties and injuries in the game, so they need a little more too
 MAX_SHOWN, MIN_SHOWN = 4, 2
+BLOWOUT = 3  # goal margin from which ice-time (bottom-six) surprises are not told
 TAGS = {"break": "Broke the pattern", "further": "Further than usual", "muted": "Closer than usual",
         "unusual": "Out of character", "rare": "Out of the ordinary", "worse": "Bad to worse", "better": "Good to better"}
 SIDE, EXTREME = 0.5, 0.9  # standings (bell-curve units): leaning one way, and known for it
@@ -93,6 +96,35 @@ def spreads() -> dict[str, np.ndarray]:
     return out
 
 
+@lru_cache(maxsize=1)
+def pp_levels() -> tuple[np.ndarray, np.ndarray]:
+    """(team's season power-play level, that night's rate) for every past team-game with enough power-play time."""
+    w = adjust.weights()
+    lv, val = [], []
+    for season in FULL_SEASONS:
+        for (_,), g in team_style.per_game(season, w).group_by("team_id"):
+            v = np.array([x for x in map(_pp, g.to_dicts()) if x is not None])
+            if len(v) > 5:
+                lv += [float(v.mean())] * len(v)
+                val += list(v)
+    return np.array(lv), np.array(val)
+
+
+def pp_tail(usual: float, x: float) -> float:
+    """How often a power play at this level has a night this far out, from teams at about the same level. A night at
+    or near zero is far rarer for an elite power play than for a poor one, but not "less than once in a thousand":
+    measured against every team, Vegas's chanceless two power plays at Nashville read that way, when about one in 400
+    nights for power plays as good as theirs does it (eye test, 2026-10-14)."""
+    lv, val = pp_levels()
+    near = np.abs(lv - usual) <= PP_NEAR
+    v = val[near] if near.sum() >= 200 else val
+    n = (v <= x).sum() if x < usual else (v >= x).sum()
+    return max(float(n), 0.5) / len(v)
+
+
+PP_NEAR = 1.5  # expected goals per 60: teams this close to a power play's level are its comparison
+
+
 def sd(k: str) -> float:
     return float(np.std(spreads()[k]))
 
@@ -111,15 +143,18 @@ def z_of(k: str, dev: float) -> float:
 
 def every(k: str, dev: float) -> int:
     """About how many team-games go by between departures this big in this direction, rounded to a friendly number."""
-    n = 1 / tail(k, dev)
+    return _friendly(1 / tail(k, dev))
+
+
+def _friendly(n: float) -> int:
     for step in (1, 5, 10, 25, 50, 100):
         if n < step * 10:
             return max(2, int(round(n / step) * step))
     return int(round(n, -2))
 
 
-def rarity(k: str, dev: float) -> str:
-    n = every(k, dev)
+def rarity(k: str, dev: float, share: float | None = None) -> str:
+    n = every(k, dev) if share is None else _friendly(1 / share)
     # A team plays 82 games, so "once every 100+" is rarer than once a season for any one club (Sora, 2026-10-14: say
     # how rare it really is, the way a fan would).
     tail_ = " That’s rarer than once a season for any one team." if n >= 100 else ""
@@ -406,6 +441,8 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
         return None
     e = usual if expected is None else expected
     z = z_of(kind, x - e)
+    if kind == "pp":  # the same rarity the sentence quotes
+        z = float(np.sign(x - e) * NormalDist().inv_cdf(1 - min(0.5, pp_tail(usual, x))))
     s, own, opp, why = standing(kind, t, o, fp, places, season) if fp else (None, 0.0, 0.0, [])
     cls = classify(e, x, league, sd(kind), s, own, opp)
     if kind in NEUTRAL and cls in ("worse", "better"):
@@ -438,7 +475,7 @@ def team_stat(kind: str, t: str, o: str, x: float | None, usual: float | None, l
         fig = f"{T}’s bottom-six forwards played {x:.0f}% of the forwards’ 5-on-5 time, {rest}"
         short = f"the bottom six played {x:.0f}% of the forwards’ 5-on-5 time, {rest}"
         cat = "lineup"
-    body = compose(cls, why, fig, short, rarity(kind, x - e), BRIDGE[kind][0 if up else 1], who=T)
+    body = compose(cls, why, fig, short, rarity(kind, x - e, pp_tail(usual, x) if kind == "pp" else None), BRIDGE[kind][0 if up else 1], who=T)
     return _item(cat, abs(z) * (DEPTH_WEIGHT if kind == "depth" else 1.0), cls, head, body, (kind, t, up))
 
 
@@ -477,7 +514,7 @@ def pp_goals(t: str, o: str, g: int, n: int, fp: dict, places: dict, season: int
     head = {"break": "{T}’s power play came alive", "worse": "{T}’s power play feasted on {O}’s kill"}.get(cls, "{T}’s power play did damage")
     fig = f"{g} power-play goals on {n} {'chance' if n == 1 else 'chances'}."
     short = fig
-    rare = f"A power play like theirs against a kill like {places[o]}’s scores {g} or more about once every {_friendly(1 / max(p, 1e-3))} games."
+    rare = f"A power play like theirs against a kill like {places[o]}’s scores {g} or more about once every {_friendly(1 / max(p, 1e-3)):,} games."
     return _item("special", z, cls, head.format(T=places[t], O=places[o]), compose(cls, why, fig, short, rare, "a big night", who=places[t]), ("pp", t, True))
 
 
@@ -500,8 +537,9 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
         out.append(team_stat("pp", t, o, _pp(r), u, lg, places, against(u, lg, "pk"), fp, season, score["pp_goals"][t]))
         u, lg = level(t, "physical")
         out.append(team_stat("hits", t, o, _hits(r), u, lg, places, None, fp, season))
-        u, lg = level(t, "depth")
-        out.append(team_stat("depth", t, o, _depth(r), u, lg, places, None, fp, season))
+        if abs(score[a] - score[h]) < BLOWOUT:  # a bench shortens or lengthens with the score (Sora's review, 2026-10-17)
+            u, lg = level(t, "depth")
+            out.append(team_stat("depth", t, o, _depth(r), u, lg, places, None, fp, season))
         out.append(pp_goals(t, o, score["pp_goals"][t], score["pp_opps"][t], fp, places, season))
     won = {a: score[a] > score[h], h: score[h] > score[a]}
     for gl in glines:
@@ -527,37 +565,50 @@ def candidates(rows: dict, a: str, h: str, score: dict, fp: dict, places: dict, 
     return [c for c in out if c is not None]
 
 
+SET_UP_XG = 0.10  # "rated low" for a goal that came off a pass (goal-tracking study, 2026-10-25)
+
+
 def goalie_night(gl: dict, places: dict, score: dict, won: dict) -> dict | None:
     """A starting goalie far from what his shots were worth. He "stole one" only when he saved more goals above
     expected than his team won by, empty-net goals left out (Sora, 2026-10-12): with an average night in net they would
     not have won. Zero goals against is a shutout."""
     z = z_of("gsax", gl["gsax"])
-    t, N = gl["team"], gl["name"]
+    t, N = gl["team"], gl.get("full") or gl["name"]
     o = next(k for k in won if k != t)
     goals = score.get("goals", {t: score[t], o: score[o]})
     non_en = score.get("non_en", goals)
     blank = gl["ga"] == 0 and goals[o] == 0
     shutout = blank and not score.get("shootout")  # a 0-0 game settled by a shootout is not called a shutout
     stole = won[t] and gl["gsax"] > non_en[t] - goals[o]
+    L = N.split(" ", 1)[-1]  # the headline names him in full; the body goes on by last name
     shots = f"{gl['shots']} shots, worth {gl['xga']:.1f} expected goals"
     if z > 0:
         if shutout:
             head = f"{N} stole one with a shutout" if stole else f"A shutout for {N}"
-            body = f"{N} stopped all {shots}."
+            body = f"{L} stopped all {shots}."
         elif blank:
             head = f"{N} stole one" if stole else f"A big night for {N}"
-            body = f"{N} stopped all {shots}, through overtime."
+            body = f"{L} stopped all {shots}, through overtime."
         else:
             head = f"{N} stole one" if stole else f"{N} stood on his head" if gl["gsax"] >= 3 else f"A big night for {N}"
-            body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
+            body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {gl['gsax']:.1f} fewer than expected."
         if stole:
             en = non_en[t] < goals[t]
             body += f" That is more than {places[t]}’s winning margin{', not counting empty-net goals' if en else ''}."
     else:
-        head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
-        body = f"{N} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
+        # Most of the goals came off a pass and were rated low: credit the shooters, not blame the goalie. The chance
+        # model can't see the pass or the open man, so those goals are usually well-made plays (goal-tracking study,
+        # Sora approved 2026-10-25).
+        set_up = gl.get("_set_up", 0)
+        if set_up * 2 > gl["ga"]:
+            head = [f"{places[o]} kept finding open men against {N}", f"{places[o]} picked {N} apart"][zlib.crc32(N.encode()) % 2]
+            body = (f"{L} allowed {gl['ga']} goals on {shots}: {-gl['gsax']:.1f} more than expected, though {grammar.num(set_up)} "
+                    f"of them came off a pass that set up the shooter.")
+        else:
+            head = f"{N} got lit up" if gl["gsax"] <= -3 else f"A rough night for {N}"
+            body = f"{L} allowed {gl['ga']} {'goal' if gl['ga'] == 1 else 'goals'} on {shots}: {-gl['gsax']:.1f} more than expected."
     n = every("gsax", gl["gsax"])
-    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n} starts."
+    body += f" Starting goalies have a night this {'good' if z > 0 else 'rough'} about once every {n:,} starts."
     if n >= 100:  # a busy starter makes about 60 starts: at 1 in 100 a start, fewer than half see one in a season
         body += " Most starters don’t get one a season."
     score_ = max(abs(z), SMALL) if blank else abs(z)  # a shutout is always worth a mention when nothing bigger happened
@@ -642,6 +693,16 @@ def when_left(sec: int) -> str:
     if into >= 900:
         return f"late in the {ORDINAL[per]} period"
     return f"in the {ORDINAL[per]} period"
+
+
+def clock_at(sec: int) -> str:
+    """"10:20 of the second period" for the exact moment, or "the first period" when it was the horn."""
+    if sec > 0 and sec % 1200 == 0 and sec <= 2400:
+        return f"the {ORDINAL[sec // 1200]} period"
+    per, into = min(sec // 1200 + 1, 3), sec % 1200
+    if per == 3 and sec >= 3600:
+        return f"{(sec - 3600) // 60}:{(sec - 3600) % 60:02d} of overtime"
+    return f"{into // 60}:{into % 60:02d} of the {ORDINAL[per]} period"
 
 
 def _names(xs: list[str]) -> str:

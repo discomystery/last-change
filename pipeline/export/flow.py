@@ -2,7 +2,9 @@
 
 One small file per finished regular-season game, `flow/{game_id}.json`, read by the post-game page's
 "How it unfolded" section in the visitor's browser (so the numbers are not copied into every page).
-Shots are rows [sec, home, xg, goal, x, y, shooter, empty net, strength, shot type, assist, assist]; shifts are flat
+Shots are rows [sec, home, xg, goal, x, y, shooter, empty net, strength, shot type, assist, assist], and a goal with an
+official NHL.com video clip adds the clip's address after nhl.com/video/ (Sora, 2026-10-25: the page links to it, never
+copies it; the play-by-play carries `highlightClipSharingUrl` once the clip is up); shifts are flat
 [start, end, start, end, ...] lists in game seconds, merged across line changes within a period. Also (Sora, 2026-10-14,
 thread on "how it unfolded"): blocked shots [sec, shooter's side, x, y, blocker, shooter] in the shooter's attacking
 direction like shots; penalties [sec, side that took it, player, drawn by, minutes, type code, infraction, served by];
@@ -93,8 +95,21 @@ def shootout(pbp: dict) -> list[list]:
     return out
 
 
+VIDEO = "https://nhl.com/video/"
+
+
+def clips(pbp: dict) -> dict[int, str]:
+    """Each goal's official NHL.com video clip, {event id: the address after nhl.com/video/}."""
+    out = {}
+    for p in pbp.get("plays", []):
+        url = (p.get("details") or {}).get("highlightClipSharingUrl") or ""
+        if p.get("typeDescKey") == "goal" and url.startswith(VIDEO):
+            out[int(p["eventId"])] = url[len(VIDEO):]
+    return out
+
+
 def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame, gu: pl.DataFrame | None, roster: pl.DataFrame,
-         so: list[list] | None = None, season: int = CURRENT_SEASON) -> dict:
+         so: list[list] | None = None, season: int = CURRENT_SEASON, clips: dict[int, str] | None = None) -> dict:
     ev = ev.filter(pl.col("period_type") != "SO").sort("sort")
     length = int(ev["sec"].max() or 0)
     shots = []
@@ -108,6 +123,8 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
         goal = r["type"] == "goal"
         shots.append([int(r["sec"]), h, round(r["xg"], 3), int(goal), round(x, 1), round(y, 1), r["p1"], en, strength(c, h),
                       r["shot_type"], r["p2"] if goal else None, r["p3"] if goal else None])
+        if goal and (clips or {}).get(r["event_id"]):
+            shots[-1].append(clips[r["event_id"]])
     blocks = []
     for r in ev.filter((pl.col("type") == "blocked-shot") & (pl.col("reason").fill_null("") != "teammate-blocked")).iter_rows(named=True):
         if r["x_norm"] is None or r["y_norm"] is None or r["is_home"] is None or r["p2"] is None:
@@ -120,11 +137,14 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
     # Tonight's lines and pairs by 5-on-5 time together, numbered as team and preview pages number them; anyone
     # else is listed under "other".
     group: dict[int, str] = {}
+    slot: dict[int, int] = {}  # place within a forward line: 0 left wing, 1 center, 2 right wing
     if gu is not None:
         for team_id in (g["away_id"], g["home_id"]):
-            for _, label, u in U.game_lines(season, gu, gid, team_id):
-                for pid in u["unit"].split("-"):
-                    group[int(pid)] = label
+            for kind, label, u in U.game_lines(season, gu, gid, team_id):
+                for i, pid in enumerate(u["unit"].split("-")):
+                    if int(pid) not in group and kind == "F":
+                        slot[int(pid)] = i
+                    group.setdefault(int(pid), label)  # a forward on two lines (11 dressed) keeps the higher one
 
     skaters: dict[int, list] = {}
     goalies: dict[int, list] = {}
@@ -138,12 +158,14 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
                 goalies.setdefault(r[gk], []).append((r["period"], r["start"], r["end"]))
                 side_of[r[gk]] = h
     info = {r["player_id"]: r for r in roster.iter_rows(named=True)}
-    name = lambda pid: f'{info[pid]["first"][0]}. {info[pid]["last"]}' if pid in info else str(pid)
+    from pipeline.export import wording
+    short = wording.short_names(info.values())  # "Aho"; "M. Tkachuk" when both brothers play
+    name = lambda pid: short.get(pid, str(pid))
     players = []
     for pid, spans in skaters.items():
         pos = info.get(pid, {}).get("pos")
         grp = group.get(pid) or ("XD" if pos == "D" else "XF")
-        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans)})
+        players.append({"id": pid, "n": name(pid), "h": side_of[pid], "grp": grp, "s": merge(spans), **({"o": slot[pid]} if pid in slot else {})})
     gks = [{"id": pid, "n": name(pid), "h": side_of[pid], "s": merge(spans)} for pid, spans in goalies.items()]
     # Shooters, passers, penalty takers and shootout shooters not on a shift chart still need a name.
     ids = {s[i] for s in shots for i in (6, 10, 11)} | {b[i] for b in blocks for i in (4, 5)} | {p[i] for p in pens for i in (2, 3, 7)}
@@ -172,9 +194,11 @@ def run(season: int = CURRENT_SEASON) -> dict:
         sub = st.filter(pl.col("game_id") == gid).sort("start")
         if sub.is_empty():
             continue
-        so = shootout(nhl.read_raw(season, "pbp", gid)) if g.get("last_period") == "SO" else None
+        raw = nhl.read_raw(season, "pbp", gid)
+        so = shootout(raw) if g.get("last_period") == "SO" else None
         out = game(gid, g, ev.filter(pl.col("game_id") == gid), xg.filter(pl.col("game_id") == gid).drop("game_id"), sub,
-                   gu.filter(pl.col("game_id") == gid) if gu is not None else None, roster.filter(pl.col("game_id") == gid), so, season)
+                   gu.filter(pl.col("game_id") == gid) if gu is not None else None, roster.filter(pl.col("game_id") == gid), so, season,
+                   clips(raw))
         (OUT / f"{gid}.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
         n += 1
     return {"games": n}

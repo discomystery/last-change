@@ -77,12 +77,13 @@ def _fit(*options: str | None) -> str | None:
     return next((o for o in options if o and len(o) <= NOTE_MAX), None)
 
 
-def _pick(parts: list[tuple[float, str | None, str | None]]) -> tuple[int, list[str], str | None]:
-    """(score, chips, note) from (weight, chip, note) parts."""
+def _pick(parts: list[tuple[float, str | None, str | tuple[str, ...] | None]]) -> tuple[int, list[str], str | None]:
+    """(score, chips, note) from (weight, chip, note) parts; a note may be a tuple of wordings, longest first."""
     parts = sorted((p for p in parts if p[0] > 0), key=lambda p: -p[0])
     chips = list(dict.fromkeys(c for _, c, _ in parts if c))[:CHIPS]
     # the note is the strongest reason that is particular to this game; a plain "One-goal game" only when nothing is
-    note = next((_fit(n, c) for _, c, n in parts if n and _fit(n, c)), None) or next((_fit(c) for c in chips if _fit(c)), None)
+    opts = lambda n, c: (*(n if isinstance(n, tuple) else (n,)), c)
+    note = next((_fit(*opts(n, c)) for _, c, n in parts if n and _fit(*opts(n, c))), None) or next((_fit(c) for c in chips if _fit(c)), None)
     return round(sum(p[0] for p in parts)), chips, note
 
 
@@ -99,6 +100,19 @@ def _rivals(a: str, b: str, season: int, div: dict[str, str]) -> list[tuple[floa
 
 
 # --- finished games ----------------------------------------------------------------------------------------------------
+
+def _blown(goals: list[dict], winner_home: bool) -> str | None:
+    """"5-2" when the winner led by two or more and the other team then drew level or went ahead (eye test, 2026-10-13:
+    Vancouver's 5-2 lead at Edmonton read "The game was tied twice"). Kept here since #202 took it out of stories."""
+    best, at = 0, None
+    for g in goals:
+        mine, theirs = (g["hs"], g["as"]) if winner_home else (g["as"], g["hs"])
+        if mine - theirs > best:
+            best, at = mine - theirs, f"{mine}-{theirs}"
+        if best >= 2 and mine <= theirs:
+            return at
+    return None
+
 
 def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dict:
     gid, away, home = r["game_id"], r["away"], r["home"]
@@ -129,7 +143,7 @@ def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dic
     lead = {home: 0, away: 0}
     for g in goals:
         lead[home], lead[away] = max(lead[home], g["hs"] - g["as"]), max(lead[away], g["as"] - g["hs"])
-    blown = stories._blown(goals, winner == home)
+    blown = _blown(goals, winner == home)
     if lead[loser] >= 2:
         parts.append((14, f"Came back from {_num(lead[loser])} down", f"Came back from {_num(lead[loser])} down"))
     elif blown:
@@ -162,8 +176,11 @@ def result_interest(r: dict, nm: Namer, div: dict[str, str], season: int) -> dic
             parts.append((26, f"{nm.last(pid)} scored {_num(len(gs))}", f"{nm.last(pid)} scored {_num(len(gs))}"))
         elif len(gs) == 3:
             natural = storylines.natural_hat(goals) == pid
+            # a long name drops "natural" (the chip still says it) before the note loses the name: "Brady Tkachuk’s
+            # natural hat trick" ran past a phone line and fell back to a bare "Natural hat trick" (Sora, 2026-10-16)
+            who = nm.last(pid)
             parts.append((22 if natural else 18, "Natural hat trick" if natural else "Hat trick",
-                          f"{nm.last(pid)}’s {'natural ' if natural else ''}hat trick"))
+                          (f"{who}’s natural hat trick", f"{who}’s hat trick") if natural else f"{who}’s hat trick"))
         if len(gs) >= 3:
             helper = storylines.set_up_all(goals, pid)
             if helper:
@@ -324,9 +341,10 @@ def coming_interest(g: dict, nm: Namer, div: dict[str, str], season: int, star_i
                 parts.append((14, f"{nm.last(sf[0]['pid'])} fought last time", f"{nm.last(sf[0]['pid'])} fought last time"))
             else:
                 parts.append((blood["score"] / 8, "Bad blood last time", None))
-    rec = storylines.table_before(nm.G, season, day)
-    if all(t in rec and rec[t]["gp"] >= storylines.BASEMENT_GP and rec[t]["best"] <= 6 for t in (away, home)):
-        parts.append((6, "Two of the league’s best", "Two of the league’s best"))
+    if facts.get("tier") == "best":
+        parts.append((10, "Best against best", "Best against best"))
+    elif facts.get("tier") == "good":
+        parts.append((6, "Two good teams", "Two good teams"))
     parts += [x for x in _rivals(away, home, season, div) if x[1] != "Playoff rematch"]  # told by the preview's item
     claims = pv.get("claims") or []
     for k, c in enumerate(claims[:2]):

@@ -1,0 +1,98 @@
+---
+// A club's plain season line as the league records it, each figure with its rank among the 32 clubs (Sora,
+// 2026-10-14). Rates (per game, percentages) carry the ranks, so a club with a game in hand isn't ranked lower for it;
+// the totals sit under them. Points are ranked too, as the standings do. Hits and the other arena-scorer counts are left to the style fingerprint, which adjusts them; faceoffs and
+// the rest are on the Leaders page.
+import Section from './Section.astro';
+import { rows, seasons, seasonName, rankOf, TEAM } from '../lib/stats';
+
+interface Props { abbr: string; place: string }
+const { abbr, place } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const cur = seasons('teams')[0];
+const on = seasons('teams').filter((s) => s >= cur - 1);
+const label = (s: number) => (s === cur ? 'this season' : 'last season');
+type Tile = { key: string; sub?: string };
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const sets = on.map((season) => {
+  const all = rows('teams', season);
+  const me = all.find((r) => r.team === abbr);
+  if (!me) return null;
+  const tile = ({ key, sub }: Tile) => {
+    const st = TEAM[key];
+    return { key, name: st.name, tip: st.tip, value: st.fmt(me[key]), sub, rank: rankOf(me[key], all.map((r) => r[key]), st.low) };
+  };
+  const groups: [string, Tile[]][] = [
+    ['Record', [
+      { key: 'pts', sub: `${me.w}-${me.l}-${me.otl} in ${plural(me.gp, 'game')}` },
+      { key: 'ptspct', sub: 'of the points they could have had' },
+      { key: 'rw', sub: `of ${plural(me.w, 'win')}` },
+      { key: 'diff', sub: `${me.gf} for, ${me.ga} against` },
+    ]],
+    ['Goals and shots', [
+      { key: 'gfpg', sub: plural(me.gf, 'goal') },
+      { key: 'gapg', sub: `${plural(me.ga, 'goal')} allowed` },
+      { key: 'sfpg' },
+      { key: 'sapg' },
+    ]],
+    ['Special teams', [
+      { key: 'pppct', sub: `${me.ppg} goals on ${plural(me.ppo, 'power play')}` },
+      { key: 'pkpct', sub: `${me.ppga} allowed in ${me.tsh} times shorthanded` },
+      { key: 'shgf', sub: 'scored while killing a penalty' },
+      { key: 'shga', sub: 'allowed on their own power play' },
+    ]],
+  ];
+  return { season, gp: me.gp, groups: groups.map(([g, ts]) => [g, ts.map(tile)] as const) };
+}).filter((x): x is NonNullable<typeof x> => !!x);
+---
+{sets.length > 0 && (
+  <Section id="stats" title="Team stats" placeholder={false} takeaway={`${place}’s season as the NHL records it, with where each figure ranks among the 32 clubs.`}>
+    <Fragment slot="explain"><p class="note">Points rank the way the standings do. Everything else is ranked as a rate (per game, or a percentage), so a club that has played a game more or less isn’t ranked on that. Totals sit under each figure. 1st is always the best: the fewest goals against, the most goals for. A “T-” means tied.</p></Fragment>
+    {sets.length > 1 && (
+      <p class="pick tsp-pick">
+        <span>Show</span>
+        <select class="tsp-season" aria-label="Season">{sets.map((x) => <option value={x.season}>{label(x.season)} ({seasonName(x.season)})</option>)}</select>
+      </p>
+    )}
+    {sets.map((x, i) => (
+      <div class="tsp" data-season={x.season} hidden={i > 0}>
+        {x.groups.map(([g, tiles]) => (
+          <div class="tsp-grp">
+            <p class="mini-h">{g}</p>
+            <ul class="tsp-tiles">
+              {tiles.map((t) => (
+                <li class="card tsp-tile">
+                  <p class="tsp-h"><span class="term" tabindex="0" data-tip={t.tip}>{t.name}</span></p>
+                  <p class="tsp-big">{t.value}{t.rank && <span class="rank" tabindex="0" data-tip={`${t.rank.word} of ${t.rank.of} clubs${t.rank.tied ? ', tied' : ''}.`}>{t.rank.word}</span>}</p>
+                  {t.sub && <p class="tsp-sub">{t.sub}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    ))}
+    <p class="note"><a href={`${base}players/leaders/?k=t&p=${abbr}`}>Compare every club, stat by stat →</a></p>
+  </Section>
+)}
+
+<script is:inline>
+  document.querySelectorAll('.tsp-season').forEach((sel) => {
+    const sec = sel.closest('section');
+    sel.addEventListener('change', () => sec.querySelectorAll('.tsp').forEach((d) => { d.hidden = d.dataset.season !== sel.value; }));
+  });
+</script>
+
+<style>
+  .tsp-pick { margin: 14px 0 4px; }
+  .tsp-grp { margin-top: 16px; }
+  .tsp-grp .mini-h { margin: 0 0 8px; }
+  .tsp-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); }
+  .tsp-tile { padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+  .tsp-h { margin: 0; font: 500 13px var(--ui); color: var(--ink-2); }
+  .tsp-big { margin: 0; display: flex; align-items: center; gap: 10px; font: 600 26px/1.1 var(--display); font-variation-settings: 'SOFT' 100; font-variant-numeric: tabular-nums; }
+  .tsp-big .rank { font-family: var(--ui); }
+  .tsp-sub { margin: 0; font: 400 12.5px var(--ui); color: var(--ink-3); }
+  @media (min-width: 720px) and (max-width: 1000px) { .tsp-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 719px) { .tsp-tiles { grid-template-columns: 1fr 1fr; } .tsp-big { font-size: 22px; flex-wrap: wrap; gap: 4px 8px; } }
+</style>
