@@ -1635,6 +1635,22 @@ def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser
     return out
 
 
+EVEN_GAP = 8  # 5-on-5 shots on goal the winner had more of, for the 5-on-5 count to ride beside the shot total ...
+EVEN_OTHER = 4  # ... when the loser had this many shots outside 5-on-5 ...
+EVEN_SHARE = 0.05  # ... and the winner's share of 5-on-5 shots was this much bigger than of all shots
+
+
+def _even_shots(gid: int, season: int, home: str, away: str) -> dict[str, int]:
+    """Each team's shots on goal at 5-on-5 with both goalies in (penalty shots and shootouts out)."""
+    d = TABLES / str(season)
+    if not (d / "events.parquet").exists():
+        return {}
+    ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "is_home", "situation_code", "period_type"]).filter(
+        (pl.col("game_id") == gid) & pl.col("type").is_in(["shot-on-goal", "goal"]) & (pl.col("period_type") != "SO")
+        & (pl.col("situation_code").cast(pl.Utf8) == "1551"))
+    return {home: ev.filter(pl.col("is_home")).height, away: ev.filter(~pl.col("is_home")).height}
+
+
 FOLLOW_TAGS = ("Haunts them", "Behind the record", "In net", "Bad blood", "Hot streak", "Milestone", "Club history")
 
 
@@ -2763,6 +2779,12 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         nums = r.get("numbers") or {}
         sw, sl = (nums.get(winner) or {}).get("shots"), (nums.get(loser) or {}).get("shots")
         outshot = f", outshooting {W.the(loser)} {sw}-{sl}" if sw and sl and sw - sl >= 5 else ""
+        even = _even_shots(gid, season, home, away) if sw is not None and sl is not None else {}
+        e_w, e_l = even.get(winner, 0), even.get(loser, 0)
+        if (e_w - e_l >= EVEN_GAP and sl - e_l >= EVEN_OTHER and sw + sl
+                and e_w / (e_w + e_l) >= sw / (sw + sl) + EVEN_SHARE):
+            # the loser's shots came on the power play (Sora, 2026-10-29: Boston at Carolina was 30-15, and 25-9 at 5-on-5)
+            outshot = f"{outshot} ({e_w}-{e_l} at 5-on-5)" if outshot else f", outshooting {W.the(loser)} {e_w}-{e_l} at 5-on-5"
         # The chances line must not contradict the shot count beside it (VAN at FLA, 2026-10-15: "nothing much separated
         # these two" when Florida outshot them 39-17; CGY at VGK: "the Golden Knights drove the play" when Calgary had
         # more of the shots). `outshot_by` is set when the loser had 5+ more shots, `lopsided` when either side had

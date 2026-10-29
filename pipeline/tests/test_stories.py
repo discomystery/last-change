@@ -351,3 +351,15 @@ def test_post_game_follows_up_the_preview_storylines(monkeypatch):
     assert got["Streak over"] == "Jackson Blake’s point streak ended at four games."
     assert got["Milestone"] == "Seth Jarvis is now one goal from 100."
     assert "Bad blood" not in got  # no fight tonight, nothing to carry over
+
+
+def test_five_on_five_shots_ride_beside_the_total_when_the_loser_lived_on_the_power_play(monkeypatch):
+    """Sora, 2026-10-29: Boston at Carolina was 30-15, but 25-9 at 5-on-5."""
+    import polars as pl
+    rows = [(189, "goal" if i == 0 else "shot-on-goal", True, "1551", "REG") for i in range(25)]
+    rows += [(189, "shot-on-goal", True, "1451", "REG")] * 5
+    rows += [(189, "shot-on-goal", False, "1551", "REG")] * 9 + [(189, "shot-on-goal", False, "1541", "REG")] * 6
+    ev = pl.DataFrame(rows, schema=["game_id", "type", "is_home", "situation_code", "period_type"], orient="row")
+    monkeypatch.setattr(stories.pl, "read_parquet", lambda *a, **k: ev)
+    monkeypatch.setattr(stories, "TABLES", type("T", (), {"__truediv__": lambda self, x: self, "exists": lambda self: True})())
+    assert stories._even_shots(189, 2026, "CAR", "BOS") == {"CAR": 25, "BOS": 9}
