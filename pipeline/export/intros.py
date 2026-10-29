@@ -18,7 +18,7 @@ import polars as pl
 from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _ordinal
 from pipeline.config import CURRENT_SEASON, PLAYOFFS, REGULAR, SITE_DATA, TABLES
 from pipeline.ingest import history
-from pipeline.export import wording
+from pipeline.export import absences, wording
 from pipeline.metrics import adjust
 
 HISTORY = 4  # seasons of team history to describe (we hold full tables from 2022-23)
@@ -228,7 +228,8 @@ def _run_streak(recent: list[dict]) -> tuple[int, bool]:
 # Voice (user, 2026-10-10: the first drafts read "stiff"): written the way a fan would tell a friend about a team.
 # Lead with a verdict that ties the past to the present, then whether the play backs up the record, then how they
 # play, then special teams. Vary the openings; no two sentences start the same way.
-def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict], full: list[dict] | None = None) -> dict:
+def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent: list[dict], full: list[dict] | None = None,
+               absent: str | None = None) -> dict:
     """`full` is the franchise's NHL history since 1997-98 (ingest/history.py); droughts and playoff runs are counted
     over it when it is there, so a ten-year drought is not told as four."""
     X, nick = _the(t), _nick(t)
@@ -303,6 +304,10 @@ def team_intro(abbr: str, t: dict, fp: dict, xg: dict, hist: list[dict], recent:
         if gp < 10 and "though" not in say and "write them off" not in say:
             say += " " + _pick(["Early days, of course.", "It’s early, mind you.", "Small sample, sure."], *key, "early")
         out.append(say)
+
+    # 2b. Regulars missing, only when the league rank stands out (absences.py; Sora, 2026-10-19).
+    if absent and gp:
+        out.append(absent)
 
     # 3. How they play.
     phrases, used = team_style(fp)
@@ -647,7 +652,10 @@ def run(today: str | None = None) -> dict:
         if not g["final"] and g["date"] >= today:
             for t, o in ((g["home"], g["away"]), (g["away"], g["home"])):
                 nxt.setdefault(t, {"date": g["date"], "opp": o, "id": g["id"], "home": t == g["home"]})
-    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts(), history.franchise_history(a))
+    missing = absences.table(CURRENT_SEASON, today)
+    the = lambda a: _the(teams[a]) if a in teams else a
+    team_out = {a: team_intro(a, teams[a], fp[a], xg, hist.get(a, []), res.filter(pl.col("team") == a).to_dicts(), history.franchise_history(a),
+                              absences.intro_line(missing.get(a), the(a), the))
                 for a in teams if a in fp}
 
     careers = _careers()
