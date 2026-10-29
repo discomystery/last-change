@@ -148,14 +148,22 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
     </p>
     <div class="jpick">
       <span>Show</span>
-      <select id="sw-team" aria-label="Team">{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
-      <span>highlighting</span>
+      <select id="sw-team" aria-label="Team"><option value="all">both teams together</option>{order.map((a) => <option value={a}>{place(a)}</option>)}</select>
+      <span class="sw-hl" hidden>highlighting</span>
       {order.map((t) => (
-        <select class="sw-line" data-team={t} aria-label="Line or pair to highlight">
+        <select class="sw-line" data-team={t} aria-label="Line or pair to highlight" hidden>
           <option value="">no line</option>
           {units(t).map((u) => <option value={u.key}>{u.key} {u.ids.map((i) => last(byId.get(i))).join('–')}</option>)}
         </select>
       ))}
+    </div>
+    {/* Both teams ranked together: the browser moves every row in here, each keeping his own team's colour. */}
+    <div class="sw-team sw-both card" data-team="all" hidden>
+      <p class="sw-key" aria-hidden="true">
+        {order.map((t) => <span class:list={['sw-club', `t-${side(t)}`]}><i></i>{place(t)}</span>)}
+        {PARTS.map((p) => <span class="sw-part"><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}
+      </p>
+      <ol class="sw-rows"></ol>
     </div>
     {order.map((t) => {
       const mine = d.players.filter((r) => r.team === t);
@@ -165,11 +173,11 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
       us.forEach((u) => u.ids.forEach((i) => of.set(i, of.has(i) ? `${of.get(i)} ${u.key}` : u.key)));
       return (
         <div class:list={['sw-team card', `t-${side(t)}`, { pale: pale(t) }]} data-team={t}>
-          {us.map((u) => <p class="sw-unit" data-unit={u.key} hidden><strong>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
+          {us.map((u) => <p class="sw-unit" data-t={t} data-unit={u.key} hidden><strong><span class="sw-ut">{place(t)} </span>{u.key}</strong> {clock(u.sec)} together at 5-on-5 tonight, chances {u.xgf.toFixed(1)}–{u.xga.toFixed(1)} with them on.</p>)}
           <p class="sw-key" aria-hidden="true">{PARTS.map((p) => <span><i style={`--mix:${p.mix}%`}></i>{p.label}</span>)}</p>
           <ol class="sw-rows">
             {mine.map((r, i) => (
-              <li class="sw-item" data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} style={`--i:${Math.min(i, 20)}`}>
+              <li class:list={['sw-item', `t-${side(t)}`, { pale: pale(t) }]} data-t={t} data-s={r.score.toFixed(3)} data-unit={of.get(r.id) ?? (r.pos === 'G' ? 'G' : '')} style={`--i:${Math.min(i, 20)}`}>
                 <div class="sw-row" role="button" tabindex="0" aria-expanded="false">
                   <span class="sw-name"><PLink id={r.id} name={r.name} /><span class="sw-tag" data-key={of.get(r.id)?.split(' ')[0] ?? ''}>{of.get(r.id)?.replace(' ', '/') ?? (r.pos === 'G' ? 'G' : '')}</span></span>
                   <span class="sw-foot">Swing tonight</span>
@@ -197,34 +205,56 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
 <script type="application/json" id="sw-parts" set:html={JSON.stringify(detail).replace(/</g, '\\u003c')}></script>
 
 <script is:inline>
-  // "Show [team] highlighting [line]": opens on the visitor's own team when it played. Picking a line or pair fades
-  // everyone else and names how long the group played together; pointing at a line tag does the same.
+  // "Show [both teams together | team] highlighting [line]": opens on every player of both teams in one ranked list,
+  // each bar in his own team's colour (Sora, 2026-10-29). Picking one team shows its card and the line menu; picking a
+  // line or pair fades everyone else and names how long the group played together. Pointing at a line tag does the
+  // same in either view (in the shared list, only that team's line).
   (() => {
     const team = document.getElementById('sw-team');
     if (!team) return;
-    const mine = [...team.options].find((o) => o.value === window.lcPrefs?.get('team'));
-    if (mine) team.value = mine.value;
+    const hl = document.querySelector('.sw-hl');
+    const both = document.querySelector('.sw-team[data-team="all"]');
+    const homes = [...document.querySelectorAll('.sw-team:not([data-team="all"])')].map((box) => ({
+      box, list: box.querySelector('.sw-rows'), key: box.querySelector('.sw-key'),
+      items: [...box.querySelectorAll('.sw-item')], units: [...box.querySelectorAll('.sw-unit')],
+    }));
+    const ranked = homes.flatMap((h) => h.items).sort((a, b) => b.dataset.s - a.dataset.s);
     const lineFor = (t) => document.querySelector(`.sw-line[data-team="${t}"]`);
-    const mark = (box, key) => {
+    // The line picked in a box: its team's menu in a team card, the last tapped tag in the shared list.
+    const picked = (box) => box === both ? (box.dataset.sel || '|').split('|') : [box.dataset.team, lineFor(box.dataset.team)?.value ?? ''];
+    const mark = (box, t, key) => {
       box.classList.toggle('lit', !!key);
-      box.querySelectorAll('.sw-item').forEach((r) => r.classList.toggle('on', !!key && (r.dataset.unit ?? '').split(' ').includes(key)));
-      box.querySelectorAll('.sw-unit').forEach((p) => { p.hidden = p.dataset.unit !== key; });
+      box.querySelectorAll('.sw-item').forEach((r) => r.classList.toggle('on', !!key && r.dataset.t === t && (r.dataset.unit ?? '').split(' ').includes(key)));
+      box.querySelectorAll('.sw-unit').forEach((p) => { p.hidden = !key || p.dataset.t !== t || p.dataset.unit !== key; });
     };
+    let together = null;
     const show = () => {
-      document.querySelectorAll('.sw-team').forEach((b) => { b.hidden = b.dataset.team !== team.value; });
-      document.querySelectorAll('.sw-line').forEach((s) => { s.hidden = s.dataset.team !== team.value; });
-      const box = document.querySelector(`.sw-team[data-team="${team.value}"]`);
-      if (box) mark(box, lineFor(team.value)?.value);
+      const all = team.value === 'all';
+      if (all !== together) {
+        together = all;
+        if (all) { both.querySelector('.sw-key').before(...homes.flatMap((h) => h.units)); both.querySelector('.sw-rows').append(...ranked); }
+        else homes.forEach((h) => { h.key.before(...h.units); h.list.append(...h.items); });
+      }
+      if (hl) hl.hidden = all;
+      document.querySelectorAll('.sw-line').forEach((s) => { s.hidden = all || s.dataset.team !== team.value; });
+      document.querySelectorAll('.sw-team').forEach((b) => {
+        b.hidden = b.dataset.team !== team.value;
+        if (!b.hidden) mark(b, ...picked(b));
+      });
     };
     team.addEventListener('change', show);
     document.querySelectorAll('.sw-line').forEach((s) => s.addEventListener('change', show));
-    document.querySelectorAll('.sw-team').forEach((box) => {
-      box.querySelectorAll('.sw-tag').forEach((tag) => {
-        const key = tag.dataset.key;
-        if (!key) return;
-        tag.addEventListener('mouseenter', () => mark(box, key));
-        tag.addEventListener('mouseleave', () => mark(box, lineFor(box.dataset.team)?.value));
-        tag.addEventListener('click', (e) => { e.stopPropagation(); const s = lineFor(box.dataset.team); s.value = s.value === key ? '' : key; show(); });
+    document.querySelectorAll('.sw-tag').forEach((tag) => {
+      const key = tag.dataset.key, t = tag.closest('.sw-item')?.dataset.t;
+      if (!key) return;
+      const box = () => tag.closest('.sw-team');
+      tag.addEventListener('mouseenter', () => mark(box(), t, key));
+      tag.addEventListener('mouseleave', () => mark(box(), ...picked(box())));
+      tag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (box() === both) both.dataset.sel = both.dataset.sel === `${t}|${key}` ? '' : `${t}|${key}`;
+        else { const s = lineFor(t); s.value = s.value === key ? '' : key; }
+        show();
       });
     });
     const dist = JSON.parse(document.getElementById('sw-dist')?.textContent || '{}');
@@ -282,10 +312,17 @@ const detail = order.flatMap((t) => (d?.players ?? []).filter((r) => r.team === 
   .sw-who i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--team); margin-right: 6px; vertical-align: 1px; }
   .sw-lead-n { font: 700 15px var(--ui); color: var(--ink-2); }
   .jpick { margin-top: 18px; }
-  .jpick select[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
+  .jpick select[hidden], .sw-hl[hidden], .sw-team[hidden], .sw-unit[hidden] { display: none; }
   .sw-team { margin-top: 18px; --sw-base: var(--sheet); }
+  /* The shared list's key names both teams by colour, and shows the parts in plain grey. */
+  .sw-key .sw-club i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+  .sw-club { font-weight: 700; color: var(--ink); }
+  .sw-club + .sw-part { margin-left: 8px; }
+  .sw-part { --team: var(--ink-3); }
+  .sw-ut { display: none; }
+  .sw-both .sw-ut { display: inline; }
   /* On the dark page the lighter parts fade toward the text colour instead, so they stay visible. */
-  @media (prefers-color-scheme: dark) { .sw-team { --sw-base: var(--ink); } .sw-team.pale { --sw-base: var(--sheet); } }
+  @media (prefers-color-scheme: dark) { .sw-team { --sw-base: var(--ink); } .sw-team.pale, .sw-item.pale { --sw-base: var(--sheet); } }
   .sw-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 600 12px var(--ui); color: var(--ink-2); margin-bottom: 10px; }
   .sw-key span { display: inline-flex; align-items: center; gap: 6px; }
   .sw-key i { width: 14px; height: 10px; border-radius: 2px; background: color-mix(in oklab, var(--team) var(--mix), var(--sw-base)); }
