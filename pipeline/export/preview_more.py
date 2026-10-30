@@ -384,6 +384,30 @@ def _team_lines(season: int, day: str, t: str) -> pl.DataFrame:
     return P.filter((pl.col("season") == season) & (pl.col("team") == t) & (pl.col("date") < day))
 
 
+LEAGUE_TOLD = 10  # a team's scoring leader also gets his NHL rank when he is this high (Sora, 2026-10-30: McDavid leads the NHL)
+
+
+@lru_cache(maxsize=64)
+def _league_ranks(season: int, day: str) -> dict[int, dict]:
+    """Every skater's NHL rank in points and goals this season, in games before `day`: {player: {pts: (rank, tied),
+    g: (rank, tied)}}, rank 1 the most."""
+    from pipeline.export.stories import book
+    _, P, _ = book()
+    t = (P.filter((pl.col("season") == season) & (pl.col("date") < day)).group_by("player_id")
+         .agg(pl.col("pts").sum(), pl.col("g").sum()))
+    out = {}
+    for k in ("pts", "g"):
+        vals = sorted(t[k].to_list(), reverse=True)
+        for pid, v in zip(t["player_id"].to_list(), t[k].to_list()):
+            out.setdefault(pid, {})[k] = (vals.index(v) + 1, vals.count(v) > 1) if v else (None, False)
+    return out
+
+
+def _nhl_rank(pid: int, k: str, season: int, day: str) -> tuple[int, bool] | None:
+    r = (_league_ranks(season, day).get(pid) or {}).get(k)
+    return r if r and r[0] and r[0] <= LEAGUE_TOLD else None
+
+
 VS_RUN = 5  # a point in this many straight games against tonight's opponent is worth saying
 
 
@@ -456,7 +480,12 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     # (Sora, 2026-10-30): "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring"
     ride = extras(lead)
     who = f"{N[lead['player_id']]} ({line(lead)})"
-    if second:
+    lr = _nhl_rank(lead["player_id"], "pts", season, day)
+    if lr and lr[0] == 1:  # "leads the Oilers and the whole NHL in scoring"
+        first = f"{who} {'is tied for the NHL lead in scoring' if lr[1] else f'leads {W.the(t)} and the whole NHL in scoring'}"
+    elif lr:  # "leads the Oilers in scoring and is fifth in the NHL"
+        first = f"{who} leads {W.the(t)} in scoring and is {'tied for ' if lr[1] else ''}{ordinal_word(lr[0])} in the NHL"
+    elif second:
         first = cap(_pick([f"For {W.the(t)}, it’s {who}", f"{W.poss(t)} scoring runs through {who}"], *key, t, "lead2"))
     else:
         first = _pick([f"{who} leads {W.the(t)} in scoring", f"{who} is carrying {W.poss(t)} offense"], *key, t, "lead1")
@@ -468,7 +497,10 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     owho = f"{N[other['player_id']]} ({line(other)})"
     o_ride = extras(other)
     if other is gl and gl["g"] > lead["g"]:
-        what = f"has a team-high {_count(other['g'], 'goal')}"
+        gr = _nhl_rank(other["player_id"], "g", season, day)
+        what = f"has a team-high {_count(other['g'], 'goal')}" + (
+            "" if not gr else ", tied for the most in the NHL" if gr[0] == 1 and gr[1] else ", the most in the NHL" if gr[0] == 1
+            else f", {'tied for ' if gr[1] else ''}{ordinal_word(gr[0])} in the NHL")
     else:
         what = _pick(["isn’t far behind", "is next in line"], *key, t, "next")
     if o_ride:  # "Brady Tkachuk (...) has a team-high eight goals, with seven points in his last five games"
