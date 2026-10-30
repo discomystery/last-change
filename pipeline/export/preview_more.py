@@ -824,7 +824,9 @@ def standing(away: str, home: str, season: int, day: str, W, said: str) -> str |
         return out
     a_ = a if " NHL" in a else f"{a} ({nhl(away)})"
     h_ = h if " NHL" in h else f"{h} ({nhl(home)})" if " NHL" in a else f"{h} ({nhl(home)[: -len(' in the NHL')]})"  # "in the NHL" once
-    return f"Going in, {who(away)} are {a_} and {who(home)} {h_}."
+    # a place across the whole league takes its own verb (Sora, 2026-10-30: "and the Canes first in the NHL" read as
+    # words missing)
+    return f"Going in, {who(away)} are {a_} and {who(home)} {'are ' if ' NHL' in h else ''}{h_}."
 
 
 def paragraphs(gid: int, away: str, home: str, day: str, W, N: dict, fp: dict | None, projected: dict | None,

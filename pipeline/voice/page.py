@@ -19,6 +19,7 @@ CAT = {"lead": "Lead", "order": "Order", "omission": "Left out", "repetition": "
 
 
 BOX = re.compile(r"\s?\((\d+ G / \d+ A / \d+ P|\d+-\d+-\d+(?: / \.\d{3} SV%)?) in (\d+ G[PS])\)")
+DATE = re.compile(r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s$")
 NUM = re.compile(r"(?<![\w\-.])(?!(?:19|20)\d\d\b)\.?\d[\d.]*%?(?![\w\-])")
 
 
@@ -28,7 +29,8 @@ TAGS = re.compile(f"{BOX.pattern}|{RANK.pattern}")
 
 def T(text, ranks=None):  # escaped text with stats in the sans, as the site sets them (Base.astro sansNumbers)
     out, i = [], 0
-    sn = lambda s: NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(s))
+    # dates stay in the serif, as on the site ("Oct 17"; Sora, 2026-10-30)
+    sn = lambda s: NUM.sub(lambda n: n.group(0) if DATE.search(n.string[:n.start()]) else f"<span class=sn>{n.group(0)}</span>", E(s))
     for m in TAGS.finditer(text):
         if m.group(1):
             pill = f" <span class=pill>{E(m.group(1))} <i>in {E(m.group(2))}</i></span>"
