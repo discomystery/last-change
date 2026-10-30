@@ -2,6 +2,7 @@
 changes) and fuller previews (the site today, a fuller version from the same data), with the round's pattern table.
 `python -m pipeline.voice.page out.html voice/runs/{run} [voice/runs/{run} ...]`, then publish it as an Artifact."""
 import html
+import re
 import json
 import sys
 from collections import Counter
@@ -17,6 +18,18 @@ CAT = {"lead": "Lead", "order": "Order", "omission": "Left out", "repetition": "
        "structure": "Structure", "emphasis": "Emphasis", "tone": "Tone", "overstatement": "Overstated", "accuracy": "Accuracy"}
 
 
+BOX = re.compile(r"\d+ G / \d+ A / \d+ P in \d+ GP")
+NUM = re.compile(r"(?<![\w\-.])(?!(?:19|20)\d\d\b)\.?\d[\d.]*%?(?![\w\-])")
+
+
+def T(text):  # escaped text with stats in the sans, as the site sets them (Base.astro sansNumbers)
+    out, i = [], 0
+    for m in BOX.finditer(text):
+        out += [NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:m.start()])), f"<span class=sn>{E(m.group(0))}</span>"]
+        i = m.end()
+    return "".join(out) + NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:]))
+
+
 def sents(paras):
     return [s.strip() for p in paras for s in textcheck.sentences(p)]
 
@@ -25,7 +38,7 @@ def story(st, before=None, calls=None):
     old = set(sents(before["paras"])) if before else None
     h = f"<h4>{E(st.get('head') or '')}</h4>"
     for p in st.get("paras") or []:
-        h += "<p>" + (E(p) if old is None else " ".join(E(s) if s in old else f"<mark>{E(s)}</mark>" for s in textcheck.sentences(p))) + "</p>"
+        h += "<p>" + (T(p) if old is None else " ".join(T(s) if s in old else f"<mark>{T(s)}</mark>" for s in textcheck.sentences(p))) + "</p>"
     its = st.get("items") or []
     if its:
         h += "<ul>" + "".join(f"<li><b>{E(i.get('tag') or '')}</b> {E(i.get('text') or '')}</li>" for i in its) + "</ul>"
@@ -109,6 +122,7 @@ body{{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 Literata,Geo
 .wrap{{max-width:1360px;margin:0 auto;padding:32px 16px 80px}}
 h1,h2,h3,h4{{font-family:Fraunces,Georgia,serif;font-variation-settings:"SOFT" 100;font-weight:600;margin:0}}
 h1{{font-size:36px;line-height:1.15}} h2{{font-size:26px;margin:48px 0 8px}}
+.sn{{font:600 .94em 'Hanken Grotesk',system-ui,sans-serif;color:var(--ink)}}
 .lede{{color:var(--ink2);max-width:860px;margin:12px 0 0}}
 .lab,.kind,.cat,.st,th,.when{{font:600 11px/1.3 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}}
 .tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:24px 0}}

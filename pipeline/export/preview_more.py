@@ -441,21 +441,20 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
             told_tags.add(v[1])
             vs_told = True
         return out
-    a = lead["pts"] - lead["g"]
+    def line(r):  # the box-score line, in figures (Sora, 2026-10-30): "10 G / 4 A / 14 P in 13 GP"
+        return f"{r['g']} G / {r['pts'] - r['g']} A / {r['pts']} P in {r['gp']} GP"
     ride = extras(lead)
     name, pts = N[lead["player_id"]], _count(lead["pts"], "point")
-    if len(ride) == 1 and lead["g"] and a:
-        # "Matthew Tkachuk (four goals, 16 assists, nine points in his last five games)"
-        who = f"{name} ({_count(lead['g'], 'goal')}, {_count(a, 'assist')}, {ride[0]})"
+    if len(ride) == 1 and lead["g"] and lead["pts"] > lead["g"]:
+        # "Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP, nine points in his last five games)"
+        who = f"{name} ({line(lead)}, {ride[0]})"
         first = (_pick([f"{W.poss(t)} scoring runs through {who}", f"For {W.the(t)}, it starts with {who}"], *key, t, "lead2") if second
                  else _pick([f"{who} leads {W.the(t)}", f"{W.poss(t)} offense runs through {who}"], *key, t, "lead1"))
         first = cap(first)
     else:
-        g_part = f"{_count(lead['g'], 'goal')} and " if lead["g"] else ""
-        stat = f"{g_part}{pts}"
+        stat = f"{pts} ({line(lead)})"
         if second:
-            first = cap(_pick([f"For {W.the(t)}, it’s {name}, with {pts}" + (f", {num(lead['g'])} of them goals" if lead["g"] and lead["pts"] > 1 else ""),
-                               f"{W.poss(t)} scoring runs through {name}, who has {stat}"], *key, t, "lead2"))
+            first = cap(_pick([f"For {W.the(t)}, it’s {name}, with {stat}", f"{W.poss(t)} scoring runs through {name}, who has {stat}"], *key, t, "lead2"))
         else:
             first = _pick([f"{name} leads {W.the(t)} with {stat}", f"{name} is carrying {W.poss(t)} offense with {stat}"], *key, t, "lead1")
         if ride:
@@ -466,9 +465,9 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     oname = N[other["player_id"]]
     o_ride = extras(other)
     if other is gl and gl["g"] > lead["g"]:
-        what = f"a team-high {_count(other['g'], 'goal')}"
+        what = f"a team-high {_count(other['g'], 'goal')} ({line(other)})"
     else:
-        what = f"{_count(other['pts'], 'point')}"
+        what = f"{_count(other['pts'], 'point')} ({line(other)})"
     if o_ride:  # "and Brady Tkachuk, who has 15 points and a point in five straight games against Winnipeg"
         return f"{first}. {oname}, who has {and_list(o_ride)}, has {what}.", used, told_tags
     return f"{first}, and {oname} has {what}.", used, told_tags

@@ -1279,7 +1279,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         if winner == away and r["home"]:
             sents.append(f"{_cap(W.the(away))} already played {at} once this season and left with {wording.article(score_text(r, win=True))} {when_before(r['date'], start)}.")
         else:
-            sents.append(f"{_cap(W.the(winner))} won the first meeting this season, {score_text(r)} {at} {when_before(r['date'], start)}.")
+            sents.append(f"{_cap(W.the(winner))} won the teams’ first meeting this season, {score_text(r)} {at} {when_before(r['date'], start)}.")
         if r["home"]:  # a plain fact: it leads only when nothing livelier does (Sora's review of 2025-26, 2026-10-17)
             facts["heads"].append((45, f"Round two {W.at(home)}"))
         else:
