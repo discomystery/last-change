@@ -94,9 +94,30 @@ def _settled(season: int) -> set[int]:
     return set(json.loads(p.read_text())) if p.exists() else set()
 
 
+def _resettle_path(season: int) -> Path:
+    return RAW / str(season) / "resettle.json"
+
+
+def _resettle(season: int) -> set[int]:
+    p = _resettle_path(season)
+    return set(json.loads(p.read_text())) if p.exists() else set()
+
+
+def resettle(season: int, game_ids) -> list[int]:
+    """Ask for saved games to be fetched once more on the next update, however old (the self-check's official totals
+    found the NHL changed a goal's credit after the game had settled: Bains' goal in CAR at VAN, 2026-10-20, saved as
+    Sasson's). Returns the games newly added."""
+    new = sorted(set(game_ids) - _resettle(season))
+    if new:
+        _resettle_path(season).write_text(json.dumps(sorted(_resettle(season) | set(new))))
+    return new
+
+
 def settle_due(season: int, game_id: int, start_utc: str | None, now: datetime | None = None) -> bool:
     """True when a saved final game's play-by-play should be fetched once more: it started SETTLE_HOURS ago or more,
-    within the last SETTLE_DAYS, and has not been settled yet."""
+    within the last SETTLE_DAYS, and has not been settled yet; or the self-check asked for it again (`resettle`)."""
+    if raw_path(season, "pbp", game_id).exists() and game_id in _resettle(season):
+        return True
     if not start_utc or not raw_path(season, "pbp", game_id).exists() or game_id in _settled(season):
         return False
     now = now or datetime.now(timezone.utc)
@@ -119,6 +140,9 @@ def fetch_game(season: int, game_id: int, start_utc: str | None = None) -> int:
     if settle:
         done = _settled(season) | {game_id}
         _settled_path(season).write_text(json.dumps(sorted(done)))
+        again = _resettle(season)
+        if game_id in again:
+            _resettle_path(season).write_text(json.dumps(sorted(again - {game_id})))
     # The shift-chart API sometimes returns nothing, an unfinished chart, or a chart that disagrees with the rest of the
     # game file; fall back to the official HTML reports, fetched again while they too stop short.
     backup = raw_path(season, "shifts_html", game_id)

@@ -29,7 +29,10 @@ ERRORS = [
     (r"\bdeserv", "\"deserve\" (MoneyPuck's word; never on the site)"),
     (r"\bmiracle\b", "\"miracle\" lean"),
     (r"\b(?:odds|betting|bettor|parlay|pick 'em|pick ’em|money on|the spread)\b", "betting language"),
-    (r"\binjur", "says a player was injured (never say why a player was out)"),
+    # our own guess that a player was hurt (a league or club report quoted after the game, "placed on injured
+    # reserve with a lower-body injury", is allowed: export/timeline.injury_news)
+    (r"\b(?:is|was|were|got|gets|been|being|looked|appeared) (?:hurt|injured)\b|\bleft (?:with|because of|due to) an?\b[^.]*\binjury\b",
+     "guesses that a player was hurt (say why only when a league or club report did)"),
     (r"\b\d+\.\d+ minutes\b", "ice time as decimal minutes (write m:ss)"),
     (r"\b\d{1,2}:\d{2} ?(?:ET|EST|EDT|PT|CT|MT)\b", "time zone beside a time"),
     (r" ,|\s{2,}|\.\.(?!\.)", "stray space or punctuation"),
@@ -37,6 +40,7 @@ ERRORS = [
     (r"\beven\b[^.]*\beven\b", "\"even\" twice in one sentence"),
 ]
 ERRORS = [(re.compile(p, re.I if not any(c.isupper() for c in p.replace("\\b", "")) else 0), why) for p, why in ERRORS]
+OPENS_CONTRAST = re.compile(r"(?:Even though|Although|Though|While)\b")  # the house rule of 2026-10-15
 CONTRAST = re.compile(r"\b(?:even though|although|though|but|while|whereas)\b", re.I)
 
 
@@ -78,6 +82,9 @@ def check_text(text: str) -> list[dict]:
         for m in ART.finditer(s):
             if grammar.article(m.group(2)).split()[0] != m.group(1).lower():
                 found.append({"level": "error", "why": f"\"{m.group(1)}\" before \"{m.group(2)}\"", "text": s})
+        if OPENS_CONTRAST.match(s) and re.search(r"\band\b.*, and\b", s):
+            found.append({"level": "error", "why": "a contrast sentence carrying an \"and ..., and\" chain (list the reasons)",
+                          "text": s})
         if len(CONTRAST.findall(s)) > 1 and not re.search(r"\bbut\b.*\bwhile\b.*\b(?:on|in) the\b", s):
             found.append({"level": "style", "why": "more than one contrast word in a sentence", "text": s})
     return found

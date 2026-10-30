@@ -120,6 +120,22 @@ jobs:
             fi
           fi
 
+      - name: Raise the alarm if the self-check finds problems on the pages
+        if: steps.mode.outputs.mode == 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # pipeline/quality checks every preview and post-game page against our own data, NHL.com's previews, the
+          # NHL's official totals and ESPN, and saves the day's report in data/raw/quality/ for the data branch.
+          text="$(uv run --project pipeline python -m pipeline.quality --alarm || echo "The self-check itself did not run to the end; see this run's log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")"
+          if [ -n "$text" ]; then
+            echo "::warning title=Self-check::The self-check found problems on the site's pages"
+            title="Self-check: problems found on the site's pages"
+            if [ -z "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[].number')" ]; then
+              gh issue create --title "$title" --body "$text"
+            fi
+          fi
+
       - name: Run the pipeline tests
         id: tests
         if: steps.mode.outputs.mode == 'full'

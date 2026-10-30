@@ -9,7 +9,6 @@ Each note is written for both teams; the page shows the visitor's own team's ver
 home team's.
 """
 import re
-import zlib
 from functools import lru_cache
 
 import polars as pl
@@ -150,7 +149,8 @@ def _a(pct: int) -> str:
 
 
 def _pick(pool: list[str], *key) -> str:
-    return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
+    from pipeline.export import variety
+    return variety.pick(pool, *key)  # by a CRC of the key, staying away from the teams' recent previews
 
 
 def _route(fp: dict, team: str, opp: str) -> tuple[str, str]:
@@ -242,7 +242,15 @@ def _why(steps: list[dict], team: str, opp: str, home: str, places: dict, lineup
         # a counterpoint too small to stand as an equal (Sora, 2026-10-12): "Even though Chicago has home-ice advantage, ..."
         counter = clauses(groups[1], named, " and ")
         named.append(None)  # a new clause: "they" would point back across the comma
-        text = "even though " + counter + ", " + clauses(groups[0], named, ", and ") + "."
+        # one team's reasons stay in the "even though" sentence; another team's reasons for the same side get a
+        # sentence of their own, since "Even though A, B has X and Y, and C is Z" chains two "and"s under one contrast
+        # (the house rule of 2026-10-15, caught by the self-check of 2026-10-30)
+        main = [f for f in groups[0] if f[2] == groups[0][0][2]]
+        rest = [f for f in groups[0] if f[2] != groups[0][0][2]]
+        text = "even though " + counter + ", " + clauses(main, named, ", and ") + "."
+        if rest:
+            named = []
+            text += " On top of that, " + clauses(rest, named, ", and ") + "."
     elif not groups[1]:
         text = clauses(groups[0], named, ", while ") + "."
     elif len({f[2] for f in groups[0]}) == 1:
