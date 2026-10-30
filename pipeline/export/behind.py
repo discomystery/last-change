@@ -515,9 +515,12 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
     side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
     # records far apart on chances worth about the same (Sora, 2026-10-30): say what that means for tonight
     tail = ""
-    if abs(ra["pp"] - rh["pp"]) >= APART and abs(ra["play"] - rh["play"]) <= ALIKE:
-        near = [t for t, r in ((away, ra), (home, rh)) if abs(r["gap"]) < TEXT_GAP]
-        off = [t for t in (away, home) if t not in near]
+    near = [t for t, r in ((away, ra), (home, rh)) if abs(r["gap"]) < TEXT_GAP]
+    off = [t for t in (away, home) if t not in near]
+    # the figures the reader sees: a club near its chances is shown by its record only, so the other club's chances are
+    # set beside that record (Sora, 2026-10-30: the Oilers' .622 would still be well ahead of the Rangers' .536)
+    told = lambda t: rows[t]["pp"] if t in near and len(near) == 1 else rows[t]["play"]
+    if abs(ra["pp"] - rh["pp"]) >= APART and abs(told(away) - told(home)) <= ALIKE:
         # one club already matches its chances (Sora, 2026-10-30): "If the Kraken’s record were closer to their chances,
         # like the Flames’, ..."
         lead = (f"If {W.poss(off[0])} record were closer to their chances, like {W.poss(near[0])}," if len(near) == 1
