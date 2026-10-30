@@ -49,6 +49,7 @@ PERIODS = {1: "first", 2: "second", 3: "third"}
 ORDINAL = {4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}
 LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
+HISTORY_TAGS = ("Owns them", "Haunts them")  # share one place in a preview's Who to watch
 HEAD_FACT = 50  # a preview fact headline needs this score to beat the top call's headline
 
 
@@ -1338,9 +1339,11 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     items = [i for i in items if i["tag"] in ("Out", "Missing") or not gone & set(i.get("pids") or [i.get("pid")])]
     picked, per, seen = [], {}, set()
     for i in items:
-        if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
+        # a player's record against tonight's opponent is mostly coincidence: one such item a game (Sora, 2026-10-30)
+        key, cap = ("history", 1) if i["tag"] in HISTORY_TAGS else (i["tag"], MAX_PER_TAG)
+        if per.get(key, 0) >= cap or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
             continue
-        per[i["tag"]] = per.get(i["tag"], 0) + 1
+        per[key] = per.get(key, 0) + 1
         seen.update(i.get("pids") or [i.get("pid")])
         picked.append({"tag": i["tag"], "text": i["text"]})
     for t in (away, home):  # always at least two: each team's leading scorer
