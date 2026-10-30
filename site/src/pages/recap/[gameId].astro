@@ -278,7 +278,7 @@ import GameSwitch from '../../components/GameSwitch.astro';
 
   <Section id="preview" title="Preview review" placeholder={false} takeaway={takeaway} lead>
     <Fragment slot="explain">
-      <p class="note">Each call is checked by a rule set before the game. <strong>Called it</strong>: the team reached their usual level. <strong>Close</strong>: they fell short of their usual level but still beat the league average. When a call says one team will come out ahead, called it means they won by at least half their usual gap, and partly means they won by less. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
+      <p class="note">Each call is checked by a rule set before the game. <strong>Called it</strong>: the team reached their usual level. <strong>Close</strong>: they fell short of their usual level but still beat the league average. When a call says one team will come out ahead, called it means they won by at least half their usual gap, and partly means they won by less. A line matchup call is called when the line spent at least halfway from what it would get with no line matching to its home habit against that line, since part of any habit is luck. One game is a small sample, so a miss doesn’t mean the preview was wrong about the team.</p>
     </Fragment>
     {rv && order.map((a) => (
       <div class={`pov pov-${side(a)}`}>

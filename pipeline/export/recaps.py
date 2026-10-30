@@ -335,10 +335,17 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
             return {"verdict": "na", "happened": f"{team}’s {chk['unit']} ({names}) spent only {clock(total)} against {opp_place}’s usual lines, too little to judge.",
                     "usual": f"{base}%", "tonight": "–"}
         v = round(100 * sec.get(chk["opp_line"], 0) / total)
-        return {"verdict": grade(v, base, chk["threshold"], "above"),
+        # The bar is halfway from rotation to the home habit (rules 25): calls saved before then are graded the same way.
+        bar = chk.get("bar", round((base + chk["threshold"]) / 2))
+        most = max(sec, key=sec.get)
+        drew = None
+        if most != chk["opp_line"]:  # who the line drew instead, for the plain sentence
+            drew = (previews._and([S.name.get(i, "?").split(" ", 1)[-1] for i in chk["opp_lines"][most]]), sec[most], total)
+        return {"verdict": grade(v, bar, chk["threshold"], "above"),
                 "happened": f"{team}’s {chk['unit']} ({names}) spent {v}% of its 5-on-5 time against {opp_place}’s {chk['opp_line']} "
-                            f"({clock(sec.get(chk['opp_line'], 0))} of {clock(total)}), against a home habit of {base}% and about {chk['threshold']}% with no line matching.",
-                "usual": f"{base}%", "tonight": f"{v}%", "league": f"{chk['threshold']}%", "_v": v}
+                            f"({clock(sec.get(chk['opp_line'], 0))} of {clock(total)}). The call needed {bar}%, halfway from the {chk['threshold']}% "
+                            f"it would get with no line matching to its home habit of {base}%.",
+                "usual": f"{base}%", "tonight": f"{v}%", "league": f"{chk['threshold']}%", "_v": v, "_bar": bar, "_drew": drew}
     return {"verdict": "na"}
 
 

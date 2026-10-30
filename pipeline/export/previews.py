@@ -27,7 +27,7 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _o
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 24  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 25  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -56,6 +56,8 @@ RULES_VERSION = 24  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 #     item tells a forward who rarely takes faceoffs taking a missing center's draws (absences.py; Sora, 2026-10-19)
 # 24: a projected starting goalie is named where a call or note would say "their goalie" (Sora, 2026-10-15), more fun
 #     headlines in every call pool, trimmed by her notes, with "vs." for side-by-side headlines ("Strength vs. strength")
+# 25: matchup calls only for forward lines whose habit holds up for its sample and that were together last game, graded at
+#     halfway between rotation and the habit; a miss says who the line drew instead (Sora, 2026-10-30)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -314,6 +316,14 @@ def _pick(pool: list[str], *key) -> str:
 
 
 MIN_HOME_GAMES, MIN_MINUTES = 3, 30  # before a home matching habit becomes a call
+# Matchup calls (Sora, 2026-10-30, thread "Improve line matchup call accuracy"; backtest over 3,761 home games since
+# 2023-24 in project files `matchup-calls/findings.md`). We pick each team's most extreme habit, so part of it is luck:
+# the next home game keeps about half of a 3-7 game habit's lean over rotation and about 85% of a 15+ game one. Graded
+# at the full habit, calls held 41-45% whatever the threshold. Now: forward lines only (pairs follow the forwards and
+# were the weakest calls), the lean over rotation scaled by games/(games + MATCHUP_K) must reach MATCHUP_LEAN, both
+# lines must have been together in their club's last game, and the bar is halfway between rotation and the habit.
+# Backtest: the coach reached halfway 63% of the time and beat rotation 78%; about 45% of eligible games get a call.
+MATCHUP_K, MATCHUP_LEAN = 4, 12
 COACH_HOME_GAMES = 10  # a habit is tonight's coach's own once he has coached this many of its home games, or half
 ORD = ["first", "second", "third", "fourth"]
 NICKS: dict[str, str] = {}  # team -> nickname, from teams.json (filled by `names`)
@@ -632,6 +642,16 @@ def _star(unit: dict, pts: dict) -> str:
     return _last(players[-1]) if players else ""
 
 
+def _together_last(team: dict, unit: dict) -> bool:
+    """Was this line (two of its three forwards) one of the club's lines in its last game? A call about a line that
+    has since been split, or has a player out, can't be checked (a third of this season's matchup calls before
+    2026-10-30). Lines exported before the last game's ids were kept fall back to the exact trio."""
+    last = (team.get("last") or {}).get("units") or []
+    if any("ids" in u for u in last):
+        return any(len(set(unit["ids"]) & set(u.get("ids") or ())) >= 2 for u in last if u["label"][0] == unit["label"][0])
+    return bool(unit.get("in_last_game", True))
+
+
 def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts: dict | None = None,
                   coach: str | dict | None = None) -> dict | None:
     """`coach` is the home team's head coach tonight (a name, or coaches.for_game's dict); without one the call says
@@ -647,15 +667,19 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
         if coach["home"] < min(mu["games"], COACH_HOME_GAMES) and coach["home"] * 2 < mu["games"]:
             return None
         coach = coach["coach"]
-    rows = [(r, j, v, v - r["expected"][j]) for r in mu["rows"] if r["minutes"] >= MIN_MINUTES for j, v in enumerate(r["share"]) if v is not None]
-    rows = [x for x in rows if x[3] >= 10]
-    if not rows:
+    lean = lambda gap: gap * mu["games"] / (mu["games"] + MATCHUP_K)
+    rows = [(r, j, v, lean(v - r["expected"][j])) for r in mu["rows"] if r["label"][0] == "L" and r["minutes"] >= MIN_MINUTES
+            for j, v in enumerate(r["share"]) if v is not None]
+    rows = [x for x in rows if x[3] >= MATCHUP_LEAN]
+    rows.sort(key=lambda x: -x[3])
+    for r, j, v, _ in rows:
+        unit = next(u for u in h["units"] if u["label"] == r["label"])
+        opp = next((u for u in a["units"] if u["label"] == f"L{j + 1}"), None)
+        if opp and _together_last(h, unit) and _together_last(a, opp):
+            break
+    else:
         return None
-    r, j, v, _ = max(rows, key=lambda x: x[3])
-    unit = next(u for u in h["units"] if u["label"] == r["label"])
-    opp = next((u for u in a["units"] if u["label"] == f"L{j + 1}"), None)
-    if not opp:
-        return None
+    bar = round((v + r["expected"][j]) / 2)
     pts = pts if pts is not None else {}
     mine = _and(_lasts(unit["players"]))
     theirs = _and(_lasts(opp["players"]))
@@ -674,7 +698,8 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
     return {
         "kind": "matchup", "metric": "matchup_share", "team": home, "opp": away, "style": style,
         "head": _fmt(_pick(heads, gid, "matchup"), **w),
-        "call": f"{_cap(w['Hp'])} {r['label']} ({mine}) spends at least {v}% of its 5-on-5 time against {w['Op']} {ORD[j]} line.",
+        "call": f"{_cap(w['Hp'])} {r['label']} ({mine}) spends at least {bar}% of its 5-on-5 time against {w['Op']} {ORD[j]} line, "
+                f"against about {r['expected'][j]}% with no line matching.",
         "body": _cap(body),
         "nums": f"At home: {v}% of this group’s 5-on-5 time against {ORD[j]} lines, about {r['expected'][j]}% with no line matching",
         "gist": f"At home, {coach or 'their coach'} likes to pick matchups, so watch who goes out against {w['Op']} {ORD[j]} line.",
@@ -689,8 +714,8 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
         "check": {"metric": "matchup_share", "measure": f"share of {places[home]} {r['label']}'s 5-on-5 time against {places[away]} L{j + 1}",
                   "team": home, "unit": r["label"], "unit_ids": unit["ids"], "opp_line": f"L{j + 1}", "opp_ids": opp["ids"],
                   "opp_lines": {u["label"]: u["ids"] for u in a["units"] if u["label"][0] == "L"},
-                  "baseline": v, "threshold": r["expected"][j], "direction": "above",
-                  "rule": "held if the share is at or above the home habit; partly if above the no-matching level; otherwise didn't happen"},
+                  "baseline": v, "threshold": r["expected"][j], "bar": bar, "direction": "above",
+                  "rule": "held if the share is at least halfway from the no-matching level to the home habit; partly if above the no-matching level; otherwise didn't happen"},
     }
 
 

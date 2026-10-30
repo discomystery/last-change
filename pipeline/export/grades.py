@@ -60,9 +60,10 @@ PACE = {"above": {"held": ("A track meet, as billed", "The game ran faster than 
 PHYSICAL = {"held": ("Bodies flew", "The two teams hit at least as much as they usually do."),
             "partly": ("Physical, not punishing", "There was more hitting than in an average game, but less than these two usually bring."),
             "missed": ("Quieter than billed", "There was less hitting than in an average NHL game.")}
-MATCHUP = {"held": ("{coach} got {his} matchup", "{Hc} sent {group} out against {Op} {line} as often as they usually do at home."),
-           "partly": ("{group} saw {Op} {line} some of the time", "{Hc} sent {group} out against {Op} {line} more than they would with no line matching, but less than usual."),
-           "missed": ("{group} barely saw {Op} {line}", "{Hc} sent {group} out against {Op} {line} less than they would with no line matching.")}
+MATCHUP = {"held": ("{coach} got {his} matchup", "{Hc} sent {group} out against {Op} {line} for {v}% of their 5-on-5 time, far more than the {thr}% they’d get with no line matching."),
+           "partly": ("{group} saw {Op} {line} some of the time", "{Hc} sent {group} out against {Op} {line} more than they would with no line matching, but not as often as the call needed."),
+           "missed": ("{group} barely saw {Op} {line}", "{Hc} sent {group} out against {Op} {line} no more than they would with no line matching.")}
+MATCHUP_DREW = " Instead, {coach} sent them out against {drew} ({sec} of {total} at 5-on-5)."
 HISTORY = {"held": ("The usual {G}", "{G} played like his usual self, not like his record against {O}. Just a coincidence, as we said."),
            "missed": ("{G} struggled against {O} again", "{Gp} night looked more like his record against {O} than his usual. Three seasons of evidence say it’s still a coincidence.")}
 REST = {"held": (["Fresh legs told", "The rested team showed it", "Tired legs showed"], "{R} got a bigger share of the chances than they usually do, against a tired {Tn} team."),
@@ -210,6 +211,8 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
     chk_e = res.pop("_chk", None)
     gname = res.pop("_name", None)
     tb = res.pop("_tb", None)
+    bar = res.pop("_bar", None)
+    drew = res.pop("_drew", None)
     verdict = res.get("verdict")
     if verdict not in ("held", "partly", "missed") or v is None:
         return res
@@ -365,9 +368,14 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
         w["group"] = previews._and([S.name.get(i, "?").split(" ", 1)[-1] for i in chk.get("unit_ids", [])]) or f"their {chk.get('unit', 'line')}"
         title, plain = MATCHUP[verdict]
         thr = chk["threshold"]
-        out["lane"] = lane(claim["team"], None, float(thr), ("No matching", f" {thr}%"), (base, f"Usual {base}%"), (v, f"Tonight {v}%"),
-                           tip="Share of this group’s 5-on-5 time against that line tonight (the filled dot) against its home habit (the ring). Reaching "
-                               "the ring holds the call; past the no-matching tick is partly; otherwise it didn’t happen.")
+        w |= {"v": v, "thr": thr}
+        if drew and verdict == "missed":
+            plain += MATCHUP_DREW.format(coach=w["coach"] if coach else "they", drew=drew[0], sec=_clock(drew[1]), total=_clock(drew[2]))
+        bar = bar if bar is not None else round((base + thr) / 2)
+        out["lane"] = lane(claim["team"], None, float(thr), ("No matching", f" {thr}%"), (bar, f"Call {bar}%"), (v, f"Tonight {v}%"), ref=(base, f"Home {base}%"),
+                           tip="Share of this group’s 5-on-5 time against that line tonight (the filled dot). The ring is the call: halfway from what it "
+                               "would get with no line matching (the tick) to its home habit (the dotted mark), since part of any habit is luck. Reaching "
+                               "the ring holds the call; past the tick is partly; otherwise it didn’t happen.")
     elif kind == "history":
         G = previews._last(gname or "")
         w = {"G": G, "Gp": previews._poss(G), **previews.team_words(claim["opp"], places, "O")}
