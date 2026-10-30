@@ -318,7 +318,8 @@ def export_lines(season: int) -> int:
                        "pct": {k: u[f"{k}_pct"] for k in ("xgf60", "xga60", "share", "sec_pg", "oz")}, "in_last_game": u["unit"] in last_sets,
                        "shared": u.get("shared"), "faced": faced_out(u.get("faced"))} for u in e["units"]],
             "last": {"date": g["date"], "opponent": g["away"] if g["home"] == place else g["home"], "at_home": g["home"] == place,
-                     "units": [{"label": u["label"], "players": fmt(u), "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]), "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
+                     "units": [{"label": u["label"], "players": fmt(u), "ids": [int(x) for x in u["unit"].split("-")], "minutes": round(u["sec"] / 60, 1), "seconds": round(u["sec"]),
+                                "usual": u["unit"] in usual_sets.values(), "shared": u.get("shared")} for u in e["last"]]},
             "notes": [{**n, "names": named(n["text"])} for n in sorted(notes, key=lambda n: (n["kind"] not in ("eleven", "shuffle"), n["kind"] != "eleven", NOTE_ORDER.get(n["kind"], 9), n.get("order", 0), -abs(n["now"] - n["before"])))],
         }
     pts = lambda x: None if x is None else round(100 * x)

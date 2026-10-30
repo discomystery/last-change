@@ -1666,7 +1666,7 @@ def _saved_preview_items(gid: int) -> list[tuple[str, str]]:
     return [(x.get("tag", ""), x.get("text", "")) for x in items if x.get("tag") in FOLLOW_TAGS]
 
 
-def _count(word: str) -> int | None:
+def _number_of(word: str) -> int | None:
     w = word.lower()
     return grammar.WORDS.index(w) if w in grammar.WORDS else int(w.replace(",", "")) if w.replace(",", "").isdigit() else None
 
@@ -1769,16 +1769,16 @@ def _preview_followups(gid: int, r: dict, season: int, P: pl.DataFrame, tonight:
         elif tag in ("Milestone", "Club history"):
             m = re.search(r"is (\w+) (goals?|assists?|points?) from (passing .+|\d[\d,]*)\.$", text)
             pids = named(text)
-            if not m or not pids or _count(m.group(1)) is None:
+            if not m or not pids or _number_of(m.group(1)) is None:
                 continue
             pid = pids[0]
             me = line[pid]
             unit = m.group(2).rstrip("s")
             got = int({"goal": me["g"], "assist": me["pts"] - me["g"], "point": me["pts"]}[unit])
-            left = _count(m.group(1)) - got
+            left = _number_of(m.group(1)) - got
             if tag == "Milestone":  # counted again from his career, tonight included: the preview's day may be stale
                 car = _careers().get(pid)
-                target = _count(m.group(3))
+                target = _number_of(m.group(3))
                 if not car or target is None:
                     continue
                 past = [x for x in car if x[0] <= day[:10]]
