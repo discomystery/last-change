@@ -2452,7 +2452,13 @@ def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: i
     if not parts:
         return " ".join(alone) or None
     if len(parts) == 2 and standing.get(winner):
-        line = f"{_cap(parts[0])}. {_cap(parts[1])}."  # two clauses with their own commas read best apart
+        # one sentence, the winner's move told as a verb: "The Lightning moved to 8-3-1 and climbed to third in the
+        # Atlantic, while the Jets dropped to 4-6-3, seventh in the Central." Two sentences built the same way closed
+        # every story (voice loop, round two: rewritten as one in 12 of 13 games)
+        st = standing[winner]
+        moved = not st[1].startswith("are ")
+        first = parts[0].rsplit(f", {st[0]}", 1)[0] + f" and {st[1]}" if moved and parts[0].endswith(f", {st[0]}") else parts[0]
+        line = f"{_cap(first)}, while {parts[1]}."
     else:
         line = f"{_cap(' and '.join(parts) if len(parts) == 1 else parts[0] + ', and ' + parts[1])}."
     return " ".join([line, *alone])
@@ -2505,7 +2511,8 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
             # 1.9 goals saved above expected in a 2-1 loss; voice loop, 2026-10-30)
             parts.append(f"{nm(lg, True)} kept {W.the(loser)} in it, stopping {saves} of {shots}")
         else:
-            parts.append(f"{nm(lg, gsax >= REDEEM_GSAX)} stopped {saves} of {shots}{for_}")
+            # "and Nedeljkovic stopped 24 of 27 at the other end": the two goalies read as one exchange (voice loop, round two)
+            parts.append(f"{nm(lg, gsax >= REDEEM_GSAX)} stopped {saves} of {shots}{for_ or ' at the other end'}")
     if not parts:
         return []
     if len(parts) == 2:
@@ -3024,7 +3031,12 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if after_goals:
         s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=after_goals,
                            kinds=("debut", "return", "club_debut"), goals_told=True, saves=saves_, in_net=net_firsts)
-    s1 += _big_nights(night, winner, loser, W, name, said, last, big_told | hat_ids, verb="finished with")
+    for b in _big_nights(night, winner, loser, W, name, said, last, big_told | hat_ids, verb="finished with"):
+        # "McDavid scored again ... McDavid added three assists" -> "He added three assists" (voice loop, round two)
+        who = b.split(" ", 1)[0]
+        if s1 and s1[-1].startswith(who + " ") and b.startswith(who + " added ") and " and " not in b:
+            b = "He" + b[len(who):]
+        s1.append(b)
     # A hot opening line for the nights fans talk about the next morning, each earned by the goals themselves
     # (Sora, 2026-10-14): a three-goal comeback, a tie with the goalie pulled that went on to win, a six-goal rout.
     s1[0:0] = [x for x in run_lead if not x.startswith(_cap(W.the(loser)))]
@@ -3120,7 +3132,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if slow:  # the plain shot counts behind "shake off a slow start"
         s2.append(slow)
     # posts and crossbars belong with who had the better of the play, not at the head of the penalty paragraph (voice loop)
-    s2 += posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
+    iron = posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
+    hit = re.match(r".+? hit (.+?)(?: and still lost| and came up a goal short|, and the bounces never came)\.$", iron[0]) if iron else None
+    if hit and s2 and s2[-1].startswith(f"{_cap(Ln)} had ") and ", but " in s2[-1]:
+        # "The Sharks had a little more of the play and hit a post and the crossbar, but the Red Wings had the finish."
+        s2[-1] = s2[-1].replace(", but ", f" and hit {hit.group(1)}, but ", 1)
+        iron = []
+    s2 += iron
     s2 += net_firsts
     s2 += _goalie_lines(r, winner, loser, W, name, said, head, pk, season)
     # goalie streaks (Sora, 2026-10-30: Kochetkov's nine straight wins to open the season went untold)

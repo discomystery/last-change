@@ -73,7 +73,7 @@ def after(run_dir: Path) -> list[tuple[int, str]]:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="python -m pipeline.voice")
-    ap.add_argument("cmd", choices=["sample", "packet", "check", "after", "report", "patterns"])
+    ap.add_argument("cmd", choices=["sample", "packet", "check", "after", "report", "patterns", "rewrite-start", "rewrite-check", "pairs"])
     ap.add_argument("--run", default=date.today().isoformat())
     ap.add_argument("--n", type=int, default=12)
     ap.add_argument("--previews", type=int, default=3)
@@ -100,6 +100,40 @@ def main(argv: list[str]) -> int:
     if a.cmd == "after":
         for gid, kind in after(run_dir):
             print(f"{kind:8s} {gid}  -> {run_dir / f'{gid}.after.json'}")
+        return 0
+    if a.cmd == "rewrite-start":  # the site's current story as each rewrite's starting point (recaps only)
+        for pk in sorted(run_dir.glob("*.packet.json")):
+            gid = pk.name.split(".")[0]
+            base = run_dir / f"{gid}.after.json"
+            if json.loads(pk.read_text())["kind"] != "recap" or not base.exists() or (run_dir / f"{gid}.rewrite.md").exists():
+                continue
+            st = json.loads(base.read_text())
+            (run_dir / f"{gid}.base.json").write_text(json.dumps(st, ensure_ascii=False, indent=1))
+            (run_dir / f"{gid}.rewrite.md").write_text(compare.to_markdown(st))
+            print(f"rewrite  {gid}  -> {run_dir / f'{gid}.rewrite.md'}")
+        return 0
+    if a.cmd == "rewrite-check":
+        bad = 0
+        for d in sorted(run_dir.glob("*.rewrite.md")):
+            gid = d.name.split(".")[0]
+            f = compare.fidelity(d.read_text(), json.loads((run_dir / f"{gid}.base.json").read_text()),
+                                 json.loads((run_dir / f"{gid}.packet.json").read_text()))
+            bad += len(f["dropped"]) + len(f["added"]) + (not f["order_kept"])
+            print(f"{gid}: dropped {f['dropped'] or '-'}  added {[x['value'] for x in f['added']] or '-'}"
+                  f"{'' if f['order_kept'] else '  ORDER CHANGED'}")
+        return 1 if bad else 0
+    if a.cmd == "pairs":  # sentence pairs: site -> rewrite, per game and in voice/pairs.jsonl
+        rows = []
+        for d in sorted(run_dir.glob("*.rewrite.md")):
+            gid = d.name.split(".")[0]
+            groups = compare.align(json.loads((run_dir / f"{gid}.base.json").read_text()), compare.parse_draft(d.read_text()))
+            (run_dir / f"{gid}.pairs.json").write_text(json.dumps(groups, ensure_ascii=False, indent=1))
+            rows += [{"run": a.run, "game_id": int(gid), **g} for g in groups if g["op"] != "kept"]
+        keep = [l for l in (VOICE / "pairs.jsonl").read_text().splitlines() if l.strip() and json.loads(l)["run"] != a.run] \
+            if (VOICE / "pairs.jsonl").exists() else []
+        (VOICE / "pairs.jsonl").write_text("\n".join(keep + [json.dumps(r, ensure_ascii=False) for r in rows]) + "\n")
+        from collections import Counter
+        print(Counter(r["op"] for r in rows))
         return 0
     if a.cmd == "report":
         print(compare.report(run_dir, VOICE))

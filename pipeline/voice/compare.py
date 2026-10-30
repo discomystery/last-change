@@ -243,3 +243,105 @@ def _html(run: str, games: list[dict], pats: list[dict], avg: dict) -> str:
     out.append("<h2>Patterns</h2><ul>" + "".join(f"<li class=f><b>{'Pattern' if p['pattern'] else 'One-off'}</b> ({p['games']} games) "
                                                   f"{html.escape(p['note'])}</li>" for p in pats) + "</ul>")
     return "".join(out)
+
+
+# ---------------------------------------------------------------- rewrite mode (Sora, 2026-10-30, round two)
+# A draft written from the facts alone came out too far from the site's story to learn sentence-building from (Sora:
+# shorter, reordered, other facts). In rewrite mode the draft starts from the site's own story and keeps every fact and
+# the game order; only how sentences are built and joined changes. Each site sentence is then paired with what it became,
+# and those pairs are the material for generator changes.
+
+def to_markdown(story: dict) -> str:
+    """The site's story in the draft format, the starting point of a rewrite."""
+    out = [f"# {story.get('head') or ''}", ""]
+    for p in story.get("paras") or []:
+        out += [p, ""]
+    out += [f"- {i['tag']}: {i['text']}" if i.get("tag") else f"- {i['text']}" for i in story.get("items") or []]
+    return "\n".join(out).strip() + "\n"
+
+
+def facts(text: str) -> set[str]:
+    """Numbers (number words as digits, ordinals included) and capitalized names, folded: what a rewrite must keep."""
+    out = set(re.findall(r"(?<![\w.])\d+(?:[.:]\d+)?(?:-\d+){0,2}", text))
+    out |= {str(v) for w, v in NUM_WORDS.items() if v > 1 and re.search(rf"\b{w}\b", text.lower())}
+    for w in re.findall(r"[A-Z][\w’'\-.]*[\w]", text):
+        base = re.sub(r"’s$|'s$|’$", "", w)
+        if base not in COMMON:
+            out.add(fold(base))
+    return out
+
+
+def _scores(text: str) -> list[str]:
+    return re.findall(r"(?<![\d-])\d{1,2}-\d{1,2}(?![\d-])", text)
+
+
+def fidelity(rewrite: str, base: dict, packet: dict) -> dict:
+    """What a rewrite dropped from the site's story, what it added that the packet doesn't back, and whether the
+    running scores still come in the same order. `<!-- drop: X -->` records a deliberate cut (a fact said twice)."""
+    r = parse_draft(rewrite)
+    dropped_ok = set(re.findall(r"<!--\s*drop:\s*([^>]*?)\s*-->", rewrite))
+    whole = lambda s: " ".join([s.get("head") or ""] + (s.get("paras") or []) + [i.get("text", "") for i in s.get("items") or []])
+    have, had = facts(whole(r)), facts(whole(base))
+    # digits and number words count as the same fact
+    def present(f):
+        if f in have:
+            return True
+        word = next((w for w, v in NUM_WORDS.items() if str(v) == f), None)
+        return bool(word and word in whole(r).lower())
+    dropped = sorted(f for f in had if not present(f) and not any(f in d for d in dropped_ok))
+    a, b = _scores(" ".join(base.get("paras") or [])), _scores(" ".join(r["paras"]))
+    seq = lambda xs, other: list(dict.fromkeys(x for x in xs if x in other))
+    order_ok = seq(a, b) == seq(b, a)
+    # anything the site's own story says is backed too (the pilot's packets predate some fields, e.g. fights)
+    return {"dropped": dropped, "added": guard(rewrite, {"packet": packet, "site": base}), "order_kept": order_ok}
+
+
+def _words(s: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z’']+", fold(s).lower()) if len(w) > 2}
+
+
+def align(base: dict, rewrite: dict) -> list[dict]:
+    """Pair each sentence of the site's story with the rewrite sentence that took over its facts (most shared facts,
+    then words). Groups come out in the rewrite's order: `kept` (same sentence), `reworded`, `merged` (several site
+    sentences into one), `split` (one site sentence told across several), `cut` (site sentence with nothing carried
+    over) and `new` (a rewrite sentence that carries no site sentence, e.g. a joining clause)."""
+    def sents(story):
+        out = []
+        for pi, p in enumerate(story.get("paras") or []):
+            out += [(pi, s) for s in textcheck.sentences(p)]
+        out += [(-1, f"{i.get('tag')}: {i.get('text')}") for i in story.get("items") or []]
+        return out
+    B, R = sents(base), sents(rewrite)
+    if base.get("head") or rewrite.get("head"):
+        B.insert(0, (-2, base.get("head") or ""))
+        R.insert(0, (-2, rewrite.get("head") or ""))
+
+    def score(b, r):
+        fb, fr = facts(b), facts(r)
+        wb, wr = _words(b), _words(r)
+        return 3 * len(fb & fr) / max(len(fb), 1) + len(wb & wr) / max(len(wb | wr), 1)
+    to = {}
+    for bi, (bp, b) in enumerate(B):
+        cands = [(score(b, r), -abs(ri - bi), ri) for ri, (rp, r) in enumerate(R) if (rp == -2) == (bp == -2)]
+        best = max(cands, default=(0, 0, None))
+        to[bi] = best[2] if best[0] >= 0.35 else None
+    # a site sentence whose facts spread over two rewrite sentences: count it once, at its best match, and mark the split
+    spread = defaultdict(set)
+    for bi, (bp, b) in enumerate(B):
+        for ri, (rp, r) in enumerate(R):
+            if (rp == -2) == (bp == -2) and len(facts(b) & facts(r)) >= 2 and ri != to[bi]:
+                spread[bi].add(ri)
+    groups, seen_b = [], set()
+    for ri, (rp, r) in enumerate(R):
+        bs = [bi for bi in sorted(to) if to[bi] == ri]
+        if not bs:
+            groups.append({"op": "new", "site": [], "rewrite": [r], "part": rp})
+            continue
+        seen_b |= set(bs)
+        site = [B[bi][1] for bi in bs]
+        op = "kept" if site == [r] else "merged" if len(bs) > 1 else "split" if spread.get(bs[0]) else "reworded"
+        groups.append({"op": op, "site": site, "rewrite": [r], "part": rp})
+    for bi, (bp, b) in enumerate(B):
+        if to[bi] is None:
+            groups.append({"op": "cut", "site": [b], "rewrite": [], "part": bp})
+    return groups

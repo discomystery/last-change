@@ -1,0 +1,145 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Finnie sparks a Red Wings comeback"
+  ],
+  "rewrite": [
+   "Finnie sparks a Red Wings comeback"
+  ],
+  "part": -2
+ },
+ {
+  "op": "split",
+  "site": [
+   "Justin Faulk got the scoring started for the Red Wings on the power play midway through the first."
+  ],
+  "rewrite": [
+   "Justin Faulk got the scoring started for the Red Wings with a power-play goal midway through the first."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Keegan Kolesar and Barclay Goodrow fought late in the period, and Dmitry Orlov tied it up for San Jose on the power play late in the period."
+  ],
+  "rewrite": [
+   "Late in the period, Keegan Kolesar and Barclay Goodrow fought, and Dmitry Orlov answered on a San Jose power play to tie it."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Macklin Celebrini put the Sharks ahead 2-1 early in the second.",
+   "Ivar Stenberg made it 3-1 on the power play early in the third, but Emmitt Finnie pulled the Wings within one a little over two minutes later."
+  ],
+  "rewrite": [
+   "Macklin Celebrini put the Sharks ahead 2-1 early in the second, and Ivar Stenberg made it 3-1 on another power play early in the third."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "With the goalie pulled and a minute and a half left, Alex DeBrincat tied it 3-3."
+  ],
+  "rewrite": [
+   "Emmitt Finnie pulled the Wings within one a little over two minutes later, and with the goalie pulled and a minute and a half left, Alex DeBrincat tied it 3-3."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Lucas Raymond scored the only goal of the shootout for the Red Wings."
+  ],
+  "rewrite": [
+   "Lucas Raymond scored the only goal of the shootout to win it for the Red Wings."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Celebrini finished with a goal and two assists."
+  ],
+  "rewrite": [
+   "Celebrini finished with a goal and two assists in the loss."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Sharks had a little more of the play, but the Red Wings had the finish.",
+   "The Sharks hit a post and the crossbar and still lost."
+  ],
+  "rewrite": [
+   "The Sharks had a little more of the play and hit a post and the crossbar, but the Red Wings had the finish."
+  ],
+  "part": 1
+ },
+ {
+  "op": "split",
+  "site": [
+   "John Gibson, who gave up five goals against New Jersey in his last start, made 31 saves for the Red Wings, and Alex Nedeljkovic stopped 24 of 27."
+  ],
+  "rewrite": [
+   "John Gibson, who gave up five goals against New Jersey in his last start, bounced back with 31 saves, and Alex Nedeljkovic stopped 24 of 27 at the other end."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Red Wings moved to 3-3-2, climbing off the bottom of the Atlantic, now seventh.",
+   "The Sharks fell to 4-3-1 but climbed to fourth in the Pacific."
+  ],
+  "rewrite": [
+   "The Red Wings moved to 3-3-2 and climbed off the bottom of the Atlantic to seventh, and the Sharks fell to 4-3-1 but still climbed to fourth in the Pacific."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Finally: Dmitry Orlov scored his first goal of the season, his first since Mar 21 (21 games played since)."
+  ],
+  "rewrite": [
+   "Finally: Dmitry Orlov scored his first goal of the season, his first since Mar 21 (21 games played since)."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Milestone: Alex DeBrincat is now one goal from 300."
+  ],
+  "rewrite": [
+   "Milestone: Alex DeBrincat is now one goal from 300."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Lineup: Luca Cagnoni was in NHL.com’s projected lineup, but Darnell Nurse played instead."
+  ],
+  "rewrite": [
+   "Lineup: Luca Cagnoni was in NHL.com’s projected lineup, but Darnell Nurse played instead."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Lineup: Axel Sandin-Pellikka was in NHL.com’s projected lineup, but Andreas Englund played instead."
+  ],
+  "rewrite": [
+   "Lineup: Axel Sandin-Pellikka was in NHL.com’s projected lineup, but Andreas Englund played instead."
+  ],
+  "part": -1
+ }
+]

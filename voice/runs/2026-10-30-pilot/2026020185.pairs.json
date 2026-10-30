@@ -1,0 +1,165 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Doughty has a goal and two assists as the Kings beat the Rangers"
+  ],
+  "rewrite": [
+   "Doughty has a goal and two assists as the Kings beat the Rangers"
+  ],
+  "part": -2
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "It was a busy first period."
+  ],
+  "rewrite": [
+   "The first period was a busy one."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Taylor Ward got the scoring started for the Kings a little over a minute in, in his first game of the season.",
+   "Brandt Clarke stretched the lead to 2-0 less than four minutes later, but J.T."
+  ],
+  "rewrite": [
+   "Taylor Ward, in his first game of the season, got the scoring started for the Kings a little over a minute in, and Brandt Clarke made it 2-0 less than four minutes later."
+  ],
+  "part": 0
+ },
+ {
+  "op": "new",
+  "site": [],
+  "rewrite": [
+   "J.T."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Miller got the Rangers on the board midway through the first.",
+   "Drew Doughty made it 3-1 for the Kings four and a half minutes later."
+  ],
+  "rewrite": [
+   "Miller got the Rangers on the board midway through the first, but Drew Doughty restored the two-goal lead four and a half minutes after that."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Rangers pulled James Reimer after three goals and turned to Dylan Garand to start the second.",
+   "Artemi Panarin stretched the lead to 4-1 on the power play early in the second, and Mikey Anderson made it 5-1 later in the period.",
+   "Los Angeles had a goal taken off for goalie interference early in the period, though it didn’t end up costing them."
+  ],
+  "rewrite": [
+   "The Rangers pulled James Reimer after three goals and sent Dylan Garand out to start the second, and Los Angeles kept coming: Artemi Panarin made it 4-1 on the power play early in the period and Mikey Anderson 5-1 later on."
+  ],
+  "part": 0
+ },
+ {
+  "op": "new",
+  "site": [],
+  "rewrite": [
+   "The Kings also had a goal taken off for goalie interference early in the second, though it didn’t end up costing them."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Adam Fox cut Los Angeles’ lead to 5-2 on the power play midway through the period, in his 500th NHL game."
+  ],
+  "rewrite": [
+   "Adam Fox, in his 500th NHL game, cut the lead to 5-2 on the power play midway through the period."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "With the goalie pulled and just under four minutes left, Tye Kartye made it 5-3.",
+   "Joel Edmundson added an empty-net goal with less than four minutes left to make it 6-3."
+  ],
+  "rewrite": [
+   "Tye Kartye made it 5-3 with the goalie pulled and just under four minutes left, but Joel Edmundson put it away with an empty-net goal with less than four minutes left, 6-3."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Doughty finished with a goal and two assists."
+  ],
+  "rewrite": [
+   "Doughty finished with a goal and two assists."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The chances were closer than the score.",
+   "Darcy Kuemper made 23 saves for the Kings."
+  ],
+  "rewrite": [
+   "The chances were closer than the score, and Darcy Kuemper made 23 saves for the Kings."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Kings moved to 3-5-2, seventh in the Pacific.",
+   "The Rangers fell to 7-6-1, second in the Metropolitan."
+  ],
+  "rewrite": [
+   "Los Angeles moved to 3-5-2, seventh in the Pacific, and the Rangers fell to 7-6-1, second in the Metropolitan."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Club history: Drew Doughty passed Dustin Brown for seventh on the Kings’ all-time scoring list, with 713 points."
+  ],
+  "rewrite": [
+   "Club history: Drew Doughty passed Dustin Brown for seventh on the Kings’ all-time scoring list, with 713 points."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Slump: The Rangers are on a three-game losing streak."
+  ],
+  "rewrite": [
+   "Slump: The Rangers are on a three-game losing streak."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Head to head: The Kings have beaten the Rangers six straight times, going back to the 2023-24 season."
+  ],
+  "rewrite": [
+   "Head to head: The Kings have beaten the Rangers six straight times, going back to the 2023-24 season."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Finally: Drew Doughty scored his first goal of the season, his first since Mar 16 (24 games played since)."
+  ],
+  "rewrite": [
+   "Finally: Drew Doughty scored his first goal of the season, his first since Mar 16 (24 games played since)."
+  ],
+  "part": -1
+ }
+]
