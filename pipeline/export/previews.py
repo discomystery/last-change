@@ -1343,6 +1343,20 @@ def _snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetim
         nhl = None
     if nhl:
         out["nhl_lineup"] = nhl
+    try:  # both clubs' last ten games; the preview stands without it
+        from pipeline.export import lately
+        form = lately.run(away, home, day, {t: v["id"] for t, v in (projected or {}).items() if v.get("id")}, CURRENT_SEASON)
+        if form:
+            out["lately"] = form
+    except Exception as e:
+        print(f"lately for {g['id']} failed: {e!r}")
+    try:  # where both clubs sit in the standings going in
+        from pipeline.export import stories
+        line = stories.stakes(CURRENT_SEASON, day, away, home, stories.Words(places))
+        if line:
+            out["stakes"] = wording.tidy(line)
+    except Exception as e:
+        print(f"stakes for {g['id']} failed: {e!r}")
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places, in_net)

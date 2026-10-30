@@ -27,6 +27,7 @@ import PkRoles from '../../components/PkRoles.astro';
 import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import Deployment from '../../components/Deployment.astro';
+import Lately, { type Form } from '../../components/Lately.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
@@ -48,7 +49,7 @@ type Claim = { id: string; kind: string; head: string; body: string; call?: stri
 // still be shown unchanged after the game. Previews for games played before snapshots began are made from the data before
 // each game and shown exactly like the rest.
 type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]>; projected?: Record<string, { id: number; from: 'nhl' | 'model' }> };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]>; projected?: Record<string, { id: number; from: 'nhl' | 'model' }>; lately?: Record<string, Form>; stakes?: string };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
@@ -182,7 +183,8 @@ import recapIndex from '../../../public/data/recaps/index.json';
   <SectionNav items={nav as [string, string][]} />
 
   <section class="sec top" id="watch" aria-label="The short version">
-    {story && <GameStory story={story} sides={sides} />}
+    {story && (snap.lately || snap.stakes) && <GameStory story={story} sides={sides}><Lately slot="band" lately={snap.lately} stakes={snap.stakes} order={order} sides={sides} /></GameStory>}
+    {story && !(snap.lately || snap.stakes) && <GameStory story={story} sides={sides} />}
     {!story && snap.outlook && (
       <div class="card outlook">
         {order.filter((a) => snap.outlook![a]).map((a) => (
