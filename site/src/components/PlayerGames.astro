@@ -97,9 +97,10 @@ const lastWords = last && `${goalie ? (last.gs ? 'Last started' : 'Last played, 
   .phfold { margin: -1px 0 0; background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 18px 18px; }
   .phfold > summary { border-radius: 0 0 17px 17px; background: color-mix(in oklab, var(--track) 70%, var(--sheet)); border-top: 1px solid var(--rule); cursor: pointer; }
   .phfold[open] > summary { border-radius: 0; margin-bottom: 0; }
-  /* Stacked above the career fold, it gives that fold the card's rounded bottom. */
-  .pg-fold:has(+ :global(.phfold)) { border-radius: 0; }
-  .pg-fold:has(+ :global(.phfold)) > summary { border-radius: 0; }
+  /* Stacked above the career fold, it gives that fold the card's rounded bottom.
+     "~", not "+": this component's inline script sits between the two folds. */
+  .pg-fold:has(~ :global(.phfold)) { border-radius: 0; }
+  .pg-fold:has(~ :global(.phfold)) > summary { border-radius: 0; }
   .pg-fold > summary { flex-wrap: wrap; row-gap: 2px; }
   .pg-last { font-weight: 600; }
   .pg-sep { color: var(--ink-3); }
