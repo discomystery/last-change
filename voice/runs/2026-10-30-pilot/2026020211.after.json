@@ -2,7 +2,7 @@
  "head": "Zellweger returns to Anaheim",
  "paras": [
   "The Sabres (5-4-3) beat San Jose 2-0 on Tuesday, while the Ducks (5-6-1) lost 6-5 in overtime to Vancouver the same night. Going in, the Sabres are seventh in the Atlantic (tied for 19th in the NHL) and the Ducks fifth in the Pacific (tied for 23rd).",
-  "The Sabres get their shots through better than almost anyone and rarely get pinned in their own end (4th), but don't block many shots (30th). The Ducks play some of the league’s fastest games and give up a lot of dangerous shots (30th). They also are one of the league’s most physical teams, so the Ducks hit a lot, but the Sabres mostly don’t. Anaheim has allowed 3.58 goals a game, the fourth most in the league. That means the Sabres could find some good looks against the Ducks, who give up plenty of them.",
+  "The Sabres get their shots through better than almost anyone (3rd) and rarely get pinned in their own end (4th), but don't block many shots (30th). The Ducks play some of the league’s fastest games (3rd) and give up a lot of dangerous shots (30th). They also are one of the league’s most physical teams (3rd), so the Ducks hit a lot, but the Sabres mostly don’t. Anaheim has allowed 3.58 goals a game, the fourth most in the league. That means the Sabres could find some good looks against the Ducks, who give up plenty of them.",
   "Jack Quinn (6 G / 5 A / 11 P in 12 GP) is tied for the Sabres’ scoring lead, with seven points in his last five games. Owen Power (2 G / 9 A / 11 P in 12 GP) shares it. For the Ducks, Leo Carlsson (4 G / 11 A / 15 P in 12 GP) leads the way in scoring, and Beckett Sennecke (7 G / 3 A / 10 P in 12 GP) has a team-high seven goals.",
   "Colten Ellis (2-1-0 / .902 SV% in 4 GS) is expected to go for Buffalo. Lukáš Dostál (4-4-1 / .872 SV% in 9 GS) has struggled for Anaheim so far, but is expected to start."
  ],
@@ -45,8 +45,11 @@
   }
  ],
  "ranks": [
+  "3rd of 32 in getting shots through",
   "4th of 32 in avoiding long shifts",
   "30th of 32 in blocking shots",
-  "30th of 32 in keeping dangerous shots away: a 6.7% chance of scoring on the average shot against"
+  "3rd of 32 in pace: pace score 104 (100 is average)",
+  "30th of 32 in keeping dangerous shots away: a 6.7% chance of scoring on the average shot against",
+  "3rd of 32 in physicality: hit score 119 (100 is average)"
  ]
 }

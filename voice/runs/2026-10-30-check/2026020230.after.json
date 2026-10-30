@@ -3,7 +3,7 @@
  "paras": [
   "The Rangers are on a three-game losing streak, while the Oilers (9-2-2) beat Calgary 4-0 on Wednesday. The Oil played last night, and the Rangers are rested. Going in, the Oilers are first in the Pacific (third in the NHL) and the Rangers fifth in the Metropolitan (tied for 16th).",
   "The Oilers’ record (.769) is running ahead of what their chances are worth (.622), largely thanks to their finishing. The Rangers’ record (.536) is about what their chances are worth.",
-  "The Oilers lean on their stars more than any team in the league (lowest), have the league’s most dangerous power play (1st) and get their defensemen shooting (3rd). Edmonton has scored 4.23 goals a game, the most in the league. As for the Rangers, they get more of their shots from in close than almost anyone (2nd), hit a lot (2nd) and get a lot of their shots blocked (32nd). The Rangers’ power play could do real damage when the Oilers are shorthanded. On top of that, both teams play slow, low-event hockey, so expect a tight one.",
+  "The Oilers lean on their stars more than any team in the league (lowest), have the league’s most dangerous power play (1st) and get their defensemen shooting (3rd). Edmonton has scored 4.23 goals a game, the most in the league. As for the Rangers, they get more of their shots from in close than almost anyone (2nd), hit a lot (2nd) and get a lot of their shots blocked (32nd). The Rangers’ power play (7th) could do real damage against the Oilers’ penalty kill (23rd). On top of that, both teams play slow, low-event hockey, so expect a tight one.",
   "Connor McDavid (8 G / 28 A / 36 P in 13 GP) leads the Oilers and the whole NHL in scoring, with 13 points in his last five games. Leon Draisaitl (12 G / 12 A / 24 P in 13 GP) has a team-high twelve goals, second in the NHL, with ten points in his last five games. For the Rangers, Adam Fox (1 G / 16 A / 17 P in 14 GP) leads the way in scoring, with eight points in his last five games. Alexis Lafrenière (9 G / 7 A / 16 P in 14 GP) has a team-high nine goals, tied for seventh in the NHL.",
   "Tristan Jarry (3-1-2 / .883 SV% in 6 GS) will likely start for Edmonton, and Dylan Garand (4-5-1 / .899 SV% in 8 GS) for the Rangers."
  ],
@@ -59,6 +59,8 @@
   "3rd of 32 in shots from defensemen: 38% of shot attempts from defensemen",
   "2nd of 32 in shots from in close: 34% of shots from within 20 feet",
   "2nd of 32 in physicality: hit score 119 (100 is average)",
-  "32nd of 32 in getting shots through"
+  "32nd of 32 in getting shots through",
+  "7th of 32 in the power play: 8.3 expected goals per 60 on the power play",
+  "23rd of 32 in the penalty kill: 8.1 expected goals allowed per 60 shorthanded"
  ]
 }

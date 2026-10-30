@@ -62,7 +62,7 @@ def test_a_shared_habit_is_said_once(monkeypatch):
     monkeypatch.setattr(pm, "stat_words", lambda *a: {})
     fp = {"FLA": dims(icing=(98, 1), physical=(97, 2)), "WPG": dims(icing=(90, 4), pace=(5, 31))}
     s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W())
-    assert s.startswith("Both teams rarely ice the puck.")
+    assert s.startswith("The Panthers and the Jets both rarely ice the puck.")
     assert s.count("ice the puck") == 1
 
 
@@ -142,3 +142,18 @@ def test_a_shared_habit_one_club_leads_is_said_once(monkeypatch):
     s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,), tips=tips)
     assert "especially the Jets (2nd), so" in s and "low-quality shots (31st)" in s
     assert tips["list"][0].startswith("31st of 32 in shot quality") and tips["list"][-1].startswith("2nd of 32 in pace")
+
+
+def test_a_power_play_line_names_the_kill_it_faces(monkeypatch):
+    """Two clubs dangerous shorthanded are told together with both ranks, and the power-play line says it is the kill,
+    not the shorthanded threat, that it could hurt (Sora, 2026-10-30)."""
+    monkeypatch.setattr(pm, "scoring", lambda *a: None)
+    monkeypatch.setattr(pm, "stat_words", lambda *a: {})
+    fp = {"FLA": dims(powerKill=(98, 1), pp=(73, 9), qualityAllowed=(2, 32)),
+          "WPG": dims(powerKill=(95, 2), pk=(27, 24), quality=(10, 29))}
+    line = ("The Panthers’ power play could do real damage when the Jets are shorthanded.", pm.partners({"pp"}, "FLA", "WPG"))
+    tips = {}
+    s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), gists=[line], key=(1,), tips=tips)
+    assert s.startswith("The Panthers (1st) and the Jets (2nd) both create chances on the penalty kill.")
+    assert "power play (9th) could do real damage against the Jets’ penalty kill (24th)" in s
+    assert "going the other way" not in s and len(tips["list"]) == s.count("th)") + s.count("st)") + s.count("nd)") + s.count("rd)")

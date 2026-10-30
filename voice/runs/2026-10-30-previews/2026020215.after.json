@@ -2,7 +2,7 @@
  "head": "Something has to change for the Jets",
  "paras": [
   "The Jets are winless in seven (0-5-2), while Florida has won two in a row. The Panthers won the teams’ first meeting this season, 5-1 in Winnipeg on Tuesday. Going in, the Jets are seventh in the Central (tied for 25th in the NHL) and the Cats fifth in the Atlantic (tied for tenth).",
-  "Both teams rarely ice the puck. The Jets take a lot of low-quality shots (29th). They also create more chances on the penalty kill than almost anyone (2nd), and that sets up a fight with the Panthers’ power play, which could do real damage when the Jets are shorthanded. As for the Panthers, they are the league’s most physical team (1st). They also forecheck harder than anyone (1st), and that could keep the Jets pinned in their own end.",
+  "The Panthers (1st) and the Jets (5th) both rarely ice the puck. The Jets take a lot of low-quality shots (29th). They also create more chances on the penalty kill than almost anyone (2nd), and that sets up a fight with the Panthers’ power play (6th), which could do real damage against the Jets’ penalty kill (24th). As for the Panthers, they are the league’s most physical team (1st). They also forecheck harder than anyone (1st), and that could keep the Jets pinned in their own end.",
   "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring, and Cole Perfetti (6 G / 5 A / 11 P in 13 GP) isn’t far behind. Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP) leads the Panthers in scoring and is tied for seventh in the NHL, with nine points in his last five games. Brady Tkachuk (8 G / 7 A / 15 P in 13 GP) has a team-high eight goals, with seven points in his last five games and a point in five straight games against Winnipeg.",
   "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) will likely start for Winnipeg, and Akira Schmid (4-2-1 / .884 SV% in 6 GS) for Florida."
  ],
@@ -45,8 +45,12 @@
   }
  ],
  "ranks": [
+  "1st of 32 in avoiding icings",
+  "5th of 32 in avoiding icings",
   "29th of 32 in shot quality: a 5.9% chance of scoring on the average shot",
   "2nd of 32 in shorthanded threat",
+  "6th of 32 in the power play: 8.6 expected goals per 60 on the power play",
+  "24th of 32 in the penalty kill: 8.1 expected goals allowed per 60 shorthanded",
   "1st of 32 in physicality: hit score 160 (100 is average)",
   "1st of 32 in forecheck pressure: forecheck score 148 (100 is average)"
  ]

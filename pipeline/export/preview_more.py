@@ -433,25 +433,53 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
     # Panthers' power play could do real damage, a strength against strength of its own): told together
     pct = lambda t, k: ((((fp.get(t) or {}).get("dims") or {}).get(k) or {}).get("blend") or {}).get("pct")
     as_pair = {}
+    blend = lambda t, k: (((fp.get(t) or {}).get("dims") or {}).get(k) or {}).get("blend") or {}
+    both_sh = all((pct(t, "powerKill") or 0) >= SH_THREAT and any(x[1] == "powerKill" for x in picks[t]) for t in (away, home))
     for i, (ln, ks) in enumerate(lines):
         if not _names(ks) & {"pp", "pk"}:
             continue
+        # the reason a power play could do damage is the kill it faces (Sora, 2026-10-30: "is it due to the strength of
+        # the Canes power play, or a weakness in the Jets penalty kill?"): both named, with their ranks
+        att = next((t for t, k in (x for x in ks if isinstance(x, tuple)) if k == "pp"), None)
+        m = re.search(r"((?:[Tt]he )?\S+(?: \S+)?’s? power play) could do real damage when (.+?) are shorthanded", ln) if att else None
+        if m:
+            opp_ = home if att == away else away
+            pk_w = f"{W.poss(opp_)} penalty kill"
+            # a kill its own club's list tells already ("have a leaky penalty kill") is not named twice
+            told_pk = any(x[1] == "pk" for x in picks[opp_])
+            ln = (ln[:m.start()] + m.group(1) + rank_tag("pp", blend(att, "pp"), tips, m.group(1))
+                  + (ln[m.end(1):m.end()] if told_pk else " could do real damage against " + pk_w + rank_tag("pk", blend(opp_, "pk"), tips, pk_w))
+                  + ln[m.end():])
+            lines[i] = (ln, ks)
         for a, b in ((away, home), (home, away)):
-            rest = ln.split(" power play ", 1)[-1]
-            if (f"{W.poss(a)} power play".lower() in ln.lower() and rest.startswith("could")
+            rest = ln.split(" could ", 1)[-1]
+            if (f"{W.poss(a)} power play".lower() in ln.lower() and " could do real damage against " in ln and not both_sh
                     and (pct(b, "powerKill") or 0) >= SH_THREAT):  # a weak kill that is dangerous the other way
-                lines[i] = (ln[:-1] + f", though {W.poss(b)} penalty killers create chances of their own going the other way.",
+                whose = "their" if f"{W.poss(b)} penalty kill" in ln else W.poss(b)  # the kill was just named
+                lines[i] = (ln[:-1] + f", though {whose} penalty killers create chances of their own going the other way.",
                             ks | {(b, "powerKill")})
                 # told with the shorthanded threat: "that sets up a fight with the Panthers’ power play, which could ..."
-                as_pair[lines[i][0]] = f"that sets up a fight with {W.poss(a)} power play, which {rest}"
+                head = ln[:ln.index(" could ")]
+                head = head[head.lower().index(f"{W.poss(a)} power play".lower()):]
+                as_pair[lines[i][0]] = f"that sets up a fight with {_lower(head)}, which could {rest}"
                 break
     # a habit both clubs have is said once, "Both teams get their defensemen shooting.", not in each club's list; one a
     # line below already tells for both (pace, or a kill that is dangerous the other way) is left to that line
-    in_lines = {k for ln, ks in lines if ln.startswith("Both") or "of their own going the other way" in ln for k in _names(ks)}
+    in_lines = {k for ln, ks in lines if ln.startswith("Both") or "of their own going the other way" in ln for k in _names(ks)
+                if k != "powerKill" or not both_sh}
     shared = [(k, b) for _, k, b in picks[away] if k not in in_lines
               and any(k == k2 and side(b) == side(b2) for _, k2, b2 in picks[home])]
-    if shared:
+    if len(shared) == 1:  # "The Hurricanes (1st) and the Jets (2nd) both create chances on the penalty kill." (Sora,
+        # 2026-10-30: the league's two best shorthanded threats meeting is worth saying with both ranks)
+        k, _ = shared[0]
+        hi = side(shared[0][1])
+        both_ = sorted(((blend(t, k), t) for t in (away, home)), key=lambda x: x[0].get("rank") or 99, reverse=not hi)
+        w = HABITS[k][0 if hi else 1]
+        named_ = [cap(W.the(t)) if i == 0 else W.the(t) for i, (_, t) in enumerate(both_)]
+        sents.append(f"{named_[0]}{rank_tag(k, both_[0][0], tips, named_[0])} and {named_[1]}{rank_tag(k, both_[1][0], tips, named_[1])} both {w}.")
+    elif shared:
         sents.append(f"Both teams {and_list([HABITS[k][0 if side(b) else 1] for k, b in shared])}.")
+    if shared:
         gone = {k for k, _ in shared}
         picks = {t: [x for x in v if x[1] not in gone] for t, v in picks.items()}
     # a habit both share, told as "Both teams ...", that one club has to a higher degree: said once, with that club named
@@ -514,6 +542,8 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             words = (IDENTITY[k][0 if b["rank"] == 1 else 1] if k in IDENTITY and side(b) and b["rank"] <= RANK_TOLD
                      else HABITS[k][0 if side(b) else 1])
             # the other club's power play is the subject by then, so the shorthanded side is named again (Sora, 2026-10-30)
+            if k == "pk":  # its kill was just told with its rank: "so the Leafs’ power play (8th) could do real damage when they’re shorthanded"
+                ln = re.sub(re.escape(f"against {W.poss(t)} penalty kill") + r" \(\d+\w\w\)", f"when {W.the(t)} are shorthanded", ln)
             ln = _lower(ln) if k == "powerKill" and link == ", and " and "sets up a fight" in ln else _them(_lower(ln), t, W)
             if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
                 ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
@@ -547,7 +577,8 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         sents.append(first)
     text = " ".join(sents) or None
     if tips is not None:  # the pills' tooltips in reading order
-        found = [(text.find(n), tip) for n, tip in tips.pop("_found", []) if text and n in text]
+        low_ = (text or "").lower()  # a tag's words may open a sentence ("The Hurricanes’ power play (9th)")
+        found = [(low_.find(n.lower()), tip) for n, tip in tips.pop("_found", []) if text and n.lower() in low_]
         tips["list"] = [tip for _, tip in sorted(found)]
     return text
 
