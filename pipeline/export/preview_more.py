@@ -132,7 +132,7 @@ def rank_tag(k: str, b: dict, tips: dict | None, words: str = "") -> str:
     tag = ("lowest" if r == 32 else f"{ordinal(33 - r)} lowest") if low else ordinal(r)
     fig = CHIP[k][1](b) if k in CHIP and b.get("v") is not None else ""
     fig += " (100 is average)" if "score" in fig else ""
-    tip = f"{ordinal(r)} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
+    tip = f"{tag if low else ordinal(r)} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
     tips.setdefault("_found", []).append((f"{words} ({tag})", tip))  # put in reading order once the paragraph is written
     return f" ({tag})"
 
