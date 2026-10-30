@@ -35,11 +35,13 @@ import json
 import re
 import zlib
 from datetime import date as Date
+from bisect import bisect_left, bisect_right
 from functools import lru_cache
 
 import polars as pl
 
 from pipeline.export.grammar import and_list as _and, cap as _cap, num
+from pipeline import tables
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, RAW, REGULAR, SITE_DATA, TABLES
 from pipeline.export import absences, grammar, penalties, storylines, wording
 from pipeline.export import surprises as surprise_rules
@@ -284,7 +286,7 @@ def _availability(season: int, day: str) -> dict[str, dict[int, dict]]:
     f = TABLES / str(season) / "availability.parquet"
     if not f.exists():
         return {}
-    av = pl.read_parquet(f).filter(pl.col("date") <= day)
+    av = tables.read(f).filter(pl.col("date") <= day)
     if not av.height:
         return {}
     av = av.filter(pl.col("date") == av["date"].max())
@@ -304,7 +306,7 @@ def _elsewhere(season: int, day: str, teams: tuple[str, str]) -> set[int]:
     f = TABLES / str(season) / "availability.parquet"
     if not f.exists():
         return set()
-    av = pl.read_parquet(f, columns=["date", "team", "player_id", "status"]).filter(pl.col("date") <= day)
+    av = tables.read(f, columns=["date", "team", "player_id", "status"]).filter(pl.col("date") <= day)
     if not av.height:
         return set()
     av = av.filter(pl.col("date") == av["date"].max())
@@ -375,8 +377,8 @@ def _filled_in(gid: int, day: str, team: str, tid: int, season: int, N: dict, na
     if not notes:
         return None
     roles = _roles_on(season, day).get(tid, {})
-    units = pl.read_parquet(TABLES / str(season) / "game_units.parquet").filter(pl.col("game_id") == gid)
-    pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet", columns=["game_id", "player_id", "team_id", "g", "a1", "a2", "fow", "fol"])
+    units = tables.read(TABLES / str(season) / "game_units.parquet").filter(pl.col("game_id") == gid)
+    pg = tables.read(TABLES / str(season) / "player_game.parquet", columns=["game_id", "player_id", "team_id", "g", "a1", "a2", "fow", "fol"])
     tonight = pg.filter(pl.col("game_id") == gid)
     for n in notes:
         cover = [c for c in patterns._with(units, tid, [gid], tuple(n["partners"]), n["grp"]) if c[0] != n["pid"]]
@@ -654,7 +656,10 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             pts, goals, gp = g["pts"].to_list(), int(g["g"].sum()), g.height
             n, gn = run_of(pts), run_of(g["g"].to_list())
             elsewhere = g.filter(pl.col("team") != t)
-            mostly = elsewhere["team"].mode()[0] if elsewhere.height * 2 > gp else None
+            # "most of them with Pittsburgh" only when one other club has most of the games (a tie between two old
+            # clubs named either one, by chance)
+            top = elsewhere.group_by("team").len().sort("len", "team", descending=[True, False]).row(0) if elsewhere.height else None
+            mostly = top[0] if top and top[1] * 2 > gp else None
             tail = f", most of them with {W.place(mostly)}" if mostly else ""
             extra = f", and {int(sum(pts))} points in his last {num(gp) if gp <= 12 else gp} against them" if sum(pts) >= 1.5 * gp and gn < n else ""
             them = f"his hometown {W.the(o)[4:]}" if hometown(pid, o, W) else W.place(o)  # "against his hometown Jets"
@@ -836,7 +841,7 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 
 
 def _goals_of(gid: int, season: int, pid: int) -> list[int]:
-    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "type", "p1", "period_type"])
+    ev = tables.read(TABLES / str(season) / "events.parquet", columns=["game_id", "type", "p1", "period_type"])
     return ev.filter((pl.col("game_id") == gid) & (pl.col("type") == "goal") & (pl.col("p1") == pid) & (pl.col("period_type") != "SO"))["p1"].to_list()
 
 
@@ -1173,7 +1178,7 @@ def _scratch_runs(season: int, day: str, team: str) -> dict[int, int]:
     p = TABLES / str(season) / "game_rosters.parquet"
     if not p.exists():
         return {}
-    gr = pl.read_parquet(p, columns=["game_id", "date", "team", "player_id", "status"]).filter((pl.col("team") == team) & (pl.col("date") < day[:10]))
+    gr = tables.read(p, columns=["game_id", "date", "team", "player_id", "status"]).filter((pl.col("team") == team) & (pl.col("date") < day[:10]))
     games = gr.select("game_id", "date").unique().sort("date", "game_id")["game_id"].to_list()[::-1]
     scr = {g: set(gr.filter((pl.col("game_id") == g) & (pl.col("status") == "scratched"))["player_id"].to_list()) for g in games}
     out = {}
@@ -1540,11 +1545,11 @@ def _leader(t: str, before: str, season: int) -> tuple[int, int] | None:
 
 def _goals(gid: int, season: int, home_id: int) -> list[dict]:
     """The game's goals in order (shootout left out): period, seconds into it, team side, scorer and helpers, strength."""
-    ev = pl.read_parquet(TABLES / str(season) / "events.parquet").filter((pl.col("game_id") == gid) & pl.col("type").is_in(["goal", "penalty"]))
+    ev = tables.read(TABLES / str(season) / "events.parquet").filter((pl.col("game_id") == gid) & pl.col("type").is_in(["goal", "penalty"]))
     pens = [(r["team_id"], r["sec"]) for r in ev.filter(pl.col("type") == "penalty").iter_rows(named=True)]
     out, hs, as_ = [], 0, 0
     gx = TABLES / str(season) / "goals.parquet"
-    xg = ({r["event_id"]: r["xg"] for r in pl.read_parquet(gx, columns=["game_id", "event_id", "xg"]).filter(pl.col("game_id") == gid).iter_rows(named=True)}
+    xg = ({r["event_id"]: r["xg"] for r in tables.read(gx, columns=["game_id", "event_id", "xg"]).filter(pl.col("game_id") == gid).iter_rows(named=True)}
           if gx.exists() else {})
     for r in ev.filter(pl.col("type") == "goal").sort("sort").iter_rows(named=True):  # `sec` counts from the opening faceoff; scores are kept here
         if r["period_type"] == "SO":
@@ -1604,7 +1609,7 @@ def _so_winner(tries: list[dict], winner_id: int) -> tuple[int | None, str]:
 
 def _ps_stopped(gid: int, season: int) -> list[dict]:
     """Penalty shots that did not go in: shooter, goalie, period, seconds into it."""
-    ev = pl.read_parquet(TABLES / str(season) / "events.parquet").filter(
+    ev = tables.read(TABLES / str(season) / "events.parquet").filter(
         (pl.col("game_id") == gid) & pl.col("type").is_in(["shot-on-goal", "missed-shot"]) & pl.col("situation_code").cast(pl.Utf8).is_in(["1010", "0101"]))
     return [{"p1": r["p1"], "goalie": r["goalie_id"], "period": r["period"], "sec": r["sec"] - 1200 * (r["period"] - 1), "type": r["type"],
              "home": bool(r["is_home"])}
@@ -1647,7 +1652,7 @@ def shot_droughts(gid: int, season: int, home: str, away: str) -> list[dict]:
     d = TABLES / str(season)
     if not (d / "events.parquet").exists():
         return []
-    ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "period", "period_type", "sec", "type", "is_home", "situation_code"]).filter(
+    ev = tables.read(d / "events.parquet", columns=["game_id", "period", "period_type", "sec", "type", "is_home", "situation_code"]).filter(
         pl.col("game_id") == gid)
     ot = ev.filter(pl.col("period") > 3).height > 0
     reg = ev.filter(pl.col("period") <= 3).sort("sec")
@@ -1792,16 +1797,18 @@ def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser
     against tonight's opponent (the preview's "Owns them") that ended or went on, and the second game of a
     home-and-home ("the Stars split the two-game set")."""
     out = []
+    ids = tonight["player_id"].to_list()  # cut once to tonight's skaters, then each player's rows from that
+    pg_, P_ = pg.filter(pl.col("player_id").is_in(ids) & (pl.col("game_id") != gid)), P.filter(pl.col("player_id").is_in(ids) & (pl.col("date") < day))
     for pr in tonight.iter_rows(named=True):
         pid = pr["player_id"]
         if not N.get(pid):
             continue
-        before = pg.filter((pl.col("player_id") == pid) & (pl.col("team") == pr["team"]) & (pl.col("game_id") != gid)).sort("date")
+        before = pg_.filter((pl.col("player_id") == pid) & (pl.col("team") == pr["team"])).sort("date")
         n = run_of(before["pts"].to_list())
         if n >= STREAK_END and not pr["pts"]:
             out.append({"tag": "Streak over", "text": f"{N[pid]}’s {num(n)}-game point streak ended.", "score": 44 + n})
         opp = away if pr["team"] == home else home
-        vs = P.filter((pl.col("player_id") == pid) & (pl.col("opp") == opp) & (pl.col("date") < day)).sort("date")
+        vs = P_.filter((pl.col("player_id") == pid) & (pl.col("opp") == opp)).sort("date")
         m = run_of(vs["pts"].to_list())
         if m >= STREAK_END and (pr["pts"] or m >= VS_STREAK_END):
             whole = m == vs.height and vs["date"][0] <= LOGS_START  # the run reaches back to where our logs begin
@@ -1836,7 +1843,7 @@ def _even_shots(gid: int, season: int, home: str, away: str) -> dict[str, int]:
     d = TABLES / str(season)
     if not (d / "events.parquet").exists():
         return {}
-    ev = pl.read_parquet(d / "events.parquet", columns=["game_id", "type", "is_home", "situation_code", "period_type"]).filter(
+    ev = tables.read(d / "events.parquet", columns=["game_id", "type", "is_home", "situation_code", "period_type"]).filter(
         (pl.col("game_id") == gid) & pl.col("type").is_in(["shot-on-goal", "goal"]) & (pl.col("period_type") != "SO")
         & (pl.col("situation_code").cast(pl.Utf8) == "1551"))
     return {home: ev.filter(pl.col("is_home")).height, away: ev.filter(~pl.col("is_home")).height}
@@ -2002,16 +2009,30 @@ def _club_logs() -> dict[int, list[tuple[str, str, str, int, int]]]:
 
 def _club_totals(pid: int, fid: int, day: str, logs) -> dict[str, tuple[int, int]] | None:
     """(before tonight, after tonight) franchise totals of points, goals and assists, from our own game logs."""
-    from pipeline.ingest import records
-    games = logs.get(pid)
-    if games is None:
+    if pid not in logs:
         return None
-    mine = [x for x in games if records.franchise_of(x[0], x[2]) == fid]
-    out = {}
-    for stat in ("points", "goals", "assists"):
-        val = (lambda x: x[4]) if stat == "points" else (lambda x: x[3]) if stat == "goals" else (lambda x: x[4] - x[3])
-        out[stat] = (sum(val(x) for x in mine if x[1] < day), sum(val(x) for x in mine if x[1] <= day))
-    return out
+    dates, goals, points = _club_series(pid, fid, id(logs), logs)
+    b, a = bisect_left(dates, day), bisect_right(dates, day)
+    return {"points": (points[b], points[a]), "goals": (goals[b], goals[a]),
+            "assists": (points[b] - goals[b], points[a] - goals[a])}
+
+
+_SERIES: dict = {}
+
+
+def _club_series(pid: int, fid: int, key: int, logs) -> tuple[list[str], list[int], list[int]]:
+    """His games for one franchise in date order with running goal and point totals (index i = before game i), worked
+    out once: every rival on a list is asked about again for each player who scored that night."""
+    k = (key, pid, fid)
+    if k not in _SERIES or _SERIES[k][0] is not logs:
+        from pipeline.ingest import records
+        mine = sorted((x for x in logs[pid] if records.franchise_of(x[0], x[2]) == fid), key=lambda x: x[1])
+        goals, points = [0], [0]
+        for x in mine:
+            goals.append(goals[-1] + x[3])
+            points.append(points[-1] + x[4])
+        _SERIES[k] = (logs, ([x[1] for x in mine], goals, points))
+    return _SERIES[k][1]
 
 
 def _club_lists(day: str, tonight, N, W, season: int) -> list[dict]:
@@ -2236,7 +2257,7 @@ def pp_drought(gid: int, season: int, day: str, home: str, away: str, W) -> list
     in 15.) Counted from the league's own power-play lines, regular season, this season only."""
     from pipeline.ingest import game_stats
     pp = game_stats.lookup(season)
-    G = pl.read_parquet(TABLES / str(season) / "games.parquet", columns=["game_id", "game_type", "date", "home", "away"])
+    G = tables.read(TABLES / str(season) / "games.parquet", columns=["game_id", "game_type", "date", "home", "away"])
     G = G.filter((pl.col("game_type") == REGULAR) & (pl.col("date") < day)).sort("date", descending=True)
     out = []
     for t in (away, home):
@@ -2286,7 +2307,7 @@ def two_man_kills(gid: int, season: int, home_id: int, home: str, away: str, goa
     notes, 2026-10-18: AP told Columbus's 1:52 kill and we did not.) From the stints, 5-on-3 stretches with both goalies
     in, merged across line changes; told only when no goal came in it."""
     try:
-        st = pl.read_parquet(TABLES / str(season) / "stints.parquet").filter(pl.col("game_id") == gid).sort("start")
+        st = tables.read(TABLES / str(season) / "stints.parquet").filter(pl.col("game_id") == gid).sort("start")
     except Exception:
         return []
     runs: list[list] = []  # [start, end, short side home?]
@@ -2320,7 +2341,7 @@ def posts_line(gid: int, season: int, ids: dict, winner: str, loser: str, margin
     """"The Hurricanes hit four posts and still lost." Outside notes, 2026-10-18 (Brind'Amour: "three or four
     goalposts"). Shots off the iron are misses to our chance model, so this is told as luck, never "should have scored"."""
     try:
-        ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "type", "team_id", "reason", "period_type"])
+        ev = tables.read(TABLES / str(season) / "events.parquet", columns=["game_id", "type", "team_id", "reason", "period_type"])
     except Exception:
         return []
     iron = ev.filter((pl.col("game_id") == gid) & (pl.col("type") == "missed-shot") & (pl.col("period_type") != "SO")
@@ -2373,7 +2394,7 @@ def bounced_back(gid: int, season: int, pid: int, W) -> str | None:
 
 def settled_in(gid: int, season: int, pid: int) -> tuple[int, int, int] | None:
     """(goals, shots by the last of them, saves after) for a goalie who allowed 2+ goals early and then stopped the rest."""
-    ev = pl.read_parquet(TABLES / str(season) / "events.parquet", columns=["game_id", "sort", "type", "goalie_id", "period_type"])
+    ev = tables.read(TABLES / str(season) / "events.parquet", columns=["game_id", "sort", "type", "goalie_id", "period_type"])
     shots = ev.filter((pl.col("game_id") == gid) & (pl.col("goalie_id") == pid) & pl.col("type").is_in(["shot-on-goal", "goal"])
                       & (pl.col("period_type") != "SO")).sort("sort")["type"].to_list()
     hits = [i for i, t in enumerate(shots) if t == "goal"]

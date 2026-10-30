@@ -360,6 +360,6 @@ def test_five_on_five_shots_ride_beside_the_total_when_the_loser_lived_on_the_po
     rows += [(189, "shot-on-goal", True, "1451", "REG")] * 5
     rows += [(189, "shot-on-goal", False, "1551", "REG")] * 9 + [(189, "shot-on-goal", False, "1541", "REG")] * 6
     ev = pl.DataFrame(rows, schema=["game_id", "type", "is_home", "situation_code", "period_type"], orient="row")
-    monkeypatch.setattr(stories.pl, "read_parquet", lambda *a, **k: ev)
+    monkeypatch.setattr(stories.tables, "read", lambda *a, **k: ev)
     monkeypatch.setattr(stories, "TABLES", type("T", (), {"__truediv__": lambda self, x: self, "exists": lambda self: True})())
     assert stories._even_shots(189, 2026, "CAR", "BOS") == {"CAR": 25, "BOS": 9}

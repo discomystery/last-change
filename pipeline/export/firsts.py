@@ -250,7 +250,11 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         return []
     day = game["date"][0]
     tonight = P.filter(pl.col("game_id") == gid)
-    before = P.filter((pl.col("season") == season) & (pl.col("date") < day))
+    # every earlier game of tonight's skaters, cut once: each player's checks below look only at his own
+    past = P.filter((pl.col("date") < day) & pl.col("player_id").is_in(tonight["player_id"].to_list()))
+    by_pid = past.partition_by("player_id", as_dict=True, maintain_order=True)
+    empty = past.clear()
+    opened = G.filter(pl.col("season") == season)["date"].min()
     club = _club_names()
     out = []
     for r in tonight.iter_rows(named=True):
@@ -258,7 +262,8 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         base = prior.get(pid)
         if base is None:
             continue
-        mine = before.filter(pl.col("player_id") == pid)
+        his = by_pid.get((pid,), empty)
+        mine = his.filter(pl.col("season") == season)
         gp, g, pts = base["gp"] + mine.height, base["g"] + int(mine["g"].sum()), base["g"] + base["a"] + int(mine["pts"].sum())
         g_now, pts_now = int(r["g"]), int(r["pts"])
         item = {"pid": pid, "team": t, "goals": g_now}
@@ -278,13 +283,13 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
         elif g_now and base["g"] + int(mine["g"].sum()) > 0:
             name = club.get(t)
             for_club = mine.filter(pl.col("team") == t)
-            past_here = P.filter((pl.col("player_id") == pid) & (pl.col("team") == t) & (pl.col("date") < day))
+            past_here = his.filter(pl.col("team") == t)
             if name and name not in base["clubs"] and not past_here["g"].sum() and not for_club["g"].sum():
                 out.append({**item, "kind": "club_goal"})
         if gp:  # his first game for a club he had never played for
             name = club.get(t)
-            here = P.filter((pl.col("player_id") == pid) & (pl.col("team") == t) & (pl.col("date") < day))
-            elsewhere = P.filter((pl.col("player_id") == pid) & (pl.col("team") != t) & (pl.col("date") < day))
+            here = his.filter(pl.col("team") == t)
+            elsewhere = his.filter(pl.col("team") != t)
             if name and name not in base["clubs"] and here.is_empty():
                 moved = mine.filter(pl.col("team") != t).height > 0  # played for someone else earlier this season
                 if moved or pts_now:
@@ -294,12 +299,11 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                     out[:] = [x for x in out if not (x["pid"] == pid and x["kind"] == "club_goal")]  # told in the debut
                     out.append({**item, "kind": "club_debut", "from": old, "from_name": old_name, "seasons": n, "moved": moved, "points": pts_now})
         if gp:  # a return: his last game, and how many of his team's games went by since
-            hist = P.filter((pl.col("player_id") == pid) & (pl.col("date") < day)).tail(10)
+            hist = his.tail(10)
             prev = hist.tail(1)
             regular = hist.height and hist["sec"].mean() >= (REGULAR_D if r["pos"] == "D" else REGULAR_F)
             if prev.height and regular:
                 last_day = _last_any(pid, prev["date"][0], day)
-                opened = G.filter(pl.col("season") == season)["date"].min()
                 fresh = opened is not None and last_day < opened  # back after the summer: count this season's games only
                 span = G.filter((pl.col("season") == season) if fresh else (pl.col("date") > last_day))
                 missed = span.filter((pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
@@ -311,7 +315,7 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
                     out.append({**item, "kind": "return", "missed": missed, "since": last_day if days >= LONG_AWAY_DAYS else None,
                                 "season_debut": fresh, "points": pts_now})
             elif prev.height and g_now and mine.is_empty():  # a depth player's season debut, told when he scored
-                opened = G.filter(pl.col("season") == season)["date"].min()  # (Miroshnichenko, 2026-10-14)
+                # (Miroshnichenko, 2026-10-14)
                 missed = G.filter((pl.col("season") == season) & (pl.col("date") < day) & ((pl.col("home") == t) | (pl.col("away") == t))).height
                 if opened is not None and missed >= DEPTH_DEBUT_GAMES:
                     out.append({**item, "kind": "return", "missed": missed, "since": None, "season_debut": True, "points": pts_now})
@@ -323,7 +327,6 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
     if win and win not in {p_ for p_, _ in starts}:  # a win in relief
         hs, as_ = game["home_score"][0], game["away_score"][0]
         cands.append((win, game["home_id"][0] if hs > as_ else game["away_id"][0], False))
-    opened = G.filter(pl.col("season") == season)["date"].min()
     for pid, tid, started in cands:
         base = prior.get(pid)
         if base is None:

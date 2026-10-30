@@ -76,8 +76,20 @@ def _ours(pid: int, logs, through: str, first: int | None) -> tuple[int, int] | 
     return sum(x[3] for x in use), sum(x[4] for x in use)
 
 
+_COVERAGE: dict = {}
+
+
 def coverage(snap: dict, name: str, season: int, logs) -> str | None:
-    """The latest date through which the snapshot's list agrees with our logs (goals and points of checked players)."""
+    """The latest date through which the snapshot's list agrees with our logs (goals and points of checked players).
+    The same for every game of a run, so it is worked out once per snapshot and list."""
+    key = (id(snap), snap.get("fetched"), name, season, id(logs))
+    hit = _COVERAGE.get(key)
+    if hit is None or hit[0] is not snap or hit[1] is not logs:
+        hit = _COVERAGE[key] = (snap, logs, _coverage(snap, name, season, logs))
+    return hit[2]
+
+
+def _coverage(snap: dict, name: str, season: int, logs) -> str | None:
     from pipeline.ingest import records
     first = records.LISTS[name][2]
     rows = [r for r in snap["lists"].get(name, []) if r["playerId"] in logs][:CHECK]

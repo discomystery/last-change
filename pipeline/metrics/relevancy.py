@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
+from pipeline import tables
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics import rapm
 
@@ -112,7 +113,14 @@ def _score(d: pl.DataFrame, sc: dict) -> np.ndarray:
 
 
 def run(season: int = CURRENT_SEASON, before: str | None = None) -> pl.DataFrame:
-    """Relevancy for every skater who has played this season (before a date, if given), blending in last season."""
+    """Relevancy for every skater who has played this season (before a date, if given), blending in last season. Kept
+    for the run while its tables are unchanged: a preview asks for the same day once for each club."""
+    files = [TABLES / str(s) / f"{n}.parquet" for s in (season - 2, season - 1, season) for n in ("player_game", "games", "team_game")]
+    return _run(season, before, tables.stamp(*files, TABLES / str(season) / "rosters.parquet"))
+
+
+@lru_cache(maxsize=16)
+def _run(season: int, before: str | None, _stamp: tuple) -> pl.DataFrame:
     sc = _scale(season - 1)
     now = season_lines(season, before)
     last = _last_full(season)
