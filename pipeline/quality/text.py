@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pipeline.config import SITE_DATA
 from pipeline.export import textcheck
 
-WORDS = {"head", "body", "text", "plain", "title", "happened", "call", "see", "gist", "kicker", "paras", "lean", "note"}
+WORDS = {"head", "body", "text", "plain", "title", "happened", "call", "see", "gist", "kicker", "paras", "lean", "note", "stakes"}
 MAX_LISTED = 25
 FROZEN_DAYS = 2
 

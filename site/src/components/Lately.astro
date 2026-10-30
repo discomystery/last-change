@@ -1,0 +1,102 @@
+---
+// "Lately" (Sora, 2026-10-30, thread "Improve game previews and automate tuning"): both clubs' last ten games at the
+// bottom of the preview's story card, from the snapshot's `lately` (pipeline/export/lately.py, games before the day
+// of the game only). Each club in its own card (Sora, 2026-10-30): a result strip, then goal difference, 5-on-5 expected-goal difference,
+// power play and penalty kill (percentages first, counts beside them), and the projected goalie's last five starts. Facts about what has happened, never a lean on tonight.
+import { fullName, playerHref } from '../lib/playerLinks';
+import { ordinal } from '../lib/traits';
+import teamsData from '../../public/data/teams.json';
+
+export type Form = {
+  n: number;
+  games: { date: string; opp: string; home: boolean; gf: number; ga: number; end: string; res: 'W' | 'L' | 'OT' }[];
+  record: { w: number; l: number; otl: number; gf: number; ga: number };
+  chances: { now: number | null; season: number | null; gap: number | null; word: 'usual' | 'better' | 'worse'; season_games: number; xgf?: number; xga?: number; rank?: number | null; of?: number };
+  pp?: [number, number];
+  pk?: [number, number];
+  goalie?: { id: number; starts: number; saves: number; shots: number; gsax: number };
+};
+interface Props { lately?: Record<string, Form>; stakes?: string; order: readonly string[]; sides: Record<string, 'away' | 'home'> }
+const { lately = {}, stakes, order, sides } = Astro.props;
+const TS = teamsData as { abbr: string; nick: string; place: string }[];
+const nick = (a: string) => TS.find((t) => t.abbr === a)?.nick ?? a;
+const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const said = { W: 'won', L: 'lost', OT: 'lost' } as const;
+const gameTip = (g: Form['games'][number]) =>
+  `${fmt(g.date)}, ${g.home ? 'vs' : 'at'} ${g.opp}: ${said[g.res]} ${g.gf}–${g.ga}${g.end !== 'REG' ? ` in ${g.end === 'OT' ? 'overtime' : 'a shootout'}` : ''}`;
+const pct = (v: number) => `${Math.round(v)}%`;
+const svp = (s: number, a: number) => (a ? (s / a).toFixed(3).replace(/^0/, '') : '–');
+const sgn0 = (v: number) => (v === 0 ? '0' : `${v > 0 ? '+' : '−'}${Math.abs(v)}`);
+const sgn = (v: number) => (Math.abs(v) < 0.05 ? '0.0' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}`);
+const chanceWord = (c: Form['chances']) =>
+  c.word === 'better' ? `up from ${pct(c.season!)} over the season` : c.word === 'worse' ? `down from ${pct(c.season!)} over the season` : null;
+const teams = order.filter((a) => lately[a]);
+---
+{stakes && <p class="lt-stakes"><span class="mini-h">Standings</span> {stakes}</p>}
+{teams.length === 2 && (
+  <div class="lately" aria-label="Lately">
+    {teams.map((a) => {
+      const f = lately[a];
+      const c = f.chances;
+      const wd = chanceWord(c);
+      const gd = f.record.gf - f.record.ga;
+      const xd = c.xgf != null && c.xga != null ? c.xgf - c.xga : null;
+      return (
+        <div class={`card lt t-${sides[a]}`}>
+          <h3 class="lt-h"><span class="lt-name"><i class="lt-dot"></i>{nick(a)}, last {f.n}</span> <strong>{f.record.w}-{f.record.l}-{f.record.otl}</strong></h3>
+          <ol class="lt-games" aria-label={`${nick(a)} results, oldest first`}>
+            {f.games.map((g) => <li class={`r-${g.res.toLowerCase()}`} tabindex="0" data-tip={gameTip(g)}><span>{g.res === 'OT' ? (g.end === 'SO' ? 'SO' : 'OT') : g.res}</span></li>)}
+          </ol>
+          <table class="stbl lt-t">
+            <tbody>
+              <tr><th><span class="term" tabindex="0" data-tip={`Goals for minus goals against over these ${f.n} games, all situations.`}>Goal difference</span></th><td class="v">{sgn0(gd)}</td><td class="n">{f.record.gf}–{f.record.ga}</td></tr>
+              {xd != null && (
+                <tr><th><span class="term" tabindex="0" data-tip={`Expected goals for minus against at 5-on-5 over these ${f.n} games, weighted for the score and home ice: how the chances went, whatever the goalies did.${c.rank ? ` Their share of them ranks ${ordinal(c.rank)} of ${c.of} teams over their last ten.` : ''}`}>Expected goal difference</span></th><td class="v">{sgn(xd)}</td><td class="n">{c.now != null ? `${pct(c.now)} of chances${c.rank ? `, ${ordinal(c.rank)}` : ''}` : ''}</td></tr>
+              )}
+              {f.pp && (
+                <tr><th><span class="term" tabindex="0" data-tip="Power-play goals, out of their power plays, over these games (the league’s own counts).">Power play</span></th><td class="v">{f.pp[1] ? pct(100 * f.pp[0] / f.pp[1]) : '–'}</td><td class="n">{f.pp[0]} of {f.pp[1]}</td></tr>
+              )}
+              {f.pk && (
+                <tr><th><span class="term" tabindex="0" data-tip="Times shorthanded over these games that the other team did not score (the league’s own counts).">Penalty kill</span></th><td class="v">{f.pk[1] ? pct(100 * (f.pk[1] - f.pk[0]) / f.pk[1]) : '–'}</td><td class="n">{f.pk[1] - f.pk[0]} of {f.pk[1]}</td></tr>
+              )}
+            </tbody>
+          </table>
+          {wd && <p class="lt-note">Their share of the 5-on-5 chances is {wd}.</p>}
+          {f.goalie && (
+            <p class="lt-g"><span class="mini-h"><span class="term" tabindex="0" data-tip={`The goalie expected to start, over his last ${f.goalie.starts === 1 ? 'start' : `${f.goalie.starts} starts`} this season: save percentage, and goals saved above what our chance model expected.`}>In net</span></span> {playerHref(f.goalie.id) ? <a class="plink" href={playerHref(f.goalie.id)}>{fullName(f.goalie.id, '')}</a> : fullName(f.goalie.id, '')}: {svp(f.goalie.saves, f.goalie.shots)}, {sgn(f.goalie.gsax)} saved above expected <span class="n">in his last {f.goalie.starts === 1 ? 'start' : `${f.goalie.starts} starts`}</span></p>
+          )}
+        </div>
+      );
+    })}
+  </div>
+)}
+<style>
+  /* Built from the site's usual parts (Sora, 2026-10-30): a white card per club like "Who’s been in net", the club's dot,
+     and a .stbl table; no team-tinted panels. */
+  .lately { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .lt-stakes { font: 400 18px/1.6 var(--body); color: var(--ink-2); margin: 0 0 16px; }
+  .lt-stakes .mini-h { margin-right: 6px; }
+  .lt { min-width: 0; display: grid; gap: 12px; align-content: start; }
+  .lt p { margin: 0; }
+  /* Card title at the type scale's middle size (20px, "most cards"), set like the special-teams unit titles: club dot, sans */
+  .lt-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; font: 600 20px/1.3 var(--ui); color: var(--ink); }
+  .lt-name { display: flex; align-items: center; gap: 8px; }
+  .lt-h strong { font-weight: 700; }
+  .lt-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
+  .lt-games { list-style: none; display: flex; gap: 4px; padding: 0; margin: 0; }
+  .lt-games li { flex: 1 1 0; max-width: 30px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    font: 700 10.5px var(--ui); letter-spacing: 0.03em; cursor: default; }
+  .lt-games .r-w { background: var(--team); color: var(--sheet); }
+  .lt-games .r-ot { box-shadow: inset 0 0 0 1.5px var(--team); color: var(--team); }
+  .lt-games .r-l { background: var(--track); color: var(--ink-3); }
+  .lt-t { width: 100%; }
+  .lt-t tbody th { font-weight: 400; color: var(--ink-2); white-space: normal; }
+  .lt-t .v { font-weight: 700; color: var(--ink); }
+  .lt-t .n { color: var(--ink-3); text-align: right; }
+  .lt-t tbody tr:first-child { border-top: 0; }
+  .lt-note { font: 400 14px/1.4 var(--ui); color: var(--ink-3); }
+  .lt-g { font: 400 15px/1.45 var(--ui); color: var(--ink); }
+  .lt-g .mini-h { margin-right: 6px; }
+  .lt-g .n { color: var(--ink-3); }
+  @media (max-width: 900px) { .lately { grid-template-columns: 1fr; } }
+</style>

@@ -281,6 +281,20 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if league is not None:
             out["league"] = fmt(league)
         return out
+    if m == "control":  # the team that usually gets more of the 5-on-5 chances: beat 50% by half the usual gap?
+        r = S.rows.get((gid, tid))
+        if r is None or r["xgf_adj"] + r["xga_adj"] <= 0:
+            return {"verdict": "na", "happened": "The numbers for this game aren’t available."}
+        if r["sec5"] < 600:
+            return {"verdict": "na", "happened": f"There was only {clock(r['sec5'])} of 5-on-5 play, too little to judge."}
+        v = r["xgf_adj"] / (r["xgf_adj"] + r["xga_adj"])
+        bar = 0.5 + chk["gap"] / 4  # a margin (2v - 1) of half the usual gap between the two
+        opp = places.get(chk["opp"], chk["opp"])
+        ut, ub = chk["baseline"][chk["team"]], chk["baseline"][chk["opp"]]
+        return {"verdict": "held" if v >= bar else "partly" if v > 0.5 else "missed",
+                "happened": f"{team} had {100 * v:.1f}% of the 5-on-5 expected goals (adjusted for score and venue). Coming in, they had "
+                            f"{100 * ut:.1f}% in their games and {opp} {100 * ub:.1f}%, so the call needed {100 * bar:.1f}%.",
+                "usual": f"{100 * bar:.1f}%", "tonight": f"{100 * v:.1f}%", "league": "50.0%", "_v": v, "_bar": bar}
     if m == "rest":
         r = S.rows.get((gid, tid))
         if r is None or r["xgf_adj"] + r["xga_adj"] <= 0:
