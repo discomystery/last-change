@@ -83,10 +83,22 @@ def test_consequences_join_the_paragraph(monkeypatch):
     monkeypatch.setattr(pm, "stat_words", lambda *a: {})
     fp = {"FLA": dims(pp=(95, 2), forecheck=(96, 2)), "WPG": dims(pk=(10, 29), longShifts=(10, 29))}
     s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,))
-    assert "power play could do real damage" in s and "forecheck could keep" in s
+    assert "could do real damage when" in s and "forecheck could keep" in s
     # each meeting line rides on the habit it comes from, right after that club's list (Sora, 2026-10-30)
-    assert "They also have a dangerous power play, so their power play could do real damage when the Jets are shorthanded" in s \
-        or "They also have a leaky penalty kill, so the Panthers’ power play could do real damage when they’re shorthanded" in s
+    assert "They also get pinned in their own end on long shifts, so the Panthers’ forecheck could keep them pinned" in s
+    assert "power plays, and that could do real damage when the Jets are shorthanded" in s
+
+
+def test_a_power_play_meets_a_dangerous_kill():
+    fp = {"FLA": dims(pp=(90, 3), physical=(97, 2)), "WPG": dims(pk=(20, 26), powerKill=(95, 2), quality=(5, 31))}
+    lines = [(t, k) for _, t, k in pm.consequences("WPG", "FLA", fp, W(), set())]
+    assert lines[0][1] == {"pp", "pk"}
+
+
+def test_depth_at_the_low_end_reads_as_stars():
+    fp = {"WPG": dims(depth=(2, 32), pace=(90, 4))}
+    s = pm.style("WPG", pm._picks("WPG", fp), W())
+    assert "lean on their stars more than any team in the league" in s and "No team gives its bottom six less of the ice time" in s
 
 
 def test_a_line_whose_habits_were_not_told_gets_no_lead_in(monkeypatch):

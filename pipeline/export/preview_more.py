@@ -37,6 +37,7 @@ HABITS = {
     "pp": ("have a dangerous power play", "have struggled on the power play"),
     "pk": ("kill penalties well", "have a leaky penalty kill"),
     "powerKill": ("create chances on the penalty kill", "rarely threaten on the penalty kill"),
+    "depth": ("spread the ice time through the lineup", "lean hard on their top players"),
     "discipline": ("draw more penalties than they take", "take more penalties than they draw"),  # "power play" once a list
 }
 LABELS = {"volume": "shot volume", "quality": "shot quality", "rebounds": "second chances", "turnover": "offense off turnovers",
@@ -45,8 +46,8 @@ LABELS = {"volume": "shot volume", "quality": "shot quality", "rebounds": "secon
           "longShifts": "avoiding long shifts", "blocking": "blocking shots", "pointAllowed": "point shots allowed",
           "icing": "avoiding icings", "goalie": "goaltending", "pace": "pace", "forecheck": "forecheck pressure",
           "physical": "physicality", "rough": "rough stuff", "pp": "the power play", "pk": "the penalty kill",
-          "powerKill": "shorthanded threat", "discipline": "discipline"}
-NEUTRAL = {"pointAllowed", "dShots", "inClose", "pace", "volume", "rough", "physical", "forecheck", "turnover"}  # no "worst" wording
+          "powerKill": "shorthanded threat", "discipline": "discipline", "depth": "depth"}
+NEUTRAL = {"pointAllowed", "dShots", "inClose", "pace", "volume", "rough", "physical", "forecheck", "turnover", "depth"}  # no "worst" wording
 BOUNCY = {"rebounds", "turnover", "breakdowns"}  # habits that take a hundred games or more to settle: mostly bounces
 STYLE_PCT = 80  # a habit is told at the 80th percentile or the 20th and beyond
 STYLE_MAX = 3
@@ -59,8 +60,11 @@ HOT_POINTS = 7  # points in his team's last five games to be "hot"
 def _picks(t: str, fp: dict) -> list[tuple]:
     """Their most distinctive habits, furthest from average first: (distance, trait, blend figures)."""
     dims = (fp.get(t) or {}).get("dims") or {}
+    eleven = ((fp.get(t) or {}).get("lineup") or {}).get("habit")  # a club that dresses eleven forwards has no fourth line to weigh
     picked = []
     for k, d in dims.items():
+        if k == "depth" and eleven:
+            continue
         b = (d or {}).get("blend") or {}
         if k in HABITS and k not in BOUNCY and b.get("pct") is not None and b.get("rank") and (b["pct"] >= STYLE_PCT or b["pct"] <= 100 - STYLE_PCT):
             picked.append((abs(b["pct"] - 50), k, b))
@@ -85,7 +89,12 @@ IDENTITY = {
     "goalie": ("have had the league’s best goaltending", "have had some of the league’s best goaltending"),
     "powerKill": ("create more chances on the penalty kill than anyone", "create more chances on the penalty kill than almost anyone"),
     "inClose": ("get more of their shots from in close than anyone", "get more of their shots from in close than almost anyone"),
+    "depth": ("roll their lines more evenly than anyone", "roll their lines more evenly than almost anyone"),
 }
+# The low end of a neutral scale said as who they are (Sora, 2026-10-30, liked "Edmonton leans on its stars more than
+# any team in the league: no team gives its bottom six less of the ice time"): (rank 32, ranks 30-31), and the fact.
+BOTTOM = {"depth": (("lean on their stars more than any team in the league", "lean on their stars as much as almost anyone"),
+                    "gives its bottom six less of the ice time", "give their bottom six less of the ice time")}
 # A weakness near the bottom, said as how few teams are worse: (plural verb for "only N teams", singular for "no team").
 FEW_WORSE = {
     "quality": ("average a lower chance of scoring per shot", "averages a lower chance of scoring per shot"),
@@ -132,6 +141,8 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
         hi = b["pct"] >= 50
         if k == ident:
             words = IDENTITY[k][0 if b["rank"] == 1 else 1]
+        elif k in BOTTOM and not hi and b["rank"] >= 30:
+            words = BOTTOM[k][0][0 if b["rank"] == 32 else 1]
         else:
             words = HABITS[k][0 if hi else 1]
         (downs if _is_bad(k, b) else ups).append((k, b, words, st.get(k, {}).get("hi" if hi else "lo")))
@@ -144,7 +155,7 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
     out = X + " " + (f"{told_list(ups)}, but {told_list(downs)}" if mixed else told_list(ups + downs))
     # ranks only at the top end of a scale: "32nd in rough stuff" reads as a knock on a calm team
     told = [(b["rank"], k) for k, b, w, _ in ups
-            if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k not in figured and not ("anyone" in w or "league’s" in w)]
+            if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k not in figured and k != "depth" and not ("anyone" in w or "league’s" in w)]
     if mixed and told:  # one contrast a sentence: the ranks get their own
         r, k = told[0]
         out += (f". No team is better at {LABELS[k]}" if r == 1 and k not in NEUTRAL else f". They’re {ordinal_word(r)} in {LABELS[k]}")
@@ -154,6 +165,11 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
         out += f", and they’re {ordinal_word(told[0][0])} in the league in {'both' if len(told) == 2 else 'all three'}"
     elif told:
         out += ", and they’re " + and_list([f"{ordinal_word(r)} in {LABELS[k]}" for r, k in told])
+    low = next(((k, b) for k, b, _, _ in ups + downs if k in BOTTOM and b["pct"] < 50 and b["rank"] >= 30), None)
+    if low:  # "No team gives its bottom six less of the ice time."
+        k, b = low
+        n = 32 - b["rank"]
+        out += f". No team {BOTTOM[k][1]}" if n == 0 else f". Only {num(n)} {'team' if n == 1 else 'teams'} {BOTTOM[k][1 if n == 1 else 2]}"
     worst = next(((k, b) for k, b, _, _ in downs if k in FEW_WORSE and k not in figured and b["rank"] >= 30), None)
     if worst:  # "Only three teams average a lower chance of scoring per shot."
         k, b = worst
@@ -304,6 +320,8 @@ def partners(traits: set) -> set:
     return out
 
 
+DEFEND = {"pk", "suppression", "qualityAllowed", "longShifts", "blocking", "powerKill"}  # the side a pairing's attack meets
+SH_THREAT = 80  # a penalty kill this dangerous going the other way is worth naming beside the power play it faces
 FACE_OFF = ("strength against strength", "has to give", "meets a team")  # two strengths meeting: a face-off, not a result
 
 
@@ -372,17 +390,34 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             break
         lines.append((cap(text) + ".", ks))
     lines = lines[:2]
+    # a power play that meets a shorthanded threat (Sora, 2026-10-30: the Jets create chances on the kill while the
+    # Panthers' power play could do real damage, a strength against strength of its own): told together
+    pct = lambda t, k: ((((fp.get(t) or {}).get("dims") or {}).get(k) or {}).get("blend") or {}).get("pct")
+    as_pair = {}
+    for i, (ln, ks) in enumerate(lines):
+        if not ks & {"pp", "pk"}:
+            continue
+        for a, b in ((away, home), (home, away)):
+            rest = ln.split(" power play ", 1)[-1]
+            if (f"{W.poss(a)} power play".lower() in ln.lower() and rest.startswith("could")
+                    and (pct(b, "powerKill") or 0) >= SH_THREAT):  # a weak kill that is dangerous the other way
+                lines[i] = (ln[:-1] + f", though {W.poss(b)} penalty killers create chances of their own going the other way.",
+                            ks | {"powerKill"})
+                # told with the shorthanded threat: "that sets up a fight with the Panthers’ power play, which could ..."
+                as_pair[lines[i][0]] = f"that sets up a fight with {W.poss(a)} power play, which {rest}"
+                break
     # pair a line with the club whose list tells one of its habits (the later club when both do)
     paired = {}
     for i, (ln, ks) in enumerate(lines):
         if ln.startswith("Both"):
             continue
-        for t in (home, away):
-            hit = next((x for x in picks[t] if x[1] in ks), None)
-            if hit and t not in paired and len(picks[t]) > 1:
-                paired[t] = (hit, ln)
-                picks[t] = [x for x in picks[t] if x is not hit]
-                break
+        # the side that meets the habit goes first (the kill that faces a power play), so the attack keeps its own list
+        options = [(t, x) for t in (home, away) for x in picks[t] if x[1] in ks and t not in paired and len(picks[t]) > 1]
+        options.sort(key=lambda o: o[1][1] not in DEFEND)
+        if options:
+            t, hit = options[0]
+            paired[t] = (hit, ln)
+            picks[t] = [x for x in picks[t] if x is not hit]
     used = {ln for _, ln in paired.values()}
     told, told_traits = 0, set()
     for t in (away, home):
@@ -394,8 +429,16 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         if t in paired:  # "They also sit back rather than chase on the forecheck, so the Canadiens have the edge ..."
             (_, k, b), ln = paired[t]
             told_traits.add(k)
-            link = ", and " if any(x in ln for x in FACE_OFF) else ", so "
-            sents.append(f"They also {HABITS[k][0 if side(b) else 1]}{link}{_them(_lower(ln), t, W)}")
+            if k == "powerKill" and ln in as_pair:
+                ln, link = as_pair[ln], ", and "
+            else:
+                link = ", and " if any(x in ln for x in FACE_OFF) else ", so "
+            words = (IDENTITY[k][0 if b["rank"] == 1 else 1] if k in IDENTITY and side(b) and b["rank"] <= RANK_TOLD
+                     else HABITS[k][0 if side(b) else 1])
+            ln = _them(_lower(ln), t, W)
+            if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
+                ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
+            sents.append(f"They also {words}{link}{ln}")
         sc = scoring(t, season, day, W)
         if sc:
             sents.append(sc)
