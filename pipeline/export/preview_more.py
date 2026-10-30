@@ -10,13 +10,13 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON
-from pipeline.export.grammar import and_list, cap, num, ordinal_word
+from pipeline.export.grammar import and_list, article, cap, num, ordinal_word
 
 # Each habit as something a team does, at the high end of its scale and at the low end (plural verbs: teams are
 # "they"). Quality is the average shot's chance of going in, never a place on the ice (wording notes, 2026-10-10).
 HABITS = {
     "volume": ("throw a lot of pucks at the net", "pick their shots"),
-    "quality": ("take a lot of high-percentage shots", "take a lot of low-percentage shots"),
+    "quality": ("take a lot of high-quality shots", "take a lot of low-quality shots"),
     "rebounds": ("get plenty of second chances", "rarely get second chances"),
     "turnover": ("pounce on turnovers", "rarely create chances off turnovers"),
     "dShots": ("get their defensemen shooting", "leave the shooting to their forwards"),
@@ -281,10 +281,13 @@ MEETS = [
 MEET_HI, MEET_LO = 70, 30
 
 
-def meet_line(kind: str, metric: str, team: str, opp: str, W) -> str | None:
+def meet_line(kind: str, metric: str, team: str, opp: str, W, gist: str = "") -> str | None:
     """A clash or duel call told as what the two habits mean together, in the same words as our own pairings."""
     if kind == "physical":
         return "Both teams like to hit, so expect plenty of it."
+    if kind == "pace":
+        return ("Both teams like to play fast, so expect an open game." if "slow" not in gist else
+                "Both teams play slow, low-event hockey, so expect a tight one.")
     for ka, _kb, weak_d, both, _ in MEETS:
         text = (both if kind == "duel" else weak_d if kind == "clash" else None) if ka == metric else None
         if text:
@@ -355,17 +358,23 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             break
         if text not in said:
             lines.append(cap(text) + ".")
-    for i, ln in enumerate(lines[:2]):
-        joins = ln.split(" ", 1)[0] in ("The", "It’s", "Something", "Expect", "Both", "Good")  # "So the Rangers aren’t ..." reads wrong
-        if not joins:
-            lead = ""
-        elif i == 0 and sents:
-            lead = _pick(["So ", "Put that together and "] + ([] if ln.startswith("Expect") else ["That means "]), *key, "meet1")
-        elif i == 1:
-            lead = _pick(["And ", "On top of that, "] + ([] if ln.startswith("Expect") else ["Beyond that, "]), *key, "meet2")
-        else:
-            lead = ""
-        sents.append(lead + _lower(ln) if lead else ln)
+    # two lines make one sentence when the second is short (Sora, 2026-10-30: "So ... . And both teams ..." read as
+    # fragments); a second line with its own comma stands as a sentence with a full lead-in
+    lines = lines[:2]
+    if lines:
+        ln = lines[0]
+        joins = (ln.split(" ", 1)[0] in ("The", "It’s", "Something", "Expect", "Both", "Good")  # "So the Rangers aren’t ..." reads wrong
+                 and not any(x in ln for x in ("strength against strength", "has to give", "meets a team")))  # a face-off, not a result
+        lead = _pick(["Put that together and ", "That means "] if not ln.startswith("Expect") else ["Put that together and "], *key, "meet1") \
+            if joins and sents else ""
+        first = lead + _lower(ln) if lead else ln
+        if len(lines) == 2 and "," not in lines[1] and "," not in first:
+            first = first[:-1] + ", and " + _lower(lines[1])
+        elif len(lines) == 2:
+            two = lines[1]
+            first += " " + (_pick(["On top of that, ", "Beyond that, "], *key, "meet2") + _lower(two)
+                            if two.split(" ", 1)[0] in ("The", "It’s", "Something", "Both", "Good") else two)
+        sents.append(first)
     return " ".join(sents) or None
 
 
@@ -549,11 +558,27 @@ def standing(away: str, home: str, season: int, day: str, W, said: str) -> str |
     def who(t):
         r = rec.get(t)
         return W.the(t) + (f" ({r})" if r and r not in said else "")
+    def nhl(t):  # the league place beside the division one (Sora, 2026-10-30: sixth in a weak Pacific is near the bottom)
+        x = m[t]
+        return f"{'tied for ' if x['pts_n'] > 1 else ''}{ordinal_word(x['pts'])} in the NHL"
+    # each division's points percentage, for "the weakest of the four divisions so far"
+    pct = {}
+    for r in rows:
+        d_ = r.get("divisionName")
+        if d_ and r.get("gamesPlayed"):
+            pct.setdefault(d_, []).append(r["points"] / (2 * r["gamesPlayed"]))
+    order = sorted(pct, key=lambda d_: -sum(pct[d_]) / len(pct[d_]))
     a, h = where(away), where(home)
     div = m[away]["division"]
     if m[home]["division"] == div and " NHL" not in a + h:
-        return f"In the {div}, {who(away)} are {a.split(' in the ')[0]} and {who(home)} {h.split(' in the ')[0]}."
-    return f"Going in, {who(away)} are {a} and {who(home)} {h}."
+        out = (f"This is {article(div)} Division matchup, with {who(away)} {a.split(' in the ')[0]} ({nhl(away)}) "
+               f"and {who(home)} {h.split(' in the ')[0]} ({nhl(home)[: -len(' in the NHL')]}).")
+        if len(order) == 4 and div in (order[0], order[-1]):
+            out += f" The {div} has been the {'strongest' if div == order[0] else 'weakest'} of the four divisions so far."
+        return out
+    a_ = a if " NHL" in a else f"{a} ({nhl(away)})"
+    h_ = h if " NHL" in h else f"{h} ({nhl(home)})" if " NHL" in a else f"{h} ({nhl(home)[: -len(' in the NHL')]})"  # "in the NHL" once
+    return f"Going in, {who(away)} are {a_} and {who(home)} {h_}."
 
 
 def paragraphs(gid: int, away: str, home: str, day: str, W, N: dict, fp: dict | None, projected: dict | None,
