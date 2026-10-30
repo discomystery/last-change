@@ -104,6 +104,20 @@ def weekday(d: str) -> str:
     return Date.fromisoformat(d[:10]).strftime("%A")
 
 
+def _history_line(c: dict) -> str:
+    """A goalie-history call with the record itself (Sora, 2026-10-30: "What is that record?"): "In goal, Wolf has a .850
+    save percentage in five starts against the Kraken, well under his usual .905. Don’t read much into it: ..."."""
+    k, g = c.get("check") or {}, c.get("gist") or ""
+    m = re.match(r"Don’t read much into (.+?)’s? record against (.+)\.$", g)
+    if not m or k.get("record") is None or k.get("baseline") is None or not k.get("starts"):
+        return g
+    who, opp = m.group(1), m.group(2)
+    fmt = lambda v: f"{v:.3f}".lstrip("0")
+    side = "under" if k["record"] < k["baseline"] else "above"
+    return (f"In goal, {who} has a {fmt(k['record'])} save percentage in {num(k['starts'])} starts against {opp}, well {side} his usual "
+            f"{fmt(k['baseline'])}. Don’t read much into it: a goalie’s record against one team rarely holds up.")
+
+
 def when_before(d: str, game_day: str | None) -> str:
     """When an earlier game was, counted from the game a preview is about: "last night", "on Tuesday" within the week,
     else "on Oct 21" (Sora, 2026-10-30). The preview page moves these to the reader's own day (Base.astro, `past`)."""
@@ -743,6 +757,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         item = behind.preview_item(t, season, before, W)
         if item:
             items.append(item)
+    items += behind.luck_items(away, home, season, before, W, book()[2])
     return out
 
 
@@ -1386,7 +1401,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
                 kinds.add(c["kind"])
             continue
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
-            look.append((c["kind"], c["gist"]))
+            look.append((c["kind"], _history_line(c) if c["kind"] == "history" else c["gist"]))
             kinds.add(c["kind"])
     if rest_gist:
         sents.append(rest_gist.replace("; ", ", and ", 1) if "last night" not in " ".join(sents) else rest_gist.split("; ", 1)[-1][:1].upper() + rest_gist.split("; ", 1)[-1][1:])
@@ -1446,6 +1461,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         for kind, g in look[1:]:
             if kind == "history" and g.startswith("Don’t read much into"):
                 out_.append("And in goal, d" + g[1:])
+            elif kind == "history" and g.startswith("In goal, "):
+                out_.append(g)
             else:
                 out_.append(_pick(["Elsewhere, ", "One more thing: "], gid, kind, "look") + preview_more._lower(g))
         paras.append(" ".join(out_))

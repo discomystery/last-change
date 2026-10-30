@@ -454,20 +454,14 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
         return f"{r['g']} G / {r['pts'] - r['g']} A / {r['pts']} P in {r['gp']} GP"
     ride = extras(lead)
     name, pts = N[lead["player_id"]], _count(lead["pts"], "point")
-    if len(ride) == 1 and lead["g"] and lead["pts"] > lead["g"]:
-        # "Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP, nine points in his last five games)"
-        who = f"{name} ({line(lead)}, {ride[0]})"
-        first = (_pick([f"{W.poss(t)} scoring runs through {who}", f"For {W.the(t)}, it starts with {who}"], *key, t, "lead2") if second
-                 else _pick([f"{who} leads {W.the(t)}", f"{W.poss(t)} offense runs through {who}"], *key, t, "lead1"))
-        first = cap(first)
+    # the line stays in its own brackets: the page draws it as a tag (GameStory.astro)
+    stat = f"{pts} ({line(lead)})"
+    if second:
+        first = cap(_pick([f"For {W.the(t)}, it’s {name}, with {stat}", f"{W.poss(t)} scoring runs through {name}, who has {stat}"], *key, t, "lead2"))
     else:
-        stat = f"{pts} ({line(lead)})"
-        if second:
-            first = cap(_pick([f"For {W.the(t)}, it’s {name}, with {stat}", f"{W.poss(t)} scoring runs through {name}, who has {stat}"], *key, t, "lead2"))
-        else:
-            first = _pick([f"{name} leads {W.the(t)} with {stat}", f"{name} is carrying {W.poss(t)} offense with {stat}"], *key, t, "lead1")
-        if ride:
-            first += f", and he has {and_list(ride)}"
+        first = _pick([f"{name} leads {W.the(t)} with {stat}", f"{name} is carrying {W.poss(t)} offense with {stat}"], *key, t, "lead1")
+    if ride:  # "who has eleven points (...) and seven points in his last five games"
+        first += (f" and {and_list(ride)}" if ", who has " in first else f", and he has {and_list(ride)}")
     if not other:
         return first + ".", used, told_tags
     used.add(other["player_id"])
@@ -479,6 +473,8 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
         what = f"{_count(other['pts'], 'point')} ({line(other)})"
     if o_ride:  # "and Brady Tkachuk, who has 15 points and a point in five straight games against Winnipeg"
         return f"{first}. {oname}, who has {and_list(o_ride)}, has {what}.", used, told_tags
+    if ride:  # "..., and he has a point in six straight games against Calgary. Frédérick Gaudreau has ..." (no "and" chain)
+        return f"{first}. {oname} has {what}.", used, told_tags
     return f"{first}, and {oname} has {what}.", used, told_tags
 
 

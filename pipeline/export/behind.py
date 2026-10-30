@@ -31,7 +31,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
-from pipeline.export.grammar import and_list as _and, cap as _cap
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.export.intros import _poss
 
 MIN_GAMES = 8  # games before a team gets the checks
@@ -409,3 +409,67 @@ def preview_item(team: str, season: int, before: str, W) -> dict | None:
         text = f"{_cap(W.the(team))} have played better than their record ({p3(r['pp'])}): their chances are worth about {p3(r['play'])}"
         text += f", and {word[why[0][1]]} held them back." if why else "."
     return {"tag": "Behind the record", "text": text, "score": 58 + min(abs(r["gap"]), 0.2) * 50}
+
+
+# ---------------------------------------------------------------- shooters whose luck may turn (previews)
+
+LUCK_HOT, LUCK_COLD = 3.0, 2.5  # goals over / under what his chances and his own usual finishing would give
+LUCK_MIN_XG = 3.0               # chances worth at least this many goals before a cold run is worth telling
+FINISH_K = 20.0                 # expected goals of weight pulling his finishing from the last two seasons toward average
+
+
+@lru_cache(maxsize=4)
+def _finishing(season: int) -> dict[int, float]:
+    """Each skater's usual finishing over the two seasons before: goals per expected goal, pulled toward 1."""
+    rows = []
+    for s in (season - 1, season - 2):
+        p = TABLES / str(s) / "player_game.parquet"
+        if p.exists():
+            rows.append(pl.read_parquet(p, columns=["game_id", "player_id", "g_net", "ixg_net"]).join(_games(s).select("game_id"), on="game_id"))
+    if not rows:
+        return {}
+    f = pl.concat(rows).group_by("player_id").agg(g=pl.col("g_net").sum(), xg=pl.col("ixg_net").sum())
+    return {r["player_id"]: (r["g"] + FINISH_K) / (r["xg"] + FINISH_K) for r in f.iter_rows(named=True)}
+
+
+def luck_items(away: str, home: str, season: int, before: str, W, names: dict[int, str]) -> list[dict]:
+    """Who to watch: a shooter on either club scoring far above or below his chances, counted against his own usual
+    finishing so a sniper is not called lucky for being a sniper (Sora, 2026-10-30: "whose luck may turn"). Only
+    players who dressed in their club's last game, from games before the preview's day."""
+    g = _games(season).filter(pl.col("date") < before[:10])
+    if g.is_empty():
+        return []
+    pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet",
+                         columns=["game_id", "player_id", "team_id", "g_net", "ixg_net"]).join(g.select("game_id", "date"), on="game_id")
+    fin = _finishing(season)
+    out = []
+    for t in (away, home):
+        ids = set(g.filter(pl.col("home") == t)["home_id"].to_list()) | set(g.filter(pl.col("away") == t)["away_id"].to_list())
+        mine = pg.filter(pl.col("team_id").is_in(list(ids)))
+        if mine.is_empty():
+            continue
+        last = mine.filter(pl.col("date") == mine["date"].max())["player_id"].to_list()
+        s = (mine.filter(pl.col("player_id").is_in(last)).group_by("player_id")
+             .agg(g=pl.col("g_net").sum(), xg=pl.col("ixg_net").sum()))
+        best = None
+        for r in s.iter_rows(named=True):
+            exp = r["xg"] * fin.get(r["player_id"], 1.0)
+            d = r["g"] - exp
+            ok = (d >= LUCK_HOT and r["g"] >= 1.6 * exp) or (d <= -LUCK_COLD and r["xg"] >= LUCK_MIN_XG)
+            if ok and r["player_id"] in names and (best is None or abs(d) > abs(best[0])):
+                best = (d, r)
+        if best:
+            d, r = best
+            who, n = names[r["player_id"]], int(r["g"])
+            goals = f"{num(n)} goal{'' if n == 1 else 's'}" if n else "no goals"
+            if d > 0:
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well above what his shooting usually turns "
+                        f"chances into. Runs like that tend to cool off.")
+            else:
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well below what his shooting usually "
+                        f"turns chances into. If the chances keep coming, so should the goals.")
+            out.append({"tag": "Luck may turn", "text": text, "pid": r["player_id"], "d": abs(d)})
+    out.sort(key=lambda i: -i.pop("d"))
+    for i, x in enumerate(out):  # one a preview usually makes the list; the other club's only when there is room
+        x["score"] = 72 if i == 0 else 61
+    return out
