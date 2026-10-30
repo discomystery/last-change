@@ -17,6 +17,7 @@ and clock-based otherwise; the last five minutes read "with 2:10 left".
 Never why a player left, never a reason for a goalie change: the data can't say (the rules in stories.py)."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -108,6 +109,13 @@ class Game:
     hat3: set = field(default_factory=set)  # indexes of goals that completed a hat trick
     naturals: set = field(default_factory=set)  # scorers of a natural hat trick (three straight goals of the game)
     droughts: list = field(default_factory=list)  # stories.shot_droughts rows: a team's long stretch without a shot on goal
+    told_for_good: bool = False  # "put them ahead for good" was said, so no goal is also called "the winner"
+
+    def names(self, s: str) -> str:
+        """Fill in names an attachment left as placeholders, at the moment the sentence is told, so a player's full name
+        comes on his first mention in the story ("Cirelli and John Carlson scored ..." used his surname first because the
+        assist note named him before the story reached him; voice loop, 2026-10-30)."""
+        return re.sub("\x00(\\d+)\x00", lambda m: self.name(int(m.group(1))), s)
 
     def side(self, g: dict) -> str:
         return self.home if g["home"] else self.away
@@ -653,13 +661,15 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     else:  # "tied it 1-1, 1:27 later": a comma keeps the score and the clock apart
         body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm_fin[:1].isdigit() else ''} {tm_fin}"
     body = " ".join(body.split())
-    tail = [dent] if dent else []
+    tail = [dent] if dent and not pre else []  # a first goal's "to make it 5-2" already gave the score ("..., bringing it to 5-2", ANA at NYR)
     if (g["period"], g["sec"]) in stood:
         x = stood[(g["period"], g["sec"])]
         tail.append(f"and the goal stood after {W.the(other)} challenged for {x['why']}")
     if att.get("tail"):
-        tail.append(att["tail"])
-    if gw_i == i and ahead_i != i and margin <= 2 and g["strength"] != "en" and g["period"] <= 3 and gm.end == "REG":
+        tail.append(gm.names(att["tail"]))
+    # once a goal was told as putting them "ahead for good", calling a later one "the winner" reads as two winners
+    # (Geekie and Hagel, WPG at TBL 2026-10-29; voice loop)
+    if gw_i == i and ahead_i != i and not gm.told_for_good and margin <= 2 and g["strength"] != "en" and g["period"] <= 3 and gm.end == "REG":
         # "the eventual winner" hung off the verb (Sora: it should modify a goal), so the goal is named
         tail.append(gm.pk(["and that one stood up as the winner", "and that goal turned out to be the winner"], "gw", i))
     # the last goal: a late one that made it close, with the winner holding on
@@ -682,6 +692,7 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         body = f"No harm done, {W.the(t)} won anyway, and " + body
     elif relief:
         body = "No harm done: " + body
+    gm.told_for_good = gm.told_for_good or "ahead for good" in body
     return " ".join(_cap(body).replace(" ,", ",").split()) + "."
 
 
@@ -779,6 +790,7 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
         did = "to " + _vary(gm, "more", [f"make it {ma}-{ta}", f"stretch the lead to {ma}-{ta}"], run[0])
     if t == gm.winner and down_most >= 2 and run[-1] == ahead_i and ma > ta and gm.end == "REG" and margin <= 2:
         did = f"to put {T} ahead for good and complete the comeback"
+    gm.told_for_good = gm.told_for_good or "ahead for good" in did
     kinds = {g["strength"] for g in gs}
     how = HOW.get(kinds.pop(), "") if len(kinds) == 1 else ""
     names = [g["p1"] for g in gs]
@@ -998,7 +1010,8 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             elif goals[j]["p1"] == pid:
                 att.setdefault(j, {})["tail"] = f"his {th(x['mark'])} NHL {x['what']}"
             else:
-                att.setdefault(j, {})["tail"] = f"with {gm.name(pid)} picking up his {th(x['mark'])} NHL {x['what']} on the assist"
+                # "with Anthony Cirelli picking up his 200th NHL assist on the assist" (voice loop, 2026-10-30)
+                att.setdefault(j, {})["tail"] = f"the {th(x['mark'])} {x['what']} of \x00{pid}\x00’s NHL career"
             told.add(pid)
     for i, g in enumerate(goals):  # his 30th of the season
         pid = g["p1"]

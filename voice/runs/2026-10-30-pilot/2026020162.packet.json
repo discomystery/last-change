@@ -1,0 +1,638 @@
+{
+ "kind": "recap",
+ "game_id": 2026020162,
+ "date": "2026-10-22",
+ "venue": "Scotiabank Saddledome",
+ "away": {
+  "abbr": "MIN",
+  "name": "Minnesota Wild",
+  "place": "Minnesota",
+  "nickname": "Wild",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "John Hynes"
+ },
+ "home": {
+  "abbr": "CGY",
+  "name": "Calgary Flames",
+  "place": "Calgary",
+  "nickname": "Flames",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Ryan Huska"
+ },
+ "final": {
+  "MIN": 1,
+  "CGY": 2,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "10:49",
+   "time_left_in_period": "9:11",
+   "team": "CGY",
+   "scorer": "Aydar Suniev",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Adam Klapka"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MIN": 0,
+    "CGY": 1
+   },
+   "chance_of_scoring": 9,
+   "shot": "wrist"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "14:06",
+   "time_left_in_period": "5:54",
+   "team": "CGY",
+   "scorer": "Joel Farabee",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Morgan Frost",
+    "Matt Coronato"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MIN": 0,
+    "CGY": 2
+   },
+   "chance_of_scoring": 42,
+   "shot": "wrist"
+  },
+  {
+   "n": 3,
+   "period": 3,
+   "time_in_period": "4:39",
+   "time_left_in_period": "15:21",
+   "team": "MIN",
+   "scorer": "Michael McCarron",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Nico Sturm",
+    "Jonas Brodin"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MIN": 1,
+    "CGY": 2
+   },
+   "chance_of_scoring": 12,
+   "shot": "slap"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "MIN": 0,
+    "CGY": 2
+   },
+   "shots": {
+    "MIN": 11,
+    "CGY": 11
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "MIN": 0,
+    "CGY": 0
+   },
+   "shots": {
+    "MIN": 9,
+    "CGY": 8
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "MIN": 1,
+    "CGY": 0
+   },
+   "shots": {
+    "MIN": 17,
+    "CGY": 3
+   }
+  }
+ ],
+ "team_numbers": {
+  "MIN": {
+   "shots": 37,
+   "xg": 3.25,
+   "cf5": 41,
+   "hits": 26,
+   "pp_goals": 0,
+   "pp_opps": 4
+  },
+  "CGY": {
+   "shots": 22,
+   "xg": 2.02,
+   "cf5": 28,
+   "hits": 25,
+   "pp_goals": 2,
+   "pp_opps": 4
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Devin Cooley",
+   "team": "CGY",
+   "started": true,
+   "toi": "60:00",
+   "shots": 37,
+   "saves": 36,
+   "ga": 1,
+   "gsax": 2.25,
+   "sv": 0.973
+  },
+  {
+   "full": "Jesper Wallstedt",
+   "team": "MIN",
+   "started": true,
+   "toi": "57:57",
+   "shots": 22,
+   "saves": 20,
+   "ga": 2,
+   "gsax": 0.02,
+   "sv": 0.909
+  }
+ ],
+ "players": [
+  {
+   "name": "Joel Farabee",
+   "team": "CGY",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "18:51",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Aydar Suniev",
+   "team": "CGY",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "11:40",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Michael McCarron",
+   "team": "MIN",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "11:28",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Jonas Brodin",
+   "team": "MIN",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "19:06",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Matt Coronato",
+   "team": "CGY",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "16:23",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Morgan Frost",
+   "team": "CGY",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:19",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Adam Klapka",
+   "team": "CGY",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "11:09",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Nico Sturm",
+   "team": "MIN",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "9:52",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Quinn Hughes",
+   "team": "MIN",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "31:04",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Matt Boldy",
+   "team": "MIN",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "25:05",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Kirill Kaprizov",
+   "team": "MIN",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "24:54",
+   "season_goals_after": 11.0
+  },
+  {
+   "name": "Kevin Bahl",
+   "team": "CGY",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "23:48",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Joel Eriksson Ek",
+   "team": "MIN",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "23:14",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Šimon Nemec",
+   "team": "CGY",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:36",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Zach Whitecloud",
+   "team": "CGY",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:38",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Jake Middleton",
+   "team": "CGY",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:53",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Danila Yurov",
+   "team": "MIN",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:27",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Jared Spurgeon",
+   "team": "MIN",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:19",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Jonathan Castagna",
+   "team": "CGY",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:28",
+   "season_goals_after": 0.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "MIN": 61,
+   "CGY": 39
+  }
+ },
+ "pregame_chance": {
+  "CGY": 25,
+  "MIN": 75
+ },
+ "records_before": {
+  "MIN": {
+   "record": "6-2-2",
+   "games": 10,
+   "run": "winless 1",
+   "last_ten": "6-2-2",
+   "last_five": [
+    {
+     "date": "2026-10-12",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": true,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-18",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    }
+   ]
+  },
+  "CGY": {
+   "record": "2-6-0",
+   "games": 8,
+   "run": "won 1",
+   "last_ten": "2-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-08",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": true,
+     "result": "L",
+     "score": "3-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-18",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "MIN": {
+   "record": "6-3-2",
+   "games": 11,
+   "run": "winless 2",
+   "last_ten": "5-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-18",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CGY": {
+   "record": "3-6-0",
+   "games": 9,
+   "run": "won 2",
+   "last_ten": "3-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-10",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-18",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "MIN": {
+   "points": 14,
+   "gp": 11,
+   "division": "Central",
+   "division_place": 2,
+   "conference_place": 5,
+   "wild_card_place": null,
+   "league_place_by_points": 9
+  },
+  "CGY": {
+   "points": 6,
+   "gp": 9,
+   "division": "Pacific",
+   "division_place": 7,
+   "conference_place": 14,
+   "wild_card_place": 8,
+   "league_place_by_points": 30
+  }
+ },
+ "firsts": [],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The Wild had the better of the chances.",
+  "Replay those chances a hundred times and the Wild win about six in ten.",
+  "Devin Cooley made the difference in net, stopping 36 of 37.",
+  "Jesper Wallstedt stopped 20 of 22 for the Wild.",
+  "The Flames killed all four Wild power plays.",
+  "The Wild hit three posts and came up a goal short.",
+  "The Flames improved to 3-6-0, climbing off the bottom of the Pacific, now seventh.",
+  "The Wild dropped to 6-3-2, second in the Central.",
+  "Club history: Jonas Brodin passed Marián Gáborík for eighth on the Wild’s all-time assists list, with 219.",
+  "Old team: Blake Coleman played his first game back in Calgary.",
+  "Streak over: Kirill Kaprizov’s seven-game point streak ended.",
+  "Finally: Michael McCarron scored his first goal of the season, his first since Apr 13 (eleven games played since)."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

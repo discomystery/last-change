@@ -1,0 +1,45 @@
+{
+ "head": "Zellweger returns to Anaheim",
+ "paras": [
+  "The Sabres (5-4-3) beat San Jose 2-0 last time out, and the Ducks (5-6-1) lost 6-5 in overtime to Vancouver.",
+  "The Ducks hit a lot, but the Sabres mostly don’t."
+ ],
+ "items": [
+  {
+   "tag": "Old team",
+   "text": "Olen Zellweger faces Anaheim for the first time since leaving."
+  },
+  {
+   "tag": "Out",
+   "text": "The Sabres are newly without Konsta Helenius, and have had to make do without Alex Lyon all season. Colten Ellis is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Ducks are newly without Nikita Klepov, and have had to make do without Troy Terry all season."
+  },
+  {
+   "tag": "Missing",
+   "text": "Pavel Mintyukov has missed the Ducks’ last three games."
+  }
+ ],
+ "outlook": {
+  "ANA": {
+   "head": "A slightly uphill night for the Ducks",
+   "body": "Buffalo has been out-chancing opponents lately, but Anaheim has home-ice advantage. The Ducks’ best way to tip it is a power play that gets going."
+  },
+  "BUF": {
+   "head": "Leaning the Sabres’ way",
+   "body": "Buffalo has been out-chancing opponents lately, but Anaheim has home-ice advantage. The Ducks can still swing it if their power play gets going."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Ducks hit, the Sabres mostly don’t",
+   "body": "On physicality, Anaheim is one of the league’s best, but Buffalo is near the bottom. Expect most of the big hits to come from the Ducks."
+  },
+  {
+   "head": "The Ducks hunt in packs",
+   "body": "The Ducks hound the puck, but the Sabres sit back. Anaheim is near the top of the league for forecheck pressure, and Buffalo is near the bottom. Expect the Ducks to win more pucks back deep in the Sabres’ end."
+  }
+ ]
+}

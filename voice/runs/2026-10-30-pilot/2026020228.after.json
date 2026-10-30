@@ -1,0 +1,53 @@
+{
+ "head": "Iron sharpens iron",
+ "paras": [
+  "The Capitals have won three straight. The Wild (9-3-3) lost 4-3 in overtime to the Islanders last time out.",
+  "It’s strength against strength: the Capitals are the league’s best for chance quality, but the Wild are near the top at preventing dangerous shots. At home, Spencer Carbery likes to send Protas, Dubois and Wilson out against the other team’s top line, so watch for them against Kaprizov, Ek and Boldy."
+ ],
+ "items": [
+  {
+   "tag": "Milestone",
+   "text": "Kirill Kaprizov is one point from 500."
+  },
+  {
+   "tag": "Out",
+   "text": "The Wild have been without Marcus Foligno since Oct 8, and have had to make do without Filip Gustavsson and Brock Faber all season. Jesper Wallstedt is expected to start."
+  },
+  {
+   "tag": "Owns them",
+   "text": "Quinn Hughes has a point in six straight games against Washington."
+  },
+  {
+   "tag": "Out",
+   "text": "The Capitals have been without Rasmus Sandin for several games."
+  }
+ ],
+ "outlook": {
+  "WSH": {
+   "head": "A slightly uphill night for the Capitals",
+   "body": "Even though Washington has home-ice advantage, Minnesota has been out-chancing opponents by a wide margin lately. The Capitals can tip it if they get good looks."
+  },
+  "MIN": {
+   "head": "The Wild start a half-step ahead",
+   "body": "Even though Washington has home-ice advantage, Minnesota has been out-chancing opponents by a wide margin lately. The Capitals can still swing it if they get good looks."
+  }
+ },
+ "calls": [
+  {
+   "head": "Iron sharpens iron",
+   "body": "The Capitals are the league’s best for chance quality, but the Wild are near the top at preventing dangerous shots. Hot take: the Capitals break through anyway."
+  },
+  {
+   "head": "Top line on top line: Wilson vs. Kaprizov",
+   "body": "At home, the Capitals keep sending Wilson’s line (Protas, Dubois and Wilson) out against opponents’ first lines, far more often than chance would suggest. Spencer Carbery has been choosing strength on strength. Tonight the Wild’s first line is Kaprizov, Ek and Boldy."
+  },
+  {
+   "head": "Penalties could cost the Capitals",
+   "body": "The Capitals’ penalty kill is near the bottom of the league, and the Wild’s power play is near the top. Discipline matters more than usual for the Capitals tonight."
+  },
+  {
+   "head": "A long night for Logan Thompson",
+   "body": "The Wild shoot a lot, and the Capitals are near the bottom of the league at keeping shots down. Look for a big shot total."
+  }
+ ]
+}

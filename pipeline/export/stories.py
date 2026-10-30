@@ -1060,13 +1060,29 @@ def _still_out(notes: list[str], team: str, N: dict[int, str], season: int) -> l
     return out
 
 
-def _form_sentence(t: str, f: dict, W: Words, meeting: bool) -> str | None:
+def _last_out(t: str, f: dict, W: Words, opp: str | None) -> str:
+    """"the Ducks (5-6-1) lost 6-5 in overtime to Vancouver", a team's record and last result, for a preview with no
+    streak to tell. Bare records ("The Predators are 4-4-5. The Hurricanes have won three straight.") said nothing about
+    how either team came in (voice loop, 2026-10-30). The last game against tonight's opponent is left to the meetings
+    sentence."""
+    res = f["res"]
+    r = res[-1]
+    if r["opp"] == opp:
+        return f"{W.the(t)} ({f['record']})"
+    if r["win"]:
+        return f"{W.the(t)} ({f['record']}) beat {W.place(r['opp'])} {score_text(r)} last time out"
+    return f"{W.the(t)} ({f['record']}) lost {score_text(r)} to {W.place(r['opp'])} last time out"
+
+
+def _form_sentence(t: str, f: dict, W: Words, meeting: bool, opp: str | None = None) -> str | None:
     kind, n = f["streak"]
     res = f["res"]
     if not res:
         return None
     lastg = res[-1]
-    rout = lastg["win"] and lastg["us"] - lastg["them"] >= 4
+    # the last game against tonight's opponent is the meetings sentence's (FLA "have won two in a row, the last a 5-1
+    # rout of Winnipeg. The Cats won the first meeting this season, 5-1 in Winnipeg."; voice loop)
+    rout = lastg["win"] and lastg["us"] - lastg["them"] >= 4 and lastg["opp"] != opp
     tail = f", the last {wording.article(score_text(lastg))} rout of {W.place(lastg['opp'])}" if rout else ""
     if kind == "winless" and n >= 3 and n == len(res):  # the whole season so far (Sora, 2026-10-18: the Flyers' 0-6-3)
         return f"{_cap(W.the(t))} are still looking for their first win of the season, {record(res)} through {num(n)} games."
@@ -1263,7 +1279,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             lead, n = (home, wins) if wins * 2 > len(m) else (away, len(m) - wins)
             sents.append(f"{_cap(W.the(lead))} have won {num(n)} of the {num(len(m))} meetings this season.")
     # form
-    form = {t: _form_sentence(t, facts["form"][t], W, bool(m)) for t in (home, away)}
+    form = {t: _form_sentence(t, facts["form"][t], W, bool(m), away if t == home else home) for t in (home, away)}
     sh, sa = facts["form"][home]["streak"], facts["form"][away]["streak"]
     order = sorted((home, away), key=lambda t: not defining_run(facts["form"][t]["res"]))  # the bigger run first
     if form[home] and form[away] and sh == sa and sh[0] == "won":  # "The X have won three straight. The Y have won three straight."
@@ -1277,11 +1293,18 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             if form[t]:
                 sents.append(form[t])
             elif facts["form"][t]["res"]:
-                sents.append(f"{_cap(W.the(t))} are {facts['form'][t]['record']}.")
+                last_ = _last_out(t, facts["form"][t], W, away if t == home else home)
+                sents.append(_cap(last_ + "." if "last time out" in last_ else f"{last_.split(' (')[0]} are {facts['form'][t]['record']}."))
     else:
         fa, fh = facts["form"][away], facts["form"][home]
         if fa["res"] and fh["res"]:
-            sents.append(f"{_cap(W.the(away))} come in at {fa['record']}, {W.the(home)} at {fh['record']}.")
+            a_, h_ = _last_out(away, fa, W, home), _last_out(home, fh, W, away)
+            if "last time out" in a_ and "last time out" in h_:  # one "last time out" a sentence
+                sents.append(_cap(f"{a_}, and {h_.replace(' last time out', '')}."))
+            elif "last time out" in a_ or "last time out" in h_:
+                sents.append(_cap(f"{a_}, and {h_}."))
+            else:
+                sents.append(f"{_cap(W.the(away))} come in at {fa['record']}, {W.the(home)} at {fh['record']}.")
     if m and any(defining_run(facts["form"][t]["res"]) for t in (home, away)):
         # a season-defining run leads, ahead of the last meeting (Sora, 2026-10-18: "winless in nine" came second)
         sents = sents[1:] + sents[:1]  # the meetings sentence is always the first one
@@ -1617,6 +1640,10 @@ def _left(g: dict) -> str:
 STREAK_END = 5  # a point streak this long that ended tonight is told (Stamkos's and Josi's five, 2026-10-13)
 
 
+VS_STREAK_END = 7  # a point streak against one club told as ended only from here: at five or six it filled the list with
+# a non-event in 4 of 13 games (voice loop, 2026-10-30); one that goes on is told from STREAK_END
+
+
 def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser: str, home: str, away: str, season: int) -> list[dict]:
     """Streaks that ended or grew tonight: a player's point streak of STREAK_END+ games that ended, a point streak
     against tonight's opponent (the preview's "Owns them") that ended or went on, and the second game of a
@@ -1633,7 +1660,7 @@ def _streak_ends(gid: int, day: str, tonight, pg, G, P, N, W, winner: str, loser
         opp = away if pr["team"] == home else home
         vs = P.filter((pl.col("player_id") == pid) & (pl.col("opp") == opp) & (pl.col("date") < day)).sort("date")
         m = run_of(vs["pts"].to_list())
-        if m >= STREAK_END:
+        if m >= STREAK_END and (pr["pts"] or m >= VS_STREAK_END):
             whole = m == vs.height and vs["date"][0] <= LOGS_START  # the run reaches back to where our logs begin
             # "after at least five games" puzzled Sora: say what we know, every meeting since our logs begin
             text = (f"{N[pid]} has a point in all {num(m + 1)} of his games against {W.place(opp)} since 2023-24." if pr["pts"] and whole else
@@ -2431,6 +2458,10 @@ def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: i
     return " ".join([line, *alone])
 
 
+QUIET_SHOTS = 18  # a winning goalie's shots faced at or under which his saves read "needed only"
+KEPT_GSAX = 1.0  # goals saved above expected for a losing goalie who "kept them in it"
+
+
 def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: str, pk=None, season: int | None = None) -> list[str]:
     """Both starters' nights in one sentence, in every story (Sora's review of 2025-26 against NHL.com and AP,
     2026-10-17: the goalies were the most-missed fact, 530 games). The winner's goalie "made 30 saves"; a shutout
@@ -2458,6 +2489,8 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
             n_, at_, after_ = early
             parts.append(pk([f"{nm(wg)} settled in after a shaky start for {W.the(winner)}: he gave up {num(n_)} goals on the first {num(at_)} shots, then stopped the last {after_}",
                              f"{nm(wg)} shook off a shaky start for {W.the(winner)}, allowing {num(n_)} goals on the first {num(at_)} shots and none on the last {after_}"], "settled"))
+        elif wg.get("shots", 0) <= QUIET_SHOTS and (wg.get("ga") or 0) <= 1:  # 14 shots: "made 14 saves" said nothing (voice loop)
+            parts.append(f"{nm(wg)} needed only {saves} saves for {W.the(winner)}")
         else:
             parts.append(f"{nm(wg, (wg.get('gsax') or 0) >= REDEEM_GSAX or saves >= 30)} made {saves} saves for {W.the(winner)}")
     if lg and lg.get("id") not in said and (lg.get("shots") or 0) > 0:
@@ -2467,6 +2500,10 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
             parts.append(f"{nm(lg, True)} made {saves} saves in a losing effort{for_}")
         elif ga >= ROUGH_GOALS and gsax <= -1:
             parts.append(f"{nm(lg)} allowed {num(ga)} goals on {shots} shots{for_}")
+        elif gsax >= KEPT_GSAX:
+            # the loser's goalie who held his team in it got the same flat "stopped 28 of 30" as a quiet night (Swayman,
+            # 1.9 goals saved above expected in a 2-1 loss; voice loop, 2026-10-30)
+            parts.append(f"{nm(lg, True)} kept {W.the(loser)} in it, stopping {saves} of {shots}")
         else:
             parts.append(f"{nm(lg, gsax >= REDEEM_GSAX)} stopped {saves} of {shots}{for_}")
     if not parts:
@@ -3074,7 +3111,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                           f"{_cap(W.the(fewer))} were outshot {hi}-{lo}, but their looks were better, and the chances came out about even."], "even-shots"))
         elif share <= 0.45:
             s2.append(pk([f"{_cap(Ln)} had a little more of the play, but {Wn} made their chances count.",
-                          f"{_cap(Ln)} had a little more of the play. {_cap(Wn)} had the finish."], "fair45"))
+                          f"{_cap(Ln)} had a little more of the play, but {Wn} had the finish."], "fair45"))
         elif ws - ls >= 3:
             s2.append(pk(["The chances were closer than the score.", "Don’t let the score fool you: the chances were a lot closer than that."], "close3"))
         else:
@@ -3082,6 +3119,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                           "Nothing much separated these two on the chances. This one could have gone either way."], "even"))
     if slow:  # the plain shot counts behind "shake off a slow start"
         s2.append(slow)
+    # posts and crossbars belong with who had the better of the play, not at the head of the penalty paragraph (voice loop)
+    s2 += posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
     s2 += net_firsts
     s2 += _goalie_lines(r, winner, loser, W, name, said, head, pk, season)
     # goalie streaks (Sora, 2026-10-30: Kochetkov's nine straight wins to open the season went untold)
@@ -3125,8 +3164,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     # paragraph three: the penalty sheet, only when something stood out (a fight, a brawl, an ejection, a strange count)
     st_first, st_last = special_teams(nums_, goals, side, winner, loser, W, name, comeback)
     s3 = penalties.recap_notes(gid, season, {home_id: home, row["away_id"][0]: away}, W, name, fights_told=True)
-    s3 = st_first + s3 + st_last + two_man_kills(gid, season, home_id, home, away, goals, W) \
-        + posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
+    s3 = st_first + s3 + st_last + two_man_kills(gid, season, home_id, home, away, goals, W)
     # what it means
     items = []
     items += sh_pair(gid, season, r["date"], goals, home, away, W)

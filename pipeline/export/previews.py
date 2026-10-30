@@ -702,7 +702,9 @@ def matchup_claim(gid: int, away: str, home: str, lines: dict, places: dict, pts
                 f"against about {r['expected'][j]}% with no line matching.",
         "body": _cap(body),
         "nums": f"At home: {v}% of this group’s 5-on-5 time against {ORD[j]} lines, about {r['expected'][j]}% with no line matching",
-        "gist": f"At home, {coach or 'their coach'} likes to pick matchups, so watch who goes out against {w['Op']} {ORD[j]} line.",
+        # the players by name: "watch who goes out against the Sabres' second line" was the same sentence in every
+        # preview and pointed at nobody (voice loop, 2026-10-30)
+        "gist": f"At home, {coach or 'their coach'} likes to send {mine} out against {theirline}, so watch for them against {theirs}.",
         "cite": f"Matchups · {places[home]} home games this season · {mu['games']} games, {r['minutes']:.0f} minutes for this group at 5-on-5",
         "chips": [
             {"team": home, "text": f"{v}% vs {ORD[j]} lines at home",

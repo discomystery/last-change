@@ -1,0 +1,820 @@
+{
+ "kind": "recap",
+ "game_id": 2026020181,
+ "date": "2026-10-25",
+ "venue": "American Airlines Center",
+ "away": {
+  "abbr": "NYI",
+  "name": "New York Islanders",
+  "place": "NY Islanders",
+  "nickname": "Islanders",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Peter DeBoer"
+ },
+ "home": {
+  "abbr": "DAL",
+  "name": "Dallas Stars",
+  "place": "Dallas",
+  "nickname": "Stars",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Glen Gulutzan"
+ },
+ "final": {
+  "NYI": 3,
+  "DAL": 6,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "11:31",
+   "time_left_in_period": "8:29",
+   "team": "DAL",
+   "scorer": "Tyler Seguin",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Jamie Benn",
+    "Roope Hintz"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 0,
+    "DAL": 1
+   },
+   "chance_of_scoring": 11,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "13:43",
+   "time_left_in_period": "6:17",
+   "team": "NYI",
+   "scorer": "Matthew Schaefer",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Bo Horvat"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 1,
+    "DAL": 1
+   },
+   "chance_of_scoring": 11,
+   "shot": "snap"
+  },
+  {
+   "n": 3,
+   "period": 1,
+   "time_in_period": "14:32",
+   "time_left_in_period": "5:28",
+   "team": "DAL",
+   "scorer": "Jason Robertson",
+   "scorer_goal_tonight": 1,
+   "assists": [],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 1,
+    "DAL": 2
+   },
+   "chance_of_scoring": 30,
+   "shot": "wrist"
+  },
+  {
+   "n": 4,
+   "period": 2,
+   "time_in_period": "4:01",
+   "time_left_in_period": "15:59",
+   "team": "NYI",
+   "scorer": "Kyle Palmieri",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Ryan Pulock",
+    "Bo Horvat"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 2,
+    "DAL": 2
+   },
+   "chance_of_scoring": 4,
+   "shot": "backhand"
+  },
+  {
+   "n": 5,
+   "period": 2,
+   "time_in_period": "10:52",
+   "time_left_in_period": "9:08",
+   "team": "DAL",
+   "scorer": "Justin Hryckowian",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Thomas Harley",
+    "Wyatt Johnston"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 2,
+    "DAL": 3
+   },
+   "chance_of_scoring": 29,
+   "shot": "backhand"
+  },
+  {
+   "n": 6,
+   "period": 2,
+   "time_in_period": "17:45",
+   "time_left_in_period": "2:15",
+   "team": "NYI",
+   "scorer": "Brayden Schenn",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Anthony Duclair",
+    "Emil Heineman"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 3,
+    "DAL": 3
+   },
+   "chance_of_scoring": 18,
+   "shot": "snap"
+  },
+  {
+   "n": 7,
+   "period": 3,
+   "time_in_period": "4:10",
+   "time_left_in_period": "15:50",
+   "team": "DAL",
+   "scorer": "Wyatt Johnston",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Nils Lundkvist",
+    "Joel Kiviranta"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 3,
+    "DAL": 4
+   },
+   "chance_of_scoring": 18,
+   "shot": "wrist"
+  },
+  {
+   "n": 8,
+   "period": 3,
+   "time_in_period": "9:45",
+   "time_left_in_period": "10:15",
+   "team": "DAL",
+   "scorer": "Jason Robertson",
+   "scorer_goal_tonight": 2,
+   "assists": [
+    "Tyler Seguin",
+    "Roope Hintz"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 3,
+    "DAL": 5
+   },
+   "chance_of_scoring": 17,
+   "shot": "snap"
+  },
+  {
+   "n": 9,
+   "period": 3,
+   "time_in_period": "13:02",
+   "time_left_in_period": "6:58",
+   "team": "DAL",
+   "scorer": "Mikko Rantanen",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Lian Bichsel"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NYI": 3,
+    "DAL": 6
+   },
+   "chance_of_scoring": 8,
+   "shot": "wrist"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "NYI": 1,
+    "DAL": 2
+   },
+   "shots": {
+    "NYI": 6,
+    "DAL": 9
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "NYI": 2,
+    "DAL": 1
+   },
+   "shots": {
+    "NYI": 9,
+    "DAL": 13
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "NYI": 0,
+    "DAL": 3
+   },
+   "shots": {
+    "NYI": 5,
+    "DAL": 16
+   }
+  }
+ ],
+ "team_numbers": {
+  "NYI": {
+   "shots": 20,
+   "xg": 1.81,
+   "cf5": 36,
+   "hits": 29,
+   "pp_goals": 0,
+   "pp_opps": 3
+  },
+  "DAL": {
+   "shots": 38,
+   "xg": 3.9,
+   "cf5": 60,
+   "hits": 9,
+   "pp_goals": 1,
+   "pp_opps": 2
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Ilya Sorokin",
+   "team": "NYI",
+   "started": true,
+   "toi": "59:56",
+   "shots": 38,
+   "saves": 32,
+   "ga": 6,
+   "gsax": -2.1,
+   "sv": 0.842
+  },
+  {
+   "full": "Jake Oettinger",
+   "team": "DAL",
+   "started": true,
+   "toi": "60:00",
+   "shots": 20,
+   "saves": 17,
+   "ga": 3,
+   "gsax": -1.19,
+   "sv": 0.85
+  }
+ ],
+ "players": [
+  {
+   "name": "Jason Robertson",
+   "team": "DAL",
+   "pos": "L",
+   "goals": 2.0,
+   "assists": 0.0,
+   "points": 2.0,
+   "toi": "18:58",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Wyatt Johnston",
+   "team": "DAL",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "20:15",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Tyler Seguin",
+   "team": "DAL",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "14:52",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Bo Horvat",
+   "team": "NYI",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "19:18",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Roope Hintz",
+   "team": "DAL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "16:17",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Matthew Schaefer",
+   "team": "NYI",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "26:16",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Mikko Rantanen",
+   "team": "DAL",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "18:52",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Kyle Palmieri",
+   "team": "NYI",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:58",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Brayden Schenn",
+   "team": "NYI",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:10",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Justin Hryckowian",
+   "team": "DAL",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "13:54",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Thomas Harley",
+   "team": "DAL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "24:43",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Ryan Pulock",
+   "team": "NYI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "19:06",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Nils Lundkvist",
+   "team": "DAL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:20",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Lian Bichsel",
+   "team": "DAL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:10",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Emil Heineman",
+   "team": "NYI",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "15:00",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Anthony Duclair",
+   "team": "NYI",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "14:37",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Joel Kiviranta",
+   "team": "DAL",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:08",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Jamie Benn",
+   "team": "DAL",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "12:15",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Miro Heiskanen",
+   "team": "DAL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:56",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Logan Stanley",
+   "team": "NYI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:51",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Tyler Myers",
+   "team": "DAL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:04",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Adam Pelech",
+   "team": "NYI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:23",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Simon Holmström",
+   "team": "NYI",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:57",
+   "season_goals_after": 4.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "NYI": 32,
+   "DAL": 68
+  }
+ },
+ "pregame_chance": {
+  "DAL": 65,
+  "NYI": 35
+ },
+ "records_before": {
+  "NYI": {
+   "record": "5-3-2",
+   "games": 10,
+   "run": "winless 1",
+   "last_ten": "5-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "OTL",
+     "score": "1-2",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    }
+   ]
+  },
+  "DAL": {
+   "record": "6-3-1",
+   "games": 10,
+   "run": "won 4",
+   "last_ten": "6-3-1",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": true,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-14",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "NYI": {
+   "record": "5-4-2",
+   "games": 11,
+   "run": "winless 2",
+   "last_ten": "5-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-15",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "OTL",
+     "score": "1-2",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    }
+   ]
+  },
+  "DAL": {
+   "record": "7-3-1",
+   "games": 11,
+   "run": "won 5",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-14",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": true,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "DAL": {
+   "points": 15,
+   "gp": 11,
+   "division": "Central",
+   "division_place": 3,
+   "conference_place": 5,
+   "wild_card_place": null,
+   "league_place_by_points": 10
+  },
+  "NYI": {
+   "points": 12,
+   "gp": 11,
+   "division": "Metropolitan",
+   "division_place": 5,
+   "conference_place": 11,
+   "wild_card_place": 5,
+   "league_place_by_points": 19
+  }
+ },
+ "firsts": [
+  {
+   "team": "DAL",
+   "goals": 0,
+   "kind": "debut",
+   "points": 0,
+   "first_round": false,
+   "player": "Matthew Seminoff"
+  },
+  {
+   "team": "DAL",
+   "goals": 0,
+   "kind": "debut",
+   "points": 0,
+   "first_round": false,
+   "player": "Dylan Hryckowian"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "physical",
+   "fact": "Dallas’s hit score in the close stretches of the game was 38, against their usual 99 (100 is league average, adjusted for the arena’s scorer). A team strays this far about once every 60 games."
+  }
+ ],
+ "notes": [
+  "The Stars carried the play, outshooting the Islanders 38-20, and got the result to match.",
+  "Jake Oettinger made 17 saves for the Stars, and Ilya Sorokin allowed six goals on 38 shots.",
+  "By our Swing measure, Lian Bichsel had the best night of anyone.",
+  "The Stars improved to 7-3-1, third in the Central.",
+  "The Isles fell to 5-4-2, fifth in the Metropolitan.",
+  "Streak: The Stars are rolling: five straight wins.",
+  "Snapped: The Islanders’ five-game point streak is over.",
+  "Haunts them: Jason Robertson scored twice more against the Islanders, and has eight goals in seven games against them since 2023-24.",
+  "Streak: Mikko Rantanen has a point in five straight games."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}
