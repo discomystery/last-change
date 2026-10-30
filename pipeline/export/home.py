@@ -291,7 +291,7 @@ def call_note(c: dict, nm: Namer) -> str | None:
     return _fit(c.get("head"))
 
 
-CALL_WEIGHT = {"duel": 6, "clash": 4, "matchup": 4, "physical": 3, "pace": 3, "edge": 2, "rest": 2, "history": 1, "changed": 2}
+CALL_WEIGHT = {"duel": 6, "clash": 4, "matchup": 4, "physical": 3, "pace": 3, "edge": 2, "rest": 2, "control": 2, "history": 1, "changed": 2}
 
 
 def coming_interest(g: dict, nm: Namer, div: dict[str, str], season: int, star_ids: set[int]) -> dict:

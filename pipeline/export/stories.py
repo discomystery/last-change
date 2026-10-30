@@ -49,6 +49,7 @@ PERIODS = {1: "first", 2: "second", 3: "third"}
 ORDINAL = {4: "fourth", 5: "fifth", 6: "sixth", 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth"}
 LIKELY = 0.6  # how sure starters.py must be of the visitors' goalie before his record on tonight's ice is told (right about 7 in 10)
 MAX_ITEMS, MIN_ITEMS, MAX_PER_TAG = 4, 2, 2
+HISTORY_TAGS = ("Owns them", "Haunts them")  # share one place in a preview's Who to watch
 HEAD_FACT = 50  # a preview fact headline needs this score to beat the top call's headline
 
 
@@ -1338,9 +1339,11 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     items = [i for i in items if i["tag"] in ("Out", "Missing") or not gone & set(i.get("pids") or [i.get("pid")])]
     picked, per, seen = [], {}, set()
     for i in items:
-        if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
+        # a player's record against tonight's opponent is mostly coincidence: one such item a game (Sora, 2026-10-30)
+        key, cap = ("history", 1) if i["tag"] in HISTORY_TAGS else (i["tag"], MAX_PER_TAG)
+        if per.get(key, 0) >= cap or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
             continue
-        per[i["tag"]] = per.get(i["tag"], 0) + 1
+        per[key] = per.get(key, 0) + 1
         seen.update(i.get("pids") or [i.get("pid")])
         picked.append({"tag": i["tag"], "text": i["text"]})
     for t in (away, home):  # always at least two: each team's leading scorer
@@ -2388,6 +2391,53 @@ def standings_after(season: int, day: str, winner: str, loser: str, W, raced: se
     swap = _swap(winner, loser, now, was, rows, prev, picture, out, raced, W)
     if swap:
         out["_swap"] = swap
+    return out
+
+
+def stakes(season: int, day: str, away: str, home: str, W) -> str | None:
+    """The preview's "What's at stake" line (Sora, 2026-10-30): where both clubs sit in the standings going in, and,
+    for division rivals within two points, what a regulation win would do to the order. Facts about the table and
+    plain arithmetic, never a lean on who wins. None before the season's first saved standings."""
+    from pipeline.ingest import standings_daily as sd
+    rows = sd.before(season, day[:10])
+    if not rows:
+        return None
+    m = _table_marks(rows)
+    if away not in m or home not in m:
+        return None
+    pts = {r["teamAbbrev"]: r["points"] for r in rows}
+
+    def spot(t: str) -> str:
+        if m[t]["pts"] == 1 and m[t]["pts_n"] == 1:
+            return "first in the NHL"
+        div = [r["points"] for r in rows if r["divisionName"] == m[t]["division"]]
+        if div.count(pts[t]) > 1:  # level on points: the shared place, whatever the tiebreakers say
+            return f"tied for {ORDINAL_N(1 + sum(p > pts[t] for p in div))} in the {m[t]['division']}"
+        return f"{ORDINAL_N(m[t]['div'])} in the {m[t]['division']}"
+
+    pt = lambda n: "a point" if n == 1 else f"{n} points"
+    same = m[away]["division"] == m[home]["division"]
+    gap = abs(pts[away] - pts[home])
+    if same and gap:
+        lead, trail = (away, home) if pts[away] > pts[home] else (home, away)
+        out = (f"{_cap(W.the(trail))} go in {spot(trail)} with {pt(pts[trail])}, {pt(gap)} behind "
+               f"{W.the(lead)}, {spot(lead).removesuffix(' in the ' + m[lead]['division'])}.")
+    elif same:
+        out = f"{_cap(W.the(away))} and {W.the(home)} go in level on {pt(pts[away])}, {spot(away).removeprefix('tied for ')} and {spot(home).removeprefix('tied for ')} in the {m[home]['division']}."
+        out = out.replace(f" in the {m[home]['division']} and", " and", 1)
+    else:
+        out = f"{_cap(W.the(away))} go in {spot(away)} with {pt(pts[away])}, {W.the(home)} {spot(home)} with {pt(pts[home])}."
+    if same and gap <= 2:
+        if gap == 0:
+            out += " A win in regulation would put either one ahead of the other."
+        else:
+            lead, trail = (away, home) if pts[away] > pts[home] else (home, away)
+            move = "lift them past" if gap == 1 else "pull them level with"
+            out += f" A regulation win for {W.the(trail)} would {move} {W.the(lead)}."
+        hand = m[away]["gp"] - m[home]["gp"]
+        if abs(hand) >= 2:
+            fewer = home if hand > 0 else away
+            out += f" {_cap(W.the(fewer))} have {num(abs(hand))} games in hand."
     return out
 
 

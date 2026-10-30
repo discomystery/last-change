@@ -26,7 +26,7 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, ordinal as _o
 from pipeline.config import SITE_DATA
 
 DAYS_AHEAD = 7
-RULES_VERSION = 25  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
+RULES_VERSION = 26  # 1: the first rulebook, with ungraded "contrast" notes; 2: every call graded (edge replaces contrast);
 # 3: calls picked for interest (duels, changed teams, matchup plans, goalie records), casual voice, pace bar raised
 # 4: shot danger told as a chance per shot; point shots split into shots from defensemen and shots from in close
 # 5: bodies are numbers-free (ranks in words); the figures move to `nums`, shown under the call; `gist` feeds the story
@@ -57,6 +57,8 @@ RULES_VERSION = 25  # 1: the first rulebook, with ungraded "contrast" notes; 2: 
 #     headlines in every call pool, trimmed by her notes, with "vs." for side-by-side headlines ("Strength vs. strength")
 # 25: matchup calls only for forward lines whose habit holds up for its sample and that were together last game, graded at
 #     halfway between rotation and the habit; a miss says who the line drew instead (Sora, 2026-10-30)
+# 26: who controls the chances (5-on-5 expected-goal share, told as who has the puck, never who wins), the Lately strip,
+#     the standings line and Key players (Sora, 2026-10-30)
 # 10: Sora's review notes: contrasts joined with "but", edges told plainly, "as far apart as two teams get" only for ranks 26+ apart, coach named first
 METHODS = 2  # 2: date cuts use the game's local date (late starts saw their own game). Bump when a change to the numbers behind previews (ratings, traits, chance model) should reach past ones
 # (offense trait, defense trait it runs into, what the offense does, what the defense does)
@@ -306,7 +308,7 @@ HISTORY_BODIES = {
             "Since 2023-24, {G} has been shaky against {O}, well below his usual. Fans love a pattern like this, "
             "but we checked three seasons of them and they predicted nothing. Don’t be surprised if he’s back to his usual self."],
 }
-PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "rest": 3, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
+PRIORITY = {"duel": 0, "changed": 1, "matchup": 2, "history": 3, "rest": 3, "control": 4, "clash": 4, "pace": 5, "physical": 5, "edge": 6}
 MAX_CALLS, MIN_CALLS, MAX_PER_KIND = 4, 2, 2
 
 
@@ -1105,6 +1107,85 @@ def rest_claim(gid: int, away: str, home: str, places: dict, rest: dict, usual: 
     }
 
 
+@lru_cache(maxsize=4)
+def _shares_by_team(season: int):
+    """Score-and-venue adjusted 5-on-5 expected goals per team-game, with each club's abbreviation."""
+    import polars as pl
+    from pipeline.config import TABLES
+    t = _xg_by_game(season)
+    p = TABLES / str(season) / "games.parquet"
+    if t is None or not p.exists():
+        return None
+    g = pl.read_parquet(p, columns=["home", "away", "home_id", "away_id"])
+    ids = pl.concat([g.select(pl.col("home").alias("abbr"), pl.col("home_id").alias("team_id")),
+                     g.select(pl.col("away").alias("abbr"), pl.col("away_id").alias("team_id"))]).unique("team_id")
+    return t.join(ids, on="team_id")
+
+
+def league_shares(before: str, season: int | None = None) -> dict[str, float]:
+    """Every club's usual share of the 5-on-5 expected goals before a date, the same blend as `usual_share` (this
+    season, with last season worth REST_SAMPLE games), for the clubs on this season's schedule."""
+    import polars as pl
+    from pipeline.config import CURRENT_SEASON
+    season = season or CURRENT_SEASON
+    now, last = _shares_by_team(season), _shares_by_team(season - 1)
+    if now is None:
+        return {}
+    now = now.filter(pl.col("date") < before[:10])
+    f = {r["abbr"]: [r["f"], r["a"]] for r in now.group_by("abbr").agg(pl.col("xgf_adj").sum().alias("f"), pl.col("xga_adj").sum().alias("a")).iter_rows(named=True)}
+    if last is not None:
+        for r in last.group_by("abbr").agg(pl.col("xgf_adj").mean().alias("f"), pl.col("xga_adj").mean().alias("a")).iter_rows(named=True):
+            if r["abbr"] in f:
+                f[r["abbr"]][0] += REST_SAMPLE * r["f"]
+                f[r["abbr"]][1] += REST_SAMPLE * r["a"]
+    return {t: x / (x + y) for t, (x, y) in f.items() if x + y > 0}
+
+
+# Who controls the chances (Sora approved it 2026-10-30, thread "Improve game previews and automate tuning"): the
+# same rule as an edge call on each club's usual share of the 5-on-5 expected goals, which held 69% over 2024-27 in the
+# blind-spots replay. It is the main input to the hidden win chance, so it is only ever told as who should have more of
+# the puck and the better looks, never as who wins (no "favored", no result words).
+CONTROL_HEADS = ["{top} should tilt the ice", "Who drives the play: {top}", "Expect {top} to have the puck more",
+                 "{top} should drive the play", "Tilted ice, toward {botp} net"]
+CONTROL_BODIES = ["{top} have been {wt} at controlling the chances at 5-on-5, and {bot} {wbs}. Expect {top} to spend more of the night in {botp} end. That’s about the puck, not the scoreboard: goalies and finishing decide plenty of games the chances don’t.",
+                  "At 5-on-5, {top} have been {wt} at getting more of the chances than they give up, and {bot} {wbs}. The ice should tilt {topp} way, even if goaltending and bounces have the final say on the score."]
+
+
+def control_claim(gid: int, away: str, home: str, places: dict, shares: dict | None) -> dict | None:
+    """The team that usually gets more of the 5-on-5 chances, called to do so tonight, when the two are an edge apart
+    (EDGE_GAP percentile points, one of them in the top or bottom quarter). Graded like an edge: held if its share
+    tonight beats 50% by at least half the usual gap between the two clubs."""
+    if not shares or away not in shares or home not in shares or len(shares) < 20:
+        return None
+    vals = sorted(shares.values())
+    pct = lambda t: 100 * (sum(v < shares[t] for v in vals) + 0.5 * (sum(v == shares[t] for v in vals) - 1)) / (len(vals) - 1)
+    rank = lambda t: 1 + sum(v > shares[t] for v in vals)
+    pa, ph = pct(away), pct(home)
+    if abs(pa - ph) < EDGE_GAP or not (max(pa, ph) >= 100 - EDGE_END or min(pa, ph) <= EDGE_END):
+        return None
+    top, bot = (away, home) if pa >= ph else (home, away)
+    ut, ub = shares[top], shares[bot]
+    w = {**team_words(top, places, "top"), **team_words(bot, places, "bot"),
+         "wt": standing(rank(top)), "wbs": short(standing(rank(bot)))}
+    cite = "Share of 5-on-5 expected goals, adjusted for score and venue · this season, with last season counted as 20 games"
+    tip = lambda t: (f"{places.get(t, t)}: {100 * shares[t]:.1f}% of the 5-on-5 expected goals in their games, {_ordinal(rank(t))} of {len(vals)}. "
+                     "Adjusted for score and venue; this season, with last season counted as 20 games.")
+    return {
+        "kind": "control", "gap": abs(pa - ph), "metric": "control", "team": top, "opp": bot,
+        "head": _fmt(_pick(CONTROL_HEADS, gid, "control"), **w),
+        "body": _fmt(_pick(CONTROL_BODIES, gid, "control", "body"), **w),
+        "call": _fmt("{top} get the bigger share of the 5-on-5 chances.", **w),
+        "nums": f"Share of 5-on-5 expected goals: {places[top]} {100 * ut:.1f}%, {places[bot]} {100 * ub:.1f}%",
+        "gist": _fmt("{top} usually control more of the chances than {bot} do.", **w),
+        "cite": cite,
+        "chips": [{"team": t, "text": f"{_ordinal(rank(t))} in chance share", "tip": tip(t)} for t in (top, bot)],
+        "check": {"metric": "control", "measure": "share of 5-on-5 expected goals, adjusted for score and venue", "team": top, "opp": bot,
+                  "baseline": {top: round(ut, 4), bot: round(ub, 4)}, "gap": round(ut - ub, 4), "league": 0.5, "direction": "ahead",
+                  "rule": "held if the team's share of the 5-on-5 expected goals beats 50% by at least half the usual gap between the two; "
+                          "partly if it is over 50% by less; otherwise didn't happen"},
+    }
+
+
 def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, extra: dict | None = None) -> list[dict]:
     """The two to four "What to watch" calls for one game, from fingerprints and lines as they stood before it.
 
@@ -1123,6 +1204,9 @@ def calls(gid: int, away: str, home: str, fp: dict, lines: dict, places: dict, e
     rc = rest_claim(gid, away, home, places, extra.get("rest") or {}, extra.get("rest_usual"))
     if rc:
         cands.append(rc)
+    cc = control_claim(gid, away, home, places, extra.get("shares"))
+    if cc:
+        cands.append(cc)
     cands += clash_claims(gid, away, home, fp, places)
     cands += tempo_claims(gid, away, home, fp, places)
     ec = edge_claim(gid, away, home, fp, places, set(), hot_only=True)
@@ -1186,7 +1270,7 @@ def call_extras(site: dict, before: str) -> dict:
     from pipeline.ingest import coaches
     hist = _goalie_history()
     return {"coaches": coaches.as_of(CURRENT_SEASON, before),"stab": site["fingerprints"].get("stabilization") or {}, "goalies": site.get("goalies") or {},
-            "pts": _points(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
+            "pts": _points(before), "shares": league_shares(before), "hist": hist.filter(pl.col("date") < before[:10]) if hist is not None else None}
 
 
 SHOW_LIKELY = 0.6  # our own guess is shown as "likely" only from here (right about three times in four)
@@ -1343,6 +1427,27 @@ def _snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetim
         nhl = None
     if nhl:
         out["nhl_lineup"] = nhl
+    try:  # both clubs' last ten games; the preview stands without it
+        from pipeline.export import lately
+        form = lately.run(away, home, day, {t: v["id"] for t, v in (projected or {}).items() if v.get("id")}, CURRENT_SEASON)
+        if form:
+            out["lately"] = form
+    except Exception as e:
+        print(f"lately for {g['id']} failed: {e!r}")
+    try:  # the skaters each club leans on most, with how they've been going
+        from pipeline.export import key_players, stories
+        kp = key_players.run(away, home, day, stories.expected_lineup(nhl) if nhl else None, CURRENT_SEASON)
+        if kp:
+            out["key_players"] = kp
+    except Exception as e:
+        print(f"key players for {g['id']} failed: {e!r}")
+    try:  # where both clubs sit in the standings going in
+        from pipeline.export import stories
+        line = stories.stakes(CURRENT_SEASON, day, away, home, stories.Words(places))
+        if line:
+            out["stakes"] = wording.tidy(line)
+    except Exception as e:
+        print(f"stakes for {g['id']} failed: {e!r}")
     if chance:
         from pipeline.export import outlook
         out["outlook"] = outlook.notes(g["id"], away, home, chance, fp, places, in_net)

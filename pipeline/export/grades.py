@@ -66,6 +66,12 @@ MATCHUP = {"held": ("{coach} got {his} matchup", "{Hc} sent {group} out against 
 MATCHUP_DREW = " Instead, {coach} sent them out against {drew} ({sec} of {total} at 5-on-5)."
 HISTORY = {"held": ("The usual {G}", "{G} played like his usual self, not like his record against {O}. Just a coincidence, as we said."),
            "missed": ("{G} struggled against {O} again", "{Gp} night looked more like his record against {O} than his usual. Three seasons of evidence say it’s still a coincidence.")}
+CONTROL = {"held": (["{topc} tilted the ice", "{topc} drove the play", "{topc} had the puck, as expected"],
+                    "{top} got the bigger share of the 5-on-5 chances, by about as much as the two teams’ seasons suggested."),
+           "partly": (["{topc} edged the chances", "{topc} got more of the chances, barely"],
+                      "{top} got more of the 5-on-5 chances, but by less than the gap between these two teams suggested."),
+           "missed": (["{botc} took over the chances instead", "The ice tilted the other way"],
+                      "{bot} got the bigger share of the 5-on-5 chances, against the run of both teams’ seasons.")}
 REST = {"held": (["Fresh legs told", "The rested team showed it", "Tired legs showed"], "{R} got a bigger share of the chances than they usually do, against a tired {Tn} team."),
         "missed": ("{Tc} shrugged it off", "{T} held their own despite playing last night.")}
 # "We said ...": the prediction in a fan's words, for wherever a graded call is shown in one line (share cards, Track
@@ -144,6 +150,9 @@ def said(S, gid: int, claim: dict, places: dict) -> str | None:
         if chk.get("record", 0) < chk.get("baseline", 0):
             return f"{previews._poss(G)} rough record against {O['O']} was a coincidence, and he’d look like himself"
         return f"{previews._poss(G)} hold on {O['O']} wouldn’t last"
+    if kind == "control" and claim.get("opp"):
+        tw = previews.team_words(claim["team"], places, "top") | previews.team_words(claim["opp"], places, "bot")
+        return f"{tw['top']} would get the bigger share of the 5-on-5 chances"
     if kind == "rest" and claim.get("opp"):
         R = previews.team_words(claim["team"], places, "R")
         T = previews.team_words(claim["opp"], places, "T")
@@ -387,6 +396,14 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
         out["lane"] = lane(claim["team"], None, base, None, (base, f"Usual {fs(base)}"), (v, f"Tonight {fs(v)}"), ref=(rec, f"Vs {places.get(claim['opp'], claim['opp'])} {fs(rec)}"),
                            tip="His save percentage tonight (the filled dot), his usual (the ring) and his record against this team (the dotted mark). "
                                "The call held if the dot landed closer to the ring.")
+    elif kind == "control":
+        top, bot = chk["team"], chk["opp"]
+        w = {**previews.team_words(top, places, "top"), **previews.team_words(bot, places, "bot")}
+        title, plain = CONTROL[verdict]
+        need = 0.5 + chk["gap"] / 4
+        out["lane"] = lane(top, None, 0.5, ("Even", " 50%"), (need, f"Needed {100 * need:.0f}%"), (v, f"Tonight {100 * v:.0f}%"),
+                           tip=f"{places[top]}’s share of the 5-on-5 chances tonight (the filled dot). Holding needed the dot at or past the ring, "
+                               "half the usual gap between the two teams; past even but short of it is partly; under even, it didn’t happen.")
     elif kind == "rest":
         w |= previews.team_words(claim["opp"], places, "T") | previews.team_words(claim["team"], places, "R")
         title, plain = REST[verdict]

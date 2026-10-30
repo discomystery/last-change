@@ -32,6 +32,7 @@ const kindInfo: Record<string, { label: string; rule: string }> = {
   pace: { label: 'Pace of the game', rule: 'Called it if the game ran at the teams’ usual pace (newer previews: faster or slower than either team’s usual)' },
   physical: { label: 'A physical game', rule: 'Called it if the hit score reached the teams’ usual' },
   matchup: { label: 'Line matching', rule: 'Called it if the coach matched lines as usual at home' },
+  control: { label: 'Who controls the chances', rule: 'Called it if the team got the bigger share of the 5-on-5 chances, by half the usual gap between the two' },
   rest: { label: 'Rested against tired', rule: 'Called it if the rested team got at least their usual share of the 5-on-5 chances' },
 };
 const kindRows = (s: CallSet) => {
