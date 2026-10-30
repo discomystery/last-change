@@ -514,9 +514,16 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
     ra, rh = rows[away], rows[home]
     side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
     # records far apart on chances worth about the same (Sora, 2026-10-30): say what that means for tonight
-    tail = (" If their records matched their chances, these teams would be much closer in the standings, so don’t be"
-            " surprised if this one is closer than the records suggest."
-            if abs(ra["pp"] - rh["pp"]) >= APART and abs(ra["play"] - rh["play"]) <= ALIKE else "")
+    tail = ""
+    if abs(ra["pp"] - rh["pp"]) >= APART and abs(ra["play"] - rh["play"]) <= ALIKE:
+        near = [t for t, r in ((away, ra), (home, rh)) if abs(r["gap"]) < TEXT_GAP]
+        off = [t for t in (away, home) if t not in near]
+        # one club already matches its chances (Sora, 2026-10-30): "If the Kraken’s record were closer to their chances,
+        # like the Flames’, ..."
+        lead = (f"If {W.poss(off[0])} record were closer to their chances, like {W.poss(near[0])}," if len(near) == 1
+                else "If their records matched their chances,")
+        tail = (f" {lead} these teams would be much closer in the standings, so don’t be surprised if this one is closer"
+                " than the records suggest.")
     a = clause(away, ra)
     if side(ra) == side(rh) != 0:  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
         h = (f"So is {W.poss(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh)}" if side(rh) > 0 else

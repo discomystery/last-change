@@ -419,6 +419,15 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             paired[t] = (hit, ln)
             picks[t] = [x for x in picks[t] if x is not hit]
     used = {ln for _, ln in paired.values()}
+    # one habit at opposite ends for the two clubs is told side by side (Sora, 2026-10-30: the Oilers lean on their stars
+    # more than anyone, the Islanders spread the ice time): the second club's half follows the first club's list
+    opposite = {}
+    for _, k, b in list(picks[away]):
+        o = next((x for x in picks[home] if x[1] == k and side(x[2]) != side(b)), None)
+        if o and len(picks[home]) > 1:
+            opposite[away] = (home, o)
+            picks[home] = [x for x in picks[home] if x is not o]
+            break
     told, told_traits = 0, set()
     for t in (away, home):
         told_traits |= {k for _, k, _ in picks[t]}
@@ -426,6 +435,10 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         if s:
             sents.append(s + ".")
             told += 1
+        if t in opposite:  # "The Islanders, by contrast, spread the ice time through the lineup."
+            o_t, (_, k, b) = opposite[t]
+            sents.append(f"{cap(W.the(o_t))}, by contrast, {HABITS[k][0 if side(b) else 1]}.")
+            told_traits.add(k)
         if t in paired:  # "They also sit back rather than chase on the forecheck, so the Canadiens have the edge ..."
             (_, k, b), ln = paired[t]
             told_traits.add(k)
@@ -439,7 +452,7 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             ln = _lower(ln) if k == "powerKill" and link == ", and " and "sets up a fight" in ln else _them(_lower(ln), t, W)
             if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
                 ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
-            sents.append(f"They also {words}{link}{ln}")
+            sents.append(f"{cap(W.the(t)) if t in opposite else 'They'} also {words}{link}{ln}")
         sc = scoring(t, season, day, W)
         if sc:
             sents.append(sc)
