@@ -1,17 +1,13 @@
 {
  "head": "Who’s in net for the Oilers?",
  "paras": [
-  "The Islanders have won two in a row. The Oilers (9-2-2) beat Calgary 4-0 last time out. Going in, the Oilers are first in the Pacific and the Islanders fourth in the Metropolitan.",
-  "Both teams get their defensemen shooting. The Oilers have a dangerous power play, but have had shaky goaltending. No team is better at the power play. Edmonton has scored 4.23 goals a game, the most in the league. The Islanders have had some of the best goaltending in the league, but have a leaky penalty kill. They’re second in goaltending.",
-  "Connor McDavid leads the Oilers with eight goals and 36 points, and he has 13 points in their last five games. Leon Draisaitl has a team-high twelve goals. For the Islanders, it’s Bo Horvat, with 14 points, seven of them goals, and Matthew Schaefer has seven points over the last five.",
+  "The Islanders have won two in a row. The Oilers (9-2-2) beat Calgary 4-0 on Wednesday. Going in, the Oil are first in the Pacific and the Islanders fourth in the Metropolitan.",
+  "Both teams get their defensemen shooting. The Oilers have the league’s most dangerous power play, scoring on 35.7% of their chances (the best), but have had shaky goaltending. Edmonton has scored 4.23 goals a game, the most in the league. On the other side, the Islanders have had some of the league’s best goaltending, but have a leaky penalty kill. Only two teams have a leakier penalty kill. Put that together and the Oilers’ power play could do real damage against the Islanders’ kill. And both teams like to hit, so expect plenty of it.",
+  "Connor McDavid (eight goals, 28 assists, 13 points in his last five games) leads the Oilers. Leon Draisaitl, who has ten points in his last five games and seven goals in six games against the Islanders since 2023-24, has a team-high twelve goals. For the Islanders, it’s Bo Horvat, with 14 points, seven of them goals. Matthew Schaefer, who has seven points in his last five games, has 14 points.",
   "Tristan Jarry should get the start for Edmonton (3-1-2, .883 in six starts), and Ilya Sorokin for the Islanders (6-3-0, .915 in nine starts).",
-  "Don’t read much into Sorokin’s record against the Oilers. The Oil’s power play has a soft target in the Islanders’ kill."
+  "Don’t read much into Sorokin’s record against the Oilers."
  ],
  "items": [
-  {
-   "tag": "Haunts them",
-   "text": "Leon Draisaitl has seven goals in six games against the Islanders since 2023-24."
-  },
   {
    "tag": "Out",
    "text": "The Oilers are newly without Zach Hyman, and have had to make do without Matt Savoie all season."
@@ -23,6 +19,10 @@
   {
    "tag": "Hot streak",
    "text": "Connor McDavid has a point in every game this season."
+  },
+  {
+   "tag": "Hot streak",
+   "text": "Matthew Schaefer has a point in six straight games."
   }
  ],
  "outlook": {
