@@ -190,12 +190,23 @@ const replays = (() => {
 const winner = r.score[home] > r.score[away] ? home : away;
 const loser = winner === home ? away : home;
 const pct = (a: string) => Math.round(100 * (dw?.share[a] ?? 0));
+// Words follow the share of the side the chances favored (Sora, 2026-10-30: "too close to call" and "a coin flip" were
+// used for anything under 60%, so a 57-43 game read like 50-50). A coin flip is 52% or less, close to even up to 54%,
+// a slight edge up to 59%, then the side that usually wins. The story paragraph and win-chance reveal use the same 45-55% close band.
+const fav = pct(home) >= pct(away) ? home : away;
+const und = fav === home ? away : home;
+const odds = `With chances like these, ${place(fav)} would win about ${pct(fav)} games in 100 and ${place(und)} ${pct(und)}`;
 const replayHead = !dw ? '' : pct(winner) >= 60 ? `${place(winner)} earned this one`
-  : pct(loser) >= 60 ? `${place(loser)} usually wins this one` : 'Too close to call on chances';
+  : pct(loser) >= 60 ? `${place(loser)} usually wins this one`
+  : pct(fav) <= 52 ? 'Too close to call on chances'
+  : pct(fav) <= 54 ? 'Close to even on chances'
+  : `A slight edge to ${place(fav)} on chances`;
 const replayBody = !dw ? '' : pct(loser) >= 60
   ? `With chances like these, ${place(loser)} would win about ${pct(loser)} games in 100. The goals went the other way.`
   : pct(winner) >= 60 ? `With chances like these, ${place(winner)} would win about ${pct(winner)} games in 100.`
-  : `With chances like these, ${place(away)} would win about ${pct(away)} games in 100 and ${place(home)} ${pct(home)}, close to a coin flip.`;
+  : pct(fav) <= 52 ? `${odds}, about as close to a coin flip as games get.`
+  : pct(fav) <= 54 ? `${odds}: close to even, if not quite a coin flip.`
+  : `${odds}. A real lean, but games like this one could still go either way.`;
 // Section order tells the story: what we expected, what happened, then the detail.
 // Report cards exist for this game when the pipeline wrote jobs/{id}.json (PlayerJobs renders nothing otherwise).
 const jobs = jobsFor<{ game_id: number; players: { pos: string }[] }>(r.game_id);
