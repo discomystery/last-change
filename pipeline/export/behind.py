@@ -2,7 +2,7 @@
 each team's record").
 
 Every goal a team scores or allows this season is split into five parts that add up to its goal difference exactly:
-the chances at 5-on-5, the chances on special teams (both as expected goals for minus against), shooting (goals minus
+the chances at 5-on-5, the chances on special teams (both as expected goals for minus against), finishing (goals minus
 expected goals, empty nets out), goaltending (expected goals against minus goals against, empty nets out) and
 empty-net goals. Rule-based checks then read those parts and write behind.json for team pages, the Standings page and
 one preview item:
@@ -12,7 +12,7 @@ one preview item:
    "playing better than their record", and the biggest one or two parts on that side are the reason. Tested on
    2023-24 to 2025-26: after 15 games the chances predicted the rest of the season better than the record did
    (r 0.59 against 0.42), and teams .100 ahead of their chances went on to finish near what the chances said.
-2. Shooting holding them back (4.5+ goals under the chances) or running hot (6+ over), naming the shooters furthest off.
+2. Finishing holding them back (4.5+ goals under the chances) or running hot (6+ over), naming the shooters furthest off.
 3. Goalies: one at +3 and another at -3 or worse goals saved above expected (3+ starts each), a goalie covering for a
    team that has been outplayed, or goaltending costing them 6+ goals.
 4. Lines: one forward line with 58%+ of the 5-on-5 chances while the rest of the lineup has 47% or less, or the depth
@@ -39,7 +39,7 @@ GAP = 0.08  # points percentage between the record and what the chances are wort
 SMALL_GAP = 0.05  # "a little ahead" / "a little behind"
 REASON = 2.5  # goals a part needs to count as a reason for the gap
 CLOSE_REASON = 1.5  # points from one-goal and overtime games that count as a reason
-COLD, HOT = -4.5, 6.0  # shooting: goals under / over the chances
+COLD, HOT = -4.5, 6.0  # finishing: goals under / over the chances
 GOALIE_SPLIT, GOALIE_STARTS = 3.0, 3  # goals saved above expected, either way, and starts each
 GOALIE_TEAM = 6.0  # goaltending covering for them or costing them
 SHOOTER = 1.5  # a shooter this far off his chances gets named
@@ -52,7 +52,7 @@ EN = ("EN", "EA")
 
 TAGS = {
     "ahead": "Record ahead of their play", "behind": "Playing better than their record",
-    "cold": "Shooting holding them back", "hot": "Shooting running hot",
+    "cold": "Finishing holding them back", "hot": "Finishing running hot",
     "split": "Goalies pulling apart", "covering": "Goalie covering for them", "costing": "Goaltending costing them",
     "carrying": "One line carrying them", "depth_up": "Depth driving it", "depth_down": "Depth being outplayed",
 }
@@ -304,11 +304,11 @@ def team_checks(t: dict, r: dict, shooters: pl.DataFrame, goalies: list[dict], l
         checks.append({"kind": verdict, "text": f"{_cap(_poss(t))} record ({p3(r['pp'])}) {how} what their chances at 5-on-5 and on special teams are worth ({p3(r['play'])})."})
     big = verdict in ("ahead", "behind")
 
-    # shooting
+    # finishing
     if "fin" not in said:
         even_so = (big and sign < 0 and r["fin"] >= HOT) or (big and sign > 0 and r["fin"] <= COLD)
         if r["fin"] <= COLD:
-            text = f"shooting has cost them about {g1(r['fin'])} goals against the chances they’ve had" + (f", most of all {_shooter_list(cold[:2], who)}" if cold else "") + "."
+            text = f"finishing has cost them about {g1(r['fin'])} goals against the chances they’ve had" + (f", most of all {_shooter_list(cold[:2], who)}" if cold else "") + "."
             checks.append({"kind": "cold", "text": ("Even so, " if even_so else "") + (text if even_so else _cap(text))})
             tags.append("cold")
         elif r["fin"] >= HOT:
