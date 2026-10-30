@@ -37,7 +37,7 @@ HABITS = {
     "pp": ("have a dangerous power play", "have struggled on the power play"),
     "pk": ("kill penalties well", "have a leaky penalty kill"),
     "powerKill": ("create chances on the penalty kill", "rarely threaten on the penalty kill"),
-    "discipline": ("draw more power plays than they give up", "give up more power plays than they draw"),
+    "discipline": ("draw more penalties than they take", "take more penalties than they draw"),  # "power play" once a list
 }
 LABELS = {"volume": "shot volume", "quality": "shot quality", "rebounds": "second chances", "turnover": "offense off turnovers",
           "dShots": "shots from defensemen", "inClose": "shots from in close", "shotsThrough": "getting shots through",
@@ -295,6 +295,18 @@ def meet_line(kind: str, metric: str, team: str, opp: str, W, gist: str = "") ->
     return None
 
 
+def partners(traits: set) -> set:
+    """The traits a pairing is about: a call on the power play is about the other side's penalty kill too."""
+    out = set(traits)
+    for ka, kb, *_ in MEETS:
+        if ka in traits or kb in traits:
+            out |= {ka, kb}
+    return out
+
+
+FACE_OFF = ("strength against strength", "has to give", "meets a team")  # two strengths meeting: a face-off, not a result
+
+
 def consequences(away: str, home: str, fp: dict, W, covered: set) -> list[tuple[float, str, set]]:
     """What the two styles mean when they meet, strongest first: (strength, sentence, traits it is about). Traits a
     call already covers are left to the call's own line."""
@@ -330,9 +342,21 @@ def _lower(s: str) -> str:
 TRAIT_CALLS = ("clash", "duel", "edge", "changed", "pace", "physical")  # calls about the two styles: their gist is a consequence
 
 
-def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gists: list[str] = (), covered: set = frozenset(),
+def _them(ln: str, t: str, W) -> str:
+    """A line told right after a club's own habits names it as "they" ("so their forecheck could keep the Jets
+    pinned", "against them", "when they are shorthanded")."""
+    the, poss = W.the(t), W.poss(t)
+    ln = ln.replace(f" {the} are ", " they’re ").replace(f" {the} aren’t ", " they aren’t ")
+    ln = ln.replace(poss, "their").replace(f" {the}", " them")
+    return ln
+
+
+def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gists: list = (), covered: set = frozenset(),
                   key=()) -> str | None:
-    """Each club's habits, then what they mean when they meet: the trait calls' own lines first, then our pairings."""
+    """Each club's habits, then what they mean when they meet: the trait calls' own lines first, then our pairings.
+    A meeting line about a habit a club's own list tells goes with that habit, right after the list (Sora, 2026-10-30:
+    the team against the league and the team against tonight's opponent are told in tandem when they agree); the rest
+    close the paragraph, with "That means" only when the habits behind them were told."""
     from pipeline.export.stories import _pick
     sents = []
     picks = {t: _picks(t, fp) for t in (away, home)}
@@ -342,36 +366,55 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         sents.append(f"Both teams {and_list([HABITS[k][0 if side(b) else 1] for k, b in shared])}.")
         gone = {k for k, _ in shared}
         picks = {t: [x for x in v if x[1] not in gone] for t, v in picks.items()}
-    told = 0
+    lines = [(g, set()) if isinstance(g, str) else (g[0], set(g[1])) for g in gists if g and (g if isinstance(g, str) else g[0])]
+    for _, text, ks in consequences(away, home, fp, W, set(covered)):
+        if len(lines) >= 2:
+            break
+        lines.append((cap(text) + ".", ks))
+    lines = lines[:2]
+    # pair a line with the club whose list tells one of its habits (the later club when both do)
+    paired = {}
+    for i, (ln, ks) in enumerate(lines):
+        if ln.startswith("Both"):
+            continue
+        for t in (home, away):
+            hit = next((x for x in picks[t] if x[1] in ks), None)
+            if hit and t not in paired and len(picks[t]) > 1:
+                paired[t] = (hit, ln)
+                picks[t] = [x for x in picks[t] if x is not hit]
+                break
+    used = {ln for _, ln in paired.values()}
+    told, told_traits = 0, set()
     for t in (away, home):
+        told_traits |= {k for _, k, _ in picks[t]}
         s = style(t, picks[t], W, stat_words(t, season, day), second=bool(told), key=key)
         if s:
             sents.append(s + ".")
             told += 1
+        if t in paired:  # "They also sit back rather than chase on the forecheck, so the Canadiens have the edge ..."
+            (_, k, b), ln = paired[t]
+            told_traits.add(k)
+            link = ", and " if any(x in ln for x in FACE_OFF) else ", so "
+            sents.append(f"They also {HABITS[k][0 if side(b) else 1]}{link}{_them(_lower(ln), t, W)}")
         sc = scoring(t, season, day, W)
         if sc:
             sents.append(sc)
     said = " ".join(sents)
-    lines = [g for g in gists if g]
-    for _, text, _k in consequences(away, home, fp, W, set(covered)):
-        if len(lines) >= 2:
-            break
-        if text not in said:
-            lines.append(cap(text) + ".")
+    rest = [(ln, ks) for ln, ks in lines if ln not in used and ln not in said]
     # two lines make one sentence when the second is short (Sora, 2026-10-30: "So ... . And both teams ..." read as
     # fragments); a second line with its own comma stands as a sentence with a full lead-in
-    lines = lines[:2]
-    if lines:
-        ln = lines[0]
-        joins = (ln.split(" ", 1)[0] in ("The", "It’s", "Something", "Expect", "Both", "Good")  # "So the Rangers aren’t ..." reads wrong
-                 and not any(x in ln for x in ("strength against strength", "has to give", "meets a team")))  # a face-off, not a result
+    if rest:
+        ln, ks = rest[0]
+        follows = not ks or ks & told_traits  # "That means" only when a habit behind it was just told
+        joins = (ln.split(" ", 1)[0] in ("The", "It’s", "Something", "Expect", "Good")  # "So the Rangers aren’t ..." reads wrong
+                 and not any(x in ln for x in FACE_OFF) and follows)
         lead = _pick(["Put that together and ", "That means "] if not ln.startswith("Expect") else ["Put that together and "], *key, "meet1") \
             if joins and sents else ""
         first = lead + _lower(ln) if lead else ln
-        if len(lines) == 2 and "," not in lines[1] and "," not in first:
-            first = first[:-1] + ", and " + _lower(lines[1])
-        elif len(lines) == 2:
-            two = lines[1]
+        if len(rest) == 2 and "," not in rest[1][0] and "," not in first:
+            first = first[:-1] + ", and " + _lower(rest[1][0])
+        elif len(rest) == 2:
+            two = rest[1][0]
             first += " " + (_pick(["On top of that, ", "Beyond that, "], *key, "meet2") + _lower(two)
                             if two.split(" ", 1)[0] in ("The", "It’s", "Something", "Both", "Good") else two)
         sents.append(first)

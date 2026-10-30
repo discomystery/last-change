@@ -83,8 +83,18 @@ def test_consequences_join_the_paragraph(monkeypatch):
     monkeypatch.setattr(pm, "stat_words", lambda *a: {})
     fp = {"FLA": dims(pp=(95, 2), forecheck=(96, 2)), "WPG": dims(pk=(10, 29), longShifts=(10, 29))}
     s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,))
-    assert "power play could do real damage" in s and "forecheck could keep the Jets pinned" in s
-    assert any(x in s for x in ("So the Panthers", "Put that together and the Panthers", "That means the Panthers"))
+    assert "power play could do real damage" in s and "forecheck could keep" in s
+    # each meeting line rides on the habit it comes from, right after that club's list (Sora, 2026-10-30)
+    assert "They also have a dangerous power play, so their power play could do real damage when the Jets are shorthanded" in s \
+        or "They also have a leaky penalty kill, so the Panthers’ power play could do real damage when they’re shorthanded" in s
+
+
+def test_a_line_whose_habits_were_not_told_gets_no_lead_in(monkeypatch):
+    monkeypatch.setattr(pm, "scoring", lambda *a: None)
+    monkeypatch.setattr(pm, "stat_words", lambda *a: {})
+    fp = {"FLA": dims(physical=(97, 2)), "WPG": dims(pace=(5, 31))}
+    s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), gists=[("The Panthers’ power play could do real damage.", {"pp", "pk"})], key=(1,))
+    assert "That means" not in s and "Put that together" not in s
 
 
 def test_earlier_games_are_told_by_day():

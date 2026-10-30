@@ -492,7 +492,7 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
     if all(abs(r["gap"]) < TEXT_GAP for r in rows.values()):
         return None
 
-    up = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "winning one-goal games"}
+    up = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "pulling off wins in one-goal games"}
     down = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "losses in one-goal games have"}
 
     def why(r):

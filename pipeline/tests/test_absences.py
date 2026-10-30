@@ -23,17 +23,17 @@ def test_season_rank_for_intros():
 
 
 def test_right_now_for_games():
-    assert A.sentence(row(), the) == "Taking into account how much value each missing player usually adds, no team is missing more right now."
-    assert A.sentence(row(now_rank=3, now_ahead=["Flyers", "Wild"]), the) == "Taking into account how much value each missing player usually adds, only the Flyers and the Wild are missing more right now."
+    assert A.sentence(row(), the) == "Taking into account how much value each of these missing players usually adds, no team is missing more right now."
+    assert A.sentence(row(now_rank=3, now_ahead=["Flyers", "Wild"]), the) == "Taking into account how much value each of these missing players usually adds, only the Flyers and the Wild are missing more right now."
     assert A.sentence(row(now_rank=4), the) is None
     assert A.sentence(row(now_lost=0.25), the) is None  # under twice the median club's
     assert A.sentence(row(now_lost=0.18, now_median=0.05), the) is None  # under the floor
     assert A.postgame_line(row(), "the Hurricanes", True, the) == (
         "The Hurricanes won without Seth Jarvis, Taylor Hall, Jordan Staal and others. "
-        "Taking into account how much value each missing player usually adds, no team was missing more at the time.")
+        "Taking into account how much value each of these missing players usually adds, no team was missing more at the time.")
     assert A.postgame_line(row(now_rank=2, now_ahead=["Flyers"], names=[(1, "Seth Jarvis")]), "the Hurricanes", False, the) == (
         "The Hurricanes were without Seth Jarvis. "
-        "Taking into account how much value each missing player usually adds, only the Flyers were missing more at the time.")
+        "Taking into account how much value each of these missing players usually adds, only the Flyers were missing more at the time.")
 
 
 def test_filling_text():

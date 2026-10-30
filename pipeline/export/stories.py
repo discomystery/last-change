@@ -1397,7 +1397,9 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         if c["kind"] in preview_more.TRAIT_CALLS:  # a call about the two styles is what they mean against each other
             covered |= {x for x in (c.get("metric"), (c.get("check") or {}).get("metric")) if isinstance(x, str)}
             if c.get("gist") and c["kind"] not in kinds and len(style_gists) < 2:
-                style_gists.append(preview_more.meet_line(c["kind"], c.get("metric"), c.get("team"), c.get("opp"), W, c.get("gist") or "") or c["gist"])
+                traits = {x for x in (c.get("metric"), (c.get("check") or {}).get("metric")) if isinstance(x, str)}
+                style_gists.append((preview_more.meet_line(c["kind"], c.get("metric"), c.get("team"), c.get("opp"), W, c.get("gist") or "")
+                                    or c["gist"], preview_more.partners(traits)))
                 kinds.add(c["kind"])
             continue
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
