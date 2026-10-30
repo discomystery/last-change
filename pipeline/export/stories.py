@@ -1295,6 +1295,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             lead, n = (home, wins) if wins * 2 > len(m) else (away, len(m) - wins)
             sents.append(f"{_cap(W.the(lead))} have won {num(n)} of the {num(len(m))} meetings this season.")
     # form
+    ups = {}  # each club's form sentence and whether it is going their way, for joining the two below
     form = {t: _form_sentence(t, facts["form"][t], W, bool(m), away if t == home else home) for t in (home, away)}
     sh, sa = facts["form"][home]["streak"], facts["form"][away]["streak"]
     order = sorted((home, away), key=lambda t: not defining_run(facts["form"][t]["res"]))  # the bigger run first
@@ -1304,27 +1305,46 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         sents.append(f"Both teams come in on {a_num(sh[1])}-game losing streak.")
     elif form[home] and form[away]:  # two streaks: separate sentences, since "but" only fits a real contrast (Sora, 2026-10-12)
         sents += [form[t] for t in order]
+        ups.update({t: (form[t], facts["form"][t]["streak"][0] == "won") for t in order})
     elif any(form.values()):
         for t in order:
             if form[t]:
                 sents.append(form[t])
+                ups[t] = (form[t], facts["form"][t]["streak"][0] == "won")
             elif facts["form"][t]["res"]:
                 last_ = _last_out(t, facts["form"][t], W, away if t == home else home)
                 sents.append(_cap(last_ + "." if not last_.endswith(")") else f"{last_.split(' (')[0]} are {facts['form'][t]['record']}."))
+                ups[t] = (sents[-1], facts["form"][t]["res"][-1]["win"])
     else:
         fa, fh = facts["form"][away], facts["form"][home]
         if fa["res"] and fh["res"]:
             a_, h_ = _last_out(away, fa, W, home), _last_out(home, fh, W, away)
             wa, wh = (when_before(f_["res"][-1]["date"], start) for f_ in (fa, fh))
+            join = ", and " if fa["res"][-1]["win"] == fh["res"][-1]["win"] else ", while "  # a win beside a loss is a contrast
             if wa == wh and a_.endswith(wa) and h_.endswith(wh):  # one "on Tuesday" a sentence
-                sents.append(_cap(f"{a_}, and {h_[: -len(wh)]}the same night."))
+                sents.append(_cap(f"{a_}{join}{h_[: -len(wh)]}the same night."))
             elif not a_.endswith(")") or not h_.endswith(")"):
-                sents.append(_cap(f"{a_}, and {h_}."))
+                sents.append(_cap(f"{a_}{join}{h_}."))
             else:
                 sents.append(f"{_cap(W.the(away))} come in at {fa['record']}, {W.the(home)} at {fh['record']}.")
     if m and any(defining_run(facts["form"][t]["res"]) for t in (home, away)):
         # a season-defining run leads, ahead of the last meeting (Sora, 2026-10-18: "winless in nine" came second)
         sents = sents[1:] + sents[:1]  # the meetings sentence is always the first one
+    # the two clubs’ form in one sentence, joined by how it compares (Sora, 2026-10-30): "while" for a hot team beside a cold
+    # one, "and" when both are going the same way; a sentence that already has a comma stays on its own
+    if len(ups) == 2 and all(x in sents for x, _ in ups.values()) and "," not in "".join(x for x, _ in ups.values()):
+        ia, ih = sents.index(ups[away][0]), sents.index(ups[home][0])
+        if abs(ia - ih) == 1:
+            i = min(ia, ih)
+            first, then = sents[i], sents[i + 1]
+            t2 = home if i + 1 == ih else away
+            same = ups[home][1] == ups[away][1]
+            X2 = _cap(W.the(t2))
+            if then.startswith(X2 + " have ") and i + 2 < len(sents) and sents[i + 2].startswith(X2 + " "):
+                then = f"{W.place(t2)} has " + then[len(X2 + " have "):]  # "... Florida has won two in a row. The Panthers won ..."
+            elif then.startswith("The "):
+                then = "the " + then[4:]
+            sents[i: i + 2] = [first[:-1] + (", and " if same else ", while ") + then]
     for i in range(len(sents) - 1):  # "The Kraken have won both meetings. The Kraken (8-4-1) beat ..." names them by place first
         for t in (home, away):
             X = _cap(W.the(t))
