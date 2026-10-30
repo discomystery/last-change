@@ -585,14 +585,20 @@ def _goalie_games(season: int) -> pl.DataFrame:
     return goalies.per_game(season).select("game_id", "goalie_id", "date", "sa", "ga", "started")
 
 
+NET_STARTS, NET_OFF = 4, 0.020  # starts, and save percentage off the league's, for "has been terrific" / "has struggled"
+
+
 def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: dict) -> str | None:
     """The projected starters with their season so far: record, save percentage, starts."""
     from pipeline.export import goalie_streaks
     if not projected:
         return None
+    from pipeline.export.stories import _pick
     gg = _goalie_games(season).filter(pl.col("date") < day)
     dec = goalie_streaks.decisions(season)
-    parts = []
+    lsa = int(gg["sa"].sum()) if gg.height else 0
+    lg = (lsa - int(gg["ga"].sum())) / lsa if lsa else None  # the league's save percentage so far
+    parts, said = [], []
     for t in (away, home):
         x = projected.get(t)
         if not x or x["id"] not in N:
@@ -609,7 +615,30 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
         sa, ga = int(mine["sa"].sum()), int(mine["ga"].sum())
         sv = f"{(sa - ga) / sa:.3f}".lstrip("0") if sa else None
         # "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) should get the start for Winnipeg": the line is a tag on the page
-        parts.append(f"{N[pid]} ({rec}{' / ' + sv + ' SV%' if sv else ''} in {starts} GS) {verb} for {W.place(t)}")
+        tag = f"{N[pid]} ({rec}{' / ' + sv + ' SV%' if sv else ''} in {starts} GS)"
+        # a word on how his season has gone, earned by the numbers (Sora, 2026-10-30, liked "Jacob Fowler has been
+        # terrific for Montréal" in a rewrite): save percentage .020 off the league's, over 4+ starts
+        off = (sa - ga) / sa - lg if sa and lg else 0
+        if starts >= NET_STARTS and off >= NET_OFF:
+            how = _pick([f"has been terrific for {W.place(t)}", f"has been outstanding for {W.place(t)}",
+                         f"has been a rock in net for {W.place(t)}"], pid, day, "net+")
+            said.append((t, f"{tag} {how} and {verb}"))
+        elif starts >= NET_STARTS and off <= -NET_OFF:
+            how = _pick([f"has struggled for {W.place(t)} so far", f"has had a rough start to the season for {W.place(t)}"], pid, day, "net-")
+            said.append((t, f"{tag} {how}, but {verb}"))
+        else:
+            parts.append(f"{tag} {verb} for {W.place(t)}")
+    if said:  # a judged goalie gets a sentence of his own, in game order; a plain one beside it takes other words
+        plain = {t: x for t, x in zip([t for t in (away, home) if t not in dict(said) and projected.get(t) and projected[t]["id"] in N], parts)}
+        alt = {"should get the start for": "is the likely starter for", "is expected to start for": "is expected to go for"}
+        out = []
+        for t in (away, home):
+            if t in dict(said):
+                out.append(dict(said)[t])
+            elif t in plain:
+                x = plain[t]
+                out.append(next((x.replace(a, b, 1) for a, b in alt.items() if a in x), x))
+        return " ".join(cap(x) + "." for x in out)
     if not parts:
         return None
     if len(parts) == 2:
