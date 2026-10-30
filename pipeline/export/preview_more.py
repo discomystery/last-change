@@ -102,7 +102,7 @@ FEW_WORSE = {
     "qualityAllowed": ("give up more dangerous shots", "gives up more dangerous shots"),
     "pp": ("get less from their power play", "gets less from its power play"),
     "pk": ("kill penalties worse", "kills penalties worse"),
-    "longShifts": ("get pinned in their own end more often", "gets pinned in its own end more often"),
+    "longShifts": ("get stuck in their own end more", "gets stuck in its own end more"),
     "shotsThrough": ("get more of their shots blocked", "gets more of its shots blocked"),
     "icing": ("ice the puck more", "ices the puck more"),
 }
@@ -148,33 +148,30 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
         (downs if _is_bad(k, b) else ups).append((k, b, words, st.get(k, {}).get("hi" if hi else "lo")))
     figured = {k for k, b, w, f in ups + downs if f}
 
+    # ranks only at the top end of a scale ("32nd in rough stuff" reads as a knock on a calm team), and each rides on its
+    # own habit (Sora, 2026-10-30: a rank in a later sentence read as a repeat, cut off from what it was about)
+    told = {k for k, b, w, _ in ups
+            if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k not in figured and k != "depth" and not ("anyone" in w or "league’s" in w)}
+    ups = [(k, b, w + (f" ({ordinal_word(b['rank'])} in the league)" if k in told else ""), f) for k, b, w, f in ups]
+
     def told_list(group):  # the figure behind a habit: a trailing clause on the last one, in brackets mid-list
         return and_list([w + ("" if not f else f", {f[0]} ({f[1]})" if i == len(group) - 1 else f" ({f[0]}, {f[1]})")
                          for i, (k, b, w, f) in enumerate(group)])
     mixed = bool(ups and downs) and any(_is_good(k, b) for k, b, _, _ in ups)
-    out = X + " " + (f"{told_list(ups)}, but {told_list(downs)}" if mixed else told_list(ups + downs))
-    # ranks only at the top end of a scale: "32nd in rough stuff" reads as a knock on a calm team
-    told = [(b["rank"], k) for k, b, w, _ in ups
-            if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k not in figured and k != "depth" and not ("anyone" in w or "league’s" in w)]
-    if mixed and told:  # one contrast a sentence: the ranks get their own
-        r, k = told[0]
-        out += (f". No team is better at {LABELS[k]}" if r == 1 and k not in NEUTRAL else f". They’re {ordinal_word(r)} in {LABELS[k]}")
-    elif figured and told:  # a list that already carries a figure gets its ranks in a sentence of their own
-        out += ". They’re " + and_list([f"{ordinal_word(r)} in {LABELS[k]}" for r, k in told])
-    elif len(told) > 1 and len(told) == len(picked) and all(r == told[0][0] for r, _ in told):
-        out += f", and they’re {ordinal_word(told[0][0])} in the league in {'both' if len(told) == 2 else 'all three'}"
-    elif told:
-        out += ", and they’re " + and_list([f"{ordinal_word(r)} in {LABELS[k]}" for r, k in told])
+    order = ups + downs
+    out = X + " " + (f"{told_list(ups)}, but {told_list(downs)}" if mixed else told_list(order))
+    worst = next(((k, b) for k, b, _, _ in downs if k in FEW_WORSE and k not in figured and b["rank"] >= 30), None)
+    if worst:  # "Only three teams average a lower chance of scoring per shot.", after its habit when that ends the list
+        k, b = worst
+        n = 32 - b["rank"]
+        few = f"no team {FEW_WORSE[k][1]}" if n == 0 else f"only {num(n)} {'team' if n == 1 else 'teams'} {FEW_WORSE[k][1 if n == 1 else 0]}"
+        last = (downs if mixed else order)[-1][0]
+        out += f": {few}" if last == k else f". {cap(few)}"
     low = next(((k, b) for k, b, _, _ in ups + downs if k in BOTTOM and b["pct"] < 50 and b["rank"] >= 30), None)
     if low:  # "No team gives its bottom six less of the ice time."
         k, b = low
         n = 32 - b["rank"]
         out += f". No team {BOTTOM[k][1]}" if n == 0 else f". Only {num(n)} {'team' if n == 1 else 'teams'} {BOTTOM[k][1 if n == 1 else 2]}"
-    worst = next(((k, b) for k, b, _, _ in downs if k in FEW_WORSE and k not in figured and b["rank"] >= 30), None)
-    if worst:  # "Only three teams average a lower chance of scoring per shot."
-        k, b = worst
-        n = 32 - b["rank"]
-        out += f". No team {FEW_WORSE[k][1]}" if n == 0 else f". Only {num(n)} {'team' if n == 1 else 'teams'} {FEW_WORSE[k][1 if n == 1 else 0]}"
     return out
 
 
@@ -342,9 +339,9 @@ def consequences(away: str, home: str, fp: dict, W, covered: set) -> list[tuple[
                 out.append((abs(pa - 50) + abs(pb - 50), text.format(**w), {ka, kb}))
     both = lambda k, test: all(pct(t, k) is not None and test(pct(t, k)) for t in (away, home))
     if "pace" not in covered and both("pace", lambda p: p >= MEET_HI):
-        out.append((60, "expect a fast, open game", {"pace"}))
+        out.append((60, "both teams like to play fast, so expect an open game", {"pace"}))
     elif "pace" not in covered and both("pace", lambda p: p <= MEET_LO):
-        out.append((60, "expect a tight, low-event game", {"pace"}))
+        out.append((60, "both teams play slow, low-event hockey, so expect a tight one", {"pace"}))
     heavy = [t for t in (away, home) if (pct(t, "physical") or 0) >= 85 and (pct(t, "rough") or 0) >= 70]
     if "physical" not in covered and (heavy or both("physical", lambda p: p >= MEET_HI)):
         out.append((70 if heavy else 50, "expect a chippy, heavy game" if heavy else "both teams like to hit, so expect plenty of it", {"physical"}))
@@ -406,6 +403,18 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
                 # told with the shorthanded threat: "that sets up a fight with the Panthers’ power play, which could ..."
                 as_pair[lines[i][0]] = f"that sets up a fight with {W.poss(a)} power play, which {rest}"
                 break
+    # a habit both share, told as "Both teams ...", that one club has to a higher degree: said once, with that club named
+    # (Sora, 2026-10-30: "The Flames play some of the league’s fastest games" and later "Both teams like to play fast")
+    for i, (ln, ks) in enumerate(lines):
+        if not (ln.lower().startswith("both teams") and len(ks) == 1 and ", so " in ln):
+            continue
+        k = next(iter(ks))
+        high = "slow" not in ln and "tight" not in ln
+        own = [(t, x) for t in (away, home) for x in picks[t] if x[1] == k and side(x[2]) == high]
+        if len(own) == 1:
+            t, x = own[0]
+            picks[t] = [y for y in picks[t] if y is not x]
+            lines[i] = (ln.replace(", so ", f", {W.the(t)} most of all, so ", 1), ks)
     # pair a line with the club whose list tells one of its habits (the later club when both do)
     paired = {}
     for i, (ln, ks) in enumerate(lines):

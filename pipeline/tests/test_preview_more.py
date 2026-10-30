@@ -40,7 +40,7 @@ def test_a_low_rank_is_never_told():
 def test_strengths_and_weaknesses_take_one_but():
     fp = {"WPG": dims(qualityAllowed=(97, 1), suppression=(5, 31))}
     s = pm.style("WPG", pm._picks("WPG", fp), W())
-    assert s.startswith("The Jets keep dangerous shots away better than anyone, but give up a lot of shots.")
+    assert s.startswith("The Jets keep dangerous shots away better than anyone, but give up a lot of shots: only one team gives up more shots")
     assert s.count(" but ") == 1
 
 
@@ -114,3 +114,17 @@ def test_earlier_games_are_told_by_day():
     assert when_before("2026-10-27", "2026-10-30") == "on Tuesday"
     assert when_before("2026-10-21", "2026-10-30") == "on Oct 21"
     assert when_before("2026-10-29", None) == "last time out"
+
+
+def test_a_rank_rides_on_its_habit():
+    fp = {"WPG": dims(longShifts=(92, 3), quality=(2, 32))}
+    s = pm.style("WPG", pm._picks("WPG", fp), W())
+    assert s == "The Jets rarely get pinned in their own end (third in the league), but take a lot of low-quality shots: no team averages a lower chance of scoring per shot"
+
+
+def test_a_shared_habit_one_club_leads_is_said_once(monkeypatch):
+    monkeypatch.setattr(pm, "scoring", lambda *a: None)
+    monkeypatch.setattr(pm, "stat_words", lambda *a: {})
+    fp = {"FLA": dims(pace=(75, 8), physical=(97, 2)), "WPG": dims(pace=(95, 2), quality=(5, 31))}
+    s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,))
+    assert "Both teams like to play fast, the Jets most of all" in s and "fastest" not in s
