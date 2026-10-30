@@ -62,3 +62,24 @@ def test_an_edge_body_that_only_repeats_its_headline_is_caught():
     from pipeline.export import previews
     assert previews.echoes("The Ants hound the puck, the Bees sit back", "The Ants hound the puck, but the Bees sit back.")
     assert not previews.echoes("Bruisers against finesse", "The Ants hit a lot, but the Bees mostly don’t.")
+
+
+def test_no_contrast_sentence_carries_an_and_chain():
+    """"Even though Florida will be without Barkov, the Panthers have been out-chancing opponents lately and have
+    home-ice advantage, and Winnipeg will be without Morrissey" (found by the self-check, 2026-10-30)."""
+    import itertools
+    from pipeline.export import textcheck
+    places, nicks = {"AAA": "Alpha", "BBB": "Beta"}, {"AAA": "the Ants", "BBB": "the Bees"}
+    for xgd, b2b, home, wo, back in itertools.product([0.0, 0.03, -0.1], [0, 0.02, -0.02], [0.02, 0.06], [None, "AAA", "BBB"], [None, "AAA", "BBB"]):
+        steps = [{"input": "xgd", "shift": xgd}, {"input": "b2b", "shift": b2b}, {"input": "home", "shift": home}, {"input": "roster", "shift": 0.03}]
+        lu = {}
+        if wo:
+            lu.setdefault(wo, {})["without"] = "Star"
+        if back:
+            lu.setdefault(back, {})["back"] = "Ace"
+        body = outlook._why(steps, "AAA", "BBB", "BBB", places, lu, nicks)
+        assert not [f for f in textcheck.check_text(body) if f["level"] == "error"], body
+    body = outlook._why([{"input": "xgd", "shift": 0.06}, {"input": "home", "shift": 0.03}, {"input": "roster", "shift": 0.02}],
+                        "AAA", "BBB", "BBB", places, {"AAA": {"without": "Star"}, "BBB": {"without": "Ace"}}, nicks)
+    assert body == ("Even though Beta will be without Ace, the Bees have been out-chancing opponents lately and have "
+                    "home-ice advantage. On top of that, Alpha will be without Star."), body

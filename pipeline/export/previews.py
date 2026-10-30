@@ -19,7 +19,6 @@ Reads the site JSON the other exports have just written (fingerprints, lines), s
 """
 import json
 import re
-import zlib
 from functools import lru_cache
 from datetime import date, datetime, timedelta, timezone
 
@@ -310,7 +309,8 @@ MAX_CALLS, MIN_CALLS, MAX_PER_KIND = 4, 2, 2
 
 
 def _pick(pool: list[str], *key) -> str:
-    return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
+    from pipeline.export import variety
+    return variety.pick(pool, *key)  # by a CRC of the key, staying away from the teams' recent previews
 
 
 MIN_HOME_GAMES, MIN_MINUTES = 3, 30  # before a home matching habit becomes a call
@@ -1248,7 +1248,9 @@ def nhl_lineup(g: dict, rebuilt: bool = False) -> dict | None:
             continue
         f, d = NP.shape(lu)
         out["teams"][t] = {"lines": [named(x) for x in lu["lines"]], "pairs": [named(x) for x in lu["pairs"]], "extra_d": named(lu.get("extra_d") or []),
-                           "f": f, "d": d, "eleven": f == 11 and d == 7}
+                           "f": f,
+                           # everyone it projects to dress, names known or not (stories.expected_lineup)
+                           "ids": sorted({p for x in lu["lines"] + lu["pairs"] for p in x} | set(lu.get("extra_d") or []) | set(lu.get("goalies") or [])), "d": d, "eleven": f == 11 and d == 7}
     teams_json = {x["abbr"]: x for x in json.loads((SITE_DATA / "teams.json").read_text())} if (SITE_DATA / "teams.json").exists() else {}
     aliases = {t: [x for x in (teams_json.get(t, {}).get(k) for k in ("place", "nick", "name")) if x] for t in teams}
     facts = NP.status_facts(got.get("status"), aliases, people)
@@ -1261,6 +1263,18 @@ def nhl_lineup(g: dict, rebuilt: bool = False) -> dict | None:
 
 def snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
              likely: dict | None = None, **extra) -> dict:
+    """One game's preview, its wording kept away from what both teams' last few previews said (export/variety.py)."""
+    from pipeline.config import SITE_DATA
+    from pipeline.export import variety
+    with variety.game(variety.recent(SITE_DATA / "previews", (g["away"], g["home"]), g["start"])) as picked:
+        out = _snapshot(g, site, places, sched, now, chance, likely, **extra)
+    out["picks"] = sorted(set(picked))
+    variety.remember(out)
+    return out
+
+
+def _snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetime, chance: dict | None = None,
+              likely: dict | None = None, **extra) -> dict:
     """`chance` is the win model's morning figure for the game; only the words it picks are saved, never the number.
     `likely` is each team's likely starting goalies (starters.upcoming); only their order is saved."""
     away, home = g["away"], g["home"]

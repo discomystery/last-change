@@ -88,7 +88,8 @@ def streak_text(gn: int, pn: int, games: int, vs: str = "", atleast: bool = Fals
 
 
 def _pick(pool: list[str], *key) -> str:
-    return pool[zlib.crc32("-".join(map(str, key)).encode()) % len(pool)]
+    from pipeline.export import variety
+    return variety.pick(pool, *key)  # by a CRC of the key, staying away from the teams' recent previews
 
 
 def _secs(toi: str | None) -> int:
@@ -491,8 +492,11 @@ def _race_after(gid: int, day: str, teams: tuple[str, str], W: Words, season: in
 
 
 def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON, likely: dict | None = None,
-                  gid: int | None = None) -> dict:
-    """Everything the preview story can say, from games before `before` (a date)."""
+                  gid: int | None = None, expected_in: set | None = None) -> dict:
+    """Everything the preview story can say, from games before `before` (a date). `expected_in` holds the players
+    NHL.com's game-day preview puts in tonight's lineup: none of them is told as out (the self-check of 2026-10-30
+    found 30 of 33 players our Out items named who then dressed were in NHL.com's projected lineup)."""
+    expected_in = expected_in or set()
     G, P, N = book()
     G, P = G.filter(pl.col("date") < before[:10]), P.filter(pl.col("date") < before[:10])
     cur = _current_team(P, season)
@@ -515,10 +519,10 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         out["form"][t] = {"res": res, "streak": streak(res), "record": record(res)}
     items = out["items"]
     for t, o in ((away, home), (home, away)):
-        skip = set(reported.get(t, {}))
+        skip = set(reported.get(t, {})) - expected_in
         out["out"] |= skip
         told, team_out = [], []
-        for k, n in enumerate(notes.get(t, [])):
+        for k, n in enumerate(x for x in notes.get(t, []) if x["pid"] not in expected_in):
             out["out"].add(n["pid"])
             team_out.append({"score": 76 - k, "pid": n["pid"], "who": N.get(n["pid"]) or n["player"], "missed": n.get("games") or 0,
                              "last_played": n.get("last_played")})
@@ -541,7 +545,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             items.append({"tag": "In net", "text": text, "score": 86, "pid": ids[0], "pids": ids})
             keepers = []
         for r in keepers:
-            if r["player_id"] in told:
+            if r["player_id"] in told or r["player_id"] in expected_in:
                 continue
             from pipeline.export import changes
             nxt = next(((p, q) for p, q in ((likely or {}).get(t) or []) if p not in skip), None)
@@ -1115,6 +1119,12 @@ def _listed_injured(season: int, day: str, team: str) -> set[int]:
     return out
 
 
+def expected_lineup(nhl: dict | None) -> set[int]:
+    """Everyone NHL.com's game-day preview (`previews.nhl_lineup`) puts in either club's lineup tonight: its projected
+    lines, pairs, extra defensemen and both goalies."""
+    return {p for mine in ((nhl or {}).get("teams") or {}).values() for p in mine.get("ids") or []}
+
+
 def _game_day(nhl: dict | None, away: str, home: str, day: str, W: "Words", N: dict[int, str], lines: dict, fp: dict | None,
               season: int) -> tuple[list[dict], set[int]]:
     """Who to watch items from NHL.com's game-day preview (`previews.nhl_lineup`): a projected 11 forwards and 7
@@ -1225,7 +1235,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     """The story for one preview, from data before the game and the calls already chosen for it. `start` is the game's
     local date: games are dated locally, so a late start's UTC date would count the game itself."""
     W = Words(places)
-    facts = preview_facts(away, home, start, W, season, likely, gid)
+    facts = preview_facts(away, home, start, W, season, likely, gid, expected_lineup(nhl))
     _, _, N = book()
     sents = []
     # the last meeting(s)
