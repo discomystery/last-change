@@ -167,3 +167,31 @@ def test_hometown_matches_the_club_city(monkeypatch):
         place = staticmethod(lambda t: {"WPG": "Winnipeg", "CAR": "Carolina", "MTL": "Montréal"}[t])
     assert stories.hometown(1, "WPG", Places) and stories.hometown(2, "CAR", Places) and stories.hometown(3, "MTL", Places)
     assert not stories.hometown(1, "CAR", Places)
+
+
+def _net(monkeypatch, tmp_path, starters):
+    """A club's recent starts (oldest first, goalie 1 or 2) for pm._options."""
+    import polars as pl
+    from pipeline.export import changes, previews
+    monkeypatch.setattr(changes, "_team_ids", lambda season: {"FLA": 13})
+    monkeypatch.setattr(previews, "_full_names", lambda ids: {1: "Sergei Bobrovsky", 2: "Daniil Tarasov"})
+    monkeypatch.setattr(pm, "TABLES", tmp_path)
+    days = [f"2026-10-{d:02d}" for d in range(10, 10 + 2 * len(starters), 2)]
+    gg = pl.DataFrame({"game_id": list(range(len(starters))), "team_id": [13] * len(starters), "started": [True] * len(starters),
+                       "date": days, "goalie_id": starters, "sa": [30] * len(starters), "ga": [3] * len(starters)})
+    return pm._options("FLA", 2026, "2026-10-30", gg, {}, W())
+
+
+def test_clear_starter_back_after_a_backup_start_is_not_a_guess(monkeypatch, tmp_path):
+    s = _net(monkeypatch, tmp_path, [1, 1, 1, 1, 1, 1, 1, 2])
+    assert "expect him back in net after Tarasov got the last one" in s and pm.GUESS not in s
+
+
+def test_clear_starter_who_played_last_may_get_a_rest(monkeypatch, tmp_path):
+    s = _net(monkeypatch, tmp_path, [2, 1, 1, 1, 1, 1, 1, 1])
+    assert "could turn to Tarasov to give him a rest" in s and s.endswith(pm.GUESS)
+
+
+def test_shared_net_stays_a_guess(monkeypatch, tmp_path):
+    s = _net(monkeypatch, tmp_path, [1, 2, 1, 2, 1, 2])
+    assert "split the last six starts" in s and s.endswith(pm.GUESS)

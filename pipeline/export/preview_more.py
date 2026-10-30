@@ -793,7 +793,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
     # Kochetkov and Brandon Bussi as options in net ... It's anyone's guess who will take the net")
     open_ = [(t, x) for t in (away, home) if not (projected.get(t) and projected[t]["id"] in N)
              for x in [_options(t, season, day, gg, dec, W)] if x]
-    if len(open_) == 2:  # "anyone's guess" once, for both
+    if len(open_) == 2 and all(GUESS in x for _, x in open_):  # "anyone's guess" once, for both
         (t1, x1), (t2, x2) = open_
         open_ = [(t1, x1.replace(" " + GUESS, "")), (t2, x2.replace(GUESS, "For both teams, it’s anyone’s guess who gets the net.")
                                                       .replace(" has two options in net:", " also has two options:", 1))]
@@ -821,6 +821,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
 
 GUESS = "It’s anyone’s guess who gets the net."
 OPTION_GAMES = 10  # a club's last games whose starters are its options in net when no one is the likely starter
+CLEAR = 2  # a goalie with twice his partner's recent starts is the club's clear first choice
 
 
 def _options(t: str, season: int, day: str, gg: pl.DataFrame, dec: dict, W) -> str | None:
@@ -863,6 +864,14 @@ def _options(t: str, season: int, day: str, gg: pl.DataFrame, dec: dict, W) -> s
     n_games = recent["game_id"].n_unique()
     first = f"{W.place(t)} has two options in net: {tag(a)} and {tag(b)}"
     last_name = lambda pid: names[pid].split(" ", 1)[1]
+    if na >= CLEAR * nb and latest == b:
+        # a clear first choice whose backup got the last start: he is the one to expect back, not a coin flip
+        # (Sora, 2026-10-30: "anyone's guess" only when the starter played last and may get a rest)
+        return (f"{first}. {last_name(a)} has started {num(na)} of their last {num(n_games)} games, so expect him back "
+                f"in net after {last_name(b)} got the last one {when_before(lb, day)}.")
+    if na >= CLEAR * nb:  # the first choice played last: the club may give him a rest
+        return (f"{first}. {last_name(a)} has started {num(na)} of their last {num(n_games)} games, including the last one "
+                f"{when_before(la, day)}, so {W.place(t)} could turn to {last_name(b)} to give him a rest. {GUESS}")
     if na > nb:
         more = (f"{last_name(a)} has started {num(na)} of their last {num(n_games)} games"
                 + (f", including the last one {when_before(la, day)}" if latest == a else f", but {last_name(b)} got the last one {when_before(lb, day)}"))
