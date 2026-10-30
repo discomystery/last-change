@@ -665,6 +665,17 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             items += [x for x in _milestones(t, res[-1], P, N, before) if x.get("pid") not in skip]
             items += [x for x in _club_chases(t, res[-1], P, N, W, before, season) if x.get("pid") not in skip]
     item = _goalie_on_the_road(away, home, before, W, N, (likely or {}).get(away))
+    # a likely starter on a winning run (Sora, 2026-10-30: Kochetkov's nine straight to open the season)
+    from pipeline.export import goalie_streaks
+    for t in (away, home):
+        lk = (likely or {}).get(t) or []
+        if not lk or lk[0][1] < LIKELY or lk[0][0] in out["out"]:
+            continue
+        run_ = goalie_streaks.preview_item(lk[0][0], t, season, day, N, W)
+        if run_ and item and item.get("pid") == run_["pid"]:  # one item for one goalie: the run first, then the rink
+            item = {**item, "text": f"{run_['text']} {item['text']}", "score": max(item["score"], run_["score"])}
+        elif run_:
+            items.append(run_)
     if item:
         items.append(item)
     # Sora's notes on what makes a game worth watching (2026-10-14): last spring's series, brothers, the bottom of the
@@ -1666,7 +1677,7 @@ def _saved_preview_items(gid: int) -> list[tuple[str, str]]:
     return [(x.get("tag", ""), x.get("text", "")) for x in items if x.get("tag") in FOLLOW_TAGS]
 
 
-def _number_of(word: str) -> int | None:
+def _word_number(word: str) -> int | None:
     w = word.lower()
     return grammar.WORDS.index(w) if w in grammar.WORDS else int(w.replace(",", "")) if w.replace(",", "").isdigit() else None
 
@@ -1769,16 +1780,16 @@ def _preview_followups(gid: int, r: dict, season: int, P: pl.DataFrame, tonight:
         elif tag in ("Milestone", "Club history"):
             m = re.search(r"is (\w+) (goals?|assists?|points?) from (passing .+|\d[\d,]*)\.$", text)
             pids = named(text)
-            if not m or not pids or _number_of(m.group(1)) is None:
+            if not m or not pids or _word_number(m.group(1)) is None:
                 continue
             pid = pids[0]
             me = line[pid]
             unit = m.group(2).rstrip("s")
             got = int({"goal": me["g"], "assist": me["pts"] - me["g"], "point": me["pts"]}[unit])
-            left = _number_of(m.group(1)) - got
+            left = _word_number(m.group(1)) - got
             if tag == "Milestone":  # counted again from his career, tonight included: the preview's day may be stale
                 car = _careers().get(pid)
-                target = _number_of(m.group(3))
+                target = _word_number(m.group(3))
                 if not car or target is None:
                     continue
                 past = [x for x in car if x[0] <= day[:10]]
@@ -2810,6 +2821,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         verbs = ["beat", "edge", "get past"] if real <= 1 else ["beat", "take down"] if real == 2 else \
             ["beat", "take down"] + (["handle"] if share is None or share >= 0.5 else [])
         heads.append((30, f"{star} as {W.the(winner)} {pk(verbs, 'base2')} {L_}"))
+    from pipeline.export import goalie_streaks
+    heads += goalie_streaks.story(gid, season, N, lambda pid: N.get(pid, ""), W, winner, loser, pk)["heads"]
     head = max(heads, key=lambda h: h[0])[1]
     # paragraph one: the game in the order it happened (export/timeline.py, 2026-10-17). A fan leads with the big fact
     # (a hat trick, a debut, a return), then tells the goals from the first to the last, each by what it did to the
@@ -3061,6 +3074,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         s2.append(slow)
     s2 += net_firsts
     s2 += _goalie_lines(r, winner, loser, W, name, said, head, pk, season)
+    # goalie streaks (Sora, 2026-10-30: Kochetkov's nine straight wins to open the season went untold)
+    runs_ = goalie_streaks.story(gid, season, N, name, W, winner, loser, pk)
+    s2 += runs_["sents"]
     swing = _swing(gid)
     if swing:
         top = swing[0]
@@ -3190,6 +3206,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         if text:
             items.append({"tag": "Shorthanded", "text": text, "score": 52 if t == winner else 44})
     items += _streak_ends(gid, r["date"], tonight, pg, G, P, N, W, winner, loser, home, away, season)
+    items += runs_["items"]
     items += _preview_followups(gid, r, season, P, tonight, N, W, winner, loser, home, away, bool(fights))
     items += _league_marks(G, r["date"], gid, season, W, winner, loser)
     league = []
