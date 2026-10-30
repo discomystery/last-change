@@ -1,0 +1,77 @@
+---
+// Key players on a preview (Sora, 2026-10-30): the skaters each club leans on most who are expected to play, plus one on
+// a hot run, from the snapshot's `key_players` (pipeline/export/key_players.py, games before the day of the game).
+// Each card: season line, last ten games (a "Hot run" / "Quiet run" tag only when far from his usual scoring), and his
+// Swing lately with where it ranks on his team. How he was picked is never shown.
+import PLink from './PLink.astro';
+import Portrait from './Portrait.astro';
+import { fullName } from '../lib/playerLinks';
+import { posWord } from '../lib/players';
+import { ordinal } from '../lib/traits';
+import teamsData from '../../public/data/teams.json';
+
+export type KP = {
+  id: number; pos: string;
+  season: { gp: number; g: number; a: number };
+  last: { gp: number; g: number; a: number; usual: number };
+  form: 'hot' | 'cold' | null;
+  swing: { n: number; avg: number; rank?: number; of?: number } | null;
+};
+interface Props { players: Record<string, KP[]>; order: readonly string[]; sides: Record<string, 'away' | 'home'> }
+const { players, order, sides } = Astro.props;
+const TS = teamsData as { abbr: string; nick: string; place: string }[];
+const nick = (a: string) => TS.find((t) => t.abbr === a)?.nick ?? a;
+const line = (x: { g: number; a: number }) => `${x.g} G, ${x.a} A`;
+const sgn = (v: number) => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
+const formTip = (p: KP) => {
+  const pts = p.last.g + p.last.a;
+  const usual = Math.round(p.last.usual);
+  return `${pts} points in his last ${p.last.gp} games, where his usual pace (this season and last) would give about ${usual}. Ten-game runs like this come and go: it says how he has been going, not what happens next.`;
+};
+---
+<div class="pkp">
+  {order.filter((a) => players[a]?.length).map((a) => (
+    <div class={`pkp-team t-${sides[a]}`}>
+      <h3 class="mini-h pkp-h">{nick(a)}</h3>
+      <ul>
+        {players[a].map((p) => (
+          <li class="card pkp-c">
+            <div class="pkp-id">
+              <p class="pkp-name"><PLink id={p.id} name={fullName(p.id, String(p.id))} /></p>
+              <p class="pkp-pos">{posWord[p.pos] ?? p.pos} · {line(p.season)} in {p.season.gp} GP</p>
+              {p.form && <p class="pkp-tags"><span class="chip tag term" tabindex="0" data-tip={formTip(p)}>{p.form === 'hot' ? 'Hot run' : 'Quiet run'}</span></p>}
+            </div>
+            <Portrait id={p.id} size={72} class="pkp-photo" />
+            <dl class="pkp-facts">
+              <div><dt>Last {p.last.gp}</dt><dd>{line(p.last)} <span class="n">({p.last.g + p.last.a} P)</span></dd></div>
+              {p.swing && (
+                <div>
+                  <dt><span class="term" tabindex="0" data-tip="Swing is our one-number score for a player’s night: his scoring, the chances for and against with him on the ice at 5-on-5, and special teams. 0 is an ordinary night.">Swing</span></dt>
+                  <dd>{sgn(p.swing.avg)} a game{p.swing.rank ? <span class="n"> · {ordinal(p.swing.rank)} on the {nick(a)} lately</span> : null}</dd>
+                </div>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</div>
+<style>
+  .pkp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 24px; }
+  .pkp-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .pkp ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .pkp-c { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 12px; padding: 14px 16px 12px; overflow: hidden; }
+  .pkp-id { min-width: 0; }
+  .pkp-name { font: 600 18px/1.3 var(--ui); margin: 0; }
+  .pkp-pos { font: 400 14px/1.4 var(--ui); color: var(--ink-3); margin: 2px 0 0; }
+  .pkp-tags { margin: 6px 0 0; }
+  :global(.pkp-photo) { grid-column: 2; grid-row: 1; align-self: end; }
+  .pkp-facts { grid-column: 1 / -1; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--rule);
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font: 400 15px/1.45 var(--ui); }
+  .pkp-facts > div { display: contents; }
+  .pkp-facts dt { font: 600 11px/2 var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  .pkp-facts dd { margin: 0; color: var(--ink); min-width: 0; }
+  .pkp-facts .n { color: var(--ink-3); }
+  @media (max-width: 719px) { .pkp { grid-template-columns: minmax(0, 1fr); } }
+</style>

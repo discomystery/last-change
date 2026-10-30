@@ -28,6 +28,7 @@ import { roleTip, pkRoleWord, pkRoleTip } from '../../lib/players';
 import Marker from '../../components/Marker.astro';
 import Deployment from '../../components/Deployment.astro';
 import Lately, { type Form } from '../../components/Lately.astro';
+import PreviewKeyPlayers, { type KP } from '../../components/PreviewKeyPlayers.astro';
 import UnitToi from '../../components/UnitToi.astro';
 import FpPair from '../../components/FpPair.astro';
 import FpRow from '../../components/FpRow.astro';
@@ -49,7 +50,7 @@ type Claim = { id: string; kind: string; head: string; body: string; call?: stri
 // still be shown unchanged after the game. Previews for games played before snapshots began are made from the data before
 // each game and shown exactly like the rest.
 type Pregame = { fingerprints: typeof fpAll; lines: typeof linesAll; goalies: typeof goalieAll; goal_sources: typeof srcAll; records: Record<string, string> };
-type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]>; projected?: Record<string, { id: number; from: 'nhl' | 'model' }>; lately?: Record<string, Form>; stakes?: string };
+type Snap = { game_id: number; start: string; away: string; home: string; venue: string; snapshot_at: string; data_as_of: string; claims: Claim[]; pregame?: Pregame; rebuilt?: boolean; data_through?: string | null; outlook?: Record<string, { head: string; body: string }>; story?: Story; starters?: Record<string, number[]>; projected?: Record<string, { id: number; from: 'nhl' | 'model' }>; lately?: Record<string, Form>; stakes?: string; key_players?: Record<string, KP[]> };
 
 export async function getStaticPaths() {
   const files = import.meta.glob<{ default: Snap }>('../../../public/data/previews/2*.json', { eager: true });
@@ -156,7 +157,7 @@ const story = snap.story;
 type ProjSide = { lines: { id: number; name: string }[][]; pairs: { id: number; name: string }[][]; extra_d: { id: number; name: string }[]; f: number; d: number; eleven: boolean };
 const nhlLineup = ((snap as any).nhl_lineup?.teams && Object.keys((snap as any).nhl_lineup.teams).length ? (snap as any).nhl_lineup : null) as { teams: Record<string, ProjSide> } | null;
 const sides = { [away]: 'away', [home]: 'home' } as Record<string, 'away' | 'home'>;
-const nav = [['watch', 'Overview'], ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
+const nav = [['watch', 'Overview'], ...(snap.key_players ? [['players', 'Key players']] : []), ['style', 'Style'], ['lines', 'Lines'], ['special', 'Special teams'], ['goalies', 'Goalies'], ['sources', 'Scoring']];
 // The matchup note is written for both teams: the home team's shows unless the visitor's own team is the away side.
 const povCss = `.pov-away{display:none}html[data-team="${away}"] .pov-away{display:block}html[data-team="${away}"] .pov-home{display:none}`;
 const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
@@ -205,6 +206,12 @@ import recapIndex from '../../../public/data/recaps/index.json';
     )}
     <p class="note">These calls are written by fixed rules from the numbers below, and saved as they stand at puck drop. After the game, each one will be checked against what happened.{snap.rebuilt && ' Rebuilt with our current methods, from the games before it.'}</p>
   </section>
+
+  {snap.key_players && (
+    <Section id="players" title="Key players" placeholder={false} takeaway="The skaters each team leans on most who are expected to play, and how they have been going over the last ten games.">
+      <PreviewKeyPlayers players={snap.key_players} order={order} sides={sides} />
+    </Section>
+  )}
 
   <Section id="style" title="Playing style" placeholder={false} takeaway={`How ${place(away)} and ${place(home)} play, trait by trait, on the same scales.`}>
     <Fragment slot="explain">

@@ -1350,6 +1350,13 @@ def _snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetim
             out["lately"] = form
     except Exception as e:
         print(f"lately for {g['id']} failed: {e!r}")
+    try:  # the skaters each club leans on most, with how they've been going
+        from pipeline.export import key_players, stories
+        kp = key_players.run(away, home, day, stories.expected_lineup(nhl) if nhl else None, CURRENT_SEASON)
+        if kp:
+            out["key_players"] = kp
+    except Exception as e:
+        print(f"key players for {g['id']} failed: {e!r}")
     try:  # where both clubs sit in the standings going in
         from pipeline.export import stories
         line = stories.stakes(CURRENT_SEASON, day, away, home, stories.Words(places))
