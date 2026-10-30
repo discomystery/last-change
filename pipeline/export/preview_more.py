@@ -451,6 +451,7 @@ def _nhl_rank(pid: int, k: str, season: int, day: str) -> tuple[int, bool] | Non
     return r if r and r[0] and r[0] <= LEAGUE_TOLD else None
 
 
+CARRY_GAP, CARRY_SHARE = 5, 1.4  # points ahead of the team's next scorer, and times as many, to be "carrying" the offense
 VS_RUN = 5  # a point in this many straight games against tonight's opponent is worth saying
 
 
@@ -536,7 +537,11 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
         first = cap(_pick([f"For {W.the(t)}, {who} leads the way in scoring", f"{W.poss(t)} scoring runs through {who}"],
                           *key, t, "lead2"))
     else:
-        first = _pick([f"{who} leads {W.the(t)} in scoring", f"{who} is carrying {W.poss(t)} offense"], *key, t, "lead1")
+        nxt = tot.row(1, named=True)["pts"] if tot.height > 1 else 0
+        # "carrying" only for a clear lead (Sora, 2026-10-30: strong for someone two points ahead of the next guy)
+        clear = lead["pts"] - nxt >= CARRY_GAP and lead["pts"] >= CARRY_SHARE * nxt
+        first = _pick([f"{who} leads {W.the(t)} in scoring"] + ([f"{who} is carrying {W.poss(t)} offense"] if clear else []),
+                      *key, t, "lead1")
     if ride:  # "..., who has nine points in his last five games"
         first += f", who has {and_list(ride)}" if first.endswith(")") and (second or "carrying" in first) else f", with {and_list(ride)}"
     if not other:

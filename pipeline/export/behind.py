@@ -481,6 +481,9 @@ def luck_items(away: str, home: str, season: int, before: str, W, names: dict[in
 TEXT_GAP = 0.05  # a record this far from the chances is worth a clause in the preview's opening paragraph
 
 
+APART, ALIKE = 0.150, 0.050  # records this far apart on chances this close: "much closer in the standings"
+
+
 def preview_sentence(away: str, home: str, season: int, before: str, W) -> str | None:
     """Each club's record against what its chances are worth, for the preview's opening paragraph (Sora, 2026-10-30:
     "a team by team over/underperformance note in the text"). A club near its chances gets a short clause only when
@@ -510,15 +513,19 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
         return f"{W.the(t)} have played better than their record ({p3(r['pp'])}) says: their chances are worth about {p3(r['play'])}{why(r)}"
     ra, rh = rows[away], rows[home]
     side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
+    # records far apart on chances worth about the same (Sora, 2026-10-30): say what that means for tonight
+    tail = (" If their records matched their chances, these teams would be much closer in the standings, so don’t be"
+            " surprised if this one is closer than the records suggest."
+            if abs(ra["pp"] - rh["pp"]) >= APART and abs(ra["play"] - rh["play"]) <= ALIKE else "")
     a = clause(away, ra)
     if side(ra) == side(rh) != 0:  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
         h = (f"So is {W.poss(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh)}" if side(rh) > 0 else
              f"So have {W.the(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh).replace(', and ', ', where ', 1)}")
-        return f"{cap_(a)}. {h}."
+        return f"{cap_(a)}. {h}.{tail}"
     h = clause(home, rh)
     if "," in a or "," in h:
-        return f"{cap_(a)}. {cap_(h)}."
-    return f"{cap_(a)}{', and ' if side(ra) == side(rh) else ', while '}{h}."
+        return f"{cap_(a)}. {cap_(h)}.{tail}"
+    return f"{cap_(a)}{', and ' if side(ra) == side(rh) else ', while '}{h}.{tail}"
 
 
 def cap_(s: str) -> str:

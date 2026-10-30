@@ -1460,7 +1460,12 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     head = (heads[0][1] if heads and (heads[0][0] >= HEAD_FACT or not call_head) else call_head or f"{W.place(away)} at {W.place(home)}")
     lean = {t: v["body"] for t, v in (outlook or {}).items()}
     paras = [" ".join(sents)] if sents else []
-    paras += [x for x in (luck, more["play"], more["scoring"], more["net"]) if x]
+    net = more["net"]
+    hist = next((g for k, g in look if k == "history"), None)
+    if hist and net:  # a goalie call goes with who's in net (Sora, 2026-10-30), not at the end
+        net += " " + (hist[len("In goal, "):][:1].upper() + hist[len("In goal, ") + 1:] if hist.startswith("In goal, ") else hist)
+        look = [x for x in look if x[0] != "history"]
+    paras += [x for x in (luck, more["play"], more["scoring"], net) if x]
     if look:  # separate ideas, so each gets its own way in (Sora, 2026-10-30: two lines side by side read as related)
         look.sort(key=lambda x: {"matchup": 0, "history": 1}.get(x[0], 2))
         out_ = [look[0][1]]
