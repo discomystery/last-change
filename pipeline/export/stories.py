@@ -1433,6 +1433,11 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
                                    style_gists, covered)
     if more["standing"]:
         sents.append(more["standing"])
+    from pipeline.export import behind
+    luck = behind.preview_sentence(away, home, season, start[:10], W)  # records against the chances, both clubs
+    if luck:
+        sents.append(luck)
+        items = [i for i in items if i["tag"] != "Behind the record"]
     told_tags = set().union(*more["told"].values()) if more["told"] else set()
     items = [i for i in items if not (i["tag"] in told_tags and i.get("pid") in more["used"])]  # the scorers' paragraph tells it
     picked, per, seen = [], {}, set()
@@ -1467,7 +1472,10 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
                 out_.append(_pick(["Elsewhere, ", "One more thing: "], gid, kind, "look") + preview_more._lower(g))
         paras.append(" ".join(out_))
     paras = W.nicknames(paras, gid)
-    return {"kicker": "Before the game", "head": head, "paras": paras, "lean": lean, "list_head": "Who to watch", "items": picked}
+    # the players whose names carry a stat tag in the text, so the page can link them (Sora, 2026-10-30)
+    people = {N[p]: p for p in set(more["used"]) | {x["id"] for x in (projected or {}).values() if x and x.get("id")} if p in N}
+    return {"kicker": "Before the game", "head": head, "paras": paras, "lean": lean, "list_head": "Who to watch", "items": picked,
+            **({"people": people} if people else {})}
 
 
 def _leader(t: str, before: str, season: int) -> tuple[int, int] | None:

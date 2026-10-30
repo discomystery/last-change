@@ -69,12 +69,12 @@ def test_a_shared_habit_is_said_once(monkeypatch):
 def test_what_the_styles_mean_together():
     fp = {"FLA": dims(pp=(95, 2)), "WPG": dims(pk=(10, 29))}
     lines = pm.consequences("WPG", "FLA", fp, W(), set())
-    assert lines[0][1] == "the Panthers’ power play could do real damage against the Jets’ kill"
+    assert lines[0][1] == "the Panthers’ power play could do real damage when the Jets are shorthanded"
     assert pm.consequences("WPG", "FLA", fp, W(), {"pp"}) == []  # a call already says it
 
 
 def test_a_call_is_told_in_the_pairing_words():
-    assert pm.meet_line("duel", "pp", "FLA", "WPG", W()) == "The Panthers’ power play against the Jets’ kill is strength against strength."
+    assert pm.meet_line("duel", "pp", "FLA", "WPG", W()) == "The Panthers’ power play against the Jets’ penalty killers is strength against strength."
     assert pm.meet_line("edge", "pp", "FLA", "WPG", W()) is None
 
 

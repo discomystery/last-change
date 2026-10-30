@@ -18,7 +18,7 @@ CAT = {"lead": "Lead", "order": "Order", "omission": "Left out", "repetition": "
        "structure": "Structure", "emphasis": "Emphasis", "tone": "Tone", "overstatement": "Overstated", "accuracy": "Accuracy"}
 
 
-BOX = re.compile(r"\s?\((\d+ G / \d+ A / \d+ P) in (\d+ GP)\)")
+BOX = re.compile(r"\s?\((\d+ G / \d+ A / \d+ P|\d+-\d+-\d+(?: / \.\d{3} SV%)?) in (\d+ G[PS])\)")
 NUM = re.compile(r"(?<![\w\-.])(?!(?:19|20)\d\d\b)\.?\d[\d.]*%?(?![\w\-])")
 
 

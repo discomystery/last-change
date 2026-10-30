@@ -92,7 +92,7 @@ FEW_WORSE = {
     "suppression": ("give up more shots", "gives up more shots"),
     "qualityAllowed": ("give up more dangerous shots", "gives up more dangerous shots"),
     "pp": ("get less from their power play", "gets less from its power play"),
-    "pk": ("have a leakier penalty kill", "has a leakier penalty kill"),
+    "pk": ("kill penalties worse", "kills penalties worse"),
     "longShifts": ("get pinned in their own end more often", "gets pinned in its own end more often"),
     "shotsThrough": ("get more of their shots blocked", "gets more of its shots blocked"),
     "icing": ("ice the puck more", "ices the puck more"),
@@ -268,8 +268,8 @@ def stat_words(t: str, season: int, day: str) -> dict[str, dict]:
 # What one team's habit meets in the other's: (attacking trait, defending trait, the attack strong and the defense
 # weak, both strong, the attack weak and the defense strong). {A}/{Ap} the attacking team, {B}/{Bp} the defending one.
 MEETS = [
-    ("pp", "pk", "{Ap} power play could do real damage against {Bp} kill",
-     "{Ap} power play against {Bp} kill is strength against strength", "{Ap} struggling power play gets a tough test from {Bp} kill"),
+    ("pp", "pk", "{Ap} power play could do real damage when {B} are shorthanded",
+     "{Ap} power play against {Bp} penalty killers is strength against strength", "{Ap} struggling power play gets a tough test from {Bp} penalty killers"),
     ("volume", "suppression", "{A} should get plenty of pucks to the net against {B}",
      "something has to give when {Ap} shooting runs into {Bp} defense", "{A} may have a hard time getting pucks to the net against {B}"),
     ("quality", "qualityAllowed", "{A} could find some good looks against {B}, who give up plenty of them",
@@ -452,30 +452,30 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
         return out
     def line(r):  # the box-score line, in figures (Sora, 2026-10-30): "10 G / 4 A / 14 P in 13 GP"
         return f"{r['g']} G / {r['pts'] - r['g']} A / {r['pts']} P in {r['gp']} GP"
+    # each name is followed straight away by his line, which the page draws as a tag and links the name before it
+    # (Sora, 2026-10-30): "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring"
     ride = extras(lead)
-    name, pts = N[lead["player_id"]], _count(lead["pts"], "point")
-    # the line stays in its own brackets: the page draws it as a tag (GameStory.astro)
-    stat = f"{pts} ({line(lead)})"
+    who = f"{N[lead['player_id']]} ({line(lead)})"
     if second:
-        first = cap(_pick([f"For {W.the(t)}, it’s {name}, with {stat}", f"{W.poss(t)} scoring runs through {name}, who has {stat}"], *key, t, "lead2"))
+        first = cap(_pick([f"For {W.the(t)}, it’s {who}", f"{W.poss(t)} scoring runs through {who}"], *key, t, "lead2"))
     else:
-        first = _pick([f"{name} leads {W.the(t)} with {stat}", f"{name} is carrying {W.poss(t)} offense with {stat}"], *key, t, "lead1")
-    if ride:  # "who has eleven points (...) and seven points in his last five games"
-        first += (f" and {and_list(ride)}" if ", who has " in first else f", and he has {and_list(ride)}")
+        first = _pick([f"{who} leads {W.the(t)} in scoring", f"{who} is carrying {W.poss(t)} offense"], *key, t, "lead1")
+    if ride:  # "..., who has nine points in his last five games"
+        first += f", who has {and_list(ride)}" if first.endswith(")") and (second or "carrying" in first) else f", with {and_list(ride)}"
     if not other:
         return first + ".", used, told_tags
     used.add(other["player_id"])
-    oname = N[other["player_id"]]
+    owho = f"{N[other['player_id']]} ({line(other)})"
     o_ride = extras(other)
     if other is gl and gl["g"] > lead["g"]:
-        what = f"a team-high {_count(other['g'], 'goal')} ({line(other)})"
+        what = f"has a team-high {_count(other['g'], 'goal')}"
     else:
-        what = f"{_count(other['pts'], 'point')} ({line(other)})"
-    if o_ride:  # "and Brady Tkachuk, who has 15 points and a point in five straight games against Winnipeg"
-        return f"{first}. {oname}, who has {and_list(o_ride)}, has {what}.", used, told_tags
-    if ride:  # "..., and he has a point in six straight games against Calgary. Frédérick Gaudreau has ..." (no "and" chain)
-        return f"{first}. {oname} has {what}.", used, told_tags
-    return f"{first}, and {oname} has {what}.", used, told_tags
+        what = _pick(["isn’t far behind", "is next in line"], *key, t, "next")
+    if o_ride:  # "Brady Tkachuk (...) has a team-high eight goals, with seven points in his last five games"
+        return f"{first}. {owho} {what}, with {and_list(o_ride)}.", used, told_tags
+    if ride:
+        return f"{first}. {owho} {what}.", used, told_tags
+    return f"{first}, and {owho} {what}.", used, told_tags
 
 
 def who_scores(away: str, home: str, season: int, day: str, W, N: dict, gone: set, key=()) -> tuple[str | None, set, set]:
@@ -512,15 +512,15 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
         mine = gg.filter(pl.col("goalie_id") == pid)
         starts = int(mine["started"].sum()) if mine.height else 0
         verb = "is expected to start" if x.get("from") == "nhl" else "should get the start"
-        who = f"{N[pid]} {verb} for {W.place(t)}"
         if not starts:
-            parts.append(f"{who}, his first start of the season")
+            parts.append(f"{N[pid]} {verb} for {W.place(t)}, his first start of the season")
             continue
         ds = [d.get(pid) for gid, d in dec.items() if pid in d and gid in set(mine["game_id"].to_list())]
         rec = f"{ds.count('W')}-{ds.count('L')}-{ds.count('O')}"
         sa, ga = int(mine["sa"].sum()), int(mine["ga"].sum())
         sv = f"{(sa - ga) / sa:.3f}".lstrip("0") if sa else None
-        parts.append(f"{who} ({rec}{', ' + sv if sv else ''} in {num(starts)} {'start' if starts == 1 else 'starts'})")
+        # "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) should get the start for Winnipeg": the line is a tag on the page
+        parts.append(f"{N[pid]} ({rec}{' / ' + sv + ' SV%' if sv else ''} in {starts} GS) {verb} for {W.place(t)}")
     if not parts:
         return None
     if len(parts) == 2:

@@ -473,3 +473,50 @@ def luck_items(away: str, home: str, season: int, before: str, W, names: dict[in
     for i, x in enumerate(out):  # one a preview usually makes the list; the other club's only when there is room
         x["score"] = 72 if i == 0 else 61
     return out
+
+
+TEXT_GAP = 0.05  # a record this far from the chances is worth a clause in the preview's opening paragraph
+
+
+def preview_sentence(away: str, home: str, season: int, before: str, W) -> str | None:
+    """Each club's record against what its chances are worth, for the preview's opening paragraph (Sora, 2026-10-30:
+    "a team by team over/underperformance note in the text"). A club near its chances gets a short clause only when
+    the other one is told."""
+    s = summary(season, before)
+    rows = {t: s.get(t) for t in (away, home)}
+    if any(r is None or r["gp"] < MIN_GAMES for r in rows.values()):
+        return None
+    if all(abs(r["gap"]) < TEXT_GAP for r in rows.values()):
+        return None
+
+    up = {"gk": "their goaltending", "fin": "their shooting", "en": "empty-net goals", "close": "winning the close ones"}
+    down = {"gk": "their goaltending has", "fin": "their shooting has", "en": "empty-net goals against have", "close": "losses in close games have"}
+
+    def why(r):
+        sign = 1 if r["gap"] > 0 else -1
+        w = reasons(r, sign)
+        if not w:
+            return ""
+        return f", largely thanks to {up[w[0][1]]}" if sign > 0 else f", and {down[w[0][1]]} held them back"
+
+    def clause(t, r):
+        if abs(r["gap"]) < TEXT_GAP:
+            return f"{W.poss(t)} record ({p3(r['pp'])}) is about what their chances are worth"
+        if r["gap"] > 0:
+            return f"{W.poss(t)} record ({p3(r['pp'])}) is running ahead of what their chances are worth ({p3(r['play'])}){why(r)}"
+        return f"{W.the(t)} have played better than their record ({p3(r['pp'])}) says: their chances are worth about {p3(r['play'])}{why(r)}"
+    ra, rh = rows[away], rows[home]
+    side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
+    a = clause(away, ra)
+    if side(ra) == side(rh) != 0:  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
+        h = (f"So is {W.poss(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh)}" if side(rh) > 0 else
+             f"So have {W.the(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh).replace(', and ', ', where ', 1)}")
+        return f"{cap_(a)}. {h}."
+    h = clause(home, rh)
+    if "," in a or "," in h:
+        return f"{cap_(a)}. {cap_(h)}."
+    return f"{cap_(a)}{', and ' if side(ra) == side(rh) else ', while '}{h}."
+
+
+def cap_(s: str) -> str:
+    return s[:1].upper() + s[1:]
