@@ -1351,7 +1351,7 @@ def _snapshot(g: dict, site: dict, places: dict, sched: list[dict], now: datetim
     try:  # the plain-English story at the top of the page; the preview stands without it
         from pipeline.export import stories
         out["story"] = stories.preview_story(g["id"], away, home, g.get("date") or g["start"][:10], places, claims, out.get("outlook"), site["lines"]["teams"], likely=likely,
-                                             nhl=nhl, fp=fp)
+                                             nhl=nhl, fp=fp, projected=projected)
     except Exception as e:
         print(f"story for {g['id']} failed: {e!r}")
     return out

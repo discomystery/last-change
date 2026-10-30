@@ -64,9 +64,13 @@ def build(out: Path, runs: list[Path]) -> None:
             elif "teams" in P:  # a fuller preview packet (round two on); round one's previews were written from less
                 gen = json.loads((run / f"{gid}.generator.json").read_text())
                 mine = compare.parse_draft((run / f"{gid}.claude.md").read_text())
-                cols = [("The site today", story(gen, calls=gen.get("calls"))), ("A fuller preview from the same data", story(mine))]
+                af = run / f"{gid}.after.json"
+                aft = json.loads(af.read_text()) if af.exists() else None
+                cols = [("The site before", story(gen, calls=gen.get("calls"))), ("My fuller preview", story(mine))]
+                if aft:
+                    cols.append(("The site's generator now", story(aft, gen)))
                 games.append(("preview", P["start_utc"][:10], gid, f"{a} at {hm}", "Preview", cols, [],
-                              (words(gen["paras"]), words(mine["paras"]))))
+                              (words(gen["paras"]), words(mine["paras"]), words(aft["paras"]) if aft else 0)))
     games.sort(key=lambda g: (g[0] != "recap", g[1]))
     recs = [g for g in games if g[0] == "recap"]
     prevs = [g for g in games if g[0] == "preview"]
@@ -90,8 +94,9 @@ def build(out: Path, runs: list[Path]) -> None:
     nav = "".join(f"<a href='#g{g[2]}'>{E(g[3])}</a>" for g in games)
     pw = [g[7] for g in prevs]
     changed = sum(v for k, v in ops.items() if k != "kept")
-    pw_site = round(sum(a for a, b in pw) / max(len(pw), 1))
-    pw_mine = round(sum(b for a, b in pw) / max(len(pw), 1))
+    pw_site = round(sum(x[0] for x in pw) / max(len(pw), 1))
+    pw_mine = round(sum(x[1] for x in pw) / max(len(pw), 1))
+    pw_now = round(sum(x[2] for x in pw) / max(len(pw), 1))
     page = f"""<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>Voice Loop Pilot</title>
 <link rel=preconnect href=https://fonts.googleapis.com><link rel=preconnect href=https://fonts.gstatic.com crossorigin>
@@ -137,13 +142,13 @@ mark{{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}}
 @media (max-width:1000px){{.cols,.cols.n2{{grid-template-columns:1fr}}}}
 @media (max-width:600px){{h1{{font-size:28px}}.game{{padding:14px}}td.n{{display:none}}}}
 </style></head><body><div class=wrap>
-<div class=lab>Spare Line Change · writing check, round two</div>
+<div class=lab>Spare Line Change · writing check, rounds two and three</div>
 <h1>Closer rewrites, and fuller previews</h1>
-<p class=lede>Round one's stories from scratch were too far from the site's to learn from. This time, for {len(recs)} post-game pages, I started from the site's own story and kept every fact and the order of the game, changing only how the sentences are built and joined. A check flags anything I dropped, added or moved. Each site sentence is paired with what it became, and the changes that kept coming up are now in the site's writer. For {len(prevs)} upcoming games, I wrote fuller previews from a much bigger set of facts (standings, team stats and ranks, style, top scorers and recent form, goalies, lines and power-play units), to show what the site's preview could hold.</p>
+<p class=lede>Round one's stories from scratch were too far from the site's to learn from. This time, for {len(recs)} post-game pages, I started from the site's own story and kept every fact and the order of the game, changing only how the sentences are built and joined. A check flags anything I dropped, added or moved. Each site sentence is paired with what it became, and the changes that kept coming up are now in the site's writer. For {len(prevs)} upcoming games, I wrote fuller previews from a much bigger set of facts (standings, team stats and ranks, style, top scorers and recent form, goalies, lines and power-play units), to show what the site's preview could hold. You picked that shape, so the site's own generator now writes it too: where they stand, how they play, who carries the scoring, who's in net, then the matchup to watch. Its new sentences are highlighted in the third column, built only from games before each preview.</p>
 <div class=tiles>
 <div class=tile><div class=lab>Post-game sentences reworked</div><b>{changed}</b><span>{ops.get('merged', 0)} joined, {ops.get('reworded', 0)} reworded, {ops.get('split', 0)} split, {ops.get('cut', 0)} cut</span></div>
 <div class=tile><div class=lab>Changes now in the site</div><b>{sum(1 for p in pats if p['key'].startswith('rw-') and p['status'] == 'fixed')}</b><span>of {sum(1 for p in pats if p['key'].startswith('rw-'))} patterns from the rewrites</span></div>
-<div class=tile><div class=lab>Preview words</div><b>{pw_site} → {pw_mine}</b><span>story paragraphs, site today vs. the fuller version (the call cards come on top of both)</span></div>
+<div class=tile><div class=lab>Preview words</div><b>{pw_site} → {pw_now}</b><span>story paragraphs, the site before vs. its generator now (my drafts: {pw_mine}; call cards come on top)</span></div>
 </div>
 <h2>What the rewrites kept changing</h2>
 <table><thead><tr><th>Status</th><th class=n>Games</th><th>What was different</th><th>What I did</th></tr></thead><tbody>{rows}</tbody></table>

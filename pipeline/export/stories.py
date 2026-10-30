@@ -1247,7 +1247,7 @@ def _vs_projection(gid: int, r: dict, tonight: pl.DataFrame, W: "Words", N: dict
 
 def preview_story(gid: int, away: str, home: str, start: str, places: dict, claims: list[dict],
                   outlook: dict | None, lines: dict, season: int = CURRENT_SEASON, likely: dict | None = None,
-                  nhl: dict | None = None, fp: dict | None = None) -> dict:
+                  nhl: dict | None = None, fp: dict | None = None, projected: dict | None = None) -> dict:
     """The story for one preview, from data before the game and the calls already chosen for it. `start` is the game's
     local date: games are dated locally, so a late start's UTC date would count the game itself."""
     W = Words(places)
@@ -1359,6 +1359,10 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     # nothing about a player the page lists as out, except the Out note itself (Sora's review, 2026-10-17: a
     # milestone chase for a player who was out)
     items = [i for i in items if i["tag"] in ("Out", "Missing") or not gone & set(i.get("pids") or [i.get("pid")])]
+    from pipeline.export import preview_more  # the fuller preview's extra paragraphs (Sora, 2026-10-30)
+    more = preview_more.paragraphs(gid, away, home, start[:10], W, N, fp, projected, gone, " ".join(sents), season)
+    if more["standing"]:
+        sents.append(more["standing"])
     picked, per, seen = [], {}, set()
     for i in items:
         if per.get(i["tag"], 0) >= MAX_PER_TAG or (i.get("pid") and i["pid"] in seen) or len(picked) >= MAX_ITEMS:
@@ -1367,7 +1371,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         seen.update(i.get("pids") or [i.get("pid")])
         picked.append({"tag": i["tag"], "text": i["text"]})
     for t in (away, home):  # always at least two: each team's leading scorer
-        if len(picked) >= MIN_ITEMS:
+        if len(picked) >= MIN_ITEMS or more["scoring"]:
             break
         lead = _leader(t, start, season)
         if lead and lead[0] not in seen:
@@ -1378,6 +1382,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     head = (heads[0][1] if heads and (heads[0][0] >= HEAD_FACT or not call_head) else call_head or f"{W.place(away)} at {W.place(home)}")
     lean = {t: v["body"] for t, v in (outlook or {}).items()}
     paras = [" ".join(sents)] if sents else []
+    paras += [x for x in (more["play"], more["scoring"], more["net"]) if x]
     if look:
         paras.append(" ".join(look))
     paras = W.nicknames(paras, gid)
