@@ -4,6 +4,31 @@ A way to keep improving how the generated preview and post-game text reads. A Cl
 writes the story it thinks is best, and lines it up against what the site wrote. Differences that keep showing up turn
 into generator changes. Started 2026-10-30 (pilot run `runs/2026-10-30-pilot/`).
 
+## Two kinds of round (Sora, 2026-10-30, after the pilot)
+
+- **Post-game: rewrite mode.** Stories written from scratch came out too different from the site's to learn from
+  (shorter, reordered, other facts). So a post-game draft now starts from the site's own story (`rewrite-start`),
+  keeps every fact and the order of the game, and changes only how the sentences are built and joined:
+  - merge choppy sentences
+  - vary repeated verbs
+  - say a time once
+  - use "he" for a player just named
+  - join the standings
+  - drop filler the next sentence already says.
+
+  `rewrite-check` lists what was dropped or added and whether the running scores kept their order. A deliberate cut is
+  recorded with `<!-- drop: X -->`. `pairs` lines each site sentence up with what it became, in `{gid}.pairs.json`
+  and `voice/pairs.jsonl`. Those pairs are the material for generator changes.
+- **Preview: fuller mode.** The site's previews say too little, so the preview packet carries each club's sheet:
+  - standing
+  - team stats with ranks
+  - the most distinctive style traits with their scale words
+  - top scorers with their last five games
+  - goalies
+  - lines and power-play units
+
+  Write the fuller preview you would want to read. Its sections show what the generator should add.
+
 ## A round, step by step
 
 Run each command from the repository root, with site data extracted from the data branch. For example:
@@ -38,7 +63,8 @@ Run each command from the repository root, with site data extracted from the dat
    (`{gid}.after.json`, site data untouched). Check that the change did what you meant, then run pytest.
 7. **Record.** In `patterns.json`, set each key's `status` (open, fixed, partly, kept, proposed), `since` (run) and
    `fix` (PR), with a one-line `note`. A later run that logs a `fixed` key again is a regression; `patterns` shows it.
-8. **Show Sora.** Run `python -m pipeline.voice.page voice/runs/{name} page.html` and publish the page as an Artifact.
+8. **Show Sora.** Run `python -m pipeline.voice.page page.html voice/runs/{run} [more runs]` and publish the page
+   as an Artifact.
    It shows the site's text, the draft, and the site after the fixes, with the pattern table. Open a PR with the
    generator changes and the run folder.
 

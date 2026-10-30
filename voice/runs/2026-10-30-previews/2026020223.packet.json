@@ -1,0 +1,718 @@
+{
+ "kind": "preview",
+ "game_id": 2026020223,
+ "start_utc": "2026-10-31T23:00:00Z",
+ "venue": "Centre Bell",
+ "away": {
+  "abbr": "PIT",
+  "name": "Pittsburgh Penguins",
+  "place": "Pittsburgh",
+  "nickname": "Penguins",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Dan Muse"
+ },
+ "home": {
+  "abbr": "MTL",
+  "name": "Montréal Canadiens",
+  "place": "Montréal",
+  "nickname": "Canadiens",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Martin St. Louis"
+ },
+ "form": {
+  "PIT": {
+   "record": "5-6-2",
+   "games": 13,
+   "run": "winless 1",
+   "last_ten": "3-5-2",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    }
+   ]
+  },
+  "MTL": {
+   "record": "8-3-2",
+   "games": 13,
+   "run": "won 4",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "2-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [
+  {
+   "date": "2026-10-03",
+   "winner": "PIT",
+   "score": "6-5 in overtime",
+   "where": "PIT"
+  }
+ ],
+ "projected_goalies": {
+  "PIT": "Artūrs Šilovs",
+  "MTL": "Jacob Fowler"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "MTL",
+   "facts": [
+    "Montréal’s P1 (Dobson and Hutson) at home: 63% of its 5-on-5 time against opponents’ first lines. Matchups, Montréal home games this season, 6 games, 63 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face first lines about 52% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Montréal P1's 5-on-5 time against Pittsburgh L1",
+   "usual": 63,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "PIT",
+   "facts": [
+    "Pittsburgh: a 7.0% chance of scoring on the average shot, 2nd of 32. Playing style, this season blended with last, 13 and 13 games this season.",
+    "Montréal: a 6.7% chance of scoring on the average shot against, 29th of 32. Playing style, this season blended with last, 13 and 13 games this season."
+   ],
+   "what_we_check": "the average shot’s chance of going in, by expected goals",
+   "usual": 0.0701,
+   "league": 0.0637,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "The two have been about even at out-chancing opponents lately.",
+  "Even though Montréal has home-ice advantage, the Canadiens will be without Suzuki, and Pittsburgh gets Solovyov back.",
+  "The Canadiens can tip it if they get good looks.",
+  "Out: The Penguins are newly without Bryan Rust, and have been without Trevor van Riemsdyk since Oct 9.",
+  "Out: The Canadiens are newly without Mike Matheson, and have been without Nick Suzuki, Samuel Montembeault and Ivan Demidov for several games. Jacob Fowler is expected to start.",
+  "Milestone: Phillip Danault is set to play his 800th NHL game.",
+  "Haunts them: Chris Kreider has six goals in nine games against Pittsburgh since 2023-24, most of them with the Rangers."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "PIT": {
+   "standing": {
+    "record": "5-6-2",
+    "points": 12,
+    "games": 13,
+    "division": "Metropolitan",
+    "division_place": 6,
+    "conference_place": 14,
+    "league_place_in_points": 24,
+    "home_record": "4-1-1",
+    "road_record": "1-5-1",
+    "last_ten": "3-5-2",
+    "streak": "OT1",
+    "coach": "Dan Muse"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 42,
+    "ga": 43,
+    "gfpg": 3.23,
+    "gapg": 3.31,
+    "diff": -1,
+    "ppg": 7,
+    "ppo": 35,
+    "pppct": 0.2,
+    "pkpct": 0.844,
+    "sfpg": 28.2,
+    "sapg": 28.0,
+    "fopct": 0.455
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 12,
+    "gapg": 22,
+    "pppct": 18,
+    "pkpct": 8,
+    "sfpg": 10,
+    "sapg": 18,
+    "fopct": 31
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Physicality",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Finesse",
+     "high_end_word": "Bruising"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 7,
+     "percentile": 80,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Erik Karlsson",
+     "pos": "D",
+     "gp": 13,
+     "g": 2,
+     "a": 11,
+     "p": 13,
+     "ppp": 5,
+     "toi_per_game": "23:19",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Evgeni Malkin",
+     "pos": "C",
+     "gp": 12,
+     "g": 6,
+     "a": 5,
+     "p": 11,
+     "ppp": 2,
+     "toi_per_game": "16:59",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 3,
+      "p": 6
+     }
+    },
+    {
+     "name": "Tommy Novak",
+     "pos": "C",
+     "gp": 13,
+     "g": 3,
+     "a": 5,
+     "p": 8,
+     "ppp": 4,
+     "toi_per_game": "15:33",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 3,
+      "p": 3
+     }
+    },
+    {
+     "name": "Sidney Crosby",
+     "pos": "C",
+     "gp": 13,
+     "g": 3,
+     "a": 4,
+     "p": 7,
+     "ppp": 1,
+     "toi_per_game": "19:17",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    },
+    {
+     "name": "Samuel Girard",
+     "pos": "D",
+     "gp": 10,
+     "g": 1,
+     "a": 6,
+     "p": 7,
+     "ppp": 0,
+     "toi_per_game": "18:50",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 2,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Artūrs Šilovs",
+     "gp": 9,
+     "record": "5-3-1",
+     "sv_pct": 0.889,
+     "gaa": 2.98,
+     "shutouts": 2,
+     "projected_starter": true
+    },
+    {
+     "name": "Sergei Murashov",
+     "gp": 4,
+     "record": "0-3-1",
+     "sv_pct": 0.883,
+     "gaa": 3.5,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Tommy Novak",
+      "Sidney Crosby",
+      "Rickard Rakell"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Egor Chinakhov",
+      "Ben Kindel",
+      "Evgeni Malkin"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Andrei Kuzmenko",
+      "Hendrix Lapierre",
+      "Ville Koivunen"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Kris Letang",
+      "Declan Carlile"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Erik Karlsson",
+      "Spencer Stastney"
+     ],
+     "games_together_recently": 4
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Erik Karlsson (Quarterback)",
+      "Sidney Crosby (Distributor)",
+      "Rickard Rakell (Trigger)",
+      "Evgeni Malkin",
+      "Ben Kindel"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Kris Letang (Quarterback)",
+      "Tommy Novak",
+      "Bryan Rust (Trigger)",
+      "Egor Chinakhov",
+      "Andrei Kuzmenko"
+     ]
+    }
+   ]
+  },
+  "MTL": {
+   "standing": {
+    "record": "8-3-2",
+    "points": 18,
+    "games": 13,
+    "division": "Atlantic",
+    "division_place": 2,
+    "conference_place": 3,
+    "league_place_in_points": 6,
+    "home_record": "3-2-1",
+    "road_record": "5-1-1",
+    "last_ten": "7-2-1",
+    "streak": "W4",
+    "coach": "Martin St. Louis"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 41,
+    "ga": 38,
+    "gfpg": 3.15,
+    "gapg": 2.92,
+    "diff": 3,
+    "ppg": 4,
+    "ppo": 39,
+    "pppct": 0.103,
+    "pkpct": 0.827,
+    "sfpg": 27.5,
+    "sapg": 27.5,
+    "fopct": 0.512
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 13,
+    "gapg": 9,
+    "pppct": 30,
+    "pkpct": 10,
+    "sfpg": 16,
+    "sapg": 16,
+    "fopct": 10
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Discipline",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Reckless",
+     "high_end_word": "Clean"
+    },
+    {
+     "trait": "Rough stuff",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Calm",
+     "high_end_word": "Chippy"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 7,
+     "percentile": 80,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Cole Caufield",
+     "pos": "R",
+     "gp": 13,
+     "g": 8,
+     "a": 4,
+     "p": 12,
+     "ppp": 1,
+     "toi_per_game": "18:45",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 3,
+      "p": 6
+     }
+    },
+    {
+     "name": "Nick Suzuki",
+     "pos": "C",
+     "gp": 9,
+     "g": 5,
+     "a": 7,
+     "p": 12,
+     "ppp": 2,
+     "toi_per_game": "21:47",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Lane Hutson",
+     "pos": "D",
+     "gp": 13,
+     "g": 3,
+     "a": 8,
+     "p": 11,
+     "ppp": 2,
+     "toi_per_game": "24:59",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Juraj Slafkovský",
+     "pos": "L",
+     "gp": 13,
+     "g": 2,
+     "a": 7,
+     "p": 9,
+     "ppp": 2,
+     "toi_per_game": "18:19",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Zachary Bolduc",
+     "pos": "R",
+     "gp": 13,
+     "g": 5,
+     "a": 2,
+     "p": 7,
+     "ppp": 2,
+     "toi_per_game": "13:42",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 0,
+      "p": 1
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Jacob Fowler",
+     "gp": 7,
+     "record": "6-1-0",
+     "sv_pct": 0.942,
+     "gaa": 1.54,
+     "shutouts": 2,
+     "projected_starter": true
+    },
+    {
+     "name": "Jakub Dobeš",
+     "gp": 6,
+     "record": "2-2-2",
+     "sv_pct": 0.853,
+     "gaa": 4.05,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Cole Caufield",
+      "Alex Newhook",
+      "Juraj Slafkovský"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Zachary Bolduc",
+      "Phillip Danault",
+      "Alexandre Texier"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Chris Kreider",
+      "Oliver Kapanen",
+      "Josh Anderson"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Noah Dobson",
+      "Lane Hutson"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Alexandre Carrier",
+      "Kaiden Guhle"
+     ],
+     "games_together_recently": 6
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Lane Hutson (Quarterback)",
+      "Juraj Slafkovský",
+      "Cole Caufield (Trigger)",
+      "Chris Kreider",
+      "Nick Suzuki (Distributor)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Noah Dobson (Quarterback)",
+      "Chris Kreider",
+      "Alex Newhook",
+      "Alexandre Texier",
+      "Oliver Kapanen (Trigger)"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

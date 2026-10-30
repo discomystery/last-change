@@ -11,11 +11,12 @@ facts (the chips and the check's numbers), with the outlook and Who to watch sen
 chance is never in a preview packet (it is never saved before puck drop)."""
 import gzip
 import json
+import re
 from pathlib import Path
 
 import polars as pl
 
-from pipeline.config import RAW, SITE_DATA, TABLES
+from pipeline.config import ROOT, RAW, SITE_DATA, TABLES
 from pipeline.export import stories as S
 from pipeline.export import penalties, textcheck
 
@@ -173,7 +174,99 @@ def preview(gid: int, season: int = S.CURRENT_SEASON) -> dict:
         "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
         "notes": notes,
         "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+        "teams": {t: team_sheet(t, (p.get("projected") or {}).get(t, {}).get("id")) for t in (away, home)},
+        "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word).",
     }
+
+
+# ---------------------------------------------------------------- the fuller preview packet (round two)
+# Sora, 2026-10-30: the site's previews say too little, and fuller previews written from the data should show what the
+# generator ought to add. Everything here is read from the site's own JSON as it stood before the game.
+
+def _traits() -> dict[str, dict]:
+    """Trait name and the words at each end of its scale, from site/src/lib/traits.ts (one source for the site)."""
+    src = (ROOT / "site" / "src" / "lib" / "traits.ts").read_text()
+    out: dict[str, dict] = {}
+    for k, v in re.findall(r"key: '(\w+)', label: '([^']+)'", src):
+        out.setdefault(k, {"label": v})  # team traits come first; goalie scales reuse some keys
+    for k, lo, hi in re.findall(r"^\s*(\w+): \{ group: '[^']+', lo: '([^']+)', hi: '([^']+)'", src, re.M):
+        if "low_end" not in out.setdefault(k, {}):
+            out[k].update({"low_end": lo, "high_end": hi})
+    return out
+
+
+def _rows(name: str) -> tuple[list[str], list[list]]:
+    d = json.loads((SITE_DATA / "stats" / name).read_text())
+    return d["cols"], d["seasons"].get(str(S.CURRENT_SEASON), [])
+
+
+def _rank(rows: list[dict], key: str, t: str, high_good: bool = True) -> int | None:
+    vals = sorted((r[key] for r in rows if r.get(key) is not None), reverse=high_good)
+    me = next((r[key] for r in rows if r["team"] == t), None)
+    return vals.index(me) + 1 if me is not None else None
+
+
+def _last5(pid: int) -> dict | None:
+    f = SITE_DATA / "gamelog" / f"{pid}.json"
+    if not f.exists():
+        return None
+    d = json.loads(f.read_text())
+    rows = [dict(zip(d["cols"], r)) for r in d["rows"] if r[d["cols"].index("yr")] == S.CURRENT_SEASON][:5]
+    if not rows or "p" not in d["cols"]:
+        return None
+    return {"games": len(rows), "g": sum(r["g"] for r in rows), "a": sum(r["a"] for r in rows), "p": sum(r["p"] for r in rows)}
+
+
+def team_sheet(t: str, goalie_id: int | None) -> dict:
+    """One club before the game: standing, team stats with league ranks, style (the traits furthest from average),
+    top scorers with their last five games, goalies, usual lines and power-play units."""
+    T = _teams()[t]
+    cols, rows = _rows("teams.json")
+    trows = [dict(zip(cols, r)) for r in rows]
+    me = next((r for r in trows if r["team"] == t), {})
+    ranks = {k: _rank(trows, k, t, hi) for k, hi in (("gfpg", True), ("gapg", False), ("pppct", True), ("pkpct", True),
+                                                       ("sfpg", True), ("sapg", False), ("fopct", True))}
+    stats = {k: me.get(k) for k in ("gp", "gf", "ga", "gfpg", "gapg", "diff", "ppg", "ppo", "pppct", "pkpct", "sfpg", "sapg", "fopct")}
+    fp = json.loads((SITE_DATA / "fingerprints.json").read_text())
+    tr = _traits()
+    style = []
+    for k, d in (fp["teams"].get(t, {}).get("dims") or {}).items():
+        b = (d or {}).get("blend") or {}
+        if k in fp.get("ready", []) and b.get("rank"):
+            style.append({"trait": tr.get(k, {}).get("label", k), "rank_of_32": b["rank"], "percentile": b.get("pct"),
+                          "low_end_word": tr.get(k, {}).get("low_end"), "high_end_word": tr.get(k, {}).get("high_end")})
+    style.sort(key=lambda x: -abs((x["percentile"] or 50) - 50))
+    scols, srows = _rows("skaters.json")
+    sk = sorted((dict(zip(scols, r)) for r in srows if r[scols.index("team")] == t), key=lambda r: (-r["p"], -r["g"]))
+    def who(r):
+        out = {"name": r["name"], "pos": r["pos"], "gp": r["gp"], "g": r["g"], "a": r["a"], "p": r["p"], "ppp": r["ppp"],
+               "toi_per_game": clock(int(r["toi"])) if r.get("toi") else None}
+        l5 = _last5(r["id"])
+        if l5:
+            out["last_five_games"] = l5
+        return out
+    top = [who(r) for r in sk[:5]]
+    for r in sorted(sk, key=lambda r: -r["g"])[:1]:
+        if r["name"] not in {x["name"] for x in top}:
+            top.append(who(r))
+    gcols, grows = _rows("goalies.json")
+    gl = [dict(zip(gcols, r)) for r in grows if r[gcols.index("team")] == t]
+    goalies = [{"name": g["name"], "gp": g["gp"], "record": f"{g['w']}-{g['l']}-{g['otl']}", "sv_pct": g["svpct"], "gaa": g["gaa"],
+                "shutouts": g["so"], "projected_starter": g["id"] == goalie_id} for g in sorted(gl, key=lambda g: -g["gp"])]
+    L = json.loads((SITE_DATA / "lines.json").read_text())["teams"].get(t, {})
+    idx = {p["id"]: p["name"] for p in json.loads((SITE_DATA / "players" / "index.json").read_text())}
+    lines = [{"unit": u["label"], "players": [idx.get(i, n) for i, n in zip(u.get("ids") or [], u["players"])] or u["players"],
+              "games_together_recently": u.get("gp")} for u in L.get("units") or [] if u["label"] in ("L1", "L2", "L3", "P1", "P2")]
+    pp = [{"unit": u["label"], "players": [idx.get(x["id"], x["name"]) + (f" ({x['role']})" if x.get("role") else "") for x in u["players"]]}
+          for u in (L.get("special") or {}).get("pp") or []][:2]
+    return {"standing": {"record": f"{T['w']}-{T['l']}-{T['otl']}", "points": T["pts"], "games": T["gp"],
+                         "division": T["division"], "division_place": T.get("div_rank"), "conference_place": T.get("conf_rank"),
+                         "league_place_in_points": T.get("league_rank"), "home_record": "-".join(map(str, T.get("home") or [])),
+                         "road_record": "-".join(map(str, T.get("road") or [])), "last_ten": "-".join(map(str, T.get("l10") or [])),
+                         "streak": T.get("streak"), "coach": T.get("coach")},
+            "team_stats": stats, "team_stat_ranks_of_32": ranks,
+            "style_most_distinctive": style[:8],
+            "top_scorers": top, "goalies": goalies, "usual_lines": lines, "power_play_units": pp}
 
 
 def generator_text(gid: int, kind: str) -> dict:

@@ -749,7 +749,8 @@ def _last_word(gm: Game, i: int, body: str = "") -> str:
     names = {W.the(other), W.place(other), W.nick.get(other, other)}
     T = W.the(t) if any(n and n in body for n in names) else "they"  # "they" only when no other team is named before it
     if m > th_:  # still ahead
-        return gm.pk([f"but {T} didn’t score again", f"and {T} didn’t score again"], "lastw", i)
+        # "and that was all they would get" after the opener (voice loop, round two: the same line in three stories)
+        return gm.pk([f"but {T} didn’t score again", f"and that was all {T} would get"], "lastw", i)
     if m == th_ and at(rest[0]) - at(g) <= 120:
         return ""  # the go-ahead came right back; "they didn’t score again" then reads oddly (PIT at WPG, Oct 20)
     if m == th_:  # level: "they didn't score again" could be either side, so the team is named

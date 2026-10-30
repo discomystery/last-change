@@ -1,0 +1,53 @@
+{
+ "head": "The matchup inside the matchup",
+ "paras": [
+  "The Devils come in at 8-5-0, the Golden Knights at 9-4-1.",
+  "It’s strength against strength: the Devils are one of the league’s best for the power play, but the Golden Knights are the best at the penalty kill. At home, Ryan Craig likes to pick matchups, so watch who goes out against the Devils’ fourth line."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Golden Knights are newly without Carter Hart. Adin Hill is expected to start."
+  },
+  {
+   "tag": "Milestone",
+   "text": "Brayden McNabb is set to play his 900th NHL game."
+  },
+  {
+   "tag": "Hot streak",
+   "text": "Mitch Marner has a point in eight straight games."
+  },
+  {
+   "tag": "Behind the record",
+   "text": "The Devils have played better than their record (.615): their chances are worth about .747, and their goaltending has held them back."
+  }
+ ],
+ "outlook": {
+  "VGK": {
+   "head": "Leaning the Golden Knights’ way",
+   "body": "The two have been about even at out-chancing opponents lately. Vegas has home-ice advantage. The Devils can still swing it if they keep the shots coming."
+  },
+  "NJD": {
+   "head": "Close, but the Golden Knights have the slight edge",
+   "body": "The two have been about even at out-chancing opponents lately. Vegas has home-ice advantage. The Devils can tip it if they keep the shots coming."
+  }
+ },
+ "calls": [
+  {
+   "head": "The matchup inside the matchup",
+   "body": "The Devils are one of the league’s best for the power play, but the Golden Knights are the best at the penalty kill. Our lean: the Devils’ power play wins out. Power plays usually beat kills in these spots."
+  },
+  {
+   "head": "Something has to give",
+   "body": "The Devils are one of the league’s best for shot volume, but the Golden Knights are near the top at keeping shots away. We’ll side with the Devils."
+  },
+  {
+   "head": "Matchup-hunting season",
+   "body": "At home, the Golden Knights keep sending Hertl’s line (Connelly, Hertl and Bowman) out against opponents’ fourth lines, far more often than chance would suggest. Ryan Craig has been chasing an easier matchup for the team’s scorers. Tonight the Devils’ fourth line is Lombardi, Glass and Brown."
+  },
+  {
+   "head": "Active D vs. Forward-led",
+   "body": "On shots from defensemen, Vegas is one of the league’s best, but New Jersey is near the bottom. Watch the Golden Knights’ defensemen jump into the play."
+  }
+ ]
+}

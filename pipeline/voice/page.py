@@ -1,91 +1,100 @@
-"""Side-by-side page of a run for Sora: the site's text, the draft, and the site after the run's fixes, with the
-pattern table. `python -m pipeline.voice.page voice/runs/{run} out.html`, then publish it as an Artifact."""
-import html, json, re, sys
+"""Side-by-side page of a round for Sora: post-game rewrites (the site before, the rewrite, the site after the round's
+changes) and fuller previews (the site today, a fuller version from the same data), with the round's pattern table.
+`python -m pipeline.voice.page out.html voice/runs/{run} [voice/runs/{run} ...]`, then publish it as an Artifact."""
+import html
+import json
+import sys
+from collections import Counter
 from pathlib import Path
-from statistics import mean
-from pipeline.voice import compare
-from pipeline.export import textcheck
 
-run = Path(sys.argv[1]); out = Path(sys.argv[2]); root = run.parent.parent
+from pipeline.export import textcheck
+from pipeline.voice import compare
+
 E = html.escape
-finds = [json.loads(l) for l in (root / "findings.jsonl").read_text().splitlines() if l.strip()]
-pats = compare.patterns(root)
 STAT = {"fixed": ("Fixed", "s-fixed"), "partly": ("Partly fixed", "s-partly"), "kept": ("Kept as is", "s-kept"),
-        "proposed": ("Needs your call", "s-prop"), "open": ("Noted, one-off", "s-open")}
+        "proposed": ("Needs your call", "s-prop"), "open": ("Next round", "s-open")}
 CAT = {"lead": "Lead", "order": "Order", "omission": "Left out", "repetition": "Repetition", "phrasing": "Phrasing",
        "structure": "Structure", "emphasis": "Emphasis", "tone": "Tone", "overstatement": "Overstated", "accuracy": "Accuracy"}
 
+
 def sents(paras):
     return [s.strip() for p in paras for s in textcheck.sentences(p)]
+
 
 def story(st, before=None, calls=None):
     old = set(sents(before["paras"])) if before else None
     h = f"<h4>{E(st.get('head') or '')}</h4>"
     for p in st.get("paras") or []:
-        if old is None:
-            h += f"<p>{E(p)}</p>"
-        else:
-            h += "<p>" + " ".join(f"<mark>{E(s)}</mark>" if s not in old else E(s) for s in textcheck.sentences(p)) + "</p>"
+        h += "<p>" + (E(p) if old is None else " ".join(E(s) if s in old else f"<mark>{E(s)}</mark>" for s in textcheck.sentences(p))) + "</p>"
     its = st.get("items") or []
     if its:
-        oldit = {(i.get('tag'), i.get('text')) for i in (before or {}).get("items") or []} if before else None
-        h += "<ul>" + "".join(
-            f"<li><b>{E(i.get('tag') or '')}</b> " + (f"<mark>{E(i.get('text') or '')}</mark>" if oldit is not None and (i.get('tag'), i.get('text')) not in oldit else E(i.get('text') or '')) + "</li>"
-            for i in its) + "</ul>"
+        h += "<ul>" + "".join(f"<li><b>{E(i.get('tag') or '')}</b> {E(i.get('text') or '')}</li>" for i in its) + "</ul>"
     if calls:
-        h += "<div class=calls>" + "".join(f"<div><b>{E(c.get('head') or '')}</b> {E(c.get('body') or '')}</div>" for c in calls) + "</div>"
+        h += "<div class=calls><div class=lab>Call cards further down the page</div>" + "".join(
+            f"<div><b>{E(c.get('head') or '')}</b> {E(c.get('body') or '')}</div>" for c in calls) + "</div>"
     return h
 
-games = []
-for pk in sorted(run.glob("*.packet.json")):
-    gid = pk.name.split(".")[0]
-    P = json.loads(pk.read_text())
-    a, hm = P["away"]["abbr"], P["home"]["abbr"]
-    if P["kind"] == "recap":
-        f = P["final"]; end = {"shootout": " (shootout)", "OT": " (overtime)"}.get(f.get("ended"), "")
-        title = f"{a} {f[a]} at {hm} {f[hm]}{end}"; when = P["date"]; kind = "Post-game"
-    else:
-        title = f"{a} at {hm}"; when = P["start_utc"][:10]; kind = "Preview"
-    gen = json.loads((run / f"{gid}.generator.json").read_text())
-    aft = json.loads((run / f"{gid}.after.json").read_text()) if (run / f"{gid}.after.json").exists() else None
-    me = compare.parse_draft((run / f"{gid}.claude.md").read_text())
-    changed = aft and (sents(aft["paras"]) != sents(gen["paras"]) or aft.get("head") != gen.get("head") or aft.get("items") != gen.get("items"))
-    fl = [x for x in finds if str(x["game_id"]) == gid]
-    games.append((P["kind"], gid, title, when, kind, gen, me, aft, changed, fl))
-games.sort(key=lambda g: (g[0] != "recap", g[3]))
 
-pat_rows = ""
-first = {}
-for x in finds:
-    first.setdefault(x['key'], x['note'])
-for p in pats:
-    lab, cls = STAT.get(p["status"], (p["status"], "s-open"))
-    pat_rows += (f"<tr class='{'pat' if p['pattern'] else 'one'}'><td><span class='st {cls}'>{lab}</span></td>"
-                 f"<td class=n>{p['games']}</td><td>{E(first.get(p['key'], ''))}</td><td class=did>{E(re.sub(r'^Needs Sora: ', '', p['note']))}</td></tr>")
+def words(paras):
+    return len(" ".join(paras).split())
 
-cards = ""
-for kind_, gid, title, when, kind, gen, me, aft, changed, fl in games:
-    diffs = "".join(f"<li><span class=cat>{E(CAT.get(x['category'], x['category']))}</span> {E(x['note'])}</li>" for x in fl)
-    after_col = (story(aft, gen) if changed else "<p class=same>No change from these fixes.</p>") if aft else "<p class=same>Not regenerated.</p>"
-    cards += f"""<section class=game id=g{gid}>
-<header><span class=kind>{kind}</span><h3>{E(title)}</h3><span class=when>{E(when)}</span></header>
-<div class=cols>
-<div class='col gen'><div class=lab>The site today</div>{story(gen, calls=gen.get('calls'))}</div>
-<div class='col me'><div class=lab>Written from the facts alone</div>{story(me)}</div>
-<div class='col aft'><div class=lab>The site with this round's fixes</div>{after_col}</div>
-</div>
-{f"<div class=diffs><div class=lab>What was different</div><ul>{diffs}</ul></div>" if diffs else ""}
-</section>"""
 
-M = [(compare.measures(g[5]), compare.measures(g[6])) for g in games]
-avg = lambda i, k: mean(m[i][k] for m in M)
-rep = lambda i: mean(len(m[i]['repeated_phrases']) for m in M)
-nav = "".join(f"<a href='#g{g[1]}'>{E(g[2])}</a>" for g in games)
-n_rec = sum(g[0] == "recap" for g in games); n_prev = len(games) - n_rec
-page = f"""<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+def build(out: Path, runs: list[Path]) -> None:
+    root = runs[0].parent.parent
+    finds = compare.load_findings(root)
+    pats = compare.patterns(root)
+    games = []
+    for run in runs:
+        for pk in sorted(run.glob("*.packet.json")):
+            gid = pk.name.split(".")[0]
+            P = json.loads(pk.read_text())
+            a, hm = P["away"]["abbr"], P["home"]["abbr"]
+            if P["kind"] == "recap":
+                if not (run / f"{gid}.rewrite.md").exists():
+                    continue
+                f = P["final"]
+                end = {"shootout": " (shootout)", "OT": " (overtime)"}.get(f.get("ended"), "")
+                base = json.loads((run / f"{gid}.base.json").read_text())
+                mine = compare.parse_draft((run / f"{gid}.rewrite.md").read_text())
+                aft = json.loads((run / f"{gid}.after.json").read_text())
+                cols = [("The site before this round", story(base)), ("My rewrite: same facts, same order", story(mine, base)),
+                        ("The site after this round's changes", story(aft, base))]
+                fl = [x for x in finds if str(x["game_id"]) == gid and x["run"].endswith("rewrite")]
+                games.append(("recap", P["date"], gid, f"{a} {f[a]} at {hm} {f[hm]}{end}", "Post-game", cols, fl, None))
+            elif "teams" in P:  # a fuller preview packet (round two on); round one's previews were written from less
+                gen = json.loads((run / f"{gid}.generator.json").read_text())
+                mine = compare.parse_draft((run / f"{gid}.claude.md").read_text())
+                cols = [("The site today", story(gen, calls=gen.get("calls"))), ("A fuller preview from the same data", story(mine))]
+                games.append(("preview", P["start_utc"][:10], gid, f"{a} at {hm}", "Preview", cols, [],
+                              (words(gen["paras"]), words(mine["paras"]))))
+    games.sort(key=lambda g: (g[0] != "recap", g[1]))
+    recs = [g for g in games if g[0] == "recap"]
+    prevs = [g for g in games if g[0] == "preview"]
+    pairs = [json.loads(l) for l in (root / "pairs.jsonl").read_text().splitlines() if l.strip()] if (root / "pairs.jsonl").exists() else []
+    ops = Counter(p["op"] for p in pairs)
+    first = {}
+    for x in finds:
+        first.setdefault(x["key"], x["note"])
+    rows = ""
+    for p in [p for p in pats if p["key"].startswith("rw-") or p["key"] in ("two-winners", "assist-milestone-wording")]:
+        lab, cls = STAT.get(p["status"], (p["status"], "s-open"))
+        rows += (f"<tr class='{'pat' if p['pattern'] else 'one'}'><td><span class='st {cls}'>{lab}</span></td><td class=n>{p['games']}</td>"
+                 f"<td>{E(first.get(p['key'], ''))}</td><td class=did>{E(p['note'])}</td></tr>")
+    cards = ""
+    for kind_, when, gid, title, kind, cols, fl, _ in games:
+        diffs = "".join(f"<li><span class=cat>{E(CAT.get(x['category'], x['category']))}</span> {E(x['note'])}</li>" for x in fl)
+        body = "".join(f"<div class='col'><div class=lab>{E(l)}</div>{h}</div>" for l, h in cols)
+        cards += (f"<section class=game id=g{gid}><header><span class=kind>{kind}</span><h3>{E(title)}</h3><span class=when>{E(when)}</span></header>"
+                  f"<div class='cols n{len(cols)}'>{body}</div>"
+                  + (f"<div class=diffs><div class=lab>What the rewrite changed</div><ul>{diffs}</ul></div>" if diffs else "") + "</section>")
+    nav = "".join(f"<a href='#g{g[2]}'>{E(g[3])}</a>" for g in games)
+    pw = [g[7] for g in prevs]
+    changed = sum(v for k, v in ops.items() if k != "kept")
+    pw_site = round(sum(a for a, b in pw) / max(len(pw), 1))
+    pw_mine = round(sum(b for a, b in pw) / max(len(pw), 1))
+    page = f"""<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>Voice Loop Pilot</title>
 <link rel=preconnect href=https://fonts.googleapis.com><link rel=preconnect href=https://fonts.gstatic.com crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,100&family=Literata:opsz,wght@7..72,400;7..72,600&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel=stylesheet>
 <style>
 :root{{--bg:#eef3f7;--card:#fff;--ink:#0f1c2b;--ink2:#3a4a5c;--ink3:#6f7e8e;--line:#d6e0e8;--soft:#f5f8fb;--mark:#fff1b8;--fix:#2f7d5b;--prop:#b25d12;--part:#6a6fb8}}
 @media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--bg:#0e1823;--card:#152231;--ink:#e6edf3;--ink2:#b8c4cf;--ink3:#7c8a98;--line:#26384a;--soft:#1a2a3b;--mark:#5a4a12;--fix:#6cc49b;--prop:#f0a35e;--part:#a4a8ee}}}}
@@ -116,7 +125,7 @@ tr.one td{{color:var(--ink3)}} td.did{{color:var(--ink2);font-size:14px}}
 .game{{background:var(--card);border-radius:16px;padding:20px;margin:20px 0}}
 .game header{{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:14px}}
 .game h3{{font-size:22px}}
-.cols{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}}
+.cols{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}} .cols.n2{{grid-template-columns:repeat(2,minmax(0,1fr))}}
 main,.wrap,.game,.col{{min-width:0}} .col{{overflow-wrap:anywhere;background:var(--soft);border-radius:12px;padding:14px 16px;font-size:15.5px}}
 .col h4{{font-size:18px;margin:6px 0 8px}} .col p{{margin:0 0 10px}}
 .col ul{{padding-left:18px;margin:6px 0;font-size:14.5px}} .col li b{{font:600 12px 'Hanken Grotesk',sans-serif;text-transform:uppercase;letter-spacing:.05em}}
@@ -125,31 +134,26 @@ mark{{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}}
 .same{{color:var(--ink3);font-style:italic}}
 .diffs{{margin-top:14px}} .diffs ul{{padding-left:0;list-style:none;margin:6px 0 0}} .diffs li{{margin:6px 0;font-size:15px;color:var(--ink2)}}
 .cat{{display:inline-block;min-width:92px;color:var(--ink)}}
-@media (max-width:1000px){{.cols{{grid-template-columns:1fr}}}}
+@media (max-width:1000px){{.cols,.cols.n2{{grid-template-columns:1fr}}}}
 @media (max-width:600px){{h1{{font-size:28px}}.game{{padding:14px}}td.n{{display:none}}}}
 </style></head><body><div class=wrap>
-<div class=lab>Spare Line Change · writing check, first round</div>
-<h1>The site's stories, beside ones written from the same facts</h1>
-<p class=lede>For {n_rec} post-game pages and {n_prev} previews, I was handed only the facts the site's writer sees and wrote the story I'd want to read, without looking at the site's version. Then I lined them up, logged every difference, and changed the site's writer wherever a difference kept turning up. The third column is the site's story with those changes; highlighted sentences are new.</p>
+<div class=lab>Spare Line Change · writing check, round two</div>
+<h1>Closer rewrites, and fuller previews</h1>
+<p class=lede>Round one's stories from scratch were too far from the site's to learn from. This time, for {len(recs)} post-game pages, I started from the site's own story and kept every fact and the order of the game, changing only how the sentences are built and joined. A check flags anything I dropped, added or moved. Each site sentence is paired with what it became, and the changes that kept coming up are now in the site's writer. For {len(prevs)} upcoming games, I wrote fuller previews from a much bigger set of facts (standings, team stats and ranks, style, top scorers and recent form, goalies, lines and power-play units), to show what the site's preview could hold.</p>
 <div class=tiles>
-<div class=tile><div class=lab>Words per story</div><b>{avg(0, 'words'):.0f} → {avg(1, 'words'):.0f}</b><span>site vs. mine</span></div>
-<div class=tile><div class=lab>Sentences per story</div><b>{avg(0, 'sentences'):.1f} → {avg(1, 'sentences'):.1f}</b><span>site vs. mine</span></div>
-<div class=tile><div class=lab>Repeated phrases</div><b>{rep(0):.1f} → {rep(1):.1f}</b><span>per story, site vs. mine</span></div>
-<div class=tile><div class=lab>Differences logged</div><b>{len(finds)}</b><span>{sum(p['pattern'] for p in pats)} patterns, the rest one-offs</span></div>
+<div class=tile><div class=lab>Post-game sentences reworked</div><b>{changed}</b><span>{ops.get('merged', 0)} joined, {ops.get('reworded', 0)} reworded, {ops.get('split', 0)} split, {ops.get('cut', 0)} cut</span></div>
+<div class=tile><div class=lab>Changes now in the site</div><b>{sum(1 for p in pats if p['key'].startswith('rw-') and p['status'] == 'fixed')}</b><span>of {sum(1 for p in pats if p['key'].startswith('rw-'))} patterns from the rewrites</span></div>
+<div class=tile><div class=lab>Preview words</div><b>{pw_site} → {pw_mine}</b><span>story paragraphs, site today vs. the fuller version (the call cards come on top of both)</span></div>
 </div>
-<h2>How the loop works</h2>
-<ol class=steps>
-<li>Pick a dozen varied games: a shootout, an overtime game, a comeback, a shutout, a rout, a one-goal game, plus a few previews.</li>
-<li>Hand me each game's facts only, never the site's text.</li>
-<li>I write the story. A guard flags any number or name in it that isn't in the facts, so I can't teach the site something untrue.</li>
-<li>Line the two up and log each difference. Seen in three or more games, it's a pattern.</li>
-<li>Fix the site's writer for each pattern (unless it goes against one of your decisions), rerun, and check nothing came back.</li>
-</ol>
-<h2>What kept coming up</h2>
-<table><thead><tr><th>Status</th><th class=n>Games</th><th>What was different</th><th>What I did</th></tr></thead><tbody>{pat_rows}</tbody></table>
+<h2>What the rewrites kept changing</h2>
+<table><thead><tr><th>Status</th><th class=n>Games</th><th>What was different</th><th>What I did</th></tr></thead><tbody>{rows}</tbody></table>
 <h2>Game by game</h2>
 <div class=nav>{nav}</div>
 {cards}
 </div></body></html>"""
-out.write_text(page)
-print(out, len(page))
+    out.write_text(page)
+    print(out, len(page))
+
+
+if __name__ == "__main__":
+    build(Path(sys.argv[1]), [Path(a) for a in sys.argv[2:]])

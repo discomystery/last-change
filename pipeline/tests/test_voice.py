@@ -41,3 +41,18 @@ def test_patterns_threshold(tmp_path):
     got = {p["key"]: p for p in compare.patterns(tmp_path)}
     assert got["k"]["pattern"] and got["k"]["status"] == "fixed"
     assert not got["solo"]["pattern"] and got["solo"]["status"] == "open"
+
+
+def test_fidelity_catches_a_dropped_fact_and_allows_a_marked_cut():
+    base = {"head": "H", "paras": ["Seguin opened the scoring, and Schaefer tied it 1-1 for the Islanders."], "items": []}
+    keep = "# H\n\nSeguin opened the scoring, and Schaefer tied it for the Islanders.\n"
+    f = compare.fidelity(keep, base, PACKET)
+    assert f["dropped"] == ["1-1"]
+    assert compare.fidelity("<!-- drop: 1-1 -->\n" + keep, base, PACKET)["dropped"] == []
+
+
+def test_align_pairs_two_site_sentences_merged_into_one():
+    base = {"head": "", "paras": ["Stars won. The Stars moved to 7-3-1. The Isles fell to 5-4-2."], "items": []}
+    new = {"head": "", "paras": ["Stars won. The Stars moved to 7-3-1, and the Isles fell to 5-4-2."], "items": []}
+    ops = [g["op"] for g in compare.align(base, new)]
+    assert "merged" in ops and "kept" in ops

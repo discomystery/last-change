@@ -29,12 +29,13 @@
  "assist-milestone-wording": {
   "status": "fixed",
   "since": "2026-10-30-pilot",
-  "fix": "this PR"
+  "fix": "this PR",
+  "note": "Full name on first mention; the milestone now reads \"with Cirelli picking up his 200th NHL assist on the goal\" (round one's rewording was undone, Sora 2026-10-30)."
  },
  "two-winners": {
-  "status": "fixed",
+  "status": "kept",
   "since": "2026-10-30-pilot",
-  "fix": "this PR"
+  "note": "Round one dropped \"stood up as the winner\" after \"ahead for good\"; Sora found it a step back (WPG at TBL), so it is back. Only \"assist on the assist\" was fixed."
  },
  "preview-form-bare": {
   "status": "fixed",
@@ -75,5 +76,63 @@
  "goal-by-goal-in-routs": {
   "status": "proposed",
   "note": "Proposal: three or more unanswered goals in a decided game as one sentence naming the scorers."
+ },
+ "rw-standings-one-sentence": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "One sentence; the winner's move is a verb when it moved."
+ },
+ "rw-back-ahead": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"put them back ahead\" / \"restored the lead\", each once a story."
+ },
+ "rw-goalie-other-end": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"... stopped 24 of 27 at the other end\"."
+ },
+ "rw-posts-with-play": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "Folded into the loser's \"had a little more of the play\" sentence."
+ },
+ "rw-one-clock": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "The joining pass fronts a shared period time."
+ },
+ "rw-period-belonged": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"The second period belonged to X\" when one team scored every goal of a busy period."
+ },
+ "rw-pronoun": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"He added three assists\" after a sentence about him (point-night line)."
+ },
+ "rw-join-goal-pairs": {
+  "status": "open",
+  "since": "2026-10-30-pilot-rewrite",
+  "note": "Next round: let the joining pass take a sentence that already has one \"but\", within the word limit."
+ },
+ "rw-implied-score": {
+  "status": "open",
+  "since": "2026-10-30-pilot-rewrite",
+  "note": "Next round: drop the score after \"tied it\" when the score is obvious from the sentence before."
+ },
+ "rw-quiet-scoring-end": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"and that was all they would get\" joins \"but they didn't score again\" in the pool."
  }
 }
