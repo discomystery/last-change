@@ -1,0 +1,657 @@
+{
+ "kind": "recap",
+ "game_id": 2026020166,
+ "date": "2026-10-23",
+ "venue": "United Center",
+ "away": {
+  "abbr": "MTL",
+  "name": "Montréal Canadiens",
+  "place": "Montréal",
+  "nickname": "Canadiens",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Martin St. Louis"
+ },
+ "home": {
+  "abbr": "CHI",
+  "name": "Chicago Blackhawks",
+  "place": "Chicago",
+  "nickname": "Blackhawks",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Jeff Blashill"
+ },
+ "final": {
+  "MTL": 4,
+  "CHI": 1,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "4:23",
+   "time_left_in_period": "15:37",
+   "team": "CHI",
+   "scorer": "Connor Bedard",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Patrick Kane"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 0,
+    "CHI": 1
+   },
+   "chance_of_scoring": 7,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "17:29",
+   "time_left_in_period": "2:31",
+   "team": "MTL",
+   "scorer": "Jake Evans",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Kirby Dach",
+    "Owen Beck"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 1,
+    "CHI": 1
+   },
+   "chance_of_scoring": 15,
+   "shot": "wrist"
+  },
+  {
+   "n": 3,
+   "period": 2,
+   "time_in_period": "7:45",
+   "time_left_in_period": "12:15",
+   "team": "MTL",
+   "scorer": "Jake Evans",
+   "scorer_goal_tonight": 2,
+   "assists": [
+    "Kaiden Guhle"
+   ],
+   "strength": "shorthanded",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 2,
+    "CHI": 1
+   },
+   "chance_of_scoring": 12,
+   "shot": "wrist"
+  },
+  {
+   "n": 4,
+   "period": 2,
+   "time_in_period": "18:26",
+   "time_left_in_period": "1:34",
+   "team": "MTL",
+   "scorer": "Kaiden Guhle",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Jake Evans",
+    "Alexandre Carrier"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 3,
+    "CHI": 1
+   },
+   "chance_of_scoring": 1,
+   "shot": "wrist"
+  },
+  {
+   "n": 5,
+   "period": 3,
+   "time_in_period": "17:22",
+   "time_left_in_period": "2:38",
+   "team": "MTL",
+   "scorer": "Mike Matheson",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Phillip Danault"
+   ],
+   "strength": "empty net",
+   "against_pulled_goalie": true,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 4,
+    "CHI": 1
+   },
+   "chance_of_scoring": 43,
+   "shot": "snap"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "MTL": 1,
+    "CHI": 1
+   },
+   "shots": {
+    "MTL": 9,
+    "CHI": 9
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "MTL": 2,
+    "CHI": 0
+   },
+   "shots": {
+    "MTL": 11,
+    "CHI": 8
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "MTL": 1,
+    "CHI": 0
+   },
+   "shots": {
+    "MTL": 8,
+    "CHI": 4
+   }
+  }
+ ],
+ "team_numbers": {
+  "MTL": {
+   "shots": 28,
+   "xg": 2.53,
+   "cf5": 41,
+   "hits": 23,
+   "pp_goals": 0,
+   "pp_opps": 3
+  },
+  "CHI": {
+   "shots": 21,
+   "xg": 2.02,
+   "cf5": 25,
+   "hits": 11,
+   "pp_goals": 0,
+   "pp_opps": 5
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Jacob Fowler",
+   "team": "MTL",
+   "started": true,
+   "toi": "59:55",
+   "shots": 21,
+   "saves": 20,
+   "ga": 1,
+   "gsax": 1.02,
+   "sv": 0.952
+  },
+  {
+   "full": "Spencer Knight",
+   "team": "CHI",
+   "started": true,
+   "toi": "59:14",
+   "shots": 27,
+   "saves": 24,
+   "ga": 3,
+   "gsax": -0.47,
+   "sv": 0.889
+  }
+ ],
+ "players": [
+  {
+   "name": "Jake Evans",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 2.0,
+   "assists": 1.0,
+   "points": 3.0,
+   "toi": "17:12",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Kaiden Guhle",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "23:30",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Mike Matheson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:15",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Connor Bedard",
+   "team": "CHI",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:06",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Alexandre Carrier",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "22:40",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Patrick Kane",
+   "team": "CHI",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "20:53",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Phillip Danault",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:09",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Kirby Dach",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "11:32",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Owen Beck",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "10:25",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Lane Hutson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:04",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Alex Vlasic",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:40",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Noah Dobson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:48",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Roman Kantserov",
+   "team": "CHI",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:39",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Artyom Levshunov",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:24",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Wyatt Kaiser",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:02",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Ian Cole",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:22",
+   "season_goals_after": 0.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "MTL": 55,
+   "CHI": 45
+  }
+ },
+ "pregame_chance": {
+  "CHI": 41,
+  "MTL": 59
+ },
+ "records_before": {
+  "MTL": {
+   "record": "4-3-2",
+   "games": 9,
+   "run": "winless 1",
+   "last_ten": "4-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-10",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "W",
+     "score": "1-0",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-14",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    }
+   ]
+  },
+  "CHI": {
+   "record": "3-6-0",
+   "games": 9,
+   "run": "winless 1",
+   "last_ten": "3-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-08",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": true,
+     "result": "W",
+     "score": "5-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "MTL": {
+   "record": "5-3-2",
+   "games": 10,
+   "run": "won 1",
+   "last_ten": "5-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-14",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CHI": {
+   "record": "3-7-0",
+   "games": 10,
+   "run": "winless 2",
+   "last_ten": "3-7-0",
+   "last_five": [
+    {
+     "date": "2026-10-10",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": true,
+     "result": "W",
+     "score": "5-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "MTL": {
+   "points": 12,
+   "gp": 10,
+   "division": "Atlantic",
+   "division_place": 5,
+   "conference_place": 9,
+   "wild_card_place": 3,
+   "league_place_by_points": 17
+  },
+  "CHI": {
+   "points": 6,
+   "gp": 10,
+   "division": "Central",
+   "division_place": 8,
+   "conference_place": 15,
+   "wild_card_place": 9,
+   "league_place_by_points": 31
+  }
+ },
+ "firsts": [
+  {
+   "team": "CHI",
+   "goals": 0,
+   "kind": "milestone",
+   "what": "game",
+   "mark": 1000,
+   "have": 999,
+   "player": "Ian Cole"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The chances were closer than the score.",
+  "Jacob Fowler made 20 saves for the Canadiens, and Spencer Knight stopped 24 of 27.",
+  "Neither power play scored: the Canadiens killed all five Blackhawks power plays, and the Blackhawks killed all three of Montréal’s.",
+  "The Canadiens moved to 5-3-2, climbing to fifth in the Atlantic.",
+  "The Blackhawks dropped to 3-7-0, still last in the Central.",
+  "Against them: Cole Caufield had a point in all six of his games against Chicago since 2023-24, and that run ended.",
+  "Against them: Connor Bedard has a point in all six of his games against Montréal since 2023-24.",
+  "Milestone: The Blackhawks’ Ian Cole played his 1,000th NHL game.",
+  "Finally: Mike Matheson scored his first goal of the season, his first since Mar 31 (twelve games played since)."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

@@ -1,0 +1,616 @@
+{
+ "kind": "recap",
+ "game_id": 2026020189,
+ "date": "2026-10-27",
+ "venue": "Lenovo Center",
+ "away": {
+  "abbr": "BOS",
+  "name": "Boston Bruins",
+  "place": "Boston",
+  "nickname": "Bruins",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Marco Sturm"
+ },
+ "home": {
+  "abbr": "CAR",
+  "name": "Carolina Hurricanes",
+  "place": "Carolina",
+  "nickname": "Hurricanes",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Rod Brind'Amour"
+ },
+ "final": {
+  "BOS": 1,
+  "CAR": 2,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "1:31",
+   "time_left_in_period": "18:29",
+   "team": "BOS",
+   "scorer": "Pavel Zacha",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Elias Lindholm",
+    "David Pastrňák"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "BOS": 1,
+    "CAR": 0
+   },
+   "chance_of_scoring": 21,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "19:08",
+   "time_left_in_period": "0:52",
+   "team": "CAR",
+   "scorer": "Jackson Blake",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Nikolaj Ehlers"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "BOS": 1,
+    "CAR": 1
+   },
+   "chance_of_scoring": 19,
+   "shot": "wrist"
+  },
+  {
+   "n": 3,
+   "period": 3,
+   "time_in_period": "10:19",
+   "time_left_in_period": "9:41",
+   "team": "CAR",
+   "scorer": "Sebastian Aho",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "William Carrier",
+    "Andrei Svechnikov"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "BOS": 1,
+    "CAR": 2
+   },
+   "chance_of_scoring": 19,
+   "shot": "backhand"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "BOS": 1,
+    "CAR": 1
+   },
+   "shots": {
+    "BOS": 7,
+    "CAR": 12
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "BOS": 0,
+    "CAR": 0
+   },
+   "shots": {
+    "BOS": 2,
+    "CAR": 8
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "BOS": 0,
+    "CAR": 1
+   },
+   "shots": {
+    "BOS": 6,
+    "CAR": 10
+   }
+  }
+ ],
+ "team_numbers": {
+  "BOS": {
+   "shots": 15,
+   "xg": 1.77,
+   "cf5": 24,
+   "hits": 12,
+   "pp_goals": 1,
+   "pp_opps": 5
+  },
+  "CAR": {
+   "shots": 30,
+   "xg": 3.91,
+   "cf5": 52,
+   "hits": 23,
+   "pp_goals": 0,
+   "pp_opps": 4
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Jeremy Swayman",
+   "team": "BOS",
+   "started": true,
+   "toi": "57:47",
+   "shots": 30,
+   "saves": 28,
+   "ga": 2,
+   "gsax": 1.91,
+   "sv": 0.933
+  },
+  {
+   "full": "Pyotr Kochetkov",
+   "team": "CAR",
+   "started": true,
+   "toi": "60:00",
+   "shots": 15,
+   "saves": 14,
+   "ga": 1,
+   "gsax": 0.77,
+   "sv": 0.933
+  }
+ ],
+ "players": [
+  {
+   "name": "Sebastian Aho",
+   "team": "CAR",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "21:18",
+   "season_goals_after": 8.0
+  },
+  {
+   "name": "Pavel Zacha",
+   "team": "BOS",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:53",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Jackson Blake",
+   "team": "CAR",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:47",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "David Pastrňák",
+   "team": "BOS",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "22:39",
+   "season_goals_after": 7.0
+  },
+  {
+   "name": "Elias Lindholm",
+   "team": "BOS",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "19:17",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Andrei Svechnikov",
+   "team": "CAR",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "16:47",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Nikolaj Ehlers",
+   "team": "CAR",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "16:16",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "William Carrier",
+   "team": "CAR",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "14:00",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Charlie McAvoy",
+   "team": "BOS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "26:32",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Jaccob Slavin",
+   "team": "CAR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "23:16",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Jalen Chatfield",
+   "team": "CAR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:32",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Hampus Lindholm",
+   "team": "BOS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:33",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "K'Andre Miller",
+   "team": "CAR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:24",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "JJ Peterka",
+   "team": "BOS",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:24",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Nikita Zadorov",
+   "team": "BOS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:31",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Sean Walker",
+   "team": "CAR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:18",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Will Borgen",
+   "team": "BOS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:12",
+   "season_goals_after": 2.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "BOS": 31,
+   "CAR": 69
+  }
+ },
+ "pregame_chance": {
+  "CAR": 75,
+  "BOS": 25
+ },
+ "records_before": {
+  "BOS": {
+   "record": "9-2-1",
+   "games": 12,
+   "run": "won 2",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-16",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": true,
+     "result": "W",
+     "score": "6-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "W",
+     "score": "6-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CAR": {
+   "record": "9-2-2",
+   "games": 13,
+   "run": "won 1",
+   "last_ten": "8-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-18",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "5-6",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "BOS": {
+   "record": "9-3-1",
+   "games": 13,
+   "run": "winless 1",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": true,
+     "result": "W",
+     "score": "6-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "W",
+     "score": "6-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CAR": {
+   "record": "10-2-2",
+   "games": 14,
+   "run": "won 2",
+   "last_ten": "8-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-18",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "5-6",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "CAR": {
+   "points": 22,
+   "gp": 14,
+   "division": "Metropolitan",
+   "division_place": 1,
+   "conference_place": 1,
+   "wild_card_place": null,
+   "league_place_by_points": 1
+  },
+  "BOS": {
+   "points": 19,
+   "gp": 13,
+   "division": "Atlantic",
+   "division_place": 1,
+   "conference_place": 2,
+   "wild_card_place": null,
+   "league_place_by_points": 3
+  }
+ },
+ "firsts": [],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The Hurricanes carried the play, outshooting the Bruins 30-15 (25-9 at 5-on-5), and got the result to match.",
+  "Pyotr Kochetkov made 14 saves for the Canes, and Jeremy Swayman stopped 28 of 30.",
+  "Kochetkov has won all eight of his starts this season, matching Frederik Andersen (2021-22) for the longest winning run to open a season by any goalie in franchise history.",
+  "The Bruins killed off a two-man advantage that lasted less than two minutes late in the second.",
+  "The Hurricanes improved to 10-2-2 and took the best points percentage in the NHL from the Bruins, who dropped to 9-3-1.",
+  "That leaves the Hurricanes first in the NHL in both points and points percentage.",
+  "Snapped: The Bruins’ eight-game point streak is over.",
+  "Last ten: The Hurricanes have won eight of their last ten.",
+  "Streak over: Mark Jankowski’s six-game point streak ended.",
+  "Streak over: Mark Jankowski’s goal streak ended at six games."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

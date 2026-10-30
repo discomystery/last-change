@@ -1,0 +1,734 @@
+{
+ "kind": "preview",
+ "game_id": 2026020224,
+ "start_utc": "2026-10-31T23:00:00Z",
+ "venue": "Rogers Arena",
+ "away": {
+  "abbr": "TOR",
+  "name": "Toronto Maple Leafs",
+  "place": "Toronto",
+  "nickname": "Maple Leafs",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Jim Hiller"
+ },
+ "home": {
+  "abbr": "VAN",
+  "name": "Vancouver Canucks",
+  "place": "Vancouver",
+  "nickname": "Canucks",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Manny Malhotra"
+ },
+ "form": {
+  "TOR": {
+   "record": "7-6-2",
+   "games": 15,
+   "run": "winless 2",
+   "last_ten": "5-4-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": false,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NYR",
+     "opp_name": "New York Rangers",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "W",
+     "score": "7-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    }
+   ]
+  },
+  "VAN": {
+   "record": "3-10-1",
+   "games": 14,
+   "run": "won 1",
+   "last_ten": "1-8-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "TBL",
+     "opp_name": "Tampa Bay Lightning",
+     "home": false,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "6-5",
+     "ended": "OT"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {},
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "VAN",
+   "facts": [
+    "Vancouver’s L4 (Bains, Sasson and Gallagher) at home: 47% of its 5-on-5 time against opponents’ fourth lines. Matchups, Vancouver home games this season, 6 games, 46 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face fourth lines about 24% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Vancouver L4's 5-on-5 time against Toronto L4",
+   "usual": 47,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "history",
+   "about": "TOR",
+   "facts": [
+    "Bobrovsky: .816 save percentage in 6 starts against Vancouver since 2023-24.",
+    "Bobrovsky: .902 save percentage against everyone else since 2023-24, on 4,359 shots."
+   ],
+   "what_we_check": null,
+   "usual": 0.9023,
+   "league": null,
+   "direction": "closer"
+  },
+  {
+   "kind": "clash",
+   "about": "TOR",
+   "facts": [
+    "Toronto: 8.2 expected goals per 60 on the power play, 8th of 32. Playing style, this season blended with last, 15 and 14 games this season.",
+    "Vancouver: 9.1 expected goals allowed per 60 shorthanded, 32nd of 32. Playing style, this season blended with last, 15 and 14 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 8.246,
+   "league": 7.6352,
+   "direction": "above"
+  },
+  {
+   "kind": "edge",
+   "about": "VAN",
+   "facts": [
+    "Vancouver: 43% of forward ice time to the bottom six, 6th of 32. Playing style, this season blended with last, 15 and 14 games this season.",
+    "Toronto: 41% of forward ice time to the bottom six, 29th of 32. Playing style, this season blended with last, 15 and 14 games this season."
+   ],
+   "what_we_check": "bottom-six share of forward ice time",
+   "usual": {
+    "VAN": 43.434,
+    "TOR": 40.6877
+   },
+   "league": 42.1689,
+   "direction": "ahead"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Toronto has been out-chancing opponents by a wide margin lately, but they will be without Marchenko, and Vancouver has home-ice advantage.",
+  "The Canucks’ best way through is a power play that gets going.",
+  "Old team: Teddy Blueger faces Vancouver for the first time since leaving.",
+  "Out: The Maple Leafs are newly without Kirill Marchenko and Nick Blankenburg, and have been without Chris Tanev and John Tavares for several games. Counting how much each missing player usually brings, no team is missing more right now.",
+  "Out: The Canucks have been without Thatcher Demko all season.",
+  "Haunts them: William Nylander has four goals in six games against Vancouver since 2023-24."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "TOR": {
+   "standing": {
+    "record": "7-6-2",
+    "points": 16,
+    "games": 15,
+    "division": "Atlantic",
+    "division_place": 6,
+    "conference_place": 10,
+    "league_place_in_points": 15,
+    "home_record": "4-3-1",
+    "road_record": "3-3-1",
+    "last_ten": "5-4-1",
+    "streak": "L2",
+    "coach": "Jim Hiller"
+   },
+   "team_stats": {
+    "gp": 15,
+    "gf": 56,
+    "ga": 50,
+    "gfpg": 3.73,
+    "gapg": 3.33,
+    "diff": 6,
+    "ppg": 15,
+    "ppo": 48,
+    "pppct": 0.312,
+    "pkpct": 0.923,
+    "sfpg": 28.1,
+    "sapg": 29.4,
+    "fopct": 0.523
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 3,
+    "gapg": 23,
+    "pppct": 4,
+    "pkpct": 2,
+    "sfpg": 12,
+    "sapg": 26,
+    "fopct": 8
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Discipline",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Reckless",
+     "high_end_word": "Clean"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Auston Matthews",
+     "pos": "C",
+     "gp": 15,
+     "g": 10,
+     "a": 13,
+     "p": 23,
+     "ppp": 9,
+     "toi_per_game": "20:37",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "William Nylander",
+     "pos": "R",
+     "gp": 15,
+     "g": 9,
+     "a": 10,
+     "p": 19,
+     "ppp": 7,
+     "toi_per_game": "20:08",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 2,
+      "p": 6
+     }
+    },
+    {
+     "name": "Jack Roslovic",
+     "pos": "C",
+     "gp": 15,
+     "g": 6,
+     "a": 9,
+     "p": 15,
+     "ppp": 2,
+     "toi_per_game": "16:39",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 6,
+      "p": 9
+     }
+    },
+    {
+     "name": "Easton Cowan",
+     "pos": "R",
+     "gp": 15,
+     "g": 6,
+     "a": 8,
+     "p": 14,
+     "ppp": 1,
+     "toi_per_game": "15:26",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "Kirill Marchenko",
+     "pos": "R",
+     "gp": 14,
+     "g": 6,
+     "a": 8,
+     "p": 14,
+     "ppp": 8,
+     "toi_per_game": "17:37",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Sergei Bobrovsky",
+     "gp": 10,
+     "record": "3-5-2",
+     "sv_pct": 0.885,
+     "gaa": 3.29,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Anthony Stolarz",
+     "gp": 5,
+     "record": "4-1-0",
+     "sv_pct": 0.907,
+     "gaa": 2.79,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Gavin McKenna",
+      "Auston Matthews",
+      "Jack Roslovic"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Easton Cowan",
+      "Nick Paul",
+      "William Nylander"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Brandon Duhaime",
+      "Teddy Blueger",
+      "Zack MacEwen"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Jake McCabe",
+      "Darren Raddysh"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Morgan Rielly",
+      "Troy Stecher"
+     ],
+     "games_together_recently": 9
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Darren Raddysh (Quarterback)",
+      "Auston Matthews (Trigger)",
+      "William Nylander (Distributor)",
+      "Kirill Marchenko (Net-front)",
+      "Gavin McKenna"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Morgan Rielly (Quarterback)",
+      "Jack Roslovic",
+      "Easton Cowan (Trigger)",
+      "Vinni Lettieri",
+      "Oliver Ekman-Larsson (Point)"
+     ]
+    }
+   ]
+  },
+  "VAN": {
+   "standing": {
+    "record": "3-10-1",
+    "points": 7,
+    "games": 14,
+    "division": "Pacific",
+    "division_place": 8,
+    "conference_place": 16,
+    "league_place_in_points": 32,
+    "home_record": "1-5-0",
+    "road_record": "2-5-1",
+    "last_ten": "1-8-1",
+    "streak": "W1",
+    "coach": "Manny Malhotra"
+   },
+   "team_stats": {
+    "gp": 14,
+    "gf": 43,
+    "ga": 65,
+    "gfpg": 3.07,
+    "gapg": 4.64,
+    "diff": -22,
+    "ppg": 9,
+    "ppo": 44,
+    "pppct": 0.205,
+    "pkpct": 0.638,
+    "sfpg": 20.8,
+    "sapg": 32.8,
+    "fopct": 0.468
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 17,
+    "gapg": 32,
+    "pppct": 17,
+    "pkpct": 31,
+    "sfpg": 32,
+    "sapg": 32,
+    "fopct": 28
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Penalty kill",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Leaky",
+     "high_end_word": "Airtight"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Elias Pettersson",
+     "pos": "C",
+     "gp": 14,
+     "g": 4,
+     "a": 11,
+     "p": 15,
+     "ppp": 6,
+     "toi_per_game": "19:58",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Jonathan Lekkerimäki",
+     "pos": "R",
+     "gp": 14,
+     "g": 6,
+     "a": 6,
+     "p": 12,
+     "ppp": 4,
+     "toi_per_game": "14:44",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Brock Boeser",
+     "pos": "R",
+     "gp": 14,
+     "g": 4,
+     "a": 8,
+     "p": 12,
+     "ppp": 7,
+     "toi_per_game": "18:39",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Filip Hronek",
+     "pos": "D",
+     "gp": 14,
+     "g": 1,
+     "a": 9,
+     "p": 10,
+     "ppp": 5,
+     "toi_per_game": "25:37",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Linus Karlsson",
+     "pos": "C",
+     "gp": 14,
+     "g": 3,
+     "a": 6,
+     "p": 9,
+     "ppp": 1,
+     "toi_per_game": "14:31",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Leevi Meriläinen",
+     "gp": 9,
+     "record": "2-3-1",
+     "sv_pct": 0.9,
+     "gaa": 3.35,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Kevin Lankinen",
+     "gp": 8,
+     "record": "1-7-0",
+     "sv_pct": 0.812,
+     "gaa": 6.17,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Jake DeBrusk",
+      "Elias Pettersson",
+      "Brock Boeser"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Drew O'Connor",
+      "Filip Chytil",
+      "Jonathan Lekkerimäki"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Linus Karlsson",
+      "Marco Rossi",
+      "Liam Öhgren"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Jamie Oleksiak",
+      "Tom Willander"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Filip Hronek",
+      "Elias Pettersson"
+     ],
+     "games_together_recently": 6
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Filip Hronek (Quarterback)",
+      "Brock Boeser (Distributor)",
+      "Jake DeBrusk (Trigger)",
+      "Elias Pettersson",
+      "Jonathan Lekkerimäki"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Zeev Buium (Quarterback)",
+      "Linus Karlsson (Trigger)",
+      "Liam Öhgren (Net-front)",
+      "Paul Cotter",
+      "Filip Chytil"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

@@ -1,0 +1,145 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Bjorkstrand has two goals as the Rangers take down the Ducks"
+  ],
+  "rewrite": [
+   "Bjorkstrand has two goals as the Rangers take down the Ducks"
+  ],
+  "part": -2
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Nick Jensen made his Ducks debut, after two seasons with the Senators."
+  ],
+  "rewrite": [
+   "Nick Jensen made his Ducks debut, after two seasons with the Senators."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Sean Durzi struck first for the Rangers a little over a minute in, and J.T."
+  ],
+  "rewrite": [
+   "Sean Durzi struck first for the Rangers a little over a minute in, and J.T."
+  ],
+  "part": 0
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Miller stretched the lead to 2-0 on the power play early in the second."
+  ],
+  "rewrite": [
+   "Miller doubled the lead on the power play early in the second."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Gabe Perreault and Oliver Bjorkstrand scored just under three minutes apart midway through the period to stretch the lead to 4-0.",
+   "Bjorkstrand scored again early in the third to make it 5-0."
+  ],
+  "rewrite": [
+   "Gabe Perreault and Oliver Bjorkstrand then scored just under three minutes apart midway through the period to make it 4-0, and Bjorkstrand got his second early in the third for a 5-0 lead."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Jensen got the Ducks on the board with just over a minute left, but by then the game was long gone.",
+   "A.J."
+  ],
+  "rewrite": [
+   "By the time Jensen got the Ducks on the board with just over a minute left, the game was long gone, and A.J."
+  ],
+  "part": 0
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Greer scored his first goal for Anaheim with 33 seconds left to make it 5-2."
+  ],
+  "rewrite": [
+   "Greer’s first goal for Anaheim, with 33 seconds left, only made the final 5-2."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "The Rangers had the better of the chances."
+  ],
+  "rewrite": [
+   "The Rangers had the better of the chances."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Dylan Garand made 29 saves for the Rangers, and Ville Husso stopped 25 of 30."
+  ],
+  "rewrite": [
+   "Dylan Garand made 29 saves, and Ville Husso stopped 25 of 30 at the other end."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Rangers moved to 7-3-1, second in the Metropolitan.",
+   "The Ducks fell to 4-4-0, fifth in the Pacific."
+  ],
+  "rewrite": [
+   "The Rangers moved to 7-3-1, second in the Metropolitan, while the Ducks fell to 4-4-0, fifth in the Pacific."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Slump: The Ducks are on a three-game losing streak."
+  ],
+  "rewrite": [
+   "Slump: The Ducks are on a three-game losing streak."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Milestone: The Ducks’ Frank Vatrano played his 700th NHL game and had an assist."
+  ],
+  "rewrite": [
+   "Milestone: The Ducks’ Frank Vatrano played his 700th NHL game and had an assist."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak over: Mikael Granlund’s six-game point streak ended."
+  ],
+  "rewrite": [
+   "Streak over: Mikael Granlund’s six-game point streak ended."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Snapped: The Rangers bounced back after two straight losses."
+  ],
+  "rewrite": [
+   "Snapped: The Rangers bounced back after two straight losses."
+  ],
+  "part": -1
+ }
+]

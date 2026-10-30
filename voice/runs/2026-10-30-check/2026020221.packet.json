@@ -1,0 +1,714 @@
+{
+ "kind": "preview",
+ "game_id": 2026020221,
+ "start_utc": "2026-10-31T20:00:00Z",
+ "venue": "Crypto.com Arena",
+ "away": {
+  "abbr": "BUF",
+  "name": "Buffalo Sabres",
+  "place": "Buffalo",
+  "nickname": "Sabres",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Lindy Ruff"
+ },
+ "home": {
+  "abbr": "LAK",
+  "name": "Los Angeles Kings",
+  "place": "Los Angeles",
+  "nickname": "Kings",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Peter Laviolette"
+ },
+ "form": {
+  "BUF": {
+   "record": "5-4-3",
+   "games": 12,
+   "run": "won 1",
+   "last_ten": "4-3-3",
+   "last_five": [
+    {
+     "date": "2026-10-15",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "W",
+     "score": "5-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-21",
+     "opp": "PHI",
+     "opp_name": "Philadelphia Flyers",
+     "home": true,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": false,
+     "result": "W",
+     "score": "2-0",
+     "ended": "REG"
+    }
+   ]
+  },
+  "LAK": {
+   "record": "3-6-2",
+   "games": 11,
+   "run": "winless 1",
+   "last_ten": "3-5-2",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "NYR",
+     "opp_name": "New York Rangers",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "BUF": "Ukko-Pekka Luukkonen",
+  "LAK": "Darcy Kuemper"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "LAK",
+   "facts": [
+    "Los Angeles’s P2 (Doughty and Edmundson) at home: 35% of its 5-on-5 time against opponents’ first lines. Matchups, Los Angeles home games this season, 3 games, 35 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face first lines about 24% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Los Angeles P2's 5-on-5 time against Buffalo L1",
+   "usual": 35,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "edge",
+   "about": "BUF",
+   "facts": [
+    "Buffalo: 38% of shot attempts from defensemen, 6th of 32. Playing style, this season blended with last, 12 and 11 games this season.",
+    "Los Angeles: 31% of shot attempts from defensemen, 31st of 32. Playing style, this season blended with last, 12 and 11 games this season."
+   ],
+   "what_we_check": "share of 5-on-5 shot attempts taken by defensemen",
+   "usual": {
+    "BUF": 37.5524,
+    "LAK": 30.5086
+   },
+   "league": 34.7707,
+   "direction": "ahead"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "The two have been about even at out-chancing opponents lately.",
+  "Los Angeles has home-ice advantage, but they will be without Fiala.",
+  "The Kings can tip it if they keep dangerous shots away.",
+  "Owns them: Artemi Panarin has a point in at least nine straight games against Buffalo.",
+  "Out: The Sabres are newly without Konsta Helenius, and have had to make do without Alex Lyon all season. Ukko-Pekka Luukkonen is expected to start.",
+  "Out: The Kings are newly without Mats Zuccarello, have been without Alex Turcotte since Oct 6, and have had to make do without Kevin Fiala all season.",
+  "Missing: Drew Doughty has missed the Kings’ latest game."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "BUF": {
+   "standing": {
+    "record": "5-4-3",
+    "points": 13,
+    "games": 12,
+    "division": "Atlantic",
+    "division_place": 8,
+    "conference_place": 13,
+    "league_place_in_points": 20,
+    "home_record": "3-3-0",
+    "road_record": "2-1-3",
+    "last_ten": "4-3-3",
+    "streak": "W1",
+    "coach": "Lindy Ruff"
+   },
+   "team_stats": {
+    "gp": 12,
+    "gf": 33,
+    "ga": 40,
+    "gfpg": 2.75,
+    "gapg": 3.33,
+    "diff": -7,
+    "ppg": 4,
+    "ppo": 41,
+    "pppct": 0.098,
+    "pkpct": 0.714,
+    "sfpg": 27.6,
+    "sapg": 26.2,
+    "fopct": 0.476
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 24,
+    "gapg": 23,
+    "pppct": 32,
+    "pkpct": 25,
+    "sfpg": 15,
+    "sapg": 10,
+    "fopct": 23
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Blocking shots",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Rarely block",
+     "high_end_word": "Shot blockers"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 26,
+     "percentile": 20,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Physicality",
+     "rank_of_32": 26,
+     "percentile": 20,
+     "low_end_word": "Finesse",
+     "high_end_word": "Bruising"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Jack Quinn",
+     "pos": "R",
+     "gp": 12,
+     "g": 6,
+     "a": 5,
+     "p": 11,
+     "ppp": 3,
+     "toi_per_game": "19:29",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Owen Power",
+     "pos": "D",
+     "gp": 12,
+     "g": 2,
+     "a": 9,
+     "p": 11,
+     "ppp": 0,
+     "toi_per_game": "26:49",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Tage Thompson",
+     "pos": "C",
+     "gp": 12,
+     "g": 5,
+     "a": 5,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "19:30",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Noah Östlund",
+     "pos": "C",
+     "gp": 12,
+     "g": 3,
+     "a": 5,
+     "p": 8,
+     "ppp": 2,
+     "toi_per_game": "18:54",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Zach Benson",
+     "pos": "L",
+     "gp": 12,
+     "g": 1,
+     "a": 7,
+     "p": 8,
+     "ppp": 1,
+     "toi_per_game": "19:43",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 4,
+      "p": 5
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Ukko-Pekka Luukkonen",
+     "gp": 9,
+     "record": "3-3-3",
+     "sv_pct": 0.866,
+     "gaa": 3.56,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Colten Ellis",
+     "gp": 4,
+     "record": "2-1-0",
+     "sv_pct": 0.902,
+     "gaa": 2.28,
+     "shutouts": 1,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Josh Doan",
+      "Noah Östlund",
+      "Jack Quinn"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Zach Benson",
+      "Tage Thompson",
+      "Konsta Helenius"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Jason Zucker",
+      "Josh Norris",
+      "Ryan McLeod"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Mattias Samuelsson",
+      "Rasmus Dahlin"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Owen Power",
+      "Olen Zellweger"
+     ],
+     "games_together_recently": 5
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Rasmus Dahlin (Quarterback)",
+      "Jack Quinn (Distributor)",
+      "Noah Östlund",
+      "Zach Benson (Net-front)",
+      "Tage Thompson (Trigger)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Owen Power (Quarterback)",
+      "Jack Quinn (Distributor)",
+      "Noah Östlund",
+      "Zach Benson (Net-front)",
+      "Tage Thompson (Trigger)"
+     ]
+    }
+   ]
+  },
+  "LAK": {
+   "standing": {
+    "record": "3-6-2",
+    "points": 8,
+    "games": 11,
+    "division": "Pacific",
+    "division_place": 7,
+    "conference_place": 14,
+    "league_place_in_points": 30,
+    "home_record": "0-3-0",
+    "road_record": "3-3-2",
+    "last_ten": "3-5-2",
+    "streak": "L1",
+    "coach": "Peter Laviolette"
+   },
+   "team_stats": {
+    "gp": 11,
+    "gf": 28,
+    "ga": 37,
+    "gfpg": 2.55,
+    "gapg": 3.36,
+    "diff": -9,
+    "ppg": 5,
+    "ppo": 33,
+    "pppct": 0.152,
+    "pkpct": 0.636,
+    "sfpg": 27.0,
+    "sapg": 28.6,
+    "fopct": 0.506
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 27,
+    "gapg": 26,
+    "pppct": 27,
+    "pkpct": 32,
+    "sfpg": 18,
+    "sapg": 23,
+    "fopct": 13
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    },
+    {
+     "trait": "Rough stuff",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Calm",
+     "high_end_word": "Chippy"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 8,
+     "percentile": 77,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Artemi Panarin",
+     "pos": "L",
+     "gp": 11,
+     "g": 7,
+     "a": 4,
+     "p": 11,
+     "ppp": 3,
+     "toi_per_game": "21:34",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Alex Laferriere",
+     "pos": "R",
+     "gp": 11,
+     "g": 2,
+     "a": 7,
+     "p": 9,
+     "ppp": 1,
+     "toi_per_game": "19:08",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 5,
+      "p": 5
+     }
+    },
+    {
+     "name": "Brandt Clarke",
+     "pos": "D",
+     "gp": 11,
+     "g": 3,
+     "a": 5,
+     "p": 8,
+     "ppp": 2,
+     "toi_per_game": "19:56",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    },
+    {
+     "name": "Adrian Kempe",
+     "pos": "R",
+     "gp": 11,
+     "g": 3,
+     "a": 5,
+     "p": 8,
+     "ppp": 3,
+     "toi_per_game": "20:37",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 2,
+      "p": 4
+     }
+    },
+    {
+     "name": "Scott Laughton",
+     "pos": "C",
+     "gp": 11,
+     "g": 2,
+     "a": 2,
+     "p": 4,
+     "ppp": 0,
+     "toi_per_game": "14:50",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Darcy Kuemper",
+     "gp": 7,
+     "record": "3-3-1",
+     "sv_pct": 0.889,
+     "gaa": 3.47,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Anton Forsberg",
+     "gp": 5,
+     "record": "0-3-1",
+     "sv_pct": 0.902,
+     "gaa": 2.39,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Artemi Panarin",
+      "Alex Laferriere",
+      "Adrian Kempe"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Trevor Moore",
+      "Quinton Byfield",
+      "Taylor Ward"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Scott Laughton",
+      "Erik Haula",
+      "Joel Armia"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Erik Gustafsson",
+      "Brandt Clarke"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Drew Doughty",
+      "Joel Edmundson"
+     ],
+     "games_together_recently": 5
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Brandt Clarke (Quarterback)",
+      "Artemi Panarin (Distributor)",
+      "Adrian Kempe (Trigger)",
+      "Alex Laferriere (Net-front)",
+      "Quinton Byfield"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Erik Gustafsson (Quarterback)",
+      "Artemi Panarin (Distributor)",
+      "Adrian Kempe (Trigger)",
+      "Alex Laferriere (Net-front)",
+      "Quinton Byfield"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

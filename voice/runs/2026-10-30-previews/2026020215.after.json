@@ -1,0 +1,57 @@
+{
+ "head": "Something has to change for the Jets",
+ "paras": [
+  "The Jets are winless in seven (0-5-2), while Florida has won two in a row. The Panthers won the teams’ first meeting this season, 5-1 in Winnipeg on Tuesday. Going in, the Jets are seventh in the Central (tied for 25th in the NHL) and the Cats fifth in the Atlantic (tied for tenth).",
+  "The Panthers (1st) and the Jets (5th) both rarely ice the puck. The Jets take a lot of low-quality shots (29th). They also create more chances on the penalty kill than almost anyone (2nd), and that sets up a fight with the Panthers’ power play (6th), which could do real damage against the Jets’ penalty kill (24th). As for the Panthers, they are the league’s most physical team (1st). They also forecheck harder than anyone (1st), and that could keep the Jets pinned in their own end.",
+  "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring, and Cole Perfetti (6 G / 5 A / 11 P in 13 GP) isn’t far behind. Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP) leads the Panthers in scoring and is tied for seventh in the NHL, with nine points in his last five games. Brady Tkachuk (8 G / 7 A / 15 P in 13 GP) has a team-high eight goals, with seven points in his last five games and a point in five straight games against Winnipeg.",
+  "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) will likely start for Winnipeg, and Akira Schmid (4-2-1 / .884 SV% in 6 GS) for Florida."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Panthers have been without Jacob Markström, Aleksander Barkov and Brad Marchand for several games. Akira Schmid is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Jets have been without Josh Morrissey since Oct 7."
+  },
+  {
+   "tag": "Haunts them",
+   "text": "Mark Scheifele has five goals in seven games against Florida since 2023-24."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Carter Verhaeghe has eight goals on chances worth about 4.3 goals, well above what his finishing usually turns chances into. Runs like that tend to cool off."
+  }
+ ],
+ "outlook": {
+  "FLA": {
+   "head": "The Panthers should have the upper hand",
+   "body": "Even though Florida will be without Barkov, the Panthers have been out-chancing opponents by a wide margin lately and have home-ice advantage. On top of that, Winnipeg is on the second night of a back-to-back and will be without Morrissey. The Jets’ way back in is keeping dangerous shots away."
+  },
+  "WPG": {
+   "head": "Not an easy night for the Jets",
+   "body": "Even though Florida will be without Barkov, the Panthers have been out-chancing opponents by a wide margin lately and have home-ice advantage. On top of that, Winnipeg is on the second night of a back-to-back and will be without Morrissey. The Jets’ best way through is keeping dangerous shots away."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Panthers come in rested",
+   "body": "It’s the Jets’ second game in two nights. Teams on the back end of those usually spend more time defending, so we think the Panthers get more of the play than usual."
+  },
+  {
+   "head": "The Panthers’ power play has a target",
+   "body": "The Panthers’ power play is near the top of the league, and the Jets’ kill is near the bottom. Every trip to the box hurts the Jets more than most."
+  }
+ ],
+ "ranks": [
+  "1st of 32 in avoiding icings",
+  "5th of 32 in avoiding icings",
+  "29th of 32 in shot quality: a 5.9% chance of scoring on the average shot",
+  "2nd of 32 in shorthanded threat",
+  "6th of 32 in the power play: 8.6 expected goals per 60 on the power play",
+  "24th of 32 in the penalty kill: 8.1 expected goals allowed per 60 shorthanded",
+  "1st of 32 in physicality: hit score 160 (100 is average)",
+  "1st of 32 in forecheck pressure: forecheck score 148 (100 is average)"
+ ]
+}

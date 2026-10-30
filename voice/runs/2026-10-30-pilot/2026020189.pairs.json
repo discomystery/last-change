@@ -1,0 +1,151 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Kochetkov wins his first eight, tying a Hurricanes record"
+  ],
+  "rewrite": [
+   "Kochetkov wins his first eight, tying a Hurricanes record"
+  ],
+  "part": -2
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Pavel Zacha got the scoring started for the Bruins on the power play a minute and a half in, and they didn’t score again."
+  ],
+  "rewrite": [
+   "Pavel Zacha got the scoring started for the Bruins on the power play a minute and a half in, and that was all they would get."
+  ],
+  "part": 0
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Nicolas Deslauriers and Tanner Jeannot squared off midway through the first, and Jackson Blake tied it up for Carolina late in the period."
+  ],
+  "rewrite": [
+   "Nicolas Deslauriers and Tanner Jeannot squared off midway through the first, and Jackson Blake tied it for Carolina late in the period."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "The Bruins went more than 20 minutes without a shot on goal, from early in the second to midway through the third, while the Hurricanes put twelve on net."
+  ],
+  "rewrite": [
+   "From early in the second to midway through the third, the Bruins went more than 20 minutes without a shot on goal while the Hurricanes put twelve on net, a drought most teams don’t suffer even once a season."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Sebastian Aho put the Hurricanes ahead for good midway through the third."
+  ],
+  "rewrite": [
+   "Sebastian Aho put the Hurricanes ahead for good midway through the third."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "The Hurricanes carried the play, outshooting the Bruins 30-15 (25-9 at 5-on-5), and got the result to match."
+  ],
+  "rewrite": [
+   "The Hurricanes carried the play, outshooting the Bruins 30-15 (25-9 at 5-on-5), and got the result to match."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Pyotr Kochetkov needed only 14 saves for the Canes, and Jeremy Swayman kept the Bruins in it, stopping 28 of 30."
+  ],
+  "rewrite": [
+   "Pyotr Kochetkov needed only 14 saves for the Canes, while Jeremy Swayman kept the Bruins in it by stopping 28 of 30."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Kochetkov has won all eight of his starts this season, matching Frederik Andersen (2021-22) for the longest winning run to open a season by any goalie in franchise history."
+  ],
+  "rewrite": [
+   "Kochetkov has now won all eight of his starts this season, matching Frederik Andersen (2021-22) for the longest winning run to open a season by any goalie in franchise history."
+  ],
+  "part": 1
+ },
+ {
+  "op": "split",
+  "site": [
+   "The Bruins killed off a two-man advantage that lasted less than two minutes late in the second."
+  ],
+  "rewrite": [
+   "The Bruins did kill off a two-man advantage that lasted less than two minutes late in the second."
+  ],
+  "part": 2
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Hurricanes improved to 10-2-2 and took the best points percentage in the NHL from the Bruins, who dropped to 9-3-1.",
+   "That leaves the Hurricanes first in the NHL in both points and points percentage."
+  ],
+  "rewrite": [
+   "The Hurricanes improved to 10-2-2 and took the best points percentage in the NHL from the Bruins, who dropped to 9-3-1, so Carolina is now first in the NHL in both points and points percentage."
+  ],
+  "part": 2
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Snapped: The Bruins’ eight-game point streak is over."
+  ],
+  "rewrite": [
+   "Snapped: The Bruins’ eight-game point streak is over."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Last ten: The Hurricanes have won eight of their last ten."
+  ],
+  "rewrite": [
+   "Last ten: The Hurricanes have won eight of their last ten."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak over: Mark Jankowski’s six-game point streak ended."
+  ],
+  "rewrite": [
+   "Streak over: Mark Jankowski’s six-game point streak ended."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak over: Mark Jankowski’s goal streak ended at six games."
+  ],
+  "rewrite": [
+   "Streak over: Mark Jankowski’s goal streak ended at six games."
+  ],
+  "part": -1
+ },
+ {
+  "op": "cut",
+  "site": [
+   "Most teams don’t go that long without a shot even once a season."
+  ],
+  "rewrite": [],
+  "part": 0
+ }
+]

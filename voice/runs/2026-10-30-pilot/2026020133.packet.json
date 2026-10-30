@@ -1,0 +1,730 @@
+{
+ "kind": "recap",
+ "game_id": 2026020133,
+ "date": "2026-10-17",
+ "venue": "Delta Center",
+ "away": {
+  "abbr": "EDM",
+  "name": "Edmonton Oilers",
+  "place": "Edmonton",
+  "nickname": "Oilers",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Mike Babcock"
+ },
+ "home": {
+  "abbr": "UTA",
+  "name": "Utah Mammoth",
+  "place": "Utah",
+  "nickname": "Mammoth",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "André Tourigny"
+ },
+ "final": {
+  "EDM": 6,
+  "UTA": 2,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "0:40",
+   "time_left_in_period": "19:20",
+   "team": "EDM",
+   "scorer": "Connor McDavid",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Leon Draisaitl",
+    "Vasily Podkolzin"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 1,
+    "UTA": 0
+   },
+   "chance_of_scoring": 22,
+   "shot": "backhand"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "13:21",
+   "time_left_in_period": "6:39",
+   "team": "EDM",
+   "scorer": "Zach Hyman",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Connor McDavid",
+    "Vasily Podkolzin"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 2,
+    "UTA": 0
+   },
+   "chance_of_scoring": 25,
+   "shot": "backhand"
+  },
+  {
+   "n": 3,
+   "period": 1,
+   "time_in_period": "13:53",
+   "time_left_in_period": "6:07",
+   "team": "EDM",
+   "scorer": "Mathieu Joseph",
+   "scorer_goal_tonight": 1,
+   "assists": [],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 3,
+    "UTA": 0
+   },
+   "chance_of_scoring": 14,
+   "shot": "snap"
+  },
+  {
+   "n": 4,
+   "period": 2,
+   "time_in_period": "10:57",
+   "time_left_in_period": "9:03",
+   "team": "EDM",
+   "scorer": "Kasperi Kapanen",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Connor McDavid",
+    "Evan Bouchard"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 4,
+    "UTA": 0
+   },
+   "chance_of_scoring": 19,
+   "shot": "snap"
+  },
+  {
+   "n": 5,
+   "period": 2,
+   "time_in_period": "13:48",
+   "time_left_in_period": "6:12",
+   "team": "EDM",
+   "scorer": "Leon Draisaitl",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Connor McDavid",
+    "Mattias Ekholm"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 5,
+    "UTA": 0
+   },
+   "chance_of_scoring": 21,
+   "shot": "snap"
+  },
+  {
+   "n": 6,
+   "period": 3,
+   "time_in_period": "4:25",
+   "time_left_in_period": "15:35",
+   "team": "UTA",
+   "scorer": "John Marino",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Kevin Stenlund",
+    "Daniil But"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 5,
+    "UTA": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "slap"
+  },
+  {
+   "n": 7,
+   "period": 3,
+   "time_in_period": "6:00",
+   "time_left_in_period": "14:00",
+   "team": "UTA",
+   "scorer": "Mikhail Sergachev",
+   "scorer_goal_tonight": 1,
+   "assists": [],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 5,
+    "UTA": 2
+   },
+   "chance_of_scoring": 3,
+   "shot": "snap"
+  },
+  {
+   "n": 8,
+   "period": 3,
+   "time_in_period": "10:17",
+   "time_left_in_period": "9:43",
+   "team": "EDM",
+   "scorer": "Connor McDavid",
+   "scorer_goal_tonight": 2,
+   "assists": [],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "EDM": 6,
+    "UTA": 2
+   },
+   "chance_of_scoring": 19,
+   "shot": "snap"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "EDM": 3,
+    "UTA": 0
+   },
+   "shots": {
+    "EDM": 9,
+    "UTA": 6
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "EDM": 2,
+    "UTA": 0
+   },
+   "shots": {
+    "EDM": 10,
+    "UTA": 9
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "EDM": 1,
+    "UTA": 2
+   },
+   "shots": {
+    "EDM": 2,
+    "UTA": 13
+   }
+  }
+ ],
+ "team_numbers": {
+  "EDM": {
+   "shots": 21,
+   "xg": 2.51,
+   "cf5": 44,
+   "hits": 24,
+   "pp_goals": 1,
+   "pp_opps": 1
+  },
+  "UTA": {
+   "shots": 28,
+   "xg": 2.5,
+   "cf5": 56,
+   "hits": 39,
+   "pp_goals": 0,
+   "pp_opps": 2
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Tristan Jarry",
+   "team": "EDM",
+   "started": true,
+   "toi": "60:00",
+   "shots": 28,
+   "saves": 26,
+   "ga": 2,
+   "gsax": 0.5,
+   "sv": 0.929
+  },
+  {
+   "full": "Karel Vejmelka",
+   "team": "UTA",
+   "started": true,
+   "toi": "33:48",
+   "shots": 17,
+   "saves": 12,
+   "ga": 5,
+   "gsax": -2.95,
+   "sv": 0.706
+  },
+  {
+   "full": "Sebastian Cossa",
+   "team": "UTA",
+   "started": false,
+   "toi": "26:12",
+   "shots": 4,
+   "saves": 3,
+   "ga": 1,
+   "gsax": -0.53,
+   "sv": 0.75
+  }
+ ],
+ "players": [
+  {
+   "name": "Connor McDavid",
+   "team": "EDM",
+   "pos": "C",
+   "goals": 2.0,
+   "assists": 3.0,
+   "points": 5.0,
+   "toi": "19:52",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Leon Draisaitl",
+   "team": "EDM",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "18:31",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Vasily Podkolzin",
+   "team": "EDM",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "17:30",
+   "season_goals_after": 7.0
+  },
+  {
+   "name": "Mikhail Sergachev",
+   "team": "UTA",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "21:00",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "John Marino",
+   "team": "UTA",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:34",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Kasperi Kapanen",
+   "team": "EDM",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "18:00",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Zach Hyman",
+   "team": "EDM",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:32",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Mathieu Joseph",
+   "team": "EDM",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "12:35",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Evan Bouchard",
+   "team": "EDM",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "24:04",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Mattias Ekholm",
+   "team": "EDM",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "22:43",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Kevin Stenlund",
+   "team": "UTA",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:17",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Daniil But",
+   "team": "UTA",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:04",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "MacKenzie Weegar",
+   "team": "UTA",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:38",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Ryan Shea",
+   "team": "EDM",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:12",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Connor Murphy",
+   "team": "EDM",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:04",
+   "season_goals_after": 0.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "EDM": 50,
+   "UTA": 50
+  }
+ },
+ "pregame_chance": {
+  "UTA": 55,
+  "EDM": 45
+ },
+ "records_before": {
+  "EDM": {
+   "record": "5-1-1",
+   "games": 7,
+   "run": "winless 1",
+   "last_ten": "5-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-03",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": true,
+     "result": "W",
+     "score": "3-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-07",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": false,
+     "result": "W",
+     "score": "3-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": true,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "UTA": {
+   "record": "6-2-0",
+   "games": 8,
+   "run": "won 3",
+   "last_ten": "6-2-0",
+   "last_five": [
+    {
+     "date": "2026-10-06",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "W",
+     "score": "5-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-08",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "1-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "EDM": {
+   "record": "6-1-1",
+   "games": 8,
+   "run": "won 1",
+   "last_ten": "6-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-07",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": false,
+     "result": "W",
+     "score": "3-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": true,
+     "result": "L",
+     "score": "2-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    }
+   ]
+  },
+  "UTA": {
+   "record": "6-3-0",
+   "games": 9,
+   "run": "winless 1",
+   "last_ten": "6-3-0",
+   "last_five": [
+    {
+     "date": "2026-10-08",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "1-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": true,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [
+  {
+   "date": "2026-10-15",
+   "winner": "UTA",
+   "score": "4-2"
+  }
+ ],
+ "standings_after": {
+  "EDM": {
+   "points": 13,
+   "gp": 8,
+   "division": "Pacific",
+   "division_place": 2,
+   "conference_place": 2,
+   "wild_card_place": null,
+   "league_place_by_points": 4
+  },
+  "UTA": {
+   "points": 12,
+   "gp": 9,
+   "division": "Central",
+   "division_place": 1,
+   "conference_place": 3,
+   "wild_card_place": null,
+   "league_place_by_points": 7
+  }
+ },
+ "firsts": [
+  {
+   "team": "EDM",
+   "goals": 1,
+   "kind": "return",
+   "missed": 6,
+   "since": null,
+   "season_debut": false,
+   "points": 1,
+   "player": "Zach Hyman"
+  },
+  {
+   "team": "EDM",
+   "goals": 1,
+   "kind": "club_goal",
+   "player": "Mathieu Joseph"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "goalie",
+   "fact": "Vejmelka allowed 5 goals on 17 shots, worth 2.0 expected goals: 3.0 more than expected. Starting goalies have a night this rough about once every 35 starts."
+  }
+ ],
+ "notes": [
+  "The chances were closer than the score.",
+  "Tristan Jarry made 26 saves for the Oilers.",
+  "The Oilers moved to 6-1-1, second in the Pacific.",
+  "The Mammoth dropped to 6-3-0, still first in the Central.",
+  "Snapped: The Mammoth’s three-game winning streak is over.",
+  "Streak: Connor McDavid has a point in every game this season.",
+  "Against them: Connor McDavid extended his point streak against Utah to eight games.",
+  "Against them: Evan Bouchard extended his point streak against Utah to eight games."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

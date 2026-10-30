@@ -55,8 +55,24 @@ def test_a_loser_that_still_climbed_reads_with_but():
                                     "NJD": ("climbing to second in the Metropolitan", "climbed to second in the Metropolitan")})
     finally:
         stories.results, stories.record = orig
-    assert line.endswith("The Devils fell to 8-5-0 but climbed to second in the Metropolitan.") or \
-        line.endswith("The Devils dropped to 8-5-0 but climbed to second in the Metropolitan.")
+    # one sentence for both clubs (voice loop, round two)
+    assert line.startswith("The Hurricanes ") and ", third in the Metropolitan, while the Devils " in line
+    assert line.endswith(("the Devils fell to 8-5-0 but climbed to second in the Metropolitan.",
+                          "the Devils dropped to 8-5-0 but climbed to second in the Metropolitan."))
+
+
+def test_a_winner_that_moved_reads_as_a_verb():
+    W = _words()
+    G = pl.DataFrame({"date": ["2026-10-28"], "game_id": [1]})
+    orig = stories.results, stories.record
+    stories.results, stories.record = (lambda played, t, season: []), (lambda res: "8-3-1")
+    try:
+        line = stories.record_line(G, "2026-10-28", "TBL", "WPG", W, 2026, 1, set(),
+                                   {"TBL": ("climbing to third in the Atlantic", "climbed to third in the Atlantic"),
+                                    "WPG": ("seventh in the Central", "are seventh in the Central")})
+    finally:
+        stories.results, stories.record = orig
+    assert " to 8-3-1 and climbed to third in the Atlantic, while the WPG " in line and line.endswith("8-3-1, seventh in the Central.")
 
 
 def test_injury_news_wording():

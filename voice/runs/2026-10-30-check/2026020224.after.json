@@ -1,0 +1,60 @@
+{
+ "head": "Blueger returns to Vancouver",
+ "paras": [
+  "The Maple Leafs (7-6-2) lost 5-4 to Seattle on Wednesday, while the Canucks (3-10-1) beat Anaheim 6-5 in overtime on Tuesday. Going in, the Maple Leafs are sixth in the Atlantic (tied for tenth in the NHL) and the Canucks are last in the NHL.",
+  "The Canucks (32nd) and the Maple Leafs (31st) both have had shaky goaltending. The Maple Leafs get their shots through better than anyone (1st), but take more penalties than they draw (30th). Toronto has scored 3.73 goals a game, the third most in the league. As for the Canucks, they pick their shots (lowest). They also have a leaky penalty kill (32nd), so the Leafs’ power play (8th) could do real damage when they’re shorthanded. Vancouver has allowed 4.64 goals a game, the most in the league. The Canucks roll four lines, but the Maple Leafs lean on their top six.",
+  "Auston Matthews (10 G / 13 A / 23 P in 15 GP) leads the Maple Leafs in scoring and is fourth in the NHL, with seven points in his last five games. William Nylander (9 G / 10 A / 19 P in 15 GP) is next in line, with four goals in six games against Vancouver since 2023-24. For the Canucks, Elias Pettersson (#40) (4 G / 11 A / 15 P in 14 GP) leads the way in scoring. Jonathan Lekkerimäki (6 G / 6 A / 12 P in 14 GP) has a team-high six goals, with seven points in his last five games.",
+  "Toronto has two options in net: Sergei Bobrovsky (3-5-2 / .885 SV% in 10 GS) and Anthony Stolarz (4-1-0 / .906 SV% in 5 GS). Bobrovsky has started seven of their last ten games, including the last one on Wednesday, so Toronto could turn to Stolarz to give him a rest. Vancouver also has two options: Leevi Meriläinen (2-3-1 / .900 SV% in 7 GS) and Kevin Lankinen (1-7-0 / .808 SV% in 7 GS). Meriläinen has started six of their last ten games, including the last one on Tuesday. For both teams, it’s anyone’s guess who gets the net. Bobrovsky has a .816 save percentage in six starts against the Canucks, well under his usual .902. Don’t read much into it: a goalie’s record against one team rarely holds up."
+ ],
+ "items": [
+  {
+   "tag": "Old team",
+   "text": "Teddy Blueger faces Vancouver for the first time since leaving."
+  },
+  {
+   "tag": "Out",
+   "text": "The Maple Leafs are newly without Kirill Marchenko and Nick Blankenburg, and have been without Chris Tanev and John Tavares for several games. Taking into account how much value each of these missing players usually adds, no team is missing more right now."
+  },
+  {
+   "tag": "Out",
+   "text": "The Canucks have been without Thatcher Demko all season."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Jonathan Lekkerimäki has six goals on chances worth about 2.7 goals, well above what his finishing usually turns chances into. Runs like that tend to cool off."
+  }
+ ],
+ "outlook": {
+  "VAN": {
+   "head": "The Canucks face a real test",
+   "body": "Toronto has been out-chancing opponents by a wide margin lately, but they will be without Marchenko, and Vancouver has home-ice advantage. The Canucks’ best way through is a power play that gets going."
+  },
+  "TOR": {
+   "head": "The matchup suits the Maple Leafs",
+   "body": "Toronto has been out-chancing opponents by a wide margin lately, but they will be without Marchenko, and Vancouver has home-ice advantage. The Canucks can make it interesting if their power play gets going."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Canucks don’t own Bobrovsky",
+   "body": "Bobrovsky has been shaky against the Canucks since 2023-24, well below his usual. But three seasons of data say a goalie’s record against one team tells us nothing about the next meeting, so don’t be surprised if he looks like himself tonight."
+  },
+  {
+   "head": "Special teams lean toward the Maple Leafs",
+   "body": "The Maple Leafs’ power play is near the top of the league, and the Canucks’ kill is the worst. Every trip to the box hurts the Canucks more than most."
+  },
+  {
+   "head": "The Canucks roll four lines, the Maple Leafs lean on their top six",
+   "body": "On depth, Vancouver is near the top of the league, but Toronto is one of the worst. If this one comes down to the bottom six, that suits the Canucks."
+  }
+ ],
+ "ranks": [
+  "32nd of 32 in goaltending",
+  "31st of 32 in goaltending",
+  "1st of 32 in getting shots through",
+  "30th of 32 in discipline",
+  "lowest of 32 in shot volume: shot volume score 79 (100 is average)",
+  "32nd of 32 in the penalty kill: 9.1 expected goals allowed per 60 shorthanded",
+  "8th of 32 in the power play: 8.2 expected goals per 60 on the power play"
+ ]
+}

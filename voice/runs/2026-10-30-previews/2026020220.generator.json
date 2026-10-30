@@ -1,0 +1,53 @@
+{
+ "head": "Who’s in net for the Oilers?",
+ "paras": [
+  "The Islanders have won two in a row. The Oilers are 9-2-2.",
+  "At home, Peter DeBoer likes to pick matchups, so watch who goes out against the Oilers’ fourth line. Don’t read much into Sorokin’s record against the Oil."
+ ],
+ "items": [
+  {
+   "tag": "Haunts them",
+   "text": "Leon Draisaitl has seven goals in six games against the Islanders since 2023-24."
+  },
+  {
+   "tag": "Out",
+   "text": "The Oilers are newly without Zach Hyman, and have had to make do without Matt Savoie all season."
+  },
+  {
+   "tag": "Out",
+   "text": "The Islanders have been without Matias Maccelli since Oct 17, and have had to make do without Mathew Barzal all season. Counting how much each missing player usually brings, only the Maple Leafs are missing more right now."
+  },
+  {
+   "tag": "Hot streak",
+   "text": "Connor McDavid has a point in every game this season."
+  }
+ ],
+ "outlook": {
+  "NYI": {
+   "head": "The Islanders start a half-step behind",
+   "body": "Edmonton has been out-chancing opponents lately, while the Islanders will be without Barzal. Then again, Edmonton will be without Hyman, and the Islanders have home-ice advantage. The Islanders can tip it if they keep shots to a minimum."
+  },
+  "EDM": {
+   "head": "Leaning the Oilers’ way",
+   "body": "Edmonton has been out-chancing opponents lately, while the Islanders will be without Barzal. Then again, Edmonton will be without Hyman, and the Islanders have home-ice advantage. The Islanders can still swing it if they keep shots to a minimum."
+  }
+ },
+ "calls": [
+  {
+   "head": "DeAngelo and Kessel get the Michaels assignment",
+   "body": "At home, the Islanders keep sending DeAngelo and Kessel out against opponents’ fourth lines, far more often than chance would suggest. Peter DeBoer has been picking a defense pair for opponents’ fourth lines. Tonight the Oilers’ fourth line is Frederic, Michaels and Howard."
+  },
+  {
+   "head": "Sorokin doesn’t own the Oilers",
+   "body": "Sorokin has been a wall against the Oilers since 2023-24, well above his usual. But three seasons of data say a goalie’s record against one team tells us nothing about the next meeting, so don’t be surprised if Sorokin isn’t that wall tonight."
+  },
+  {
+   "head": "Special teams lean toward the Oilers",
+   "body": "The Islanders’ penalty kill is one of the league’s worst, and the Oilers’ power play is the best. Discipline matters more than usual for the Islanders tonight. Edmonton has had one of the league’s most effective power plays for years."
+  },
+  {
+   "head": "Keep your head up",
+   "body": "The Oilers and the Islanders are both among the league’s heaviest hitters, even after adjusting for each arena’s scorer. Keep your head up."
+  }
+ ]
+}

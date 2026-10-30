@@ -1,0 +1,59 @@
+{
+ "head": "DeBrincat’s favorite opponent",
+ "paras": [
+  "Both teams have won two in a row. This is an Atlantic Division matchup, with the Red Wings seventh (tied for 16th in the NHL) and the Panthers fifth (tied for tenth). The Atlantic has been the strongest of the four divisions so far.",
+  "The Red Wings block more shots than almost anyone (2nd) and draw more penalties than they take (3rd). They also have one of the league’s most dangerous power plays (3rd), and their power play against the Panthers’ penalty killers is strength against strength. As for the Cats, they forecheck harder than anyone (1st), rarely ice the puck (1st) and hit a lot (1st). Both teams play slow, low-event hockey, so expect a tight one.",
+  "Alex DeBrincat (6 G / 9 A / 15 P in 13 GP) leads the Red Wings in scoring, with a point in seven straight games against Florida. Viktor Arvidsson (8 G / 6 A / 14 P in 13 GP) has a team-high eight goals, with nine points in his last five games. Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP) leads the Panthers in scoring and is tied for seventh in the NHL, with nine points in his last five games. Brady Tkachuk (8 G / 7 A / 15 P in 13 GP) has a team-high eight goals, with seven points in his last five games.",
+  "John Gibson (4-4-1 / .874 SV% in 9 GS) will likely start for Detroit, and Akira Schmid (4-2-1 / .884 SV% in 6 GS) for Florida."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Panthers have been without Jacob Markström, Aleksander Barkov and Brad Marchand for several games. Akira Schmid is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Red Wings are newly without Dylan Larkin and Albert Johansson, and have been without Marco Kasper and Mason Appleton for several games."
+  },
+  {
+   "tag": "Filling in",
+   "text": "With Dylan Larkin out, Emmitt Finnie took 14 faceoffs in the Red Wings’ last game. He had been taking about three a game."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Carter Verhaeghe has eight goals on chances worth about 4.3 goals, well above what his finishing usually turns chances into. Runs like that tend to cool off."
+  }
+ ],
+ "outlook": {
+  "FLA": {
+   "head": "Leaning the Panthers’ way",
+   "body": "The two have been about even at out-chancing opponents lately. Florida has home-ice advantage, but they will be without Barkov. Still, it’s close: the Red Wings can make it interesting if they keep dangerous shots away."
+  },
+  "DET": {
+   "head": "Close, but the Panthers have the slight edge",
+   "body": "The two have been about even at out-chancing opponents lately. Florida has home-ice advantage, but they will be without Barkov. The Red Wings’ best way to tip it is keeping dangerous shots away."
+  }
+ },
+ "calls": [
+  {
+   "head": "The matchup inside the matchup",
+   "body": "The Red Wings are one of the league’s best for the power play, but the Panthers are one of the best at the penalty kill. Our lean: the Red Wings’ power play wins out. Power plays usually beat kills in these spots. The Panthers take a lot of penalties and the Red Wings draw plenty of them, so their power play should get its chances."
+  },
+  {
+   "head": "Trench warfare",
+   "body": "The Red Wings play some of the league’s slowest games, and so do the Panthers. We think this one is even quieter than either team’s usual."
+  },
+  {
+   "head": "Bodies will fly",
+   "body": "The Red Wings and the Panthers are both among the league’s heaviest hitters, even after adjusting for each arena’s scorer. Keep your head up."
+  }
+ ],
+ "ranks": [
+  "2nd of 32 in blocking shots",
+  "3rd of 32 in discipline",
+  "3rd of 32 in the power play: 8.9 expected goals per 60 on the power play",
+  "1st of 32 in forecheck pressure: forecheck score 148 (100 is average)",
+  "1st of 32 in avoiding icings",
+  "1st of 32 in physicality: hit score 160 (100 is average)"
+ ]
+}

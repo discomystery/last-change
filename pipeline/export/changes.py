@@ -34,7 +34,9 @@ STATUS_WORDS = {
 OUT_STATUSES = {"injured", "suspended", "personal", "scratched", "off_roster", "not_listed"}
 LONG_GONE = 4  # a listed player with nothing reported who has missed this many games in a row counts as out (Demko, Hyman)
 UNREPORTED_MIN_MISSED = 2  # a scratch or roster move with nothing reported needs this many games in a row to count
-TOP = {"F": 9, "D": 4}  # regulars worth a note: top nine forwards, top four defensemen by ice time
+# regulars worth a note: top twelve forwards, top six defensemen by ice time, as the league-ranked absences count them
+# (Sora, 2026-10-30: Staal, Carolina's third-line center, and Nikishin were missing from the Hurricanes' Out line)
+TOP = {"F": 12, "D": 6}
 NEW_DAYS = 14
 MAX_OUT = 4
 LONG_OUT = 20  # games missed after which only a star is still listed as out
@@ -205,6 +207,10 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             if not star and (ro is None or ro["toi_rank"] > TOP[ro["grp"]] and ro["worth_rank"] > 5):
                 continue
             if not reported and (r["games_missed"] or 0) < UNREPORTED_MIN_MISSED:
+                continue
+            # off the NHL roster with nothing said is a player in the minors, not one who is out (Unger Sörum, a call-up
+            # sent back down, once depth players counted)
+            if r["status"] in ("not_listed", "off_roster") and not r["report_status"] and not star:
                 continue
             # out a long time or sent down: no longer part of what the team is now (eye test on 2025-26: Engvall after 79
             # games and Rinzel in the AHL were "one of their most valuable skaters"), so only stars are still told

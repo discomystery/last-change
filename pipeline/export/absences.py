@@ -43,7 +43,8 @@ VALUE_LAMBDA = 15000.0  # ratings as the win model's lineups
 # NOW_FLOOR expected goals a game (about one top-line forward).
 NOW_FLOOR = 0.2
 # Every line says the count is weighed, without the method (Sora, 2026-10-20: imply it is more than a head count).
-WEIGHED = "Counting how much each missing player usually brings"
+WEIGHED = "Taking into account how much value each of these missing players usually adds"  # after the names (Sora, 2026-10-30)
+WEIGHED_SEASON = "Taking into account how much value each missing player usually adds"  # team intros, before the names
 # Filling in on faceoffs: a forward who had been taking fewer than RARE_DRAWS a game (over GP_BEFORE+ games) took
 # FILL_DRAWS+ in the club's last game while a player who takes CENTER_DRAWS+ a game was out.
 RARE_DRAWS, GP_BEFORE, FILL_DRAWS, CENTER_DRAWS = 3.0, 20, 8, 8.0
@@ -306,4 +307,4 @@ def intro_line(r: dict | None, team_the: str, the) -> str | None:
     names = and_list([n for _, n in r["names"][:3]])
     tail = f", with {names} still out." if names else "."
     who = "no team has" if r["rank"] == 1 else f"only {and_list([the(t) for t in r['ahead']])} have"
-    return f"{WEIGHED}, {who} been hit harder by absences: their regulars have missed {r['missed']} games so far{tail}"
+    return f"{WEIGHED_SEASON}, {who} been hit harder by absences: their regulars have missed {r['missed']} games so far{tail}"

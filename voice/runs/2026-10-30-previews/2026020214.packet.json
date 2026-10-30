@@ -1,0 +1,738 @@
+{
+ "kind": "preview",
+ "game_id": 2026020214,
+ "start_utc": "2026-10-30T22:00:00Z",
+ "venue": "T-Mobile Arena",
+ "away": {
+  "abbr": "NJD",
+  "name": "New Jersey Devils",
+  "place": "New Jersey",
+  "nickname": "Devils",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Sheldon Keefe"
+ },
+ "home": {
+  "abbr": "VGK",
+  "name": "Vegas Golden Knights",
+  "place": "Vegas",
+  "nickname": "Golden Knights",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Ryan Craig"
+ },
+ "form": {
+  "NJD": {
+   "record": "8-5-0",
+   "games": 13,
+   "run": "winless 1",
+   "last_ten": "7-3-0",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "W",
+     "score": "3-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "W",
+     "score": "5-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    }
+   ]
+  },
+  "VGK": {
+   "record": "9-4-1",
+   "games": 14,
+   "run": "won 1",
+   "last_ten": "6-3-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": true,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "TBL",
+     "opp_name": "Tampa Bay Lightning",
+     "home": true,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": false,
+     "result": "OTL",
+     "score": "1-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": true,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "NJD": "Connor Hellebuyck",
+  "VGK": "Adin Hill"
+ },
+ "calls": [
+  {
+   "kind": "duel",
+   "about": "NJD",
+   "facts": [
+    "New Jersey: 8.7 expected goals per 60 on the power play, 5th of 32. Playing style, this season blended with last, 13 and 14 games this season.",
+    "Vegas: 6.6 expected goals allowed per 60 shorthanded, 1st of 32. Playing style, this season blended with last, 13 and 14 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 7.6462,
+   "league": 7.6462,
+   "direction": "above"
+  },
+  {
+   "kind": "duel",
+   "about": "NJD",
+   "facts": [
+    "New Jersey: shot volume score 115, 3rd of 32. Playing style, this season blended with last, 13 and 14 games this season.",
+    "Vegas: shots-against score 95, 8th of 32. Playing style, this season blended with last, 13 and 14 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 56.0986,
+   "league": 56.0986,
+   "direction": "above"
+  },
+  {
+   "kind": "matchup",
+   "about": "VGK",
+   "facts": [
+    "Vegas’s L3 (Connelly, Hertl and Bowman) at home: 39% of its 5-on-5 time against opponents’ fourth lines. Matchups, Vegas home games this season, 8 games, 47 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face fourth lines about 22% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Vegas L3's 5-on-5 time against New Jersey L4",
+   "usual": 39,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "edge",
+   "about": "VGK",
+   "facts": [
+    "Vegas: 38% of shot attempts from defensemen, 5th of 32. Playing style, this season blended with last, 13 and 14 games this season.",
+    "New Jersey: 33% of shot attempts from defensemen, 27th of 32. Playing style, this season blended with last, 13 and 14 games this season."
+   ],
+   "what_we_check": "share of 5-on-5 shot attempts taken by defensemen",
+   "usual": {
+    "VGK": 37.834,
+    "NJD": 32.5908
+   },
+   "league": 34.7101,
+   "direction": "ahead"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "The two have been about even at out-chancing opponents lately.",
+  "Vegas has home-ice advantage.",
+  "The Devils can still swing it if they keep the shots coming.",
+  "Out: The Golden Knights are newly without Carter Hart. Adin Hill is expected to start.",
+  "Milestone: Brayden McNabb is set to play his 900th NHL game.",
+  "Hot streak: Mitch Marner has a point in eight straight games.",
+  "Behind the record: The Devils have played better than their record (.615): their chances are worth about .747, and their goaltending has held them back."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "NJD": {
+   "standing": {
+    "record": "8-5-0",
+    "points": 16,
+    "games": 13,
+    "division": "Metropolitan",
+    "division_place": 3,
+    "conference_place": 6,
+    "league_place_in_points": 11,
+    "home_record": "6-2-0",
+    "road_record": "2-3-0",
+    "last_ten": "7-3-0",
+    "streak": "L1",
+    "coach": "Sheldon Keefe"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 43,
+    "ga": 38,
+    "gfpg": 3.31,
+    "gapg": 2.92,
+    "diff": 5,
+    "ppg": 7,
+    "ppo": 40,
+    "pppct": 0.175,
+    "pkpct": 0.724,
+    "sfpg": 32.6,
+    "sapg": 25.1,
+    "fopct": 0.503
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 11,
+    "gapg": 9,
+    "pppct": 22,
+    "pkpct": 24,
+    "sfpg": 2,
+    "sapg": 6,
+    "fopct": 16
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Second chances",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Rough stuff",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Calm",
+     "high_end_word": "Chippy"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Jack Hughes",
+     "pos": "C",
+     "gp": 13,
+     "g": 4,
+     "a": 10,
+     "p": 14,
+     "ppp": 4,
+     "toi_per_game": "20:21",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Jesper Bratt",
+     "pos": "L",
+     "gp": 13,
+     "g": 2,
+     "a": 9,
+     "p": 11,
+     "ppp": 5,
+     "toi_per_game": "17:16",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 4,
+      "p": 4
+     }
+    },
+    {
+     "name": "Arseny Gritsyuk",
+     "pos": "R",
+     "gp": 13,
+     "g": 6,
+     "a": 4,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "15:16",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 2,
+      "p": 5
+     }
+    },
+    {
+     "name": "Nico Hischier",
+     "pos": "C",
+     "gp": 13,
+     "g": 7,
+     "a": 2,
+     "p": 9,
+     "ppp": 5,
+     "toi_per_game": "18:02",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 1,
+      "p": 4
+     }
+    },
+    {
+     "name": "Luke Evangelista",
+     "pos": "R",
+     "gp": 10,
+     "g": 3,
+     "a": 5,
+     "p": 8,
+     "ppp": 2,
+     "toi_per_game": "17:17",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 4,
+      "p": 5
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Jake Allen",
+     "gp": 8,
+     "record": "5-3-0",
+     "sv_pct": 0.887,
+     "gaa": 3.11,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Connor Hellebuyck",
+     "gp": 1,
+     "record": "1-0-0",
+     "sv_pct": 0.944,
+     "gaa": 1.0,
+     "shutouts": 0,
+     "projected_starter": true
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Arseny Gritsyuk",
+      "Jack Hughes",
+      "Jesper Bratt"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Timo Meier",
+      "Nico Hischier",
+      "Luke Evangelista"
+     ],
+     "games_together_recently": 7
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Anthony Mantha",
+      "Evan Rodrigues",
+      "Jesper Boqvist"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Brett Pesce",
+      "Luke Hughes"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Dougie Hamilton",
+      "Jonas Siegenthaler"
+     ],
+     "games_together_recently": 10
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Luke Hughes (Quarterback)",
+      "Jack Hughes (Distributor)",
+      "Nico Hischier (Trigger)",
+      "Jesper Bratt",
+      "Luke Evangelista (Net-front)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Dougie Hamilton (Quarterback)",
+      "Timo Meier (Trigger)",
+      "Arseny Gritsyuk (Distributor)",
+      "Anthony Mantha",
+      "Dawson Mercer"
+     ]
+    }
+   ]
+  },
+  "VGK": {
+   "standing": {
+    "record": "9-4-1",
+    "points": 19,
+    "games": 14,
+    "division": "Pacific",
+    "division_place": 2,
+    "conference_place": 3,
+    "league_place_in_points": 5,
+    "home_record": "6-2-0",
+    "road_record": "3-2-1",
+    "last_ten": "6-3-1",
+    "streak": "W1",
+    "coach": "Ryan Craig"
+   },
+   "team_stats": {
+    "gp": 14,
+    "gf": 50,
+    "ga": 39,
+    "gfpg": 3.57,
+    "gapg": 2.79,
+    "diff": 11,
+    "ppg": 11,
+    "ppo": 43,
+    "pppct": 0.256,
+    "pkpct": 0.676,
+    "sfpg": 29.7,
+    "sapg": 25.1,
+    "fopct": 0.504
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 9,
+    "gapg": 7,
+    "pppct": 7,
+    "pkpct": 27,
+    "sfpg": 8,
+    "sapg": 6,
+    "fopct": 15
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Penalty kill",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Leaky",
+     "high_end_word": "Airtight"
+    },
+    {
+     "trait": "Discipline",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Reckless",
+     "high_end_word": "Clean"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Blocking shots",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Rarely block",
+     "high_end_word": "Shot blockers"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Jack Eichel",
+     "pos": "C",
+     "gp": 14,
+     "g": 7,
+     "a": 13,
+     "p": 20,
+     "ppp": 6,
+     "toi_per_game": "19:54",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 2,
+      "p": 4
+     }
+    },
+    {
+     "name": "Mark Stone",
+     "pos": "R",
+     "gp": 14,
+     "g": 8,
+     "a": 8,
+     "p": 16,
+     "ppp": 6,
+     "toi_per_game": "18:24",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Mitch Marner",
+     "pos": "R",
+     "gp": 12,
+     "g": 2,
+     "a": 11,
+     "p": 13,
+     "ppp": 5,
+     "toi_per_game": "19:52",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 7,
+      "p": 7
+     }
+    },
+    {
+     "name": "Ivan Barbashev",
+     "pos": "L",
+     "gp": 14,
+     "g": 1,
+     "a": 9,
+     "p": 10,
+     "ppp": 3,
+     "toi_per_game": "16:17",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Trevor Connelly",
+     "pos": "L",
+     "gp": 14,
+     "g": 4,
+     "a": 5,
+     "p": 9,
+     "ppp": 3,
+     "toi_per_game": "14:13",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Carter Hart",
+     "gp": 8,
+     "record": "4-3-1",
+     "sv_pct": 0.889,
+     "gaa": 2.76,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Adin Hill",
+     "gp": 6,
+     "record": "5-1-0",
+     "sv_pct": 0.895,
+     "gaa": 2.63,
+     "shutouts": 0,
+     "projected_starter": true
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Ivan Barbashev",
+      "Jack Eichel",
+      "Mark Stone"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Brett Howden",
+      "William Karlsson",
+      "Mitch Marner"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Trevor Connelly",
+      "Tomáš Hertl",
+      "Braeden Bowman"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Brayden McNabb",
+      "Shea Theodore"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Noah Hanifin",
+      "Dylan Coghlan"
+     ],
+     "games_together_recently": 6
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Shea Theodore (Quarterback)",
+      "Braeden Bowman (Trigger)",
+      "Ivan Barbashev (Distributor)",
+      "William Karlsson",
+      "Rasmus Andersson (Point)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Jack Eichel",
+      "Tomáš Hertl (Trigger)",
+      "Trevor Connelly",
+      "Mark Stone (Distributor)",
+      "Mitch Marner"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

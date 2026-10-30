@@ -1,0 +1,125 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "The Flames squeak past the Wild"
+  ],
+  "rewrite": [
+   "The Flames squeak past the Wild"
+  ],
+  "part": -2
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Aydar Suniev and Joel Farabee scored power-play goals a little over three minutes apart midway through the first to put the Flames up 2-0."
+  ],
+  "rewrite": [
+   "Aydar Suniev and Joel Farabee scored power-play goals a little over three minutes apart midway through the first to put the Flames up 2-0, and that was nearly enough on its own."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Michael McCarron cut Calgary’s lead to 2-1 early in the third."
+  ],
+  "rewrite": [
+   "Michael McCarron cut the lead to 2-1 early in the third, but Calgary held on."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Wild had the better of the chances.",
+   "Replay those chances a hundred times and the Wild win about six in ten."
+  ],
+  "rewrite": [
+   "The Wild had the better of the chances: replay them a hundred times and they win about six in ten."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Devin Cooley made the difference in net, stopping 36 of 37.",
+   "The Wild hit three posts and came up a goal short."
+  ],
+  "rewrite": [
+   "Devin Cooley was the difference, stopping 36 of 37, and the Wild hit three posts on the way to coming up a goal short."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Jesper Wallstedt stopped 20 of 22 for the Wild."
+  ],
+  "rewrite": [
+   "Jesper Wallstedt stopped 20 of 22 at the other end."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "The Flames killed all four Wild power plays."
+  ],
+  "rewrite": [
+   "The Flames also killed all four Wild power plays."
+  ],
+  "part": 2
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Flames improved to 3-6-0, climbing off the bottom of the Pacific, now seventh.",
+   "The Wild dropped to 6-3-2, second in the Central."
+  ],
+  "rewrite": [
+   "They improved to 3-6-0 and climbed off the bottom of the Pacific to seventh, while the Wild dropped to 6-3-2, second in the Central."
+  ],
+  "part": 2
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Club history: Jonas Brodin passed Marián Gáborík for eighth on the Wild’s all-time assists list, with 219."
+  ],
+  "rewrite": [
+   "Club history: Jonas Brodin passed Marián Gáborík for eighth on the Wild’s all-time assists list, with 219."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Old team: Blake Coleman played his first game back in Calgary."
+  ],
+  "rewrite": [
+   "Old team: Blake Coleman played his first game back in Calgary."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak over: Kirill Kaprizov’s seven-game point streak ended."
+  ],
+  "rewrite": [
+   "Streak over: Kirill Kaprizov’s seven-game point streak ended."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Finally: Michael McCarron scored his first goal of the season, his first since Apr 13 (eleven games played since)."
+  ],
+  "rewrite": [
+   "Finally: Michael McCarron scored his first goal of the season, his first since Apr 13 (eleven games played since)."
+  ],
+  "part": -1
+ }
+]

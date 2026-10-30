@@ -1,0 +1,835 @@
+{
+ "kind": "recap",
+ "game_id": 2026020185,
+ "date": "2026-10-26",
+ "venue": "Madison Square Garden",
+ "away": {
+  "abbr": "LAK",
+  "name": "Los Angeles Kings",
+  "place": "Los Angeles",
+  "nickname": "Kings",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Peter Laviolette"
+ },
+ "home": {
+  "abbr": "NYR",
+  "name": "New York Rangers",
+  "place": "NY Rangers",
+  "nickname": "Rangers",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Mike Sullivan"
+ },
+ "final": {
+  "LAK": 6,
+  "NYR": 3,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "1:15",
+   "time_left_in_period": "18:45",
+   "team": "LAK",
+   "scorer": "Taylor Ward",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Drew Doughty",
+    "Trevor Moore"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 1,
+    "NYR": 0
+   },
+   "chance_of_scoring": 19,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "4:52",
+   "time_left_in_period": "15:08",
+   "team": "LAK",
+   "scorer": "Brandt Clarke",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Scott Laughton",
+    "Joel Armia"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 2,
+    "NYR": 0
+   },
+   "chance_of_scoring": 27,
+   "shot": "tip-in"
+  },
+  {
+   "n": 3,
+   "period": 1,
+   "time_in_period": "13:01",
+   "time_left_in_period": "6:59",
+   "team": "NYR",
+   "scorer": "J.T. Miller",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Tye Kartye"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 2,
+    "NYR": 1
+   },
+   "chance_of_scoring": 26,
+   "shot": "deflected"
+  },
+  {
+   "n": 4,
+   "period": 1,
+   "time_in_period": "17:32",
+   "time_left_in_period": "2:28",
+   "team": "LAK",
+   "scorer": "Drew Doughty",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Joel Edmundson",
+    "Artemi Panarin"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 3,
+    "NYR": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "snap"
+  },
+  {
+   "n": 5,
+   "period": 2,
+   "time_in_period": "1:30",
+   "time_left_in_period": "18:30",
+   "team": "LAK",
+   "scorer": "Artemi Panarin",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Erik Gustafsson",
+    "Alex Laferriere"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 4,
+    "NYR": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "snap"
+  },
+  {
+   "n": 6,
+   "period": 2,
+   "time_in_period": "6:54",
+   "time_left_in_period": "13:06",
+   "team": "LAK",
+   "scorer": "Mikey Anderson",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Corey Perry"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 5,
+    "NYR": 1
+   },
+   "chance_of_scoring": 2,
+   "shot": "slap"
+  },
+  {
+   "n": 7,
+   "period": 2,
+   "time_in_period": "13:05",
+   "time_left_in_period": "6:55",
+   "team": "NYR",
+   "scorer": "Adam Fox",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Pavel Dorofeyev",
+    "Alexis Lafrenière"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 5,
+    "NYR": 2
+   },
+   "chance_of_scoring": 4,
+   "shot": "snap"
+  },
+  {
+   "n": 8,
+   "period": 3,
+   "time_in_period": "16:08",
+   "time_left_in_period": "3:52",
+   "team": "NYR",
+   "scorer": "Tye Kartye",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Sean Durzi"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": true,
+   "score_after": {
+    "LAK": 5,
+    "NYR": 3
+   },
+   "chance_of_scoring": 7,
+   "shot": "snap"
+  },
+  {
+   "n": 9,
+   "period": 3,
+   "time_in_period": "16:37",
+   "time_left_in_period": "3:23",
+   "team": "LAK",
+   "scorer": "Joel Edmundson",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Drew Doughty",
+    "Alex Laferriere"
+   ],
+   "strength": "empty net",
+   "against_pulled_goalie": true,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "LAK": 6,
+    "NYR": 3
+   },
+   "chance_of_scoring": 43,
+   "shot": "wrist"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "LAK": 3,
+    "NYR": 1
+   },
+   "shots": {
+    "LAK": 8,
+    "NYR": 5
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "LAK": 2,
+    "NYR": 1
+   },
+   "shots": {
+    "LAK": 15,
+    "NYR": 13
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "LAK": 1,
+    "NYR": 1
+   },
+   "shots": {
+    "LAK": 3,
+    "NYR": 8
+   }
+  }
+ ],
+ "team_numbers": {
+  "LAK": {
+   "shots": 26,
+   "xg": 3.01,
+   "cf5": 46,
+   "hits": 19,
+   "pp_goals": 1,
+   "pp_opps": 3
+  },
+  "NYR": {
+   "shots": 26,
+   "xg": 2.52,
+   "cf5": 52,
+   "hits": 24,
+   "pp_goals": 1,
+   "pp_opps": 1
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Dylan Garand",
+   "team": "NYR",
+   "started": false,
+   "toi": "38:05",
+   "shots": 17,
+   "saves": 15,
+   "ga": 2,
+   "gsax": -0.35,
+   "sv": 0.882
+  },
+  {
+   "full": "James Reimer",
+   "team": "NYR",
+   "started": true,
+   "toi": "20:00",
+   "shots": 8,
+   "saves": 5,
+   "ga": 3,
+   "gsax": -1.63,
+   "sv": 0.625
+  },
+  {
+   "full": "Darcy Kuemper",
+   "team": "LAK",
+   "started": true,
+   "toi": "59:19",
+   "shots": 26,
+   "saves": 23,
+   "ga": 3,
+   "gsax": -0.48,
+   "sv": 0.885
+  }
+ ],
+ "players": [
+  {
+   "name": "Drew Doughty",
+   "team": "LAK",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 2.0,
+   "points": 3.0,
+   "toi": "21:37",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Joel Edmundson",
+   "team": "LAK",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "20:00",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Artemi Panarin",
+   "team": "LAK",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "19:52",
+   "season_goals_after": 7.0
+  },
+  {
+   "name": "Tye Kartye",
+   "team": "NYR",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "17:57",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Alex Laferriere",
+   "team": "LAK",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "18:17",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Adam Fox",
+   "team": "NYR",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "24:25",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "J.T. Miller",
+   "team": "NYR",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:32",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Brandt Clarke",
+   "team": "LAK",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:10",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Mikey Anderson",
+   "team": "LAK",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "17:23",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Taylor Ward",
+   "team": "LAK",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "12:33",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Erik Gustafsson",
+   "team": "LAK",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "20:23",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Alexis Lafrenière",
+   "team": "NYR",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:27",
+   "season_goals_after": 9.0
+  },
+  {
+   "name": "Joel Armia",
+   "team": "LAK",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "17:50",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Scott Laughton",
+   "team": "LAK",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "17:23",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Pavel Dorofeyev",
+   "team": "NYR",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "16:14",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Sean Durzi",
+   "team": "NYR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "15:10",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Trevor Moore",
+   "team": "LAK",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "14:01",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Corey Perry",
+   "team": "LAK",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "10:19",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Vladislav Gavrikov",
+   "team": "NYR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:09",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Marcus Pettersson",
+   "team": "NYR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:07",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Braden Schneider",
+   "team": "NYR",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:24",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Mika Zibanejad",
+   "team": "NYR",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:15",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Adrian Kempe",
+   "team": "LAK",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:26",
+   "season_goals_after": 3.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "LAK": 54,
+   "NYR": 46
+  }
+ },
+ "pregame_chance": {
+  "NYR": 55,
+  "LAK": 45
+ },
+ "records_before": {
+  "LAK": {
+   "record": "2-5-2",
+   "games": 9,
+   "run": "winless 1",
+   "last_ten": "2-5-2",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NYR": {
+   "record": "7-5-1",
+   "games": 13,
+   "run": "winless 2",
+   "last_ten": "5-4-1",
+   "last_five": [
+    {
+     "date": "2026-10-15",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "L",
+     "score": "1-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": false,
+     "result": "OTL",
+     "score": "0-1",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "L",
+     "score": "4-7",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "LAK": {
+   "record": "3-5-2",
+   "games": 10,
+   "run": "won 1",
+   "last_ten": "3-5-2",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "NYR",
+     "opp_name": "New York Rangers",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NYR": {
+   "record": "7-6-1",
+   "games": 14,
+   "run": "winless 3",
+   "last_ten": "4-5-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": false,
+     "result": "OTL",
+     "score": "0-1",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "L",
+     "score": "4-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "NYR": {
+   "points": 15,
+   "gp": 14,
+   "division": "Metropolitan",
+   "division_place": 2,
+   "conference_place": 6,
+   "wild_card_place": null,
+   "league_place_by_points": 12
+  },
+  "LAK": {
+   "points": 8,
+   "gp": 10,
+   "division": "Pacific",
+   "division_place": 7,
+   "conference_place": 14,
+   "wild_card_place": 8,
+   "league_place_by_points": 30
+  }
+ },
+ "firsts": [
+  {
+   "team": "NYR",
+   "goals": 1,
+   "kind": "milestone",
+   "what": "game",
+   "mark": 500,
+   "have": 499,
+   "player": "Adam Fox"
+  },
+  {
+   "team": "LAK",
+   "goals": 1,
+   "kind": "return",
+   "missed": 9,
+   "since": null,
+   "season_debut": true,
+   "points": 1,
+   "player": "Taylor Ward"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The chances were closer than the score.",
+  "Darcy Kuemper made 23 saves for the Kings.",
+  "The Kings moved to 3-5-2, seventh in the Pacific.",
+  "The Rangers fell to 7-6-1, second in the Metropolitan.",
+  "Club history: Drew Doughty passed Dustin Brown for seventh on the Kings’ all-time scoring list, with 713 points.",
+  "Slump: The Rangers are on a three-game losing streak.",
+  "Head to head: The Kings have beaten the Rangers six straight times, going back to the 2023-24 season.",
+  "Finally: Drew Doughty scored his first goal of the season, his first since Mar 16 (24 games played since)."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

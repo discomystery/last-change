@@ -1,0 +1,123 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Koivunen wins it in overtime"
+  ],
+  "rewrite": [
+   "Koivunen wins it in overtime"
+  ],
+  "part": -2
+ },
+ {
+  "op": "split",
+  "site": [
+   "Steven Stamkos got the scoring started for the Predators midway through the first, but Connor Dewar made it 1-1 for Pittsburgh just 18 seconds into the second."
+  ],
+  "rewrite": [
+   "Steven Stamkos got the scoring started for the Predators midway through the first, and Connor Dewar answered for Pittsburgh just 18 seconds into the second to make it 1-1."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Jayden Struble scored his first goal for Nashville early in the second to put the Predators ahead 2-1.",
+   "With the goalie pulled and just over a minute left, Rickard Rakell tied it 2-2 for Pittsburgh."
+  ],
+  "rewrite": [
+   "Jayden Struble scored his first goal for Nashville early in the second to put the Predators back ahead 2-1, and the lead held until Rickard Rakell tied it 2-2 with the goalie pulled and just over a minute left."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Ville Koivunen won it in overtime."
+  ],
+  "rewrite": [
+   "Ville Koivunen won it in overtime."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Penguins carried the play, outshooting the Predators 37-26, but needed overtime to win it.",
+   "Artūrs Šilovs made 24 saves for the Penguins, and Juuse Saros kept the Preds in it, stopping 34 of 37."
+  ],
+  "rewrite": [
+   "The Penguins carried the play, outshooting the Predators 37-26, but needed overtime to win it, because Juuse Saros kept the Preds in it with 34 saves on 37 shots."
+  ],
+  "part": 1
+ },
+ {
+  "op": "new",
+  "site": [],
+  "rewrite": [
+   "Artūrs Šilovs made 24 saves at the other end."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Nobody on the ice had a bigger night than Elmer Söderblom, even with Koivunen’s overtime winner in the game, by our Swing measure."
+  ],
+  "rewrite": [
+   "By our Swing measure, nobody on the ice had a bigger night than Elmer Söderblom, even with Koivunen’s overtime winner in the game."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Only two penalties were called all night, something the league sees about once every 20 games."
+  ],
+  "rewrite": [
+   "Only two penalties were called all night, something the league sees about once every 20 games."
+  ],
+  "part": 2
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Penguins improved to 5-6-1, sixth in the Metropolitan.",
+   "The Predators fell to 3-3-4, seventh in the Central."
+  ],
+  "rewrite": [
+   "The Penguins improved to 5-6-1, sixth in the Metropolitan, and the Predators fell to 3-3-4, seventh in the Central."
+  ],
+  "part": 2
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Haunts them: Steven Stamkos scored again against Pittsburgh, and has six goals in eight games against them since 2023-24."
+  ],
+  "rewrite": [
+   "Haunts them: Steven Stamkos scored again against Pittsburgh, and has six goals in eight games against them since 2023-24."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Lineup: Reid Schaefer was in NHL.com’s projected lineup, but Vitali Pinchuk played instead."
+  ],
+  "rewrite": [
+   "Lineup: Reid Schaefer was in NHL.com’s projected lineup, but Vitali Pinchuk played instead."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "The preview: One of the preview’s two calls held."
+  ],
+  "rewrite": [
+   "The preview: One of the preview’s two calls held."
+  ],
+  "part": -1
+ }
+]

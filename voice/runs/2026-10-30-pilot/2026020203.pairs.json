@@ -1,0 +1,123 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Arvidsson lights the lamp for a hat trick"
+  ],
+  "rewrite": [
+   "Arvidsson lights the lamp for a hat trick"
+  ],
+  "part": -2
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Connor Bedard opened the scoring for the Blackhawks early in the first, and they didn’t score again."
+  ],
+  "rewrite": [
+   "Connor Bedard opened the scoring for the Blackhawks early in the first, but it was their only goal."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Viktor Arvidsson made it 1-1 for Detroit early in the second.",
+   "John Gibson stopped Frank Nazar on a penalty shot midway through the period."
+  ],
+  "rewrite": [
+   "Viktor Arvidsson tied it for Detroit early in the second, and midway through the period John Gibson kept it level by stopping Frank Nazar on a penalty shot."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Lucas Raymond gave the Red Wings the lead on the power play early in the third, and Arvidsson struck again with four and a half minutes left to make it 3-1.",
+   "Arvidsson completed his hat trick into the empty net with a little over three minutes left."
+  ],
+  "rewrite": [
+   "Lucas Raymond gave the Red Wings the lead on the power play early in the third, Arvidsson made it 3-1 with four and a half minutes left, and he completed his hat trick into the empty net with a little over three minutes left."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Replay this game’s chances a hundred times and the Red Wings win about seven in ten."
+  ],
+  "rewrite": [
+   "The score was fair: replay this game’s chances a hundred times and the Red Wings win about seven in ten."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Spencer Knight kept the Blackhawks in it, stopping 25 of 28."
+  ],
+  "rewrite": [
+   "Spencer Knight kept the Blackhawks in it as long as he could, stopping 25 of 28."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Wings moved to 6-4-3, climbing off the bottom of the Atlantic, now seventh.",
+   "The Blackhawks fell to 4-9-0, still last in the Central."
+  ],
+  "rewrite": [
+   "The Wings moved to 6-4-3 and climbed off the bottom of the Atlantic to seventh, while the Blackhawks fell to 4-9-0, still last in the Central."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Old team: Patrick Kane played his first game back in Detroit."
+  ],
+  "rewrite": [
+   "Old team: Patrick Kane played his first game back in Detroit."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Road run: The Blackhawks have lost five straight on the road."
+  ],
+  "rewrite": [
+   "Road run: The Blackhawks have lost five straight on the road."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Lineup: NHL.com had projected the Red Wings with 11 forwards and seven defensemen, but they dressed 12 and six."
+  ],
+  "rewrite": [
+   "Lineup: NHL.com had projected the Red Wings with 11 forwards and seven defensemen, but they dressed 12 and six."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Up next: Justin Faulk faces his old team, St. Louis, on Saturday."
+  ],
+  "rewrite": [
+   "Up next: Justin Faulk faces his old team, St. Louis, on Saturday."
+  ],
+  "part": -1
+ },
+ {
+  "op": "cut",
+  "site": [
+   "The score was fair."
+  ],
+  "rewrite": [],
+  "part": 1
+ }
+]
