@@ -1,9 +1,8 @@
 ---
 // "Lately" (Sora, 2026-10-30, thread "Improve game previews and automate tuning"): both clubs' last ten games at the
 // bottom of the preview's story card, from the snapshot's `lately` (pipeline/export/lately.py, games before the day
-// of the game only). Each club in its own tinted panel (Sora, 2026-10-30: keep the two apart): a result strip, then tiles for goal
-// difference, 5-on-5 expected-goal difference, power play and penalty kill (percentages first, counts under them), and the
-// projected goalie's last five starts. Facts about what has happened, never a lean on tonight.
+// of the game only). Each club in its own card (Sora, 2026-10-30): a result strip, then goal difference, 5-on-5 expected-goal difference,
+// power play and penalty kill (percentages first, counts beside them), and the projected goalie's last five starts. Facts about what has happened, never a lean on tonight.
 import { fullName, playerHref } from '../lib/playerLinks';
 import { ordinal } from '../lib/traits';
 import teamsData from '../../public/data/teams.json';
@@ -43,39 +42,25 @@ const teams = order.filter((a) => lately[a]);
       const gd = f.record.gf - f.record.ga;
       const xd = c.xgf != null && c.xga != null ? c.xgf - c.xga : null;
       return (
-        <div class={`lt t-${sides[a]}`}>
-          <p class="lt-h"><span class="lt-nick">{nick(a)}</span> <span class="lt-rec"><span class="n">last {f.n}</span> {f.record.w}-{f.record.l}-{f.record.otl}</span></p>
+        <div class={`card lt t-${sides[a]}`}>
+          <p class="lt-h"><span class="mini-h"><i class="lt-dot"></i>{nick(a)}, last {f.n}</span> <strong>{f.record.w}-{f.record.l}-{f.record.otl}</strong></p>
           <ol class="lt-games" aria-label={`${nick(a)} results, oldest first`}>
             {f.games.map((g) => <li class={`r-${g.res.toLowerCase()}`} tabindex="0" data-tip={gameTip(g)}><span>{g.res === 'OT' ? (g.end === 'SO' ? 'SO' : 'OT') : g.res}</span></li>)}
           </ol>
-          <div class="lt-tiles">
-            <div class="lt-t">
-              <p class="lt-l"><span class="term" tabindex="0" data-tip={`Goals for minus goals against over these ${f.n} games, all situations.`}>Goal diff</span></p>
-              <p class="lt-v">{sgn0(gd)}</p>
-              <p class="lt-s">{f.record.gf}–{f.record.ga}</p>
-            </div>
-            {xd != null && (
-              <div class="lt-t">
-                <p class="lt-l"><span class="term" tabindex="0" data-tip={`Expected goals for minus against at 5-on-5 over these ${f.n} games, weighted for the score and home ice: how the chances went, whatever the goalies did. ${c.now != null ? `Their share was ${pct(c.now)}${c.rank ? `, ${ordinal(c.rank)} of ${c.of} teams over their last ten` : ''}${wd ? `, ${wd}` : ''}.` : ''}`}>xG diff</span></p>
-                <p class="lt-v">{sgn(xd)}</p>
-                <p class="lt-s">{c.now != null ? `${pct(c.now)}${c.rank ? ` · ${ordinal(c.rank)}` : ''}` : `${c.xgf!.toFixed(1)}–${c.xga!.toFixed(1)}`}</p>
-              </div>
-            )}
-            {f.pp && (
-              <div class="lt-t">
-                <p class="lt-l"><span class="term" tabindex="0" data-tip="Power-play goals, out of their power plays, over these games (the league’s own counts).">Power play</span></p>
-                <p class="lt-v">{f.pp[1] ? pct(100 * f.pp[0] / f.pp[1]) : '–'}</p>
-                <p class="lt-s">{f.pp[0]} of {f.pp[1]}</p>
-              </div>
-            )}
-            {f.pk && (
-              <div class="lt-t">
-                <p class="lt-l"><span class="term" tabindex="0" data-tip="Times shorthanded over these games that the other team did not score (the league’s own counts).">Penalty kill</span></p>
-                <p class="lt-v">{f.pk[1] ? pct(100 * (f.pk[1] - f.pk[0]) / f.pk[1]) : '–'}</p>
-                <p class="lt-s">{f.pk[1] - f.pk[0]} of {f.pk[1]}</p>
-              </div>
-            )}
-          </div>
+          <table class="stbl lt-t">
+            <tbody>
+              <tr><th><span class="term" tabindex="0" data-tip={`Goals for minus goals against over these ${f.n} games, all situations.`}>Goal difference</span></th><td class="v">{sgn0(gd)}</td><td class="n">{f.record.gf}–{f.record.ga}</td></tr>
+              {xd != null && (
+                <tr><th><span class="term" tabindex="0" data-tip={`Expected goals for minus against at 5-on-5 over these ${f.n} games, weighted for the score and home ice: how the chances went, whatever the goalies did.${c.rank ? ` Their share of them ranks ${ordinal(c.rank)} of ${c.of} teams over their last ten.` : ''}`}>Expected goal difference</span></th><td class="v">{sgn(xd)}</td><td class="n">{c.now != null ? `${pct(c.now)} of chances${c.rank ? `, ${ordinal(c.rank)}` : ''}` : ''}</td></tr>
+              )}
+              {f.pp && (
+                <tr><th><span class="term" tabindex="0" data-tip="Power-play goals, out of their power plays, over these games (the league’s own counts).">Power play</span></th><td class="v">{f.pp[1] ? pct(100 * f.pp[0] / f.pp[1]) : '–'}</td><td class="n">{f.pp[0]} of {f.pp[1]}</td></tr>
+              )}
+              {f.pk && (
+                <tr><th><span class="term" tabindex="0" data-tip="Times shorthanded over these games that the other team did not score (the league’s own counts).">Penalty kill</span></th><td class="v">{f.pk[1] ? pct(100 * (f.pk[1] - f.pk[0]) / f.pk[1]) : '–'}</td><td class="n">{f.pk[1] - f.pk[0]} of {f.pk[1]}</td></tr>
+              )}
+            </tbody>
+          </table>
           {wd && <p class="lt-note">Their share of the 5-on-5 chances is {wd}.</p>}
           {f.goalie && (
             <p class="lt-g"><span class="mini-h"><span class="term" tabindex="0" data-tip={`The goalie expected to start, over his last ${f.goalie.starts === 1 ? 'start' : `${f.goalie.starts} starts`} this season: save percentage, and goals saved above what our chance model expected.`}>In net</span></span> {playerHref(f.goalie.id) ? <a class="plink" href={playerHref(f.goalie.id)}>{fullName(f.goalie.id, '')}</a> : fullName(f.goalie.id, '')}: {svp(f.goalie.saves, f.goalie.shots)}, {sgn(f.goalie.gsax)} saved above expected <span class="n">in his last {f.goalie.starts === 1 ? 'start' : `${f.goalie.starts} starts`}</span></p>
@@ -86,31 +71,30 @@ const teams = order.filter((a) => lately[a]);
   </div>
 )}
 <style>
+  /* Built from the site's usual parts (Sora, 2026-10-30): a white card per club like "Who’s been in net", the club's dot,
+     and a .stbl table; no team-tinted panels. */
   .lately { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   .lt-stakes { font: 400 18px/1.6 var(--body); color: var(--ink-2); margin: 0 0 16px; }
   .lt-stakes .mini-h { margin-right: 6px; }
-  .lt { min-width: 0; padding: 14px 16px 14px; border-radius: 12px; background: color-mix(in oklab, var(--team) 7%, var(--sheet)); }
-  .lt-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
-  .lt-nick { font: 700 18px var(--ui); color: var(--team); }
-  .lt-rec { font: 700 16px var(--ui); color: var(--ink); }
-  .lt-rec .n { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-right: 4px; }
-  .lt-games { list-style: none; display: flex; gap: 4px; padding: 0; margin: 0 0 14px; }
+  .lt { min-width: 0; display: grid; gap: 12px; align-content: start; }
+  .lt p { margin: 0; }
+  .lt-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .lt-h strong { font: 700 17px var(--ui); color: var(--ink); }
+  .lt-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 8px; vertical-align: 0; }
+  .lt-games { list-style: none; display: flex; gap: 4px; padding: 0; margin: 0; }
   .lt-games li { flex: 1 1 0; max-width: 30px; height: 22px; border-radius: 6px; display: grid; place-items: center;
     font: 700 10.5px var(--ui); letter-spacing: 0.03em; cursor: default; }
   .lt-games .r-w { background: var(--team); color: var(--sheet); }
   .lt-games .r-ot { box-shadow: inset 0 0 0 1.5px var(--team); color: var(--team); }
-  .lt-games .r-l { background: color-mix(in oklab, var(--ink) 9%, var(--sheet)); color: var(--ink-3); }
-  .lt-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .lt-t { min-width: 0; padding: 8px 10px 9px; border-radius: 8px; background: var(--sheet); }
-  .lt-t p { margin: 0; }
-  .lt-l { font: 600 11px/1.3 var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
-  .lt-v { font: 700 22px/1.25 var(--ui); color: var(--ink); margin-top: 2px !important; }
-  .lt-s { font: 400 13px/1.3 var(--ui); color: var(--ink-3); }
-  .lt-note { font: 400 14px/1.4 var(--ui); color: var(--ink-3); margin: 10px 0 0; }
-  .lt-g { font: 400 15px/1.45 var(--ui); color: var(--ink); margin: 12px 0 0; }
+  .lt-games .r-l { background: var(--track); color: var(--ink-3); }
+  .lt-t { width: 100%; }
+  .lt-t tbody th { font-weight: 400; color: var(--ink-2); white-space: normal; }
+  .lt-t .v { font-weight: 700; color: var(--ink); }
+  .lt-t .n { color: var(--ink-3); text-align: right; }
+  .lt-t tbody tr:first-child { border-top: 0; }
+  .lt-note { font: 400 14px/1.4 var(--ui); color: var(--ink-3); }
+  .lt-g { font: 400 15px/1.45 var(--ui); color: var(--ink); }
   .lt-g .mini-h { margin-right: 6px; }
   .lt-g .n { color: var(--ink-3); }
-  @media (max-width: 1100px) { .lt-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 900px) { .lately { grid-template-columns: 1fr; } .lt-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { .lt-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 900px) { .lately { grid-template-columns: 1fr; } }
 </style>
