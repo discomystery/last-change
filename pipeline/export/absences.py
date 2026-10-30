@@ -43,7 +43,7 @@ VALUE_LAMBDA = 15000.0  # ratings as the win model's lineups
 # NOW_FLOOR expected goals a game (about one top-line forward).
 NOW_FLOOR = 0.2
 # Every line says the count is weighed, without the method (Sora, 2026-10-20: imply it is more than a head count).
-WEIGHED = "Counting how much each missing player usually brings"
+WEIGHED = "Taking into account how much value each missing player usually adds"
 # Filling in on faceoffs: a forward who had been taking fewer than RARE_DRAWS a game (over GP_BEFORE+ games) took
 # FILL_DRAWS+ in the club's last game while a player who takes CENTER_DRAWS+ a game was out.
 RARE_DRAWS, GP_BEFORE, FILL_DRAWS, CENTER_DRAWS = 3.0, 20, 8, 8.0

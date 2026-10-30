@@ -267,7 +267,7 @@ def team_checks(t: dict, r: dict, shooters: pl.DataFrame, goalies: list[dict], l
             return f", {'led by' if sign > 0 else 'most of all'} {_shooter_list(rows, who)}" if rows else ""
         return ""
 
-    word = {"gk": "goaltending", "fin": "shooting",
+    word = {"gk": "goaltending", "fin": "finishing",
             "en": "empty-net goals" if sign > 0 else "empty-net goals against",
             "close": f"{'winning' if sign > 0 else 'losing'} more than their share of one-goal and overtime games"}
     said, why = set(), []
@@ -401,11 +401,11 @@ def preview_item(team: str, season: int, before: str, W) -> dict | None:
     sign = 1 if r["gap"] > 0 else -1
     why = reasons(r, sign)
     if sign > 0:
-        word = {"gk": "their goaltending", "fin": "their shooting", "en": "empty-net goals", "close": "a good run in one-goal and overtime games"}
+        word = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "a good run in one-goal and overtime games"}
         tail = f", largely thanks to {word[why[0][1]]}" if why else ""
         text = f"{_cap(W.poss(team))} record ({p3(r['pp'])}) is well ahead of what their chances are worth ({p3(r['play'])}){tail}."
     else:
-        word = {"gk": "their goaltending has", "fin": "their shooting has", "en": "empty-net goals against have", "close": "one-goal and overtime losses have"}
+        word = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "one-goal and overtime losses have"}
         text = f"{_cap(W.the(team))} have played better than their record ({p3(r['pp'])}): their chances are worth about {p3(r['play'])}"
         text += f", and {word[why[0][1]]} held them back." if why else "."
     return {"tag": "Behind the record", "text": text, "score": 58 + min(abs(r["gap"]), 0.2) * 50}
@@ -463,10 +463,10 @@ def luck_items(away: str, home: str, season: int, before: str, W, names: dict[in
             who, n = names[r["player_id"]], int(r["g"])
             goals = f"{num(n)} goal{'' if n == 1 else 's'}" if n else "no goals"
             if d > 0:
-                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well above what his shooting usually turns "
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well above what his finishing usually turns "
                         f"chances into. Runs like that tend to cool off.")
             else:
-                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well below what his shooting usually "
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well below what his finishing usually "
                         f"turns chances into. If the chances keep coming, so should the goals.")
             out.append({"tag": "Luck may turn", "text": text, "pid": r["player_id"], "d": abs(d)})
     out.sort(key=lambda i: -i.pop("d"))
@@ -489,8 +489,8 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
     if all(abs(r["gap"]) < TEXT_GAP for r in rows.values()):
         return None
 
-    up = {"gk": "their goaltending", "fin": "their shooting", "en": "empty-net goals", "close": "winning the close ones"}
-    down = {"gk": "their goaltending has", "fin": "their shooting has", "en": "empty-net goals against have", "close": "losses in close games have"}
+    up = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "winning one-goal games"}
+    down = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "losses in one-goal games have"}
 
     def why(r):
         sign = 1 if r["gap"] > 0 else -1

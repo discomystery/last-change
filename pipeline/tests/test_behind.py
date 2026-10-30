@@ -33,7 +33,7 @@ def test_reasons_follow_the_side_of_the_gap():
 def test_big_gap_names_the_reason_and_small_gap_says_so():
     out = behind.team_checks(TEAM, _row(), EMPTY, [], None, {})
     assert out["verdict"] == "ahead" and out["why"] == ["fin"]
-    assert "Most of the gap is shooting" in out["checks"][0]["text"]
+    assert "Most of the gap is finishing" in out["checks"][0]["text"]
     assert "Goaltending has cost them" in out["checks"][1]["text"]
     near = behind.team_checks(TEAM, _row(pp=0.62, gap=0.02, fin=1.0, gk=1.0), EMPTY, [], None, {})
     assert near["verdict"] == "level" and near["checks"][0]["text"].startswith("Aville’s record (.620) is about")
