@@ -847,7 +847,7 @@ def _options(t: str, season: int, day: str, gg: pl.DataFrame, dec: dict, W) -> s
     counts = recent.group_by("goalie_id").agg(pl.len().alias("n"), pl.col("date").max().alias("last")).filter(~pl.col("goalie_id").is_in(list(gone)))
     if counts.height < 2:
         return None
-    counts = counts.sort("n", descending=True).head(2)
+    counts = counts.sort("n", "last", "goalie_id", descending=True).head(2)  # a tie: whoever started last first
     names = _full_names(set(counts["goalie_id"].to_list()))
     if len(names) < 2:
         return None
