@@ -121,7 +121,7 @@ def _is_bad(k, b):
     return k not in NEUTRAL and b["pct"] < 50
 
 
-def rank_tag(k: str, b: dict, tips: dict | None, words: str = "") -> str:
+def rank_tag(k: str, b: dict, tips: dict | None, words: str = "", recorded: tuple | None = None) -> str:
     """A habit's league rank as a tag after its words, " (32nd)", which the page draws as a pill whose tooltip gives the
     rank in full and the figure behind it (Sora, 2026-10-30). A neutral habit at the low end counts from that end
     (" (3rd lowest)"), so a calm team never reads as last. `tips` collects {tag text: tooltip} in the order written."""
@@ -134,6 +134,8 @@ def rank_tag(k: str, b: dict, tips: dict | None, words: str = "") -> str:
     fig = CHIP[k][1](b) if k in CHIP and b.get("v") is not None else ""
     fig += " (100 is average)" if "score" in fig else ""
     tip = f"{tag if low else ordinal(r)} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
+    if recorded:  # the recorded figure behind the habit, with its own rank ("scoring on 10.0% of their chances, second worst")
+        tip += f". Recorded: {recorded[0]}, {recorded[1]}"
     tips.setdefault("_found", []).append((f"{words} ({tag})", tip))  # put in reading order once the paragraph is written
     return f" ({tag})"
 
@@ -175,18 +177,21 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
     if tips is None:  # no page to draw pills: top-three ranks in words, on their habit
         told = {k for k, b, w, _ in ups if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k != "depth" and plain(k, w)}
         ups = [(k, b, w + (f" ({ordinal_word(b['rank'])} in the league)" if k in told else ""), f) for k, b, w, f in ups]
-    else:  # every habit carries its rank as a pill (Sora, 2026-10-30), in the order the sentence tells them
+    else:  # every habit carries its rank as a pill (Sora, 2026-10-30), in the order the sentence tells them: identity
+        # phrases too ("Some of these multiple stat sentences only include one pill for multiple rankings")
         mixed_ = bool(ups and downs) and any(_is_good(k, b) for k, b, _, _ in ups)
         for grp in ((ups, downs) if mixed_ else (ups + downs,)):
             for i, (k, b, w, f) in enumerate(grp):
-                if plain(k, w):
-                    grp[i] = (k, b, w + rank_tag(k, b, tips, w), f)
+                # a recorded figure has a rank of its own, so it goes in the pill's tooltip (two ranks side by side
+                # would disagree: the 32nd power play by chances scores on the second worst share)
+                grp[i] = (k, b, w + rank_tag(k, b, tips, w, recorded=f), None)
         if not mixed_:
             n = len(ups)
             ups, downs = grp[:n], grp[n:]
 
     def told_list(group):  # the figure behind a habit: a trailing clause on the last one, in brackets mid-list
-        return and_list([w + ("" if not f else f", {f[0]} ({f[1]})" if i == len(group) - 1 else f" ({f[0]}, {f[1]})")
+        return and_list([w + ("" if not f else f", {f[0]} ({f[1]})" if i == len(group) - 1
+                              else f" ({f[0]}, {f[1]})")
                          for i, (k, b, w, f) in enumerate(group)])
     mixed = bool(ups and downs) and any(_is_good(k, b) for k, b, _, _ in ups)
     order = ups + downs
@@ -198,11 +203,6 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
         few = f"no team {FEW_WORSE[k][1]}" if n == 0 else f"only {num(n)} {'team' if n == 1 else 'teams'} {FEW_WORSE[k][1 if n == 1 else 0]}"
         last = (downs if mixed else order)[-1][0]
         out += f": {few}" if last == k else f". {cap(few)}"
-    low = next(((k, b) for k, b, _, _ in ups + downs if k in BOTTOM and b["pct"] < 50 and b["rank"] >= 30), None)
-    if low:  # "No team gives its bottom six less of the ice time."
-        k, b = low
-        n = 32 - b["rank"]
-        out += f". No team {BOTTOM[k][1]}" if n == 0 else f". Only {num(n)} {'team' if n == 1 else 'teams'} {BOTTOM[k][1 if n == 1 else 2]}"
     return out
 
 
@@ -517,8 +517,7 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             ln = _lower(ln) if k == "powerKill" and link == ", and " and "sets up a fight" in ln else _them(_lower(ln), t, W)
             if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
                 ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
-            if "anyone" not in words and "league’s" not in words:
-                words += rank_tag(k, b, tips, words)
+            words += rank_tag(k, b, tips, words)
             sents.append(f"{cap(W.the(t)) if t in opposite else 'They'} also {words}{link}{ln}")
         sc = scoring(t, season, day, W)
         if sc:
@@ -655,6 +654,8 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     # each name is followed straight away by his line, which the page draws as a tag and links the name before it
     # (Sora, 2026-10-30): "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring"
     ride = extras(lead)
+    nxt = tot.row(1, named=True)["pts"] if tot.height > 1 else 0
+    clear = lead["pts"] - nxt >= CARRY_GAP and lead["pts"] >= CARRY_SHARE * nxt
     tied = bool(other) and not (other is gl and gl["g"] > lead["g"]) and other["pts"] == lead["pts"]
     who = f"{N[lead['player_id']]} ({line(lead)})"
     lr = _nhl_rank(lead["player_id"], "pts", season, day)
@@ -666,12 +667,11 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     elif tied:  # two level at the top: "is tied for the Islanders’ scoring lead. Matthew Schaefer (...) shares it"
         first = f"{who} is tied for {W.poss(t)} scoring lead"
     elif second:  # a full sentence, never "For the Islanders, it’s Bo Horvat" (Sora: it's Bo Horvat what?)
-        first = cap(_pick([f"For {W.the(t)}, {who} leads the way in scoring", f"{W.poss(t)} scoring runs through {who}"],
+        # "runs through" only for a clear lead (Sora, 2026-10-30: Fox one point ahead of a nine-goal Lafrenière)
+        first = cap(_pick([f"For {W.the(t)}, {who} leads the way in scoring"] + ([f"{W.poss(t)} scoring runs through {who}"] if clear else []),
                           *key, t, "lead2"))
     else:
-        nxt = tot.row(1, named=True)["pts"] if tot.height > 1 else 0
         # "carrying" only for a clear lead (Sora, 2026-10-30: strong for someone two points ahead of the next guy)
-        clear = lead["pts"] - nxt >= CARRY_GAP and lead["pts"] >= CARRY_SHARE * nxt
         first = _pick([f"{who} leads {W.the(t)} in scoring"] + ([f"{who} is carrying {W.poss(t)} offense"] if clear else []),
                       *key, t, "lead1")
     if ride:  # "..., who has nine points in his last five games"

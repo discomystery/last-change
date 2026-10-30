@@ -2,7 +2,7 @@
  "head": "Open season on the Predators’ net",
  "paras": [
   "The Lightning (8-3-1) beat Winnipeg 6-4 on Thursday, while the Predators (4-4-5) lost 4-3 to Washington the same night. Going in, the Bolts are third in the Atlantic (tied for eighth in the NHL) and the Predators sixth in the Central (tied for 20th).",
-  "The Lightning ice the puck less than almost anyone, get into a lot of chippy games (2nd) and keep shots away from their net, allowing 24.2 shots a game (fourth fewest). The Predators, by contrast, ice the puck a lot (30th). They also keep things calm after the whistle (3rd lowest) and get pinned in their own end on long shifts (32nd). The Lightning are likely to get plenty of pucks to the net against the Predators, and they have the edge over the Predators on shot quality.",
+  "The Lightning ice the puck less than almost anyone (2nd), get into a lot of chippy games (2nd) and keep shots away from their net (3rd). The Predators, by contrast, ice the puck a lot (30th). They also keep things calm after the whistle (3rd lowest) and get pinned in their own end on long shifts (32nd). The Lightning are likely to get plenty of pucks to the net against the Predators, and they have the edge over the Predators on shot quality.",
   "Brandon Hagel (8 G / 8 A / 16 P in 12 GP) leads the Lightning in scoring, with four goals in six games against Nashville since 2023-24. Nikita Kucherov (4 G / 11 A / 15 P in 12 GP) is next in line, with seven points in his last five games. Steven Stamkos (7 G / 8 A / 15 P in 13 GP) is tied for the Predators’ scoring lead. Filip Forsberg (5 G / 10 A / 15 P in 13 GP) shares it, with seven points in his last five games.",
   "Andrei Vasilevskiy (6-3-0 / .876 SV% in 9 GS) will likely start for Tampa Bay, and Juuse Saros (3-3-4 / .902 SV% in 10 GS) for Nashville."
  ],
@@ -45,7 +45,9 @@
   }
  ],
  "ranks": [
+  "2nd of 32 in avoiding icings",
   "2nd of 32 in rough stuff",
+  "3rd of 32 in shot suppression: shots-against score 90 (100 is average). Recorded: allowing 24.2 shots a game, fourth fewest",
   "30th of 32 in avoiding icings",
   "3rd lowest of 32 in rough stuff",
   "32nd of 32 in avoiding long shifts"

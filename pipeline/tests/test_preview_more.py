@@ -108,7 +108,7 @@ def test_a_line_pairs_only_with_the_habit_on_its_own_side(monkeypatch):
 def test_depth_at_the_low_end_reads_as_stars():
     fp = {"WPG": dims(depth=(2, 32), pace=(90, 4))}
     s = pm.style("WPG", pm._picks("WPG", fp), W())
-    assert "lean on their stars more than any team in the league" in s and "No team gives its bottom six less of the ice time" in s
+    assert "lean on their stars more than any team in the league" in s and "bottom six" not in s
 
 
 def test_a_line_whose_habits_were_not_told_gets_no_lead_in(monkeypatch):

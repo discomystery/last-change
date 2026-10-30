@@ -2,8 +2,8 @@
  "head": "Blueger returns to Vancouver",
  "paras": [
   "The Maple Leafs (7-6-2) lost 5-4 to Seattle on Wednesday, while the Canucks (3-10-1) beat Anaheim 6-5 in overtime on Tuesday. Going in, the Maple Leafs are sixth in the Atlantic (tied for tenth in the NHL) and the Canucks last in the NHL.",
-  "Both teams have had shaky goaltending. The Maple Leafs get their shots through better than anyone, but take more penalties than they draw (30th). Toronto has scored 3.73 goals a game, the third most in the league. As for the Canucks, they pick their shots (lowest). They also have a leaky penalty kill (32nd), so the Maple Leafs’ power play could do real damage when they’re shorthanded. Vancouver has allowed 4.64 goals a game, the most in the league. The Canucks roll four lines, but the Leafs lean on their top six.",
-  "Auston Matthews (10 G / 13 A / 23 P in 15 GP) leads the Maple Leafs in scoring and is fourth in the NHL, with seven points in his last five games. William Nylander (9 G / 10 A / 19 P in 15 GP) is next in line, with four goals in six games against Vancouver since 2023-24. The Canucks’ scoring runs through Elias Pettersson (#40) (4 G / 11 A / 15 P in 14 GP). Jonathan Lekkerimäki (6 G / 6 A / 12 P in 14 GP) has a team-high six goals, with seven points in his last five games.",
+  "Both teams have had shaky goaltending. The Maple Leafs get their shots through better than anyone (1st), but take more penalties than they draw (30th). Toronto has scored 3.73 goals a game, the third most in the league. As for the Canucks, they pick their shots (lowest). They also have a leaky penalty kill (32nd), so the Maple Leafs’ power play could do real damage when they’re shorthanded. Vancouver has allowed 4.64 goals a game, the most in the league. The Canucks roll four lines, but the Leafs lean on their top six.",
+  "Auston Matthews (10 G / 13 A / 23 P in 15 GP) leads the Maple Leafs in scoring and is fourth in the NHL, with seven points in his last five games. William Nylander (9 G / 10 A / 19 P in 15 GP) is next in line, with four goals in six games against Vancouver since 2023-24. For the Canucks, Elias Pettersson (#40) (4 G / 11 A / 15 P in 14 GP) leads the way in scoring. Jonathan Lekkerimäki (6 G / 6 A / 12 P in 14 GP) has a team-high six goals, with seven points in his last five games.",
   "In goal, Sergei Bobrovsky has a .816 save percentage in six starts against the Canucks, well under his usual .902. Don’t read much into it: a goalie’s record against one team rarely holds up."
  ],
  "items": [
@@ -49,6 +49,7 @@
   }
  ],
  "ranks": [
+  "1st of 32 in getting shots through",
   "30th of 32 in discipline",
   "lowest of 32 in shot volume: shot volume score 79 (100 is average)",
   "32nd of 32 in the penalty kill: 9.1 expected goals allowed per 60 shorthanded"

@@ -2,7 +2,7 @@
  "head": "DeBrincat’s favorite opponent",
  "paras": [
   "Both teams have won two in a row. This is an Atlantic Division matchup, with the Red Wings seventh (tied for 16th in the NHL) and the Panthers fifth (tied for tenth). The Atlantic has been the strongest of the four divisions so far.",
-  "The Red Wings block more shots than almost anyone and draw more penalties than they take (3rd). They also have one of the league’s most dangerous power plays, and their power play against the Panthers’ penalty killers is strength against strength. As for the Cats, they forecheck harder than anyone, rarely ice the puck (1st) and hit a lot (1st). Both teams play slow, low-event hockey, so expect a tight one.",
+  "The Red Wings block more shots than almost anyone (2nd) and draw more penalties than they take (3rd). They also have one of the league’s most dangerous power plays (3rd), and their power play against the Panthers’ penalty killers is strength against strength. As for the Cats, they forecheck harder than anyone (1st), rarely ice the puck (1st) and hit a lot (1st). Both teams play slow, low-event hockey, so expect a tight one.",
   "Alex DeBrincat (6 G / 9 A / 15 P in 13 GP) leads the Red Wings in scoring, with a point in seven straight games against Florida. Viktor Arvidsson (8 G / 6 A / 14 P in 13 GP) has a team-high eight goals, with nine points in his last five games. Matthew Tkachuk (4 G / 16 A / 20 P in 13 GP) leads the Panthers in scoring and is tied for seventh in the NHL, with nine points in his last five games. Brady Tkachuk (8 G / 7 A / 15 P in 13 GP) has a team-high eight goals, with seven points in his last five games.",
   "John Gibson (4-4-1 / .874 SV% in 9 GS) will likely start for Detroit, and Akira Schmid (4-2-1 / .884 SV% in 6 GS) for Florida."
  ],
@@ -49,7 +49,10 @@
   }
  ],
  "ranks": [
+  "2nd of 32 in blocking shots",
   "3rd of 32 in discipline",
+  "3rd of 32 in the power play: 8.9 expected goals per 60 on the power play",
+  "1st of 32 in forecheck pressure: forecheck score 148 (100 is average)",
   "1st of 32 in avoiding icings",
   "1st of 32 in physicality: hit score 160 (100 is average)"
  ]
