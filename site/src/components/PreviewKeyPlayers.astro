@@ -33,7 +33,7 @@ const formTip = (p: KP) => {
 <div class="pkp">
   {order.filter((a) => players[a]?.length).map((a) => (
     <div class={`pkp-team t-${sides[a]}`}>
-      <h3 class="mini-h pkp-h">{nick(a)}</h3>
+      <h3 class="pkp-h">{nick(a)}</h3>
       <ul>
         {players[a].map((p) => (
           <li class="card pkp-c">
@@ -59,10 +59,12 @@ const formTip = (p: KP) => {
   ))}
 </div>
 <style>
-  .pkp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 24px; }
-  .pkp-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .pkp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  /* Each club in its own tinted panel, as in Lately: a tinted panel means "this half is about one club, beside the other" */
+  .pkp-team { min-width: 0; padding: 14px 16px 16px; border-radius: 12px; background: color-mix(in oklab, var(--team) 7%, var(--sheet)); }
+  .pkp-h { font: 700 18px var(--ui); color: var(--team); margin: 0 0 12px; }
   .pkp ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-  .pkp-c { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 12px; padding: 14px 16px 12px; overflow: hidden; }
+  .pkp-c { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 12px; padding: 14px 16px 12px; overflow: hidden; background: var(--sheet); border: 0; box-shadow: none; }
   .pkp-id { min-width: 0; }
   .pkp-name { font: 600 18px/1.3 var(--ui); margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
   .pkp-pos { font: 400 14px/1.4 var(--ui); color: var(--ink-3); margin: 2px 0 0; }
