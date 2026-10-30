@@ -1435,8 +1435,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
         sents.append(more["standing"])
     from pipeline.export import behind
     luck = behind.preview_sentence(away, home, season, start[:10], W)  # records against the chances, both clubs
-    if luck:
-        sents.append(luck)
+    if luck:  # its own paragraph, after where they stand (Sora, 2026-10-30)
         items = [i for i in items if i["tag"] != "Behind the record"]
     told_tags = set().union(*more["told"].values()) if more["told"] else set()
     items = [i for i in items if not (i["tag"] in told_tags and i.get("pid") in more["used"])]  # the scorers' paragraph tells it
@@ -1459,7 +1458,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     head = (heads[0][1] if heads and (heads[0][0] >= HEAD_FACT or not call_head) else call_head or f"{W.place(away)} at {W.place(home)}")
     lean = {t: v["body"] for t, v in (outlook or {}).items()}
     paras = [" ".join(sents)] if sents else []
-    paras += [x for x in (more["play"], more["scoring"], more["net"]) if x]
+    paras += [x for x in (luck, more["play"], more["scoring"], more["net"]) if x]
     if look:  # separate ideas, so each gets its own way in (Sora, 2026-10-30: two lines side by side read as related)
         look.sort(key=lambda x: {"matchup": 0, "history": 1}.get(x[0], 2))
         out_ = [look[0][1]]
