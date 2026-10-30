@@ -10,7 +10,7 @@ import re
 
 import polars as pl
 
-from pipeline.config import CURRENT_SEASON
+from pipeline.config import CURRENT_SEASON, TABLES
 from pipeline.export.grammar import and_list, article, cap, num, ordinal, ordinal_word
 
 # Each habit as something a team does, at the high end of its scale and at the low end (plural verbs: teams are
@@ -745,7 +745,7 @@ def who_scores(away: str, home: str, season: int, day: str, W, N: dict, gone: se
 @lru_cache(maxsize=4)
 def _goalie_games(season: int) -> pl.DataFrame:
     from pipeline.metrics import goalies
-    return goalies.per_game(season).select("game_id", "goalie_id", "date", "sa", "ga", "started")
+    return goalies.per_game(season).select("game_id", "goalie_id", "team_id", "date", "sa", "ga", "started")
 
 
 NET_STARTS, NET_OFF = 4, 0.020  # starts, and save percentage off the league's, for "has been terrific" / "has struggled"
@@ -754,8 +754,6 @@ NET_STARTS, NET_OFF = 4, 0.020  # starts, and save percentage off the league's, 
 def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: dict) -> str | None:
     """The projected starters with their season so far: record, save percentage, starts."""
     from pipeline.export import goalie_streaks
-    if not projected:
-        return None
     from pipeline.export.stories import _pick
     gg = _goalie_games(season).filter(pl.col("date") < day)
     dec = goalie_streaks.decisions(season)
@@ -791,6 +789,16 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
             said.append((t, f"{tag} {how}, but {verb}"))
         else:
             parts.append(f"{tag} {verb} for {W.place(t)}")
+    # no likely starter: the goalies who have shared the net lately (Sora, 2026-10-30: "Carolina has both Pyotr
+    # Kochetkov and Brandon Bussi as options in net ... It's anyone's guess who will take the net")
+    open_ = [(t, x) for t in (away, home) if not (projected.get(t) and projected[t]["id"] in N)
+             for x in [_options(t, season, day, gg, dec, W)] if x]
+    if len(open_) == 2:  # "anyone's guess" once, for both
+        (t1, x1), (t2, x2) = open_
+        open_ = [(t1, x1.replace(" " + GUESS, "")), (t2, x2.replace(GUESS, "For both teams, it’s anyone’s guess who gets the net.")
+                                                      .replace(" has two options in net:", " also has two options:", 1))]
+    if open_ and not parts and not said:
+        return " ".join(x for _, x in open_)
     if said:  # a judged goalie gets a sentence of his own, in game order; a plain one beside it takes other words
         plain = {t: x for t, x in zip([t for t in (away, home) if t not in dict(said) and projected.get(t) and projected[t]["id"] in N], parts)}
         alt = {"will likely start for": "is in line to start for", "is expected to start for": "is expected to go for"}
@@ -801,14 +809,66 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
             elif t in plain:
                 x = plain[t]
                 out.append(next((x.replace(a, b, 1) for a, b in alt.items() if a in x), x))
-        return " ".join(cap(x) + "." for x in out)
+        return " ".join(cap(x) + "." for x in out) + "".join(" " + x for _, x in open_)
     if not parts:
         return None
     if len(parts) == 2:
         verb = next((v for v in ("is expected to start", "will likely start") if v in parts[0] and v in parts[1]), None)
         second = parts[1].replace(f" {verb}", "", 1) if verb else parts[1]
         return cap(f"{parts[0]}, and {second}.")
-    return cap(parts[0]) + "."
+    return cap(parts[0]) + "." + "".join(" " + x for _, x in open_)
+
+
+GUESS = "It’s anyone’s guess who gets the net."
+OPTION_GAMES = 10  # a club's last games whose starters are its options in net when no one is the likely starter
+
+
+def _options(t: str, season: int, day: str, gg: pl.DataFrame, dec: dict, W) -> str | None:
+    """The goalies who have started the club's last ten games, when none is the likely starter: each with his line,
+    who started more and who started last. Facts only, no guess at who plays (never a chance as a number)."""
+    from pipeline.export.changes import _team_ids
+    from pipeline.export.previews import _full_names
+    from pipeline.export.stories import when_before
+    tid = _team_ids(season).get(t)
+    if tid is None:
+        return None
+    club = gg.filter((pl.col("team_id") == tid) & pl.col("started")).sort("date")
+    recent = club.filter(pl.col("game_id").is_in(club["game_id"].unique(maintain_order=True).tail(OPTION_GAMES).to_list()))
+    if recent.height < 3:
+        return None
+    av_path = TABLES / str(season) / "availability.parquet"
+    gone = set()
+    if av_path.exists():  # out, or no longer with the club, the day before
+        av = pl.read_parquet(av_path, columns=["date", "team", "player_id", "status"]).filter(pl.col("date") < day)
+        last = av.filter(pl.col("date") == av["date"].max()) if av.height else av
+        gone = set(last.filter((pl.col("team") == t) & pl.col("status").is_in(["injured", "suspended", "personal", "off_roster", "not_listed", "no_club"]))["player_id"].to_list())
+        gone |= set(last.filter((pl.col("team") != t) & pl.col("player_id").is_in(recent["goalie_id"].unique().to_list()))["player_id"].to_list())
+    counts = recent.group_by("goalie_id").agg(pl.len().alias("n"), pl.col("date").max().alias("last")).filter(~pl.col("goalie_id").is_in(list(gone)))
+    if counts.height < 2:
+        return None
+    counts = counts.sort("n", descending=True).head(2)
+    names = _full_names(set(counts["goalie_id"].to_list()))
+    if len(names) < 2:
+        return None
+
+    def tag(pid):
+        mine = gg.filter((pl.col("goalie_id") == pid) & (pl.col("date") < day))
+        starts = int(mine["started"].sum())
+        ds = [d.get(pid) for gid, d in dec.items() if pid in d and gid in set(mine["game_id"].to_list())]
+        sa, ga = int(mine["sa"].sum()), int(mine["ga"].sum())
+        sv = f" / {(sa - ga) / sa:.3f} SV%".replace(" 0.", " .") if sa else ""
+        return f"{names[pid]} ({ds.count('W')}-{ds.count('L')}-{ds.count('O')}{sv} in {starts} GS)"
+    (a, na, la), (b, nb, lb) = counts.select("goalie_id", "n", "last").rows()
+    latest = a if la >= lb else b
+    n_games = recent["game_id"].n_unique()
+    first = f"{W.place(t)} has two options in net: {tag(a)} and {tag(b)}"
+    last_name = lambda pid: names[pid].split(" ", 1)[1]
+    if na > nb:
+        more = (f"{last_name(a)} has started {num(na)} of their last {num(n_games)} games"
+                + (f", including the last one {when_before(la, day)}" if latest == a else f", but {last_name(b)} got the last one {when_before(lb, day)}"))
+    else:
+        more = f"They have split the last {num(n_games)} starts, and {last_name(latest)} got the last one {when_before(max(la, lb), day)}"
+    return f"{first}. {more}. {GUESS}"
 
 
 def standing(away: str, home: str, season: int, day: str, W, said: str) -> str | None:

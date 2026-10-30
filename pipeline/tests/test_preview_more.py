@@ -157,3 +157,13 @@ def test_a_power_play_line_names_the_kill_it_faces(monkeypatch):
     assert s.startswith("The Panthers (1st) and the Jets (2nd) both create chances on the penalty kill.")
     assert "power play (9th) could do real damage against the Jets’ penalty kill (24th)" in s
     assert "going the other way" not in s and len(tips["list"]) == s.count("th)") + s.count("st)") + s.count("nd)") + s.count("rd)")
+
+
+def test_hometown_matches_the_club_city(monkeypatch):
+    from pipeline.export import stories
+    monkeypatch.setattr(stories, "birth_city", lambda pid: {1: "Winnipeg", 2: "Raleigh", 3: "Montreal"}.get(pid))
+
+    class Places:
+        place = staticmethod(lambda t: {"WPG": "Winnipeg", "CAR": "Carolina", "MTL": "Montréal"}[t])
+    assert stories.hometown(1, "WPG", Places) and stories.hometown(2, "CAR", Places) and stories.hometown(3, "MTL", Places)
+    assert not stories.hometown(1, "CAR", Places)

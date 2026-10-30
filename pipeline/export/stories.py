@@ -523,6 +523,30 @@ def _race_after(gid: int, day: str, teams: tuple[str, str], W: Words, season: in
     return out
 
 
+# the city a club plays in when its name is a region (geography, not rosters): "Raleigh" is home for Carolina
+METRO = {"CAR": ("Raleigh",), "TBL": ("Tampa",), "FLA": ("Sunrise", "Fort Lauderdale"), "MIN": ("Saint Paul", "St. Paul", "Minneapolis"),
+         "COL": ("Denver",), "NJD": ("Newark",), "NYR": ("New York", "Manhattan"), "NYI": ("New York",), "UTA": ("Salt Lake City",),
+         "VGK": ("Las Vegas",)}
+
+
+@lru_cache(maxsize=4096)
+def birth_city(pid: int) -> str | None:
+    """Where he was born, from his saved NHL landing (None until it is on file)."""
+    from pipeline.ingest.careers import DIR
+    f = DIR / f"{pid}.json.gz"
+    if not f.exists():
+        return None
+    city = ((json.loads(gzip.open(f).read()).get("landing") or {}).get("birthCity") or {})
+    return city.get("default") if isinstance(city, dict) else city
+
+
+def hometown(pid: int, t: str, W) -> bool:
+    """Whether club `t` plays in the city he was born in (Sora, 2026-10-30: Jarvis, born in Winnipeg, against the Jets)."""
+    from pipeline.ingest.names import fold
+    city = birth_city(pid)
+    return bool(city) and fold(city) in {fold(c) for c in (W.place(t), *METRO.get(t, ()))}
+
+
 def preview_facts(away: str, home: str, before: str, W: Words, season: int = CURRENT_SEASON, likely: dict | None = None,
                   gid: int | None = None, expected_in: set | None = None) -> dict:
     """Everything the preview story can say, from games before `before` (a date). `expected_in` holds the players
@@ -631,15 +655,22 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
             elsewhere = g.filter(pl.col("team") != t)
             mostly = elsewhere["team"].mode()[0] if elsewhere.height * 2 > gp else None
             tail = f", most of them with {W.place(mostly)}" if mostly else ""
+            extra = f", and {int(sum(pts))} points in his last {num(gp) if gp <= 12 else gp} against them" if sum(pts) >= 1.5 * gp and gn < n else ""
+            them = f"his hometown {W.the(o)[4:]}" if hometown(pid, o, W) else W.place(o)  # "against his hometown Jets"
             if n >= 5 or gn >= GOAL_RUN:
-                extra = f", and {int(sum(pts))} points in his last {num(gp) if gp <= 12 else gp} against them" if sum(pts) >= 1.5 * gp and gn < n else ""
                 cands.append({"tag": "Owns them", "score": 70 + n + gn / 2, "pid": pid, "streak": n,
-                              "text": f"{N[pid]} has {streak_text(gn, n, gp, f' against {W.place(o)}', atleast=(n == gp or gn == gp) and g['date'][0] <= LOGS_START)}{extra}."})
+                              "text": f"{N[pid]} has {streak_text(gn, n, gp, f' against {them}', atleast=(n == gp or gn == gp) and g['date'][0] <= LOGS_START)}{extra}."})
             elif gp >= 6 and goals / gp >= 0.6:
                 cands.append({"tag": "Haunts them", "score": 68 + goals / gp * 10, "pid": pid,
-                              "text": f"{N[pid]} has {num(goals)} goals in {num(gp) if gp <= 12 else gp} games against {W.place(o)} since 2023-24{tail}."})
+                              "text": f"{N[pid]} has {num(goals)} goals in {num(gp) if gp <= 12 else gp} games against {them} since 2023-24{tail}."})
         cands.sort(key=lambda c: -c["score"])
         items += cands[:1]
+        told_home = {c["pid"] for c in cands[:1] if "hometown" in c["text"]}
+        homes = [pid for pid in roster if pid not in told_home and pid in N and hometown(pid, o, W)]
+        if homes:  # "Seth Jarvis faces his hometown Jets." / "Seth Jarvis plays in his hometown of Winnipeg."
+            pid = homes[0]
+            where = f"plays in his hometown, {birth_city(pid)}" if t == away else f"faces his hometown {W.the(o)[4:]}"
+            items.append({"tag": "Hometown", "text": f"{N[pid]} {where}.", "score": 56 if t == away else 52, "pid": pid})
         if cands and cands[0].get("streak", 0) >= 7:
             out["heads"].append((80 + 1.5 * cands[0]["streak"], f"{_short(cands[0]['pid'], P, N, season)}’s favorite opponent"))
         # old teams: the club he played for before this one
