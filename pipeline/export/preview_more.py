@@ -10,7 +10,7 @@ from functools import lru_cache
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON
-from pipeline.export.grammar import and_list, article, cap, num, ordinal_word
+from pipeline.export.grammar import and_list, article, cap, num, ordinal, ordinal_word
 
 # Each habit as something a team does, at the high end of its scale and at the low end (plural verbs: teams are
 # "they"). Quality is the average shot's chance of going in, never a place on the ice (wording notes, 2026-10-10).
@@ -120,7 +120,24 @@ def _is_bad(k, b):
     return k not in NEUTRAL and b["pct"] < 50
 
 
-def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: bool = False, key=()) -> str | None:
+def rank_tag(k: str, b: dict, tips: dict | None, words: str = "") -> str:
+    """A habit's league rank as a tag after its words, " (32nd)", which the page draws as a pill whose tooltip gives the
+    rank in full and the figure behind it (Sora, 2026-10-30). A neutral habit at the low end counts from that end
+    (" (3rd lowest)"), so a calm team never reads as last. `tips` collects {tag text: tooltip} in the order written."""
+    from pipeline.export.previews import CHIP
+    r = b.get("rank")
+    if not r or tips is None:
+        return ""
+    low = k in NEUTRAL and b["pct"] < 50
+    tag = ("lowest" if r == 32 else f"{ordinal(33 - r)} lowest") if low else ordinal(r)
+    fig = CHIP[k][1](b) if k in CHIP and b.get("v") is not None else ""
+    fig += " (100 is average)" if "score" in fig else ""
+    tip = f"{ordinal(r)} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
+    tips.setdefault("_found", []).append((f"{words} ({tag})", tip))  # put in reading order once the paragraph is written
+    return f" ({tag})"
+
+
+def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: bool = False, key=(), tips: dict | None = None) -> str | None:
     """Their most distinctive habits in a sentence or two: an identity when they top a scale, the recorded numbers
     behind a habit when they agree with it, and how few teams are worse at a weakness near the bottom."""
     from pipeline.export.stories import _pick
@@ -150,9 +167,19 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
 
     # ranks only at the top end of a scale ("32nd in rough stuff" reads as a knock on a calm team), and each rides on its
     # own habit (Sora, 2026-10-30: a rank in a later sentence read as a repeat, cut off from what it was about)
-    told = {k for k, b, w, _ in ups
-            if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k not in figured and k != "depth" and not ("anyone" in w or "league’s" in w)}
-    ups = [(k, b, w + (f" ({ordinal_word(b['rank'])} in the league)" if k in told else ""), f) for k, b, w, f in ups]
+    plain = lambda k, w: k not in figured and not ("anyone" in w or "league’s" in w or (k in BOTTOM and "stars" in w))
+    if tips is None:  # no page to draw pills: top-three ranks in words, on their habit
+        told = {k for k, b, w, _ in ups if b["rank"] <= RANK_TOLD and b["pct"] >= 50 and k != "depth" and plain(k, w)}
+        ups = [(k, b, w + (f" ({ordinal_word(b['rank'])} in the league)" if k in told else ""), f) for k, b, w, f in ups]
+    else:  # every habit carries its rank as a pill (Sora, 2026-10-30), in the order the sentence tells them
+        mixed_ = bool(ups and downs) and any(_is_good(k, b) for k, b, _, _ in ups)
+        for grp in ((ups, downs) if mixed_ else (ups + downs,)):
+            for i, (k, b, w, f) in enumerate(grp):
+                if plain(k, w):
+                    grp[i] = (k, b, w + rank_tag(k, b, tips, w), f)
+        if not mixed_:
+            n = len(ups)
+            ups, downs = grp[:n], grp[n:]
 
     def told_list(group):  # the figure behind a habit: a trailing clause on the last one, in brackets mid-list
         return and_list([w + ("" if not f else f", {f[0]} ({f[1]})" if i == len(group) - 1 else f" ({f[0]}, {f[1]})")
@@ -161,7 +188,7 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
     order = ups + downs
     out = X + " " + (f"{told_list(ups)}, but {told_list(downs)}" if mixed else told_list(order))
     worst = next(((k, b) for k, b, _, _ in downs if k in FEW_WORSE and k not in figured and b["rank"] >= 30), None)
-    if worst:  # "Only three teams average a lower chance of scoring per shot.", after its habit when that ends the list
+    if worst and tips is None:  # "Only three teams average a lower chance of scoring per shot.", after its habit when that ends the list
         k, b = worst
         n = 32 - b["rank"]
         few = f"no team {FEW_WORSE[k][1]}" if n == 0 else f"only {num(n)} {'team' if n == 1 else 'teams'} {FEW_WORSE[k][1 if n == 1 else 0]}"
@@ -367,7 +394,7 @@ def _them(ln: str, t: str, W) -> str:
 
 
 def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gists: list = (), covered: set = frozenset(),
-                  key=()) -> str | None:
+                  key=(), tips: dict | None = None) -> str | None:
     """Each club's habits, then what they mean when they meet: the trait calls' own lines first, then our pairings.
     A meeting line about a habit a club's own list tells goes with that habit, right after the list (Sora, 2026-10-30:
     the team against the league and the team against tonight's opponent are told in tandem when they agree); the rest
@@ -414,7 +441,8 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         if len(own) == 1:
             t, x = own[0]
             picks[t] = [y for y in picks[t] if y is not x]
-            lines[i] = (ln.replace(", so ", f", {W.the(t)} most of all, so ", 1), ks)
+            # "especially the Flames (2nd)": the rank says how far (Sora, 2026-10-30: "most of all" read as the league's fastest)
+            lines[i] = (ln.replace(", so ", f", especially {W.the(t)}{rank_tag(k, x[2], tips, 'especially ' + W.the(t))}, so ", 1), ks)
     # pair a line with the club whose list tells one of its habits (the later club when both do)
     paired = {}
     for i, (ln, ks) in enumerate(lines):
@@ -440,13 +468,14 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
     told, told_traits = 0, set()
     for t in (away, home):
         told_traits |= {k for _, k, _ in picks[t]}
-        s = style(t, picks[t], W, stat_words(t, season, day), second=bool(told), key=key)
+        s = style(t, picks[t], W, stat_words(t, season, day), second=bool(told), key=key, tips=tips)
         if s:
             sents.append(s + ".")
             told += 1
         if t in opposite:  # "The Islanders, by contrast, spread the ice time through the lineup."
             o_t, (_, k, b) = opposite[t]
-            sents.append(f"{cap(W.the(o_t))}, by contrast, {HABITS[k][0 if side(b) else 1]}.")
+            w = HABITS[k][0 if side(b) else 1]
+            sents.append(f"{cap(W.the(o_t))}, by contrast, {w}{rank_tag(k, b, tips, w)}.")
             told_traits.add(k)
         if t in paired:  # "They also sit back rather than chase on the forecheck, so the Canadiens have the edge ..."
             (_, k, b), ln = paired[t]
@@ -461,6 +490,8 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             ln = _lower(ln) if k == "powerKill" and link == ", and " and "sets up a fight" in ln else _them(_lower(ln), t, W)
             if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
                 ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
+            if "anyone" not in words and "league’s" not in words:
+                words += rank_tag(k, b, tips, words)
             sents.append(f"{cap(W.the(t)) if t in opposite else 'They'} also {words}{link}{ln}")
         sc = scoring(t, season, day, W)
         if sc:
@@ -484,7 +515,11 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             first += " " + (_pick(["On top of that, ", "Beyond that, "], *key, "meet2") + _lower(two)
                             if two.split(" ", 1)[0] in ("The", "It’s", "Something", "Both", "Good") else two)
         sents.append(first)
-    return " ".join(sents) or None
+    text = " ".join(sents) or None
+    if tips is not None:  # the pills' tooltips in reading order
+        found = [(text.find(n), tip) for n, tip in tips.pop("_found", []) if text and n in text]
+        tips["list"] = [tip for _, tip in sorted(found)]
+    return text
 
 
 def _team_lines(season: int, day: str, t: str) -> pl.DataFrame:
@@ -766,15 +801,17 @@ def paragraphs(gid: int, away: str, home: str, day: str, W, N: dict, fp: dict | 
     """The fuller preview's extra parts: `standing` (a sentence for the opening paragraph), then `play` (habits and what
     they mean against each other, with the trait calls' `gists`), `scoring` and `net` paragraphs; `used` (players the
     scoring paragraph named) and `told` ({team: item tags its records against the opponent replace})."""
-    out = {"standing": None, "play": None, "scoring": None, "net": None, "used": set(), "told": {}}
+    out = {"standing": None, "play": None, "scoring": None, "net": None, "used": set(), "told": {}, "ranks": []}
     key = (gid,)
+    tips = {}
     for k, f in (("standing", lambda: standing(away, home, season, day, W, said)),
-                 ("play", lambda: how_they_play(away, home, fp or {}, season, day, W, gists, covered, key)),
+                 ("play", lambda: how_they_play(away, home, fp or {}, season, day, W, gists, covered, key, tips)),
                  ("net", lambda: in_net(away, home, projected or {}, season, day, W, N))):
         try:
             out[k] = f()
         except Exception as e:  # each part is optional; the preview stands without it
             print(f"preview {gid}: {k} failed: {e!r}")
+    out["ranks"] = tips.get("list", [])
     try:
         out["scoring"], out["used"], out["told"] = who_scores(away, home, season, day, W, N, gone, key)
     except Exception as e:

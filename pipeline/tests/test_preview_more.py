@@ -127,4 +127,8 @@ def test_a_shared_habit_one_club_leads_is_said_once(monkeypatch):
     monkeypatch.setattr(pm, "stat_words", lambda *a: {})
     fp = {"FLA": dims(pace=(75, 8), physical=(97, 2)), "WPG": dims(pace=(95, 2), quality=(5, 31))}
     s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,))
-    assert "Both teams like to play fast, the Jets most of all" in s and "fastest" not in s
+    assert "Both teams like to play fast, especially the Jets, so" in s and "fastest" not in s
+    tips = {}
+    s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), key=(1,), tips=tips)
+    assert "especially the Jets (2nd), so" in s and "low-quality shots (31st)" in s
+    assert tips["list"][0].startswith("31st of 32 in shot quality") and tips["list"][-1].startswith("2nd of 32 in pace")

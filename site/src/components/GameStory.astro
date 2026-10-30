@@ -4,28 +4,31 @@ import PLink from './PLink.astro';
 // The story reads at a comfortable width on the left; "Who to watch" (or "What it means") sits in a pale panel on the
 // right, and drops under the story on narrow screens. A preview's first paragraph ends with the matchup's lean, written
 // from one team's side: both versions are rendered and the page's pov CSS shows the visitor's team's, else the home team's.
-export type Story = { kicker: string; head: string; paras: string[]; people?: Record<string, number>; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
+export type Story = { kicker: string; head: string; paras: string[]; people?: Record<string, number>; ranks?: string[]; lean?: Record<string, string>; list_head: string; items: { tag: string; text: string }[] };
 interface Props { story: Story; sides?: Record<string, 'away' | 'home'>; kicker?: boolean }
 const { story, sides = {}, kicker = true } = Astro.props;
 const band = Astro.slots.has('band');
 const leanTeams = Object.keys(story.lean ?? {}).filter((t) => sides[t]);
 // A player's line right after his name, "(10 G / 4 A / 14 P in 13 GP)" or a goalie's "(3-3-3 / .899 SV% in 9 GS)", is
 // drawn as a tag, and the name before it links to his page (Sora, 2026-10-30). `people` maps those names to ids.
-const TAG = /\s?\((?:(\d+) G \/ (\d+) A \/ (\d+) P in (\d+) GP|(\d+)-(\d+)-(\d+)(?: \/ (\.\d{3}) SV%)? in (\d+) GS)\)/g;
+// A habit's league rank, "(32nd)" or "(3rd lowest)", is a pill whose tooltip comes from `ranks`, in reading order.
+const TAG = /\s?\((?:(\d+) G \/ (\d+) A \/ (\d+) P in (\d+) GP|(\d+)-(\d+)-(\d+)(?: \/ (\.\d{3}) SV%)? in (\d+) GS|((?:\d+(?:st|nd|rd|th) )?lowest|\d+(?:st|nd|rd|th)))\)/g;
 const plural = (n: string, w: string) => `${n} ${w}${n === '1' ? '' : 's'}`;
 const people = Object.entries(story.people ?? {}).sort((x, y) => y[0].length - x[0].length);
 type Tag = { text: string; small: string; tip: string };
+const ranks = [...(story.ranks ?? [])];
 type Piece = string | { name: string; id: number } | Tag;
 const pieces = (p: string): Piece[] => {
   const out: Piece[] = [];
   let last = 0;
   for (const m of p.matchAll(TAG)) {
+    if (m[10] !== undefined && !ranks.length) continue;  // a rank with no tooltip stays plain text
     let before = p.slice(last, m.index);
     const who = people.find(([n]) => before.endsWith(n));
     if (who) before = before.slice(0, -who[0].length);
     out.push(before);
     if (who) out.push({ name: who[0], id: who[1] });
-    out.push(m[1] !== undefined
+    out.push(m[10] !== undefined ? { text: m[10], small: '', tip: ranks.shift()! } : m[1] !== undefined
       ? { text: `${m[1]} G / ${m[2]} A / ${m[3]} P`, small: `in ${m[4]} GP`,
           tip: `${plural(m[1], 'goal')}, ${plural(m[2], 'assist')} and ${plural(m[3], 'point')} in ${plural(m[4], 'game')} this season` }
       : { text: `${m[5]}-${m[6]}-${m[7]}${m[8] ? ` / ${m[8]} SV%` : ''}`, small: `in ${m[9]} GS`,
@@ -45,9 +48,9 @@ const pieces = (p: string): Piece[] => {
     {leanTeams.length > 0 ? (
       <>
         {leanTeams.map((t) => <p class={`para pov pov-${sides[t]}`}>{[story.paras[0], story.lean![t]].filter(Boolean).join(' ')}</p>)}
-        {story.paras.slice(1).map((p) => <p class="para">{pieces(p).map((x) => typeof x === 'string' ? x : 'id' in x ? <PLink id={x.id} name={x.name} /> : <> <span class="chip phrase box" data-tip={x.tip}>{x.text} <span class="gp">{x.small}</span></span></>)}</p>)}
+        {story.paras.slice(1).map((p) => <p class="para">{pieces(p).map((x) => typeof x === 'string' ? x : 'id' in x ? <PLink id={x.id} name={x.name} /> : <> <span class="chip phrase box" data-tip={x.tip}>{x.text}{x.small && <> <span class="gp">{x.small}</span></>}</span></>)}</p>)}
       </>
-    ) : story.paras.map((p) => <p class="para">{pieces(p).map((x) => typeof x === 'string' ? x : 'id' in x ? <PLink id={x.id} name={x.name} /> : <> <span class="chip phrase box" data-tip={x.tip}>{x.text} <span class="gp">{x.small}</span></span></>)}</p>)}
+    ) : story.paras.map((p) => <p class="para">{pieces(p).map((x) => typeof x === 'string' ? x : 'id' in x ? <PLink id={x.id} name={x.name} /> : <> <span class="chip phrase box" data-tip={x.tip}>{x.text}{x.small && <> <span class="gp">{x.small}</span></>}</span></>)}</p>)}
     <slot />
   </div>
   {band && <div class="s-band"><slot name="band" /></div>}

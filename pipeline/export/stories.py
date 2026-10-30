@@ -1481,7 +1481,9 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     # the players whose names carry a stat tag in the text, so the page can link them (Sora, 2026-10-30)
     people = {N[p]: p for p in set(more["used"]) | {x["id"] for x in (projected or {}).values() if x and x.get("id")} if p in N}
     return {"kicker": "Before the game", "head": head, "paras": paras, "lean": lean, "list_head": "Who to watch", "items": picked,
-            **({"people": people} if people else {})}
+            **({"people": people} if people else {}),
+            # each habit's rank tag in the play paragraph, "(32nd)", gets this tooltip, in reading order (Sora, 2026-10-30)
+            **({"ranks": more["ranks"]} if more.get("ranks") else {})}
 
 
 def _leader(t: str, before: str, season: int) -> tuple[int, int] | None:

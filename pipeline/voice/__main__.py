@@ -65,7 +65,7 @@ def after(run_dir: Path) -> list[tuple[int, str]]:
                                      methods=previews.METHODS)
             st = snap.get("story") or {}
             out = {"head": st.get("head"), "paras": st.get("paras") or [], "items": st.get("items") or [], "outlook": snap.get("outlook"),
-                   "calls": [{"head": c.get("head"), "body": c.get("body")} for c in snap["claims"]]}
+                   "calls": [{"head": c.get("head"), "body": c.get("body")} for c in snap["claims"]], "ranks": st.get("ranks") or []}
         (run_dir / f"{gid}.after.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
         done.append((gid, kind))
     return done

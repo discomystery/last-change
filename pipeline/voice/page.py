@@ -22,12 +22,23 @@ BOX = re.compile(r"\s?\((\d+ G / \d+ A / \d+ P|\d+-\d+-\d+(?: / \.\d{3} SV%)?) i
 NUM = re.compile(r"(?<![\w\-.])(?!(?:19|20)\d\d\b)\.?\d[\d.]*%?(?![\w\-])")
 
 
-def T(text):  # escaped text with stats in the sans, as the site sets them (Base.astro sansNumbers)
+RANK = re.compile(r"\s?\(((?:\d+(?:st|nd|rd|th) )?lowest|\d+(?:st|nd|rd|th))\)")
+TAGS = re.compile(f"{BOX.pattern}|{RANK.pattern}")
+
+
+def T(text, ranks=None):  # escaped text with stats in the sans, as the site sets them (Base.astro sansNumbers)
     out, i = [], 0
-    for m in BOX.finditer(text):
-        out += [NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:m.start()])), f" <span class=pill>{E(m.group(1))} <i>in {E(m.group(2))}</i></span>"]
+    sn = lambda s: NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(s))
+    for m in TAGS.finditer(text):
+        if m.group(1):
+            pill = f" <span class=pill>{E(m.group(1))} <i>in {E(m.group(2))}</i></span>"
+        elif ranks:  # a habit's league rank, its tooltip in reading order (story["ranks"])
+            pill = f" <span class='pill rk' title='{E(ranks.pop(0))}'>{E(m.group(3))}</span>"
+        else:
+            continue
+        out += [sn(text[i:m.start()]), pill]
         i = m.end()
-    return "".join(out) + NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:]))
+    return "".join(out) + sn(text[i:])
 
 
 def sents(paras):
@@ -37,8 +48,9 @@ def sents(paras):
 def story(st, before=None, calls=None):
     old = set(sents(before["paras"])) if before else None
     h = f"<h4>{E(st.get('head') or '')}</h4>"
+    ranks = list(st.get("ranks") or [])
     for p in st.get("paras") or []:
-        h += "<p>" + (T(p) if old is None else " ".join(T(s) if s in old else f"<mark>{T(s)}</mark>" for s in textcheck.sentences(p))) + "</p>"
+        h += "<p>" + (T(p, ranks) if old is None else " ".join(T(s, ranks) if s in old else f"<mark>{T(s, ranks)}</mark>" for s in textcheck.sentences(p))) + "</p>"
     its = st.get("items") or []
     if its:
         h += "<ul>" + "".join(f"<li><b>{E(i.get('tag') or '')}</b> {E(i.get('text') or '')}</li>" for i in its) + "</ul>"
@@ -123,7 +135,7 @@ body{{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 Literata,Geo
 h1,h2,h3,h4{{font-family:Fraunces,Georgia,serif;font-variation-settings:"SOFT" 100;font-weight:600;margin:0}}
 h1{{font-size:36px;line-height:1.15}} h2{{font-size:26px;margin:48px 0 8px}}
 .sn{{font:600 .94em 'Hanken Grotesk',system-ui,sans-serif;color:var(--ink)}}
-.pill{{display:inline-block;font:600 12px/1 'Hanken Grotesk',system-ui,sans-serif;padding:4px 8px;border-radius:999px;background:var(--line);color:var(--ink2);white-space:nowrap;vertical-align:1px}} .pill i{{font-style:normal;font-weight:500;color:var(--ink3)}}
+.pill{{display:inline-block;font:600 12px/1 'Hanken Grotesk',system-ui,sans-serif;padding:4px 8px;border-radius:999px;background:var(--line);color:var(--ink2);white-space:nowrap;vertical-align:1px}} .pill i{{font-style:normal;font-weight:500;color:var(--ink3)}} .pill.rk{{cursor:help;padding:3px 7px;font-size:11.5px}}
 .lede{{color:var(--ink2);max-width:860px;margin:12px 0 0}}
 .lab,.kind,.cat,.st,th,.when{{font:600 11px/1.3 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}}
 .tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:24px 0}}
