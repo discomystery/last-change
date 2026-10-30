@@ -18,14 +18,14 @@ CAT = {"lead": "Lead", "order": "Order", "omission": "Left out", "repetition": "
        "structure": "Structure", "emphasis": "Emphasis", "tone": "Tone", "overstatement": "Overstated", "accuracy": "Accuracy"}
 
 
-BOX = re.compile(r"\d+ G / \d+ A / \d+ P in \d+ GP")
+BOX = re.compile(r"\s?\((\d+ G / \d+ A / \d+ P) in (\d+ GP)\)")
 NUM = re.compile(r"(?<![\w\-.])(?!(?:19|20)\d\d\b)\.?\d[\d.]*%?(?![\w\-])")
 
 
 def T(text):  # escaped text with stats in the sans, as the site sets them (Base.astro sansNumbers)
     out, i = [], 0
     for m in BOX.finditer(text):
-        out += [NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:m.start()])), f"<span class=sn>{E(m.group(0))}</span>"]
+        out += [NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:m.start()])), f" <span class=pill>{E(m.group(1))} <i>in {E(m.group(2))}</i></span>"]
         i = m.end()
     return "".join(out) + NUM.sub(lambda n: f"<span class=sn>{n.group(0)}</span>", E(text[i:]))
 
@@ -123,6 +123,7 @@ body{{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 Literata,Geo
 h1,h2,h3,h4{{font-family:Fraunces,Georgia,serif;font-variation-settings:"SOFT" 100;font-weight:600;margin:0}}
 h1{{font-size:36px;line-height:1.15}} h2{{font-size:26px;margin:48px 0 8px}}
 .sn{{font:600 .94em 'Hanken Grotesk',system-ui,sans-serif;color:var(--ink)}}
+.pill{{display:inline-block;font:600 12px/1 'Hanken Grotesk',system-ui,sans-serif;padding:4px 8px;border-radius:999px;background:var(--line);color:var(--ink2);white-space:nowrap;vertical-align:1px}} .pill i{{font-style:normal;font-weight:500;color:var(--ink3)}}
 .lede{{color:var(--ink2);max-width:860px;margin:12px 0 0}}
 .lab,.kind,.cat,.st,th,.when{{font:600 11px/1.3 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}}
 .tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:24px 0}}
