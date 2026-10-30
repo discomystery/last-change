@@ -112,6 +112,10 @@ def _history_line(c: dict) -> str:
     if not m or k.get("record") is None or k.get("baseline") is None or not k.get("starts"):
         return g
     who, opp = m.group(1), m.group(2)
+    if k.get("goalie_id"):  # named in full; the in-net paragraph shortens it when he was named there already
+        from pipeline.export.previews import _full_names
+        full = _full_names({k["goalie_id"]}).get(k["goalie_id"])
+        who = full if full and full.endswith(who) else who
     fmt = lambda v: f"{v:.3f}".lstrip("0")
     side = "under" if k["record"] < k["baseline"] else "above"
     return (f"In goal, {who} has a {fmt(k['record'])} save percentage in {num(k['starts'])} starts against {opp}, well {side} his usual "
@@ -1399,7 +1403,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             if c.get("gist") and c["kind"] not in kinds and len(style_gists) < 2:
                 traits = {x for x in (c.get("metric"), (c.get("check") or {}).get("metric")) if isinstance(x, str)}
                 style_gists.append((preview_more.meet_line(c["kind"], c.get("metric"), c.get("team"), c.get("opp"), W, c.get("gist") or "")
-                                    or c["gist"], preview_more.partners(traits)))
+                                    or c["gist"], preview_more.partners(traits, *((c.get("team"), c.get("opp")) if c["kind"] in ("clash", "duel") else ()))))
                 kinds.add(c["kind"])
             continue
         if c.get("gist") and c["kind"] not in kinds and len(look) < 2:
@@ -1463,6 +1467,9 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     net = more["net"]
     hist = next((g for k, g in look if k == "history"), None)
     if hist and net:  # a goalie call goes with who's in net (Sora, 2026-10-30), not at the end
+        named = re.match(r"In goal, (\S+) (.+?) has a ", hist)
+        if named and f"{named.group(1)} {named.group(2)}" in net:  # named in full a sentence ago
+            hist = hist.replace(f"{named.group(1)} {named.group(2)}", named.group(2), 1)
         net += " " + (hist[len("In goal, "):][:1].upper() + hist[len("In goal, ") + 1:] if hist.startswith("In goal, ") else hist)
         look = [x for x in look if x[0] != "history"]
     paras += [x for x in (luck, more["play"], more["scoring"], net) if x]

@@ -1,0 +1,55 @@
+{
+ "head": "The Bruins hunt better looks than the Blackhawks",
+ "paras": [
+  "The Blackhawks (4-9-0) lost 4-1 to Detroit on Thursday, and the Bruins (9-4-1) lost 4-1 to St. Louis the same night. Going in, the Hawks are last in the Central (tied for 30th in the NHL) and the Bruins first in the Atlantic (tied for fourth).",
+  "The Blackhawks have played better than their record (.308) says: their chances are worth about .380, and their finishing has held them back. The Bruins’ record (.679) is running ahead of what their chances are worth (.555), largely thanks to their goaltending.",
+  "The Blackhawks do a lot of their shooting from distance (2nd lowest), don't block many shots (32nd) and have struggled on the power play, scoring on 10.0% of their chances (second worst). Chicago has scored 2.08 goals a game, the second fewest in the league, and allowed 3.69, the third most. As for the Bruins, they leave the shooting to their forwards (lowest), have had the league’s best goaltending and sit back rather than chase on the forecheck (2nd lowest). Boston has allowed 2.29 goals a game, the second fewest in the league. The Bruins wait for good looks, but the Blackhawks settle for hopeful ones. Beyond that, the Blackhawks’ knack for getting shots through meets a team that blocks a lot.",
+  "Patrick Kane (1 G / 7 A / 8 P in 13 GP) leads the Blackhawks in scoring, and Roman Kantserov (5 G / 1 A / 6 P in 13 GP) has a team-high five goals. The Bruins’ scoring runs through David Pastrňák (7 G / 11 A / 18 P in 14 GP).",
+  "Spencer Knight (4-7-0 / .896 SV% in 11 GS) is in line to start for Chicago. Jeremy Swayman (7-3-1 / .912 SV% in 11 GS) has been a rock in net for Boston and will likely start.",
+  "At home, Marco Sturm likes to send Mittelstadt, Lindholm and Hagens out against the other team’s top line, so watch for them against Kantserov, Bedard and Teräväinen."
+ ],
+ "items": [
+  {
+   "tag": "Milestone",
+   "text": "Patrick Kane is one assist from 900."
+  },
+  {
+   "tag": "Out",
+   "text": "The Blackhawks have been without Bowen Byram since Oct 13."
+  },
+  {
+   "tag": "Out",
+   "text": "The Bruins have been without Jonathan Aspirot since Oct 17, and have had to make do without Michael Eyssimont all season."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Morgan Geekie has one goal on chances worth about 3.6 goals, well below what his finishing usually turns chances into. If the chances keep coming, so should the goals."
+  }
+ ],
+ "outlook": {
+  "BOS": {
+   "head": "The Bruins have a lot going for them",
+   "body": "Boston has been out-chancing opponents by a wide margin lately and has home-ice advantage. The Blackhawks’ way back in is a penalty kill that holds up."
+  },
+  "CHI": {
+   "head": "The Blackhawks have a hill to climb",
+   "body": "Boston has been out-chancing opponents by a wide margin lately and has home-ice advantage. The Blackhawks’ best way through is a penalty kill that holds up."
+  }
+ },
+ "calls": [
+  {
+   "head": "A shadow job for Mittelstadt, Lindholm and Hagens",
+   "body": "At home, the Bruins keep sending Lindholm’s line (Mittelstadt, Lindholm and Hagens) out against opponents’ first lines, far more often than chance would suggest. Marco Sturm has been giving this group the hard job of facing the other team’s top line. Tonight the Blackhawks’ first line is Kantserov, Bedard and Teräväinen."
+  },
+  {
+   "head": "The Bruins hunt better looks than the Blackhawks",
+   "body": "On shot quality, Boston is one of the league’s best, but Chicago is near the bottom. The more dangerous chances should be the Bruins’."
+  }
+ ],
+ "ranks": [
+  "2nd lowest of 32 in shots from in close: 28% of shots from within 20 feet",
+  "32nd of 32 in blocking shots",
+  "lowest of 32 in shots from defensemen: 30% of shot attempts from defensemen",
+  "2nd lowest of 32 in forecheck pressure: forecheck score 79 (100 is average)"
+ ]
+}

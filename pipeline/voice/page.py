@@ -88,9 +88,13 @@ def build(out: Path, runs: list[Path]) -> None:
                 games.append(("recap", P["date"], gid, f"{a} {f[a]} at {hm} {f[hm]}{end}", "Post-game", cols, fl, None))
             elif "teams" in P:  # a fuller preview packet (round two on); round one's previews were written from less
                 gen = json.loads((run / f"{gid}.generator.json").read_text())
-                mine = compare.parse_draft((run / f"{gid}.claude.md").read_text())
                 af = run / f"{gid}.after.json"
                 aft = json.loads(af.read_text()) if af.exists() else None
+                if not (run / f"{gid}.claude.md").exists():  # a check round: the generator's own text on fresh games
+                    cols = [("The live site", story(gen, calls=gen.get("calls")))] + ([("The site's generator now", story(aft, gen))] if aft else [])
+                    games.append(("preview", P["start_utc"][:10], gid, f"{a} at {hm}", "New sample", cols, [], None))
+                    continue
+                mine = compare.parse_draft((run / f"{gid}.claude.md").read_text())
                 cols = [("The site before", story(gen, calls=gen.get("calls"))), ("My fuller preview", story(mine))]
                 if aft:
                     cols.append(("The site's generator now", story(aft, gen)))
@@ -117,7 +121,7 @@ def build(out: Path, runs: list[Path]) -> None:
                   f"<div class='cols n{len(cols)}'>{body}</div>"
                   + (f"<div class=diffs><div class=lab>What the rewrite changed</div><ul>{diffs}</ul></div>" if diffs else "") + "</section>")
     nav = "".join(f"<a href='#g{g[2]}'>{E(g[3])}</a>" for g in games)
-    pw = [g[7] for g in prevs]
+    pw = [g[7] for g in prevs if g[7]]
     changed = sum(v for k, v in ops.items() if k != "kept")
     pw_site = round(sum(x[0] for x in pw) / max(len(pw), 1))
     pw_mine = round(sum(x[1] for x in pw) / max(len(pw), 1))

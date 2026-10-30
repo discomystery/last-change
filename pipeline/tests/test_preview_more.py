@@ -92,7 +92,17 @@ def test_consequences_join_the_paragraph(monkeypatch):
 def test_a_power_play_meets_a_dangerous_kill():
     fp = {"FLA": dims(pp=(90, 3), physical=(97, 2)), "WPG": dims(pk=(20, 26), powerKill=(95, 2), quality=(5, 31))}
     lines = [(t, k) for _, t, k in pm.consequences("WPG", "FLA", fp, W(), set())]
-    assert lines[0][1] == {"pp", "pk"}
+    assert lines[0][1] == {("FLA", "pp"), ("WPG", "pk")}
+
+
+def test_a_line_pairs_only_with_the_habit_on_its_own_side(monkeypatch):
+    """The Rangers' power play against the Oilers' kill is not told beside the Oilers' own power play."""
+    monkeypatch.setattr(pm, "scoring", lambda *a: None)
+    monkeypatch.setattr(pm, "stat_words", lambda *a: {})
+    fp = {"WPG": dims(pp=(97, 1), depth=(2, 32)), "FLA": dims(physical=(97, 2), inClose=(95, 2))}
+    line = ("The Panthers’ power play could do real damage when the Jets are shorthanded.", pm.partners({"pp"}, "FLA", "WPG"))
+    s = pm.how_they_play("WPG", "FLA", fp, 2026, "2026-10-30", W(), gists=[line], key=(1,))
+    assert "also have the league’s most dangerous power play, so" not in s and "power play could do real damage" in s
 
 
 def test_depth_at_the_low_end_reads_as_stars():

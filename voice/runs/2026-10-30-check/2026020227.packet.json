@@ -1,0 +1,731 @@
+{
+ "kind": "preview",
+ "game_id": 2026020227,
+ "start_utc": "2026-11-01T18:00:00Z",
+ "venue": "Lenovo Center",
+ "away": {
+  "abbr": "WPG",
+  "name": "Winnipeg Jets",
+  "place": "Winnipeg",
+  "nickname": "Jets",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Scott Arniel"
+ },
+ "home": {
+  "abbr": "CAR",
+  "name": "Carolina Hurricanes",
+  "place": "Carolina",
+  "nickname": "Hurricanes",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Rod Brind'Amour"
+ },
+ "form": {
+  "WPG": {
+   "record": "4-6-3",
+   "games": 13,
+   "run": "winless 7",
+   "last_ten": "2-6-2",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "L",
+     "score": "1-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "TBL",
+     "opp_name": "Tampa Bay Lightning",
+     "home": false,
+     "result": "L",
+     "score": "4-6",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CAR": {
+   "record": "11-2-2",
+   "games": 15,
+   "run": "won 3",
+   "last_ten": "8-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "5-6",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [
+  {
+   "date": "2026-10-17",
+   "winner": "CAR",
+   "score": "3-2",
+   "where": "WPG"
+  }
+ ],
+ "projected_goalies": {
+  "WPG": "Stuart Skinner"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "CAR",
+   "facts": [
+    "Carolina’s L3 (Martinook, Jankowski and Jarvis) at home: 65% of its 5-on-5 time against opponents’ second lines. Matchups, Carolina home games this season, 6 games, 31 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face second lines about 25% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Carolina L3's 5-on-5 time against Winnipeg L2",
+   "usual": 65,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "CAR",
+   "facts": [
+    "Carolina: 8.2 expected goals per 60 on the power play, 9th of 32. Playing style, this season blended with last, 15 and 13 games this season.",
+    "Winnipeg: 8.1 expected goals allowed per 60 shorthanded, 24th of 32. Playing style, this season blended with last, 15 and 13 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 8.2237,
+   "league": 7.6145,
+   "direction": "above"
+  },
+  {
+   "kind": "edge",
+   "about": "CAR",
+   "facts": [
+    "Carolina: 44% of forward ice time to the bottom six, 5th of 32. Playing style, this season blended with last, 13 and 15 games this season.",
+    "Winnipeg: 41% of forward ice time to the bottom six, 25th of 32. Playing style, this season blended with last, 13 and 15 games this season."
+   ],
+   "what_we_check": "bottom-six share of forward ice time",
+   "usual": {
+    "CAR": 43.639,
+    "WPG": 41.3872
+   },
+   "league": 42.368,
+   "direction": "ahead"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Carolina has been out-chancing opponents by a wide margin lately and has home-ice advantage, while Winnipeg will be without Morrissey.",
+  "It’s on the Jets to make it a game, and they can if they get good looks.",
+  "Out: The Jets have been without Josh Morrissey since Oct 7.",
+  "Out: The Hurricanes have been without Taylor Hall since Oct 13.",
+  "Milestone: Jaccob Slavin is set to play his 800th NHL game.",
+  "Owns them: Seth Jarvis has scored in three straight games against Winnipeg."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "WPG": {
+   "standing": {
+    "record": "4-6-3",
+    "points": 11,
+    "games": 13,
+    "division": "Central",
+    "division_place": 7,
+    "conference_place": 12,
+    "league_place_in_points": 26,
+    "home_record": "2-4-1",
+    "road_record": "2-2-2",
+    "last_ten": "2-6-2",
+    "streak": "L3",
+    "coach": "Scott Arniel"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 32,
+    "ga": 42,
+    "gfpg": 2.46,
+    "gapg": 3.23,
+    "diff": -10,
+    "ppg": 6,
+    "ppo": 35,
+    "pppct": 0.171,
+    "pkpct": 0.735,
+    "sfpg": 26.5,
+    "sapg": 28.9,
+    "fopct": 0.467
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 28,
+    "gapg": 18,
+    "pppct": 24,
+    "pkpct": 23,
+    "sfpg": 19,
+    "sapg": 24,
+    "fopct": 29
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Blocking shots",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Rarely block",
+     "high_end_word": "Shot blockers"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 26,
+     "percentile": 20,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 8,
+     "percentile": 77,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Kyle Connor",
+     "pos": "L",
+     "gp": 13,
+     "g": 10,
+     "a": 4,
+     "p": 14,
+     "ppp": 5,
+     "toi_per_game": "21:11",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    },
+    {
+     "name": "Cole Perfetti",
+     "pos": "C",
+     "gp": 13,
+     "g": 6,
+     "a": 5,
+     "p": 11,
+     "ppp": 5,
+     "toi_per_game": "18:45",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Mark Scheifele",
+     "pos": "C",
+     "gp": 13,
+     "g": 2,
+     "a": 9,
+     "p": 11,
+     "ppp": 2,
+     "toi_per_game": "21:05",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 3,
+      "p": 3
+     }
+    },
+    {
+     "name": "Neal Pionk",
+     "pos": "D",
+     "gp": 13,
+     "g": 3,
+     "a": 6,
+     "p": 9,
+     "ppp": 1,
+     "toi_per_game": "24:13",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    },
+    {
+     "name": "Gabriel Vilardi",
+     "pos": "C",
+     "gp": 13,
+     "g": 1,
+     "a": 5,
+     "p": 6,
+     "ppp": 3,
+     "toi_per_game": "17:18",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Stuart Skinner",
+     "gp": 9,
+     "record": "3-3-3",
+     "sv_pct": 0.899,
+     "gaa": 2.97,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Clay Stevenson",
+     "gp": 4,
+     "record": "1-3-0",
+     "sv_pct": 0.87,
+     "gaa": 3.57,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Kyle Connor",
+      "Mark Scheifele",
+      "Cole Perfetti"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Nino Niederreiter",
+      "Viggo Björck",
+      "Gabriel Vilardi"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Isak Rosén",
+      "Adam Lowry",
+      "Alex Iafallo"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Dylan Samberg",
+      "Neal Pionk"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Dylan DeMelo",
+      "Mario Ferraro"
+     ],
+     "games_together_recently": 6
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Neal Pionk (Quarterback)",
+      "Mark Scheifele",
+      "Cole Perfetti (Net-front)",
+      "Kyle Connor (Distributor)",
+      "Gabriel Vilardi (Trigger)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Haydn Fleury (Quarterback)",
+      "Isak Rosén",
+      "Viggo Björck",
+      "Nino Niederreiter (Net-front)",
+      "Alex Iafallo (Trigger)"
+     ]
+    }
+   ]
+  },
+  "CAR": {
+   "standing": {
+    "record": "11-2-2",
+    "points": 24,
+    "games": 15,
+    "division": "Metropolitan",
+    "division_place": 1,
+    "conference_place": 1,
+    "league_place_in_points": 1,
+    "home_record": "4-1-1",
+    "road_record": "7-1-1",
+    "last_ten": "8-1-1",
+    "streak": "W3",
+    "coach": "Rod Brind'Amour"
+   },
+   "team_stats": {
+    "gp": 15,
+    "gf": 56,
+    "ga": 35,
+    "gfpg": 3.73,
+    "gapg": 2.33,
+    "diff": 21,
+    "ppg": 12,
+    "ppo": 53,
+    "pppct": 0.226,
+    "pkpct": 0.824,
+    "sfpg": 33.2,
+    "sapg": 22.2,
+    "fopct": 0.5
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 3,
+    "gapg": 3,
+    "pppct": 13,
+    "pkpct": 11,
+    "sfpg": 1,
+    "sapg": 2,
+    "fopct": 17
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Penalty kill",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Leaky",
+     "high_end_word": "Airtight"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Sebastian Aho",
+     "pos": "C",
+     "gp": 15,
+     "g": 8,
+     "a": 11,
+     "p": 19,
+     "ppp": 6,
+     "toi_per_game": "19:49",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Jackson Blake",
+     "pos": "R",
+     "gp": 15,
+     "g": 3,
+     "a": 12,
+     "p": 15,
+     "ppp": 5,
+     "toi_per_game": "18:07",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 5,
+      "p": 7
+     }
+    },
+    {
+     "name": "Andrei Svechnikov",
+     "pos": "R",
+     "gp": 15,
+     "g": 6,
+     "a": 7,
+     "p": 13,
+     "ppp": 6,
+     "toi_per_game": "17:38",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 2,
+      "p": 2
+     }
+    },
+    {
+     "name": "Logan Stankoven",
+     "pos": "C",
+     "gp": 15,
+     "g": 9,
+     "a": 3,
+     "p": 12,
+     "ppp": 2,
+     "toi_per_game": "17:19",
+     "last_five_games": {
+      "games": 5,
+      "g": 5,
+      "a": 1,
+      "p": 6
+     }
+    },
+    {
+     "name": "Nikolaj Ehlers",
+     "pos": "L",
+     "gp": 15,
+     "g": 4,
+     "a": 8,
+     "p": 12,
+     "ppp": 5,
+     "toi_per_game": "16:15",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Pyotr Kochetkov",
+     "gp": 9,
+     "record": "9-0-0",
+     "sv_pct": 0.919,
+     "gaa": 1.66,
+     "shutouts": 1,
+     "projected_starter": false
+    },
+    {
+     "name": "Brandon Bussi",
+     "gp": 6,
+     "record": "2-2-2",
+     "sv_pct": 0.865,
+     "gaa": 3.27,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "William Carrier",
+      "Sebastian Aho",
+      "Andrei Svechnikov"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Nikolaj Ehlers",
+      "Logan Stankoven",
+      "Jackson Blake"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Jordan Martinook",
+      "Mark Jankowski",
+      "Seth Jarvis"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Jaccob Slavin",
+      "Jalen Chatfield"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Sean Walker",
+      "K'Andre Miller"
+     ],
+     "games_together_recently": 10
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Shayne Gostisbehere (Quarterback)",
+      "Jackson Blake (Net-front)",
+      "Andrei Svechnikov (Trigger)",
+      "Sebastian Aho",
+      "Nikolaj Ehlers (Distributor)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "K'Andre Miller (Quarterback)",
+      "Logan Stankoven (Trigger)",
+      "Jesperi Kotkaniemi",
+      "Mark Jankowski",
+      "Sean Walker (Point)"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

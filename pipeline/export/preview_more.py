@@ -6,6 +6,7 @@ says what a live one would have."""
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 
 import polars as pl
 
@@ -137,7 +138,8 @@ def rank_tag(k: str, b: dict, tips: dict | None, words: str = "") -> str:
     return f" ({tag})"
 
 
-def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: bool = False, key=(), tips: dict | None = None) -> str | None:
+def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: bool = False, key=(), tips: dict | None = None,
+          named: bool = False) -> str | None:
     """Their most distinctive habits in a sentence or two: an identity when they top a scale, the recorded numbers
     behind a habit when they agree with it, and how few teams are worse at a weakness near the bottom."""
     from pipeline.export.stories import _pick
@@ -148,10 +150,12 @@ def style(t: str, picked: list[tuple], W, stats: dict | None = None, second: boo
     X = cap(W.the(t))
     if second:  # the second club is introduced apart from the first ("As for the Jets, they ...")
         X = _pick([X, f"As for {W.the(t)}, they", f"On the other side, {W.the(t)}"], *key, t, "style2")
+    if named:  # the sentence before was about them ("The Predators, by contrast, ice the puck a lot.")
+        X = "They also"
     keys = {k for _, k, _ in picked}
     fam = next((ident for ks, ident in FAMILIES if keys <= ks), None)
     if fam and len(picked) == 3 and all(r <= RANK_TOLD for r in ranks) and all(b["pct"] >= 50 for _, _, b in picked):
-        return f"{X} {fam}: " + and_list([f"{ordinal_word(b['rank'])} in {LABELS[k]}" for _, k, b in picked])
+        return f"{'They' if named else X} {fam}: " + and_list([f"{ordinal_word(b['rank'])} in {LABELS[k]}" for _, k, b in picked])
     ups, downs = [], []
     ident = next((k for _, k, b in picked if b["pct"] >= 50 and b["rank"] <= RANK_TOLD and k in IDENTITY), None)  # one a team
     for i, (_, k, b) in enumerate(picked):
@@ -335,13 +339,28 @@ def meet_line(kind: str, metric: str, team: str, opp: str, W, gist: str = "") ->
     return None
 
 
-def partners(traits: set) -> set:
-    """The traits a pairing is about: a call on the power play is about the other side's penalty kill too."""
-    out = set(traits)
-    for ka, kb, *_ in MEETS:
-        if ka in traits or kb in traits:
-            out |= {ka, kb}
+def partners(traits: set, team: str | None = None, opp: str | None = None) -> set:
+    """The traits a pairing is about, tied to the club that has each when the call says who attacks: a call on the
+    Rangers' power play is about the Oilers' penalty kill, never the Oilers' own power play. Plain trait names count
+    for either club."""
+    out = set()
+    for k in traits:
+        pair = next(((ka, kb) for ka, kb, *_ in MEETS if k in (ka, kb)), None)
+        if pair and team and opp:
+            out |= {(team, pair[0]), (opp, pair[1])}
+        else:
+            out.add(k)
     return out
+
+
+def _names(ks: set) -> set:
+    """The trait names in a pairing's set, whoever has them."""
+    return {k[1] if isinstance(k, tuple) else k for k in ks}
+
+
+def _about(t: str, k: str, ks: set) -> bool:
+    """Whether club `t`'s habit `k` is one the pairing is about."""
+    return k in ks or (t, k) in ks
 
 
 DEFEND = {"pk", "suppression", "qualityAllowed", "longShifts", "blocking", "powerKill"}  # the side a pairing's attack meets
@@ -358,12 +377,12 @@ def consequences(away: str, home: str, fp: dict, W, covered: set) -> list[tuple[
         w = {"A": W.the(a), "Ap": W.poss(a), "B": W.the(b), "Bp": W.poss(b)}
         for ka, kb, weak_d, both, weak_a in MEETS:
             pa, pb = pct(a, ka), pct(b, kb)
-            if pa is None or pb is None or {ka, kb} & covered:
+            if pa is None or pb is None or {ka, kb} & _names(covered):
                 continue
             text = (weak_d if pa >= MEET_HI and pb <= MEET_LO else both if pa >= MEET_HI and pb >= MEET_HI
                     else weak_a if pa <= MEET_LO and pb >= MEET_HI else None)
             if text:
-                out.append((abs(pa - 50) + abs(pb - 50), text.format(**w), {ka, kb}))
+                out.append((abs(pa - 50) + abs(pb - 50), text.format(**w), {(a, ka), (b, kb)}))
     both = lambda k, test: all(pct(t, k) is not None and test(pct(t, k)) for t in (away, home))
     if "pace" not in covered and both("pace", lambda p: p >= MEET_HI):
         out.append((60, "both teams like to play fast, so expect an open game", {"pace"}))
@@ -389,6 +408,7 @@ def _them(ln: str, t: str, W) -> str:
     pinned", "against them", "when they are shorthanded")."""
     the, poss = W.the(t), W.poss(t)
     ln = ln.replace(f" {the} are ", " they’re ").replace(f" {the} aren’t ", " they aren’t ")
+    ln = re.sub(re.escape(poss) + r"(?= not\b|[,.])", "theirs", ln)  # "and the Kings’ not so much" -> "theirs"
     ln = ln.replace(poss, "their").replace(f" {the}", " them")
     return ln
 
@@ -403,11 +423,6 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
     sents = []
     picks = {t: _picks(t, fp) for t in (away, home)}
     side = lambda b: b["pct"] >= 50
-    shared = [(k, b) for _, k, b in picks[away] if any(k == k2 and side(b) == side(b2) for _, k2, b2 in picks[home])]
-    if shared:  # "Both teams get their defensemen shooting." once, not in each team's list
-        sents.append(f"Both teams {and_list([HABITS[k][0 if side(b) else 1] for k, b in shared])}.")
-        gone = {k for k, _ in shared}
-        picks = {t: [x for x in v if x[1] not in gone] for t, v in picks.items()}
     lines = [(g, set()) if isinstance(g, str) else (g[0], set(g[1])) for g in gists if g and (g if isinstance(g, str) else g[0])]
     for _, text, ks in consequences(away, home, fp, W, set(covered)):
         if len(lines) >= 2:
@@ -419,25 +434,36 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
     pct = lambda t, k: ((((fp.get(t) or {}).get("dims") or {}).get(k) or {}).get("blend") or {}).get("pct")
     as_pair = {}
     for i, (ln, ks) in enumerate(lines):
-        if not ks & {"pp", "pk"}:
+        if not _names(ks) & {"pp", "pk"}:
             continue
         for a, b in ((away, home), (home, away)):
             rest = ln.split(" power play ", 1)[-1]
             if (f"{W.poss(a)} power play".lower() in ln.lower() and rest.startswith("could")
                     and (pct(b, "powerKill") or 0) >= SH_THREAT):  # a weak kill that is dangerous the other way
                 lines[i] = (ln[:-1] + f", though {W.poss(b)} penalty killers create chances of their own going the other way.",
-                            ks | {"powerKill"})
+                            ks | {(b, "powerKill")})
                 # told with the shorthanded threat: "that sets up a fight with the Panthers’ power play, which could ..."
                 as_pair[lines[i][0]] = f"that sets up a fight with {W.poss(a)} power play, which {rest}"
                 break
+    # a habit both clubs have is said once, "Both teams get their defensemen shooting.", not in each club's list; one a
+    # line below already tells for both (pace, or a kill that is dangerous the other way) is left to that line
+    in_lines = {k for ln, ks in lines if ln.startswith("Both") or "of their own going the other way" in ln for k in _names(ks)}
+    shared = [(k, b) for _, k, b in picks[away] if k not in in_lines
+              and any(k == k2 and side(b) == side(b2) for _, k2, b2 in picks[home])]
+    if shared:
+        sents.append(f"Both teams {and_list([HABITS[k][0 if side(b) else 1] for k, b in shared])}.")
+        gone = {k for k, _ in shared}
+        picks = {t: [x for x in v if x[1] not in gone] for t, v in picks.items()}
     # a habit both share, told as "Both teams ...", that one club has to a higher degree: said once, with that club named
     # (Sora, 2026-10-30: "The Flames play some of the league’s fastest games" and later "Both teams like to play fast")
     for i, (ln, ks) in enumerate(lines):
         if not (ln.lower().startswith("both teams") and len(ks) == 1 and ", so " in ln):
             continue
-        k = next(iter(ks))
+        k = next(iter(_names(ks)))
         high = "slow" not in ln and "tight" not in ln
         own = [(t, x) for t in (away, home) for x in picks[t] if x[1] == k and side(x[2]) == high]
+        if len(own) == 2:  # both have it at the same end: the line says it for both
+            picks = {t: [y for y in v if y[1] != k] for t, v in picks.items()}
         if len(own) == 1:
             t, x = own[0]
             picks[t] = [y for y in picks[t] if y is not x]
@@ -449,7 +475,7 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
         if ln.startswith("Both"):
             continue
         # the side that meets the habit goes first (the kill that faces a power play), so the attack keeps its own list
-        options = [(t, x) for t in (home, away) for x in picks[t] if x[1] in ks and t not in paired and len(picks[t]) > 1]
+        options = [(t, x) for t in (home, away) for x in picks[t] if _about(t, x[1], ks) and t not in paired and len(picks[t]) > 1]
         options.sort(key=lambda o: o[1][1] not in DEFEND)
         if options:
             t, hit = options[0]
@@ -467,8 +493,9 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             break
     told, told_traits = 0, set()
     for t in (away, home):
-        told_traits |= {k for _, k, _ in picks[t]}
-        s = style(t, picks[t], W, stat_words(t, season, day), second=bool(told), key=key, tips=tips)
+        told_traits |= {(t, k) for _, k, _ in picks[t]}
+        named = bool(sents) and sents[-1].startswith(f"{cap(W.the(t))}, by contrast")  # just told beside the other club's list
+        s = style(t, picks[t], W, stat_words(t, season, day), second=bool(told), key=key, tips=tips, named=named)
         if s:
             sents.append(s + ".")
             told += 1
@@ -476,10 +503,10 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             o_t, (_, k, b) = opposite[t]
             w = HABITS[k][0 if side(b) else 1]
             sents.append(f"{cap(W.the(o_t))}, by contrast, {w}{rank_tag(k, b, tips, w)}.")
-            told_traits.add(k)
+            told_traits.add((o_t, k))
         if t in paired:  # "They also sit back rather than chase on the forecheck, so the Canadiens have the edge ..."
             (_, k, b), ln = paired[t]
-            told_traits.add(k)
+            told_traits.add((t, k))
             if k == "powerKill" and ln in as_pair:
                 ln, link = as_pair[ln], ", and "
             else:
@@ -502,14 +529,18 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
     # fragments); a second line with its own comma stands as a sentence with a full lead-in
     if rest:
         ln, ks = rest[0]
-        follows = not ks or ks & told_traits  # "That means" only when a habit behind it was just told
+        follows = not ks or any(_about(t, k, ks) for t, k in told_traits)  # "That means" only when a habit behind it was just told
         joins = (ln.split(" ", 1)[0] in ("The", "It’s", "Something", "Expect", "Good")  # "So the Rangers aren’t ..." reads wrong
                  and not any(x in ln for x in FACE_OFF) and follows)
         lead = _pick(["Put that together and ", "That means "] if not ln.startswith("Expect") else ["Put that together and "], *key, "meet1") \
             if joins and sents else ""
         first = lead + _lower(ln) if lead else ln
         if len(rest) == 2 and "," not in rest[1][0] and "," not in first:
-            first = first[:-1] + ", and " + _lower(rest[1][0])
+            two = _lower(rest[1][0])
+            subj = next((f"{W.the(t)} " for t in (away, home) if two.startswith(f"{W.the(t)} ") and f"{W.the(t)} are".lower() in first.lower()), None)
+            if subj:  # "the Lightning are likely to ..., and they have the edge ..."
+                two = "they " + two[len(subj):]
+            first = first[:-1] + ", and " + two
         elif len(rest) == 2:
             two = rest[1][0]
             first += " " + (_pick(["On top of that, ", "Beyond that, "], *key, "meet2") + _lower(two)

@@ -1,0 +1,54 @@
+{
+ "head": "Panarin’s favorite opponent",
+ "paras": [
+  "The Sabres (5-4-3) beat San Jose 2-0 on Tuesday, while the Kings (3-6-2) lost 2-1 to Chicago the same night. Going in, the Sabres are last in the Atlantic (tied for 20th in the NHL) and the Kings seventh in the Pacific (tied for 30th).",
+  "The Sabres’ record (.542) is about what their chances are worth. The Kings have played better than their record (.364) says: their chances are worth about .522, and their finishing has held them back. If the Kings’ record were closer to their chances, like the Sabres’, these teams would be much closer in the standings, so don’t be surprised if this one is closer than the records suggest.",
+  "The Sabres get their shots through better than almost anyone and rarely get pinned in their own end (4th), but don't block many shots (30th). On the other side, the Kings keep dangerous shots away better than almost anyone, but take a lot of low-quality shots (31st). They also leave the shooting to their forwards (2nd lowest), so the Sabres’ defensemen shoot a lot, and theirs not so much.",
+  "Jack Quinn (6 G / 5 A / 11 P in 12 GP) is tied for the Sabres’ scoring lead, with seven points in his last five games. Owen Power (2 G / 9 A / 11 P in 12 GP) shares it. The Kings’ scoring runs through Artemi Panarin (7 G / 4 A / 11 P in 11 GP), who has seven points in his last five games and a point in nine straight games against Buffalo. Alex Laferriere (2 G / 7 A / 9 P in 11 GP) is next in line.",
+  "Ukko-Pekka Luukkonen (3-3-3 / .866 SV% in 8 GS) has struggled for Buffalo so far, but will likely start. Darcy Kuemper (3-3-1 / .889 SV% in 7 GS) is in line to start for Los Angeles."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Sabres are newly without Konsta Helenius, and have had to make do without Alex Lyon all season. Ukko-Pekka Luukkonen is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Kings are newly without Mats Zuccarello, have been without Alex Turcotte since Oct 6, and have had to make do without Kevin Fiala all season."
+  },
+  {
+   "tag": "Missing",
+   "text": "Drew Doughty has missed the Kings’ latest game."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Zach Benson has no goals on chances worth about 4.5 goals, well below what his finishing usually turns chances into. If the chances keep coming, so should the goals."
+  }
+ ],
+ "outlook": {
+  "LAK": {
+   "head": "A genuine toss-up",
+   "body": "The two have been about even at out-chancing opponents lately. Los Angeles has home-ice advantage, but they will be without Fiala. The Kings can tip it if they keep dangerous shots away."
+  },
+  "BUF": {
+   "head": "Too close to call",
+   "body": "The two have been about even at out-chancing opponents lately. Los Angeles has home-ice advantage, but they will be without Fiala. For the Sabres, the difference could be keeping dangerous shots away."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Sabres’ defense joins the attack, the Kings’ stays home",
+   "body": "On shots from defensemen, Buffalo is near the top of the league, but Los Angeles is one of the worst. Watch the Sabres’ defensemen jump into the play."
+  },
+  {
+   "head": "The Sabres’ edge in shot quality",
+   "body": "The Sabres are near the top of the league for shot quality, and the Kings are one of the worst. It’s the widest gap between these two, though not a huge one."
+  }
+ ],
+ "ranks": [
+  "4th of 32 in avoiding long shifts",
+  "30th of 32 in blocking shots",
+  "31st of 32 in shot quality: a 5.7% chance of scoring on the average shot",
+  "2nd lowest of 32 in shots from defensemen: 31% of shot attempts from defensemen"
+ ]
+}

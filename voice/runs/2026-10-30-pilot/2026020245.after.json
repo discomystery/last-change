@@ -1,17 +1,19 @@
 {
  "head": "Expect the Hurricanes to fire from everywhere",
  "paras": [
-  "The Predators (4-4-5) lost 4-3 to Washington last time out. The Hurricanes have won three straight.",
-  "The Hurricanes shoot a lot, and the Predators give up plenty. Both teams like a fast game."
+  "The Predators (4-4-5) lost 4-3 to Washington on Thursday, while the Hurricanes have won three straight. Going in, the Hurricanes are first in the NHL and the Predators sixth in the Central (tied for 20th in the NHL).",
+  "The Hurricanes take away shots from the point (lowest) and create more chances on the penalty kill than anyone, but give up a lot of dangerous shots (32nd). Carolina has scored 3.73 goals a game, the third most in the league, and allowed 2.33, the third fewest. As for the Predators, they keep things calm after the whistle (3rd lowest), get pinned in their own end on long shifts (32nd) and ice the puck a lot (30th). The Canes are likely to get plenty of pucks to the net against the Predators. On top of that, both teams like to play fast, so expect an open game.",
+  "Sebastian Aho (8 G / 11 A / 19 P in 15 GP) leads the Hurricanes in scoring and is tied for tenth in the NHL, with six goals in six games against Nashville since 2023-24. Logan Stankoven (9 G / 3 A / 12 P in 15 GP) has a team-high nine goals, tied for seventh in the NHL. Steven Stamkos (7 G / 8 A / 15 P in 13 GP) is tied for the Predators’ scoring lead. Filip Forsberg (5 G / 10 A / 15 P in 13 GP) shares it, with seven points in his last five games.",
+  "Juuse Saros (3-3-4 / .902 SV% in 10 GS) will likely start for Nashville."
  ],
  "items": [
   {
-   "tag": "Haunts them",
-   "text": "Sebastian Aho has six goals in six games against Nashville since 2023-24."
-  },
-  {
    "tag": "Out",
    "text": "The Hurricanes have been without Taylor Hall since Oct 13."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Mark Jankowski has six goals on chances worth about 2.6 goals, well above what his finishing usually turns chances into. Runs like that tend to cool off."
   },
   {
    "tag": "Hot streak",
@@ -41,5 +43,12 @@
    "head": "Pond hockey",
    "body": "The Hurricanes play some of the league’s fastest games, and so do the Predators. We think this one runs hotter than either team’s usual."
   }
+ ],
+ "ranks": [
+  "lowest of 32 in point shots allowed",
+  "32nd of 32 in keeping dangerous shots away: a 6.9% chance of scoring on the average shot against",
+  "3rd lowest of 32 in rough stuff",
+  "32nd of 32 in avoiding long shifts",
+  "30th of 32 in avoiding icings"
  ]
 }

@@ -1,0 +1,753 @@
+{
+ "kind": "preview",
+ "game_id": 2026020230,
+ "start_utc": "2026-11-01T23:00:00Z",
+ "venue": "Madison Square Garden",
+ "away": {
+  "abbr": "EDM",
+  "name": "Edmonton Oilers",
+  "place": "Edmonton",
+  "nickname": "Oilers",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Mike Babcock"
+ },
+ "home": {
+  "abbr": "NYR",
+  "name": "New York Rangers",
+  "place": "NY Rangers",
+  "nickname": "Rangers",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Mike Sullivan"
+ },
+ "form": {
+  "EDM": {
+   "record": "9-2-2",
+   "games": 13,
+   "run": "won 1",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "6-5",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "L",
+     "score": "2-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": true,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NYR": {
+   "record": "7-6-1",
+   "games": 14,
+   "run": "winless 3",
+   "last_ten": "4-5-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": false,
+     "result": "OTL",
+     "score": "0-1",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "L",
+     "score": "4-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "EDM": "Matt Tomkins",
+  "NYR": "Dylan Garand"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "NYR",
+   "facts": [
+    "NY Rangers’s P3 (Schneider and Šmits) at home: 30% of its 5-on-5 time against opponents’ fourth lines. Matchups, NY Rangers home games this season, 7 games, 38 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face fourth lines about 18% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of NY Rangers P3's 5-on-5 time against Edmonton L4",
+   "usual": 30,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "rest",
+   "about": "NYR",
+   "facts": [
+    "Edmonton played yesterday. Schedule, back-to-backs over 2023-24 to 2025-26 (809 games).",
+    "NY Rangers had 5 days off before this game.",
+    "NY Rangers’s usual share of 5-on-5 expected goals: 48.7%, adjusted for score and venue."
+   ],
+   "what_we_check": "share of 5-on-5 expected goals, adjusted for score and venue",
+   "usual": 0.4868,
+   "league": 0.5,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "NYR",
+   "facts": [
+    "NY Rangers: 8.3 expected goals per 60 on the power play, 7th of 32. Playing style, this season blended with last, 14 and 13 games this season.",
+    "Edmonton: 8.1 expected goals allowed per 60 shorthanded, 23rd of 32. Playing style, this season blended with last, 14 and 13 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 8.347,
+   "league": 7.6578,
+   "direction": "above"
+  },
+  {
+   "kind": "pace",
+   "about": "EDM",
+   "facts": [
+    "Edmonton: pace score 98, 27th of 32. Playing style, this season blended with last, 13 and 14 games this season.",
+    "NY Rangers: pace score 96, 29th of 32. Playing style, this season blended with last, 13 and 14 games this season."
+   ],
+   "what_we_check": "shots per 60 at 5-on-5 (blocked shots left out), both teams combined, adjusted for score and venue",
+   "usual": 78.26,
+   "league": 81.34,
+   "direction": "below"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Edmonton has been out-chancing opponents lately, but the Rangers have home-ice advantage, and the Oilers will be without Hyman.",
+  "The Rangers can tip it if their power play gets going.",
+  "Out: The Oilers are newly without Zach Hyman, and have had to make do without Matt Savoie all season.",
+  "Owns them: Sean Durzi has a point in six straight games against Edmonton.",
+  "Hot streak: Connor McDavid has a point in every game this season.",
+  "Behind the record: The Oilers’ record (.769) is well ahead of what their chances are worth (.622), largely thanks to their shooting."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "EDM": {
+   "standing": {
+    "record": "9-2-2",
+    "points": 20,
+    "games": 13,
+    "division": "Pacific",
+    "division_place": 1,
+    "conference_place": 2,
+    "league_place_in_points": 3,
+    "home_record": "4-2-2",
+    "road_record": "5-0-0",
+    "last_ten": "7-2-1",
+    "streak": "W1",
+    "coach": "Mike Babcock"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 55,
+    "ga": 42,
+    "gfpg": 4.23,
+    "gapg": 3.23,
+    "diff": 13,
+    "ppg": 15,
+    "ppo": 42,
+    "pppct": 0.357,
+    "pkpct": 0.714,
+    "sfpg": 26.1,
+    "sapg": 26.8,
+    "fopct": 0.493
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 1,
+    "gapg": 18,
+    "pppct": 1,
+    "pkpct": 25,
+    "sfpg": 21,
+    "sapg": 14,
+    "fopct": 18
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Second chances",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Connor McDavid",
+     "pos": "C",
+     "gp": 13,
+     "g": 8,
+     "a": 28,
+     "p": 36,
+     "ppp": 13,
+     "toi_per_game": "23:30",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 11,
+      "p": 13
+     }
+    },
+    {
+     "name": "Leon Draisaitl",
+     "pos": "C",
+     "gp": 13,
+     "g": 12,
+     "a": 12,
+     "p": 24,
+     "ppp": 8,
+     "toi_per_game": "21:43",
+     "last_five_games": {
+      "games": 5,
+      "g": 6,
+      "a": 4,
+      "p": 10
+     }
+    },
+    {
+     "name": "Evan Bouchard",
+     "pos": "D",
+     "gp": 13,
+     "g": 7,
+     "a": 15,
+     "p": 22,
+     "ppp": 7,
+     "toi_per_game": "26:10",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 5,
+      "p": 6
+     }
+    },
+    {
+     "name": "Vasily Podkolzin",
+     "pos": "R",
+     "gp": 13,
+     "g": 8,
+     "a": 5,
+     "p": 13,
+     "ppp": 6,
+     "toi_per_game": "18:54",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    },
+    {
+     "name": "Kasperi Kapanen",
+     "pos": "R",
+     "gp": 13,
+     "g": 4,
+     "a": 2,
+     "p": 6,
+     "ppp": 4,
+     "toi_per_game": "17:52",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Devon Levi",
+     "gp": 7,
+     "record": "6-1-0",
+     "sv_pct": 0.887,
+     "gaa": 3.11,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Tristan Jarry",
+     "gp": 6,
+     "record": "3-1-2",
+     "sv_pct": 0.889,
+     "gaa": 2.95,
+     "shutouts": 1,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Vasily Podkolzin",
+      "Connor McDavid",
+      "Leon Draisaitl"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Colton Dach",
+      "Ryan Nugent-Hopkins",
+      "Kasperi Kapanen"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Alex Formenton",
+      "Jason Dickinson",
+      "Mathieu Joseph"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Mattias Ekholm",
+      "Evan Bouchard"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Connor Murphy",
+      "Ryan Shea"
+     ],
+     "games_together_recently": 9
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Evan Bouchard (Quarterback)",
+      "Leon Draisaitl (Distributor)",
+      "Connor McDavid (Trigger)",
+      "Vasily Podkolzin (Net-front)",
+      "Ryan Nugent-Hopkins (Net-front)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Ryan Shea (Quarterback)",
+      "Kasperi Kapanen (Trigger)",
+      "Isaac Howard",
+      "Trent Frederic",
+      "Colton Dach"
+     ]
+    }
+   ]
+  },
+  "NYR": {
+   "standing": {
+    "record": "7-6-1",
+    "points": 15,
+    "games": 14,
+    "division": "Metropolitan",
+    "division_place": 5,
+    "conference_place": 12,
+    "league_place_in_points": 19,
+    "home_record": "6-1-0",
+    "road_record": "1-5-1",
+    "last_ten": "4-5-1",
+    "streak": "L3",
+    "coach": "Mike Sullivan"
+   },
+   "team_stats": {
+    "gp": 14,
+    "gf": 44,
+    "ga": 42,
+    "gfpg": 3.14,
+    "gapg": 3.0,
+    "diff": 2,
+    "ppg": 8,
+    "ppo": 38,
+    "pppct": 0.211,
+    "pkpct": 0.905,
+    "sfpg": 24.7,
+    "sapg": 26.3,
+    "fopct": 0.538
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 14,
+    "gapg": 13,
+    "pppct": 15,
+    "pkpct": 3,
+    "sfpg": 28,
+    "sapg": 13,
+    "fopct": 5
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Physicality",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Finesse",
+     "high_end_word": "Bruising"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Adam Fox",
+     "pos": "D",
+     "gp": 14,
+     "g": 1,
+     "a": 16,
+     "p": 17,
+     "ppp": 4,
+     "toi_per_game": "22:07",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 7,
+      "p": 8
+     }
+    },
+    {
+     "name": "Alexis Lafrenière",
+     "pos": "L",
+     "gp": 14,
+     "g": 9,
+     "a": 7,
+     "p": 16,
+     "ppp": 5,
+     "toi_per_game": "19:03",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Mika Zibanejad",
+     "pos": "C",
+     "gp": 14,
+     "g": 3,
+     "a": 8,
+     "p": 11,
+     "ppp": 2,
+     "toi_per_game": "20:44",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "J.T. Miller",
+     "pos": "C",
+     "gp": 14,
+     "g": 4,
+     "a": 6,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "18:34",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 1,
+      "p": 4
+     }
+    },
+    {
+     "name": "Tye Kartye",
+     "pos": "L",
+     "gp": 14,
+     "g": 4,
+     "a": 6,
+     "p": 10,
+     "ppp": 0,
+     "toi_per_game": "15:29",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 2,
+      "p": 4
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Dylan Garand",
+     "gp": 10,
+     "record": "4-5-1",
+     "sv_pct": 0.899,
+     "gaa": 2.69,
+     "shutouts": 1,
+     "projected_starter": true
+    },
+    {
+     "name": "Igor Shesterkin",
+     "gp": 5,
+     "record": "3-1-0",
+     "sv_pct": 0.927,
+     "gaa": 1.79,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Spencer Martin",
+     "gp": 1,
+     "record": "0-0-0",
+     "sv_pct": 0.833,
+     "gaa": 5.09,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "James Reimer",
+     "gp": 1,
+     "record": "0-0-0",
+     "sv_pct": 0.625,
+     "gaa": 9.0,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Gabe Perreault",
+      "Mika Zibanejad",
+      "Alexis Lafrenière"
+     ],
+     "games_together_recently": 7
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Tye Kartye",
+      "J.T. Miller",
+      "Oliver Bjorkstrand"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Will Cuylle",
+      "Noah Laba",
+      "Pavel Dorofeyev"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Vladislav Gavrikov",
+      "Adam Fox"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Marcus Pettersson",
+      "Sean Durzi"
+     ],
+     "games_together_recently": 9
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Adam Fox (Quarterback)",
+      "Mika Zibanejad (Trigger)",
+      "Alexis Lafrenière (Distributor)",
+      "J.T. Miller (Net-front)",
+      "Pavel Dorofeyev"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Sean Durzi (Quarterback)",
+      "Gabe Perreault (Distributor)",
+      "Will Cuylle (Trigger)",
+      "Oliver Bjorkstrand",
+      "Eeli Tolvanen"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

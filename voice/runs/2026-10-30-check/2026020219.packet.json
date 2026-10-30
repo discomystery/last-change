@@ -1,0 +1,719 @@
+{
+ "kind": "preview",
+ "game_id": 2026020219,
+ "start_utc": "2026-10-31T18:00:00Z",
+ "venue": "Bridgestone Arena",
+ "away": {
+  "abbr": "TBL",
+  "name": "Tampa Bay Lightning",
+  "place": "Tampa Bay",
+  "nickname": "Lightning",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Jon Cooper"
+ },
+ "home": {
+  "abbr": "NSH",
+  "name": "Nashville Predators",
+  "place": "Nashville",
+  "nickname": "Predators",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Andrew Brunette"
+ },
+ "form": {
+  "TBL": {
+   "record": "8-3-1",
+   "games": 12,
+   "run": "won 1",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": true,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "OTL",
+     "score": "4-5",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "6-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NSH": {
+   "record": "4-4-5",
+   "games": 13,
+   "run": "winless 2",
+   "last_ten": "3-3-4",
+   "last_five": [
+    {
+     "date": "2026-10-22",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "0-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": true,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": true,
+     "result": "L",
+     "score": "3-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "TBL": "Andrei Vasilevskiy",
+  "NSH": "Juuse Saros"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "NSH",
+   "facts": [
+    "Nashville’s L4 (Höglander, Wood and Forsberg) at home: 32% of its 5-on-5 time against opponents’ third lines. Matchups, Nashville home games this season, 8 games, 35 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face third lines about 18% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Nashville L4's 5-on-5 time against Tampa Bay L3",
+   "usual": 32,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "TBL",
+   "facts": [
+    "Tampa Bay: shot volume score 112, 5th of 32. Playing style, this season blended with last, 12 and 13 games this season.",
+    "Nashville: shots-against score 108, 27th of 32. Playing style, this season blended with last, 12 and 13 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 62.4956,
+   "league": 55.7996,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Even though Nashville has home-ice advantage, Tampa Bay has been out-chancing opponents by a wide margin lately.",
+  "The Predators’ best way through is a penalty kill that holds up.",
+  "Out: The Lightning are newly without Max Crozier, and have had to make do without Yanni Gourde all season.",
+  "Owns them: Brandon Hagel has scored in three straight games against Nashville.",
+  "Hot streak: Filip Forsberg has scored in three straight games.",
+  "Hot streak: Ryan O'Reilly has a point in four straight games."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "TBL": {
+   "standing": {
+    "record": "8-3-1",
+    "points": 17,
+    "games": 12,
+    "division": "Atlantic",
+    "division_place": 3,
+    "conference_place": 4,
+    "league_place_in_points": 8,
+    "home_record": "6-0-0",
+    "road_record": "2-3-1",
+    "last_ten": "7-2-1",
+    "streak": "W1",
+    "coach": "Jon Cooper"
+   },
+   "team_stats": {
+    "gp": 12,
+    "gf": 44,
+    "ga": 38,
+    "gfpg": 3.67,
+    "gapg": 3.17,
+    "diff": 6,
+    "ppg": 7,
+    "ppo": 43,
+    "pppct": 0.163,
+    "pkpct": 0.781,
+    "sfpg": 30.4,
+    "sapg": 24.2,
+    "fopct": 0.475
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 6,
+    "gapg": 17,
+    "pppct": 25,
+    "pkpct": 16,
+    "sfpg": 5,
+    "sapg": 3,
+    "fopct": 24
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    },
+    {
+     "trait": "Rough stuff",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Calm",
+     "high_end_word": "Chippy"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Brandon Hagel",
+     "pos": "L",
+     "gp": 12,
+     "g": 8,
+     "a": 8,
+     "p": 16,
+     "ppp": 3,
+     "toi_per_game": "21:35",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Nikita Kucherov",
+     "pos": "R",
+     "gp": 12,
+     "g": 4,
+     "a": 11,
+     "p": 15,
+     "ppp": 5,
+     "toi_per_game": "20:45",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "Jake Guentzel",
+     "pos": "C",
+     "gp": 12,
+     "g": 7,
+     "a": 6,
+     "p": 13,
+     "ppp": 4,
+     "toi_per_game": "20:22",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 2,
+      "p": 6
+     }
+    },
+    {
+     "name": "Pontus Holmberg",
+     "pos": "R",
+     "gp": 12,
+     "g": 4,
+     "a": 6,
+     "p": 10,
+     "ppp": 1,
+     "toi_per_game": "14:33",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 3,
+      "p": 6
+     }
+    },
+    {
+     "name": "Brayden Point",
+     "pos": "C",
+     "gp": 12,
+     "g": 3,
+     "a": 7,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "19:10",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Andrei Vasilevskiy",
+     "gp": 9,
+     "record": "6-3-0",
+     "sv_pct": 0.876,
+     "gaa": 2.91,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Dennis Hildeby",
+     "gp": 3,
+     "record": "2-0-1",
+     "sv_pct": 0.885,
+     "gaa": 2.98,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Brayden Point",
+      "Jake Guentzel",
+      "Nikita Kucherov"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Brandon Hagel",
+      "Anthony Cirelli",
+      "Pontus Holmberg"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Gage Goncalves",
+      "Dominic James",
+      "Ilya Mikheyev"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "John Carlson",
+      "J.J. Moser"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Charle-Édouard D'Astous",
+      "Emil Lilleberg"
+     ],
+     "games_together_recently": 2
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "John Carlson (Quarterback)",
+      "Jake Guentzel (Trigger)",
+      "Nikita Kucherov (Distributor)",
+      "Brayden Point",
+      "Brandon Hagel"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Charle-Édouard D'Astous (Quarterback)",
+      "Jake Guentzel (Trigger)",
+      "Nikita Kucherov (Distributor)",
+      "Brayden Point",
+      "Brandon Hagel"
+     ]
+    }
+   ]
+  },
+  "NSH": {
+   "standing": {
+    "record": "4-4-5",
+    "points": 13,
+    "games": 13,
+    "division": "Central",
+    "division_place": 6,
+    "conference_place": 9,
+    "league_place_in_points": 22,
+    "home_record": "3-3-2",
+    "road_record": "1-1-3",
+    "last_ten": "3-3-4",
+    "streak": "L1",
+    "coach": "Andrew Brunette"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 37,
+    "ga": 40,
+    "gfpg": 2.85,
+    "gapg": 3.08,
+    "diff": -3,
+    "ppg": 14,
+    "ppo": 44,
+    "pppct": 0.318,
+    "pkpct": 0.881,
+    "sfpg": 25.7,
+    "sapg": 29.1,
+    "fopct": 0.506
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 21,
+    "gapg": 14,
+    "pppct": 3,
+    "pkpct": 4,
+    "sfpg": 24,
+    "sapg": 25,
+    "fopct": 13
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    },
+    {
+     "trait": "Rough stuff",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Calm",
+     "high_end_word": "Chippy"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Blocking shots",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Rarely block",
+     "high_end_word": "Shot blockers"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 27,
+     "percentile": 17,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 6,
+     "percentile": 83,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Steven Stamkos",
+     "pos": "C",
+     "gp": 13,
+     "g": 7,
+     "a": 8,
+     "p": 15,
+     "ppp": 8,
+     "toi_per_game": "19:02",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 2,
+      "p": 5
+     }
+    },
+    {
+     "name": "Filip Forsberg",
+     "pos": "L",
+     "gp": 13,
+     "g": 5,
+     "a": 10,
+     "p": 15,
+     "ppp": 6,
+     "toi_per_game": "20:43",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Roman Josi",
+     "pos": "D",
+     "gp": 13,
+     "g": 1,
+     "a": 14,
+     "p": 15,
+     "ppp": 9,
+     "toi_per_game": "25:12",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 6,
+      "p": 6
+     }
+    },
+    {
+     "name": "Ryan O'Reilly",
+     "pos": "C",
+     "gp": 13,
+     "g": 7,
+     "a": 7,
+     "p": 14,
+     "ppp": 7,
+     "toi_per_game": "21:13",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "Adam Edström",
+     "pos": "C",
+     "gp": 13,
+     "g": 4,
+     "a": 1,
+     "p": 5,
+     "ppp": 0,
+     "toi_per_game": "14:40",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 1,
+      "p": 1
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Juuse Saros",
+     "gp": 10,
+     "record": "3-3-4",
+     "sv_pct": 0.902,
+     "gaa": 2.94,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Justus Annunen",
+     "gp": 2,
+     "record": "1-1-0",
+     "sv_pct": 0.846,
+     "gaa": 4.0,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Matt Murray",
+     "gp": 1,
+     "record": "0-0-1",
+     "sv_pct": 0.9,
+     "gaa": 1.85,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Steven Stamkos",
+      "Ryan O'Reilly",
+      "Mavrik Bourque"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Filip Forsberg",
+      "Alexander Kerfoot",
+      "Jonathan Marchessault"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Ross Colton",
+      "Jack Drury",
+      "Adam Edström"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Roman Josi",
+      "Adam Wilsby"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Brady Skjei",
+      "Nick Perbix"
+     ],
+     "games_together_recently": 9
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Roman Josi (Quarterback)",
+      "Steven Stamkos (Trigger)",
+      "Filip Forsberg",
+      "Ryan O'Reilly (Distributor)",
+      "Jonathan Marchessault (Net-front)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Brady Skjei (Quarterback)",
+      "Matthew Wood (Trigger)",
+      "Alexander Kerfoot",
+      "Vitali Pinchuk",
+      "Mavrik Bourque"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

@@ -1,0 +1,713 @@
+{
+ "kind": "preview",
+ "game_id": 2026020217,
+ "start_utc": "2026-10-31T17:00:00Z",
+ "venue": "TD Garden",
+ "away": {
+  "abbr": "CHI",
+  "name": "Chicago Blackhawks",
+  "place": "Chicago",
+  "nickname": "Blackhawks",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Jeff Blashill"
+ },
+ "home": {
+  "abbr": "BOS",
+  "name": "Boston Bruins",
+  "place": "Boston",
+  "nickname": "Bruins",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Marco Sturm"
+ },
+ "form": {
+  "CHI": {
+   "record": "4-9-0",
+   "games": 13,
+   "run": "winless 1",
+   "last_ten": "4-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "BOS": {
+   "record": "9-4-1",
+   "games": 14,
+   "run": "winless 2",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": true,
+     "result": "W",
+     "score": "6-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "W",
+     "score": "6-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "CHI": "Spencer Knight",
+  "BOS": "Jeremy Swayman"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "BOS",
+   "facts": [
+    "Boston’s L2 (Mittelstadt, Lindholm and Hagens) at home: 67% of its 5-on-5 time against opponents’ first lines. Matchups, Boston home games this season, 6 games, 33 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face first lines about 34% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Boston L2's 5-on-5 time against Chicago L1",
+   "usual": 67,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "edge",
+   "about": "BOS",
+   "facts": [
+    "Boston: a 6.7% chance of scoring on the average shot, 4th of 32. Playing style, this season blended with last, 13 and 14 games this season.",
+    "Chicago: a 6.1% chance of scoring on the average shot, 27th of 32. Playing style, this season blended with last, 13 and 14 games this season."
+   ],
+   "what_we_check": "how dangerous the average shot was",
+   "usual": {
+    "BOS": 0.0673,
+    "CHI": 0.0611
+   },
+   "league": 0.0635,
+   "direction": "ahead"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Boston has been out-chancing opponents by a wide margin lately and has home-ice advantage.",
+  "The Blackhawks’ way back in is a penalty kill that holds up.",
+  "Milestone: Patrick Kane is one assist from 900.",
+  "Out: The Blackhawks have been without Bowen Byram since Oct 13.",
+  "Out: The Bruins have been without Jonathan Aspirot since Oct 17, and have had to make do without Michael Eyssimont all season.",
+  "Club history: David Pastrňák is one goal from passing Patrice Bergeron for third on the Bruins’ all-time goals list."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "CHI": {
+   "standing": {
+    "record": "4-9-0",
+    "points": 8,
+    "games": 13,
+    "division": "Central",
+    "division_place": 8,
+    "conference_place": 15,
+    "league_place_in_points": 31,
+    "home_record": "4-4-0",
+    "road_record": "0-5-0",
+    "last_ten": "4-6-0",
+    "streak": "L1",
+    "coach": "Jeff Blashill"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 27,
+    "ga": 48,
+    "gfpg": 2.08,
+    "gapg": 3.69,
+    "diff": -21,
+    "ppg": 4,
+    "ppo": 40,
+    "pppct": 0.1,
+    "pkpct": 0.78,
+    "sfpg": 21.6,
+    "sapg": 30.3,
+    "fopct": 0.428
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 31,
+    "gapg": 30,
+    "pppct": 31,
+    "pkpct": 17,
+    "sfpg": 31,
+    "sapg": 27,
+    "fopct": 32
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Blocking shots",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Rarely block",
+     "high_end_word": "Shot blockers"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Physicality",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Finesse",
+     "high_end_word": "Bruising"
+    },
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Patrick Kane",
+     "pos": "R",
+     "gp": 13,
+     "g": 1,
+     "a": 7,
+     "p": 8,
+     "ppp": 1,
+     "toi_per_game": "18:51",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 3,
+      "p": 3
+     }
+    },
+    {
+     "name": "Connor Bedard",
+     "pos": "C",
+     "gp": 7,
+     "g": 3,
+     "a": 4,
+     "p": 7,
+     "ppp": 3,
+     "toi_per_game": "20:16",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 2,
+      "p": 4
+     }
+    },
+    {
+     "name": "Roman Kantserov",
+     "pos": "R",
+     "gp": 13,
+     "g": 5,
+     "a": 1,
+     "p": 6,
+     "ppp": 2,
+     "toi_per_game": "18:31",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    },
+    {
+     "name": "Teuvo Teräväinen",
+     "pos": "C",
+     "gp": 11,
+     "g": 2,
+     "a": 4,
+     "p": 6,
+     "ppp": 1,
+     "toi_per_game": "15:18",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 1,
+      "p": 1
+     }
+    },
+    {
+     "name": "Anton Frondell",
+     "pos": "C",
+     "gp": 13,
+     "g": 1,
+     "a": 5,
+     "p": 6,
+     "ppp": 0,
+     "toi_per_game": "16:31",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 0,
+      "p": 0
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Spencer Knight",
+     "gp": 11,
+     "record": "4-7-0",
+     "sv_pct": 0.897,
+     "gaa": 3.21,
+     "shutouts": 0,
+     "projected_starter": true
+    },
+    {
+     "name": "Arvid Söderblom",
+     "gp": 2,
+     "record": "0-2-0",
+     "sv_pct": 0.82,
+     "gaa": 4.58,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Roman Kantserov",
+      "Connor Bedard",
+      "Teuvo Teräväinen"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Tyler Bertuzzi",
+      "Anton Frondell",
+      "Ryan Donato"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Oliver Moore",
+      "Frank Nazar",
+      "Patrick Kane"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Wyatt Kaiser",
+      "Artyom Levshunov"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Ian Cole",
+      "Alex Vlasic"
+     ],
+     "games_together_recently": 10
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Bowen Byram (Quarterback)",
+      "Roman Kantserov (Net-front)",
+      "Tyler Bertuzzi (Trigger)",
+      "Patrick Kane",
+      "Anton Frondell"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Sam Rinzel (Quarterback)",
+      "Frank Nazar (Trigger)",
+      "Ryan Donato",
+      "Oliver Moore",
+      "Nick Lardis"
+     ]
+    }
+   ]
+  },
+  "BOS": {
+   "standing": {
+    "record": "9-4-1",
+    "points": 19,
+    "games": 14,
+    "division": "Atlantic",
+    "division_place": 1,
+    "conference_place": 2,
+    "league_place_in_points": 4,
+    "home_record": "5-1-0",
+    "road_record": "4-3-1",
+    "last_ten": "7-2-1",
+    "streak": "L2",
+    "coach": "Marco Sturm"
+   },
+   "team_stats": {
+    "gp": 14,
+    "gf": 50,
+    "ga": 32,
+    "gfpg": 3.57,
+    "gapg": 2.29,
+    "diff": 18,
+    "ppg": 9,
+    "ppo": 43,
+    "pppct": 0.209,
+    "pkpct": 0.776,
+    "sfpg": 25.9,
+    "sapg": 27.4,
+    "fopct": 0.536
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 9,
+    "gapg": 2,
+    "pppct": 16,
+    "pkpct": 19,
+    "sfpg": 23,
+    "sapg": 15,
+    "fopct": 6
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Discipline",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Reckless",
+     "high_end_word": "Clean"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "David Pastrňák",
+     "pos": "R",
+     "gp": 14,
+     "g": 7,
+     "a": 11,
+     "p": 18,
+     "ppp": 6,
+     "toi_per_game": "20:02",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 3,
+      "p": 6
+     }
+    },
+    {
+     "name": "Elias Lindholm",
+     "pos": "C",
+     "gp": 14,
+     "g": 4,
+     "a": 7,
+     "p": 11,
+     "ppp": 4,
+     "toi_per_game": "16:40",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Fraser Minten",
+     "pos": "C",
+     "gp": 14,
+     "g": 5,
+     "a": 5,
+     "p": 10,
+     "ppp": 1,
+     "toi_per_game": "16:29",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    },
+    {
+     "name": "James Hagens",
+     "pos": "C",
+     "gp": 14,
+     "g": 5,
+     "a": 5,
+     "p": 10,
+     "ppp": 1,
+     "toi_per_game": "13:10",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 1,
+      "p": 4
+     }
+    },
+    {
+     "name": "JJ Peterka",
+     "pos": "R",
+     "gp": 14,
+     "g": 4,
+     "a": 5,
+     "p": 9,
+     "ppp": 1,
+     "toi_per_game": "17:13",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Jeremy Swayman",
+     "gp": 11,
+     "record": "7-3-1",
+     "sv_pct": 0.912,
+     "gaa": 2.35,
+     "shutouts": 1,
+     "projected_starter": true
+    },
+    {
+     "name": "Michael DiPietro",
+     "gp": 3,
+     "record": "2-1-0",
+     "sv_pct": 0.941,
+     "gaa": 1.69,
+     "shutouts": 1,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "JJ Peterka",
+      "Pavel Zacha",
+      "David Pastrňák"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Casey Mittelstadt",
+      "Elias Lindholm",
+      "James Hagens"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Marat Khusnutdinov",
+      "Fraser Minten",
+      "Morgan Geekie"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Hampus Lindholm",
+      "Charlie McAvoy"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Nikita Zadorov",
+      "Will Borgen"
+     ],
+     "games_together_recently": 7
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Charlie McAvoy (Quarterback)",
+      "David Pastrňák (Trigger)",
+      "Morgan Geekie",
+      "Elias Lindholm (Distributor)",
+      "Pavel Zacha (Net-front)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Frédéric Brunet (Quarterback)",
+      "James Hagens",
+      "JJ Peterka",
+      "Fraser Minten (Trigger)",
+      "Casey Mittelstadt (Distributor)"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}
