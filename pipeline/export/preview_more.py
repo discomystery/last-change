@@ -286,13 +286,13 @@ def stat_words(t: str, season: int, day: str) -> dict[str, dict]:
 MEETS = [
     ("pp", "pk", "{Ap} power play could do real damage when {B} are shorthanded",
      "{Ap} power play against {Bp} penalty killers is strength against strength", "{Ap} struggling power play gets a tough test from {Bp} penalty killers"),
-    ("volume", "suppression", "{A} should get plenty of pucks to the net against {B}",
+    ("volume", "suppression", "{A} are likely to get plenty of pucks to the net against {B}",
      "something has to give when {Ap} shooting runs into {Bp} defense", "{A} may have a hard time getting pucks to the net against {B}"),
     ("quality", "qualityAllowed", "{A} could find some good looks against {B}, who give up plenty of them",
-     "{Ap} good looks will be harder to come by against {B}", "good looks should be hard to come by for {A}"),
+     "{Ap} good looks will be harder to come by against {B}", "good looks are likely to be hard to come by for {A}"),
     ("forecheck", "longShifts", "{Ap} forecheck could keep {B} pinned in their own end", None, None),
     ("shotsThrough", "blocking", None, "{Ap} knack for getting shots through meets a team that blocks a lot",
-     "{B} should get in the way of a lot of {Ap} shots"),
+     "{B} are likely to get in the way of a lot of {Ap} shots"),
 ]
 MEET_HI, MEET_LO = 70, 30
 
@@ -435,7 +435,8 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
                 link = ", and " if any(x in ln for x in FACE_OFF) else ", so "
             words = (IDENTITY[k][0 if b["rank"] == 1 else 1] if k in IDENTITY and side(b) and b["rank"] <= RANK_TOLD
                      else HABITS[k][0 if side(b) else 1])
-            ln = _them(_lower(ln), t, W)
+            # the other club's power play is the subject by then, so the shorthanded side is named again (Sora, 2026-10-30)
+            ln = _lower(ln) if k == "powerKill" and link == ", and " and "sets up a fight" in ln else _them(_lower(ln), t, W)
             if k not in DEFEND and ln.startswith("their ") and " could " in ln:  # their own attack: "..., and that could ..."
                 ln, link = "that could " + ln.split(" could ", 1)[1], ", and "
             sents.append(f"They also {words}{link}{ln}")
@@ -649,7 +650,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
         pid = x["id"]
         mine = gg.filter(pl.col("goalie_id") == pid)
         starts = int(mine["started"].sum()) if mine.height else 0
-        verb = "is expected to start" if x.get("from") == "nhl" else "should get the start"
+        verb = "is expected to start" if x.get("from") == "nhl" else "will likely start"
         if not starts:
             parts.append(f"{N[pid]} {verb} for {W.place(t)}, his first start of the season")
             continue
@@ -657,7 +658,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
         rec = f"{ds.count('W')}-{ds.count('L')}-{ds.count('O')}"
         sa, ga = int(mine["sa"].sum()), int(mine["ga"].sum())
         sv = f"{(sa - ga) / sa:.3f}".lstrip("0") if sa else None
-        # "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) should get the start for Winnipeg": the line is a tag on the page
+        # "Stuart Skinner (3-3-3 / .899 SV% in 9 GS) will likely start for Winnipeg": the line is a tag on the page
         tag = f"{N[pid]} ({rec}{' / ' + sv + ' SV%' if sv else ''} in {starts} GS)"
         # a word on how his season has gone, earned by the numbers (Sora, 2026-10-30, liked "Jacob Fowler has been
         # terrific for Montréal" in a rewrite): save percentage .020 off the league's, over 4+ starts
@@ -673,7 +674,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
             parts.append(f"{tag} {verb} for {W.place(t)}")
     if said:  # a judged goalie gets a sentence of his own, in game order; a plain one beside it takes other words
         plain = {t: x for t, x in zip([t for t in (away, home) if t not in dict(said) and projected.get(t) and projected[t]["id"] in N], parts)}
-        alt = {"should get the start for": "is the likely starter for", "is expected to start for": "is expected to go for"}
+        alt = {"will likely start for": "is in line to start for", "is expected to start for": "is expected to go for"}
         out = []
         for t in (away, home):
             if t in dict(said):
@@ -685,7 +686,7 @@ def in_net(away: str, home: str, projected: dict, season: int, day: str, W, N: d
     if not parts:
         return None
     if len(parts) == 2:
-        verb = next((v for v in ("is expected to start", "should get the start") if v in parts[0] and v in parts[1]), None)
+        verb = next((v for v in ("is expected to start", "will likely start") if v in parts[0] and v in parts[1]), None)
         second = parts[1].replace(f" {verb}", "", 1) if verb else parts[1]
         return cap(f"{parts[0]}, and {second}.")
     return cap(parts[0]) + "."
