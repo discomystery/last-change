@@ -21,7 +21,8 @@ interface Props { players: Record<string, KP[]>; order: readonly string[]; sides
 const { players, order, sides } = Astro.props;
 const TS = teamsData as { abbr: string; nick: string; place: string }[];
 const nick = (a: string) => TS.find((t) => t.abbr === a)?.nick ?? a;
-const line = (x: { g: number; a: number }) => `${x.g} G, ${x.a} A`;
+const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+const line = (x: { g: number; a: number }) => `${n(x.g, 'goal', 'goals')}, ${n(x.a, 'assist', 'assists')} for ${n(x.g + x.a, 'point', 'points')}`;
 const sgn = (v: number) => (Math.abs(v) < 0.005 ? '0.00' : `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`);
 const formTip = (p: KP) => {
   const pts = p.last.g + p.last.a;
@@ -37,13 +38,13 @@ const formTip = (p: KP) => {
         {players[a].map((p) => (
           <li class="card pkp-c">
             <div class="pkp-id">
-              <p class="pkp-name"><PLink id={p.id} name={fullName(p.id, String(p.id))} /></p>
-              <p class="pkp-pos">{posWord[p.pos] ?? p.pos} · {line(p.season)} in {p.season.gp} GP</p>
-              {p.form && <p class="pkp-tags"><span class="chip tag term" tabindex="0" data-tip={formTip(p)}>{p.form === 'hot' ? 'Hot run' : 'Quiet run'}</span></p>}
+              <p class="pkp-name"><PLink id={p.id} name={fullName(p.id, String(p.id))} />{p.form && <span class="chip tag term" tabindex="0" data-tip={formTip(p)}>{p.form === 'hot' ? 'Hot run' : 'Quiet run'}</span>}</p>
+              <p class="pkp-pos">{posWord[p.pos] ?? p.pos}</p>
+              <p class="pkp-line">{line(p.season)} in {n(p.season.gp, 'game', 'games')}</p>
             </div>
             <Portrait id={p.id} size={72} class="pkp-photo" />
             <dl class="pkp-facts">
-              <div><dt>Last {p.last.gp}</dt><dd>{line(p.last)} <span class="n">({p.last.g + p.last.a} P)</span></dd></div>
+              <div><dt>Last {p.last.gp}</dt><dd>{line(p.last)}</dd></div>
               {p.swing && (
                 <div>
                   <dt><span class="term" tabindex="0" data-tip="Swing is our one-number score for a player’s night: his scoring, the chances for and against with him on the ice at 5-on-5, and special teams. 0 is an ordinary night.">Swing</span></dt>
@@ -63,9 +64,9 @@ const formTip = (p: KP) => {
   .pkp ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
   .pkp-c { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 4px 12px; padding: 14px 16px 12px; overflow: hidden; }
   .pkp-id { min-width: 0; }
-  .pkp-name { font: 600 18px/1.3 var(--ui); margin: 0; }
+  .pkp-name { font: 600 18px/1.3 var(--ui); margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
   .pkp-pos { font: 400 14px/1.4 var(--ui); color: var(--ink-3); margin: 2px 0 0; }
-  .pkp-tags { margin: 6px 0 0; }
+  .pkp-line { font: 400 15px/1.4 var(--ui); color: var(--ink); margin: 6px 0 0; }
   :global(.pkp-photo) { grid-column: 2; grid-row: 1; align-self: end; }
   .pkp-facts { grid-column: 1 / -1; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--rule);
     display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; font: 400 15px/1.45 var(--ui); }

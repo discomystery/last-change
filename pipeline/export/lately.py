@@ -79,7 +79,8 @@ def team_form(g: pl.DataFrame, team: str, band: list[float]) -> dict | None:
                                       "end": r["end"], "res": x} for r, x in zip(rows, res)],
            "record": {"w": res.count("W"), "l": res.count("L"), "otl": res.count("OT"),
                       "gf": int(last["gf"].sum()), "ga": int(last["ga"].sum())},
-           "chances": {"now": now, "season": season, "gap": gap, "word": word, "season_games": mine.height}}
+           "chances": {"now": now, "season": season, "gap": gap, "word": word, "season_games": mine.height,
+                       "xgf": round(float(last["xgf_adj"].sum()), 1), "xga": round(float(last["xga_adj"].sum()), 1)}}
     if "ppg" in last.columns:
         out["pp"] = [int(last["ppg"].fill_null(0).sum()), int(last["ppo"].fill_null(0).sum())]
         out["pk"] = [int(last["ppga"].fill_null(0).sum()), int(last["ppa"].fill_null(0).sum())]
