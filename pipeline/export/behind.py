@@ -124,14 +124,17 @@ def summary(season: int = CURRENT_SEASON, before: str | None = None) -> dict[str
         gp = r["gp"]
         pp = r["pts"] / (2 * gp)
         play = k["play"][0] + k["play"][1] * (r["ev"] + r["st"]) / gp
-        by_goals = k["goals"][0] + k["goals"][1] * r["gd"] / gp
+        # Empty-net goals come after the game is mostly decided (a team chasing pulls its goalie), so they move the goal
+        # difference but hardly the points: leave them out of what the goals say, and they show up as one-goal results.
+        by_goals = k["goals"][0] + k["goals"][1] * (r["gd"] - r["en"]) / gp
         out[r["ab"]] = {**r, "pp": pp, "play": play, "gap": pp - play, "close": (pp - by_goals) * 2 * gp}
     return out
 
 
 def reasons(r: dict, sign: int) -> list[tuple[float, str]]:
-    """The parts on the side of the gap, biggest first: (size, kind), kind one of gk / fin / en / close."""
-    out = [(r[k] * sign, k) for k in ("gk", "fin", "en") if r[k] * sign >= REASON]
+    """The parts on the side of the gap, biggest first: (size, kind), kind one of gk / fin / close. Empty-net goals are
+    never a reason for points (Sora, 2026-10-30): they go into the close-game part instead."""
+    out = [(r[k] * sign, k) for k in ("gk", "fin") if r[k] * sign >= REASON]
     if r["close"] * sign >= CLOSE_REASON:
         out.append((r["close"] * sign * 1.6, "close"))  # a point is worth about 1.6 goals of difference over a season
     return sorted(out, reverse=True)

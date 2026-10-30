@@ -479,14 +479,19 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
     # each name is followed straight away by his line, which the page draws as a tag and links the name before it
     # (Sora, 2026-10-30): "Kyle Connor (10 G / 4 A / 14 P in 13 GP) leads the Jets in scoring"
     ride = extras(lead)
+    tied = bool(other) and not (other is gl and gl["g"] > lead["g"]) and other["pts"] == lead["pts"]
     who = f"{N[lead['player_id']]} ({line(lead)})"
     lr = _nhl_rank(lead["player_id"], "pts", season, day)
+    tied = tied and not lr  # a league rank is told instead, and the other player follows as usual
     if lr and lr[0] == 1:  # "leads the Oilers and the whole NHL in scoring"
         first = f"{who} {'is tied for the NHL lead in scoring' if lr[1] else f'leads {W.the(t)} and the whole NHL in scoring'}"
     elif lr:  # "leads the Oilers in scoring and is fifth in the NHL"
         first = f"{who} leads {W.the(t)} in scoring and is {'tied for ' if lr[1] else ''}{ordinal_word(lr[0])} in the NHL"
-    elif second:
-        first = cap(_pick([f"For {W.the(t)}, it’s {who}", f"{W.poss(t)} scoring runs through {who}"], *key, t, "lead2"))
+    elif tied:  # two level at the top: "is tied for the Islanders’ scoring lead. Matthew Schaefer (...) shares it"
+        first = f"{who} is tied for {W.poss(t)} scoring lead"
+    elif second:  # a full sentence, never "For the Islanders, it’s Bo Horvat" (Sora: it's Bo Horvat what?)
+        first = cap(_pick([f"For {W.the(t)}, {who} leads the way in scoring", f"{W.poss(t)} scoring runs through {who}"],
+                          *key, t, "lead2"))
     else:
         first = _pick([f"{who} leads {W.the(t)} in scoring", f"{who} is carrying {W.poss(t)} offense"], *key, t, "lead1")
     if ride:  # "..., who has nine points in his last five games"
@@ -501,11 +506,15 @@ def scorers(t: str, opp: str, season: int, day: str, W, N: dict, gone: set, seco
         what = f"has a team-high {_count(other['g'], 'goal')}" + (
             "" if not gr else ", tied for the most in the NHL" if gr[0] == 1 and gr[1] else ", the most in the NHL" if gr[0] == 1
             else f", {'tied for ' if gr[1] else ''}{ordinal_word(gr[0])} in the NHL")
+    elif tied:
+        what = "shares it"
     else:
         what = _pick(["isn’t far behind", "is next in line"], *key, t, "next")
     if o_ride:  # "Brady Tkachuk (...) has a team-high eight goals, with seven points in his last five games"
         return f"{first}. {owho} {what}, with {and_list(o_ride)}.", used, told_tags
     if ride:
+        return f"{first}. {owho} {what}.", used, told_tags
+    if tied:
         return f"{first}. {owho} {what}.", used, told_tags
     return f"{first}, and {owho} {what}.", used, told_tags
 
