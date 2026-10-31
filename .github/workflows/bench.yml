@@ -1,0 +1,97 @@
+# Bench: on every pull request that changes the pipeline, replay the preview calls over past seasons and rebuild the
+# sample games' pages, once with the pull request and once with the main branch it would merge into, and post the
+# difference as one comment on the pull request (kept up to date on later pushes). Nothing is saved or published.
+# Plan items D and E of "Better previews, and text that improves itself" (Sora, 2026-10-31).
+name: Bench
+
+on:
+  pull_request:
+    paths:
+      - "pipeline/**"
+      - "content/**"
+      - ".github/workflows/bench.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: bench-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LC_OFFLINE: "1"  # never fetch: both sides read the same saved data
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Restore data and the last published numbers from the data branch
+        run: |
+          git fetch --depth=1 origin data
+          mkdir -p data
+          git archive FETCH_HEAD | tar -x -C data
+          mkdir -p site/public/data
+          cp -R data/site_data/. site/public/data/
+          rm -rf data/site_data
+
+      - name: Check out the code this would merge into
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || 'origin/main' }}"
+          git worktree add ../base "$BASE"
+          # The base side is measured with this pull request's bench, so a change to the bench itself compares like with like.
+          rm -rf ../base/pipeline/bench
+          cp -R pipeline/bench ../base/pipeline/bench
+
+      - name: Bench with this pull request
+        run: |
+          mkdir -p ../out
+          uv run --project pipeline python -m pipeline.bench calls --out ../out/calls-head.json
+          uv run --project pipeline python -m pipeline.bench samples --out ../out/samples-head.json
+
+      - name: Bench with the base branch
+        env:
+          LAST_CHANGE_DATA: ${{ github.workspace }}/data
+          LAST_CHANGE_SITE_DATA: ${{ github.workspace }}/site/public/data
+        working-directory: ../base
+        run: |
+          uv run --project pipeline python -m pipeline.bench calls --out ../out/calls-base.json
+          uv run --project pipeline python -m pipeline.bench samples --out ../out/samples-base.json
+
+      - name: Write the report
+        run: |
+          uv run --project pipeline python -m pipeline.bench compare \
+            --calls ../out/calls-base.json ../out/calls-head.json \
+            --samples ../out/samples-base.json ../out/samples-head.json \
+            --out ../out/bench-report.md
+          cat ../out/bench-report.md >> "$GITHUB_STEP_SUMMARY"
+          cp -R ../out bench-out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: bench-out/
+
+      - name: Post or update the comment on the pull request
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- bench-report -->';
+            const body = marker + '\n' + fs.readFileSync('bench-out/bench-report.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const old = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
