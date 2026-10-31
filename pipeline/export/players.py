@@ -14,7 +14,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
-from pipeline.export import carries
+from pipeline.export import carries, top_gear
 from pipeline.ingest import careers, edge, names, official_stats, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics import war
@@ -222,6 +222,23 @@ def run(season: int) -> int:
             n = c["len"].sum()
             area_avg[mode][g] = {row["area"]: round(100 * row["len"] / n, 1) for row in c.iter_rows(named=True)}
 
+    # Per 60 minutes, for the map against a typical player at his position: every skater's ice time per mode, and
+    # each position's shots per 60 from each area (all situations, the same shots as the map).
+    toi_mode = {}
+    for mode in ("blend", "season"):
+        t = (pg if mode == "blend" else pg.filter(pl.col("season") == season)).group_by("player_id").agg(pl.col("sec").sum())
+        toi_mode[mode] = dict(zip(t["player_id"], t["sec"]))
+    area_rate = {}
+    for mode in ("blend", "season"):
+        sub = shots if mode == "blend" else shots.filter(pl.col("season") == season)
+        counts = sub.group_by("p1", "area").len()
+        area_rate[mode] = {}
+        for g in ("F", "D"):
+            members = [p for p, gg in group_of.items() if gg == g]
+            hours = sum(toi_mode[mode].get(p, 0) for p in members) / 3600
+            c = counts.filter(pl.col("p1").is_in(members)).group_by("area").agg(pl.col("len").sum())
+            area_rate[mode][g] = {row["area"]: row["len"] / hours for row in c.iter_rows(named=True)} if hours else {}
+
     misses = ev.filter((pl.col("type") == "missed-shot") & pl.col("p1").is_not_null()).with_columns(
         kind=pl.col("reason").replace_strict(MISS_GROUPS, default="other"), side=pl.col("reason").str.extract(r"(left|right)"))
     miss_by = {}
@@ -260,6 +277,13 @@ def run(season: int) -> int:
                     edge_pct.setdefault(pid, {}).setdefault(mode, {})[k] = {"v": round(v, 2), "pct": round(rating._pct(v, pool, higher)), "ok": pid in regular,
                                                                          "of": int(len(pool)), "avg": round(float(pool.mean()), 2), "vs": g,
                                                                          "rank": int((pool > v).sum() + 1 if higher else (pool < v).sum() + 1)}
+
+    # Top gear (Skating and shot): how often he reaches each speed, from EDGE's speed detail (export/top_gear.py).
+    gear = top_gear.run(season, {pid: {"group": rec["group"]} for pid, rec in r["players"].items()},
+                        {pid: {"now": rec["totals"]["season"]["sec"] / 3600, "last": (rec["totals"]["last"]["sec"] / 3600) if rec["totals"]["last"] else None}
+                         for pid, rec in r["players"].items()},
+                        {mode: {pid for pid, rec in r["players"].items() if rec["games"] + (rec["games_last"] if mode == "blend" else 0) >= POOL_GAMES[mode]}
+                         for mode in ("blend", "season")})
 
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -312,7 +336,7 @@ def run(season: int) -> int:
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"),
                      "zone_starts": {**rec["zone_starts"], "coach": whole_season.get(team)} if rec.get("zone_starts") else None, "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0), shift_table),
-                     "edge": edge_pct.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
+                     "edge": edge_pct.get(pid), "gear": gear.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
                              for s_ in mine.select("x_norm", "y_norm", "xg", "type", "season").iter_rows(named=True)]
@@ -325,6 +349,11 @@ def run(season: int) -> int:
                 areas[mode] = {"n": n, "areas": {a: {"shots": int(have[a]["shots"]) if a in have else 0, "goals": int(have[a]["goals"]) if a in have else 0,
                                                      "share": round(100 * have[a]["shots"] / n, 1) if a in have and n else 0.0,
                                                      "avg": area_avg[mode][rec["group"]].get(a, 0.0)} for a in AREAS}}
+                hours = toi_mode[mode].get(pid, 0) / 3600
+                if hours:  # against a typical player at his position, per 60 (see _vs_typical)
+                    areas[mode]["hours"] = round(hours, 1)
+                    for a in AREAS:
+                        areas[mode]["areas"][a] |= _vs_typical(areas[mode]["areas"][a]["shots"], hours, area_rate[mode][rec["group"]].get(a, 0.0))
             base["areas"] = areas
             mb = miss_by.get(pid, {})
             base["misses"] = {"season": mb.get(season), "blend": _add(mb.get(season), mb.get(season - 1))}
@@ -332,6 +361,18 @@ def run(season: int) -> int:
         index.append({"id": pid, "name": base["name"], "last": row["last"], "team": team, "pos": row["pos"], "number": row["number"], "photo": base["photo"], **({"unplayed": True} if pid in unplayed else {})})
     (OUT / "index.json").write_text(json.dumps(sorted(index, key=lambda x: (x["team"] or "", x["last"])), separators=(",", ":")))
     return len(index)
+
+
+# The map against a typical player pulls each area toward typical with this many shots' weight, so a handful of
+# shots from a quiet area cannot paint it (an area a typical forward shoots from once an hour needs a few seasons).
+AREA_PULL = 8
+
+
+def _vs_typical(n: int, hours: float, typical60: float) -> dict:
+    """His shots per 60 from one area, a typical player's at his position, and how many times as often he shoots from
+    there after pulling toward typical (1 = the same)."""
+    expected = typical60 * hours
+    return {"per60": round(n / hours, 2), "typ60": round(typical60, 2), "ratio": round((n + AREA_PULL) / (expected + AREA_PULL), 2)}
 
 
 def _num(v):

@@ -1,0 +1,99 @@
+---
+// "Top gear" card in Skating and shot: how often he reaches each speed, per 60 minutes of his ice time, against the
+// middle 80% of regulars at his position. Data: `gear` in his player JSON and the league bands in top_gear.json
+// (pipeline/export/top_gear.py, from NHL EDGE's speed bands and ten fastest skates). Inspired by Post Hockey's
+// hourly burst chart (Sora, 2026-10-31). Follows the Seasons setting like the other EDGE cards.
+// Drawn in the browser at the card's real width (a log scale needs readable labels on phones); the bands are one
+// script per position, identical on every page of that position, so the build's slimming step shares it.
+import { ordinal } from '../lib/format';
+
+interface Props { p: any }
+const { p } = Astro.props;
+const file = Object.values(import.meta.glob('../../public/data/top_gear.json', { eager: true, import: 'default' }))[0] as any;
+const g = p.group === 'D' ? 'D' : 'F';
+const gear = p.gear ?? {};
+const modes = (['blend', 'season'] as const).filter((m) => gear[m]?.curve?.length >= 2 && file?.[m]?.[g]?.band?.length);
+const who = g === 'D' ? 'defensemen' : 'forwards';
+const bandJs = `window.lcGear=window.lcGear||{};window.lcGear.${g}=${JSON.stringify({ blend: file?.blend?.[g], season: file?.season?.[g] })};`;
+const mph = (v: number) => `${v.toFixed(1)} mph`;
+const span = { blend: 'this season and last', season: 'this season' } as const;
+---
+{modes.length > 0 && (
+  <div class="card tg">
+    <p class="chart-title">Top gear</p>
+    {modes.map((m) => {
+      const x = gear[m], lg = file[m][g];
+      return (
+        <div class={`gmode m-${m}`}>
+          <p class="tg-sum">{x.hour != null ? <><strong>{mph(x.hour)}</strong> about once every 60 minutes{x.ok && x.hour_pct != null && ` (${ordinal(x.hour_pct)} percentile of ${who}; the median is ${mph(lg.hour)})`}</> : <>Under 18 mph most hours</>} · <strong>{x.c20.toFixed(1)}</strong> skates over 20 mph per 60{x.ok && ` (${ordinal(x.c20_pct)} percentile)`}</p>
+          <figure class="tg-fig" data-g={g} data-m={m} data-me={JSON.stringify(x)} aria-label={`How often he skates at or above each speed, per 60 minutes, ${span[m]}`}></figure>
+          <p class="n">How many times per 60 minutes he reaches each speed or faster, {span[m]}: big dots at 18, 20 and 22 mph, small dots his ten fastest skates, the ring the speed he reaches about once an hour. The further right his line runs, the faster his top gear; the higher it sits, the more often he uses it. Shaded: the middle 80% of {who} with {m === 'blend' ? '20+ games over the two seasons' : '3+ games'}, with a line at the median. {Math.round(x.hours)} hours of ice time, regular season, all situations.{!x.ok && ' Too few games yet to rank him.'}</p>
+        </div>
+      );
+    })}
+    <script is:inline set:html={bandJs}></script>
+  </div>
+)}
+
+<script is:inline>
+  // Draws every Top gear chart on the page at its real width; redrawn when the width or the Seasons setting changes.
+  (() => {
+    const NS = 'http://www.w3.org/2000/svg';
+    const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+    const tx = (s, a, p) => { const t = el('text', a, p); t.textContent = s; return t; };
+    const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+    function draw(fig) {
+      const B0 = ((window.lcGear || {})[fig.dataset.g] || {})[fig.dataset.m]; if (!B0) return;
+      const me = JSON.parse(fig.dataset.me), W = Math.round(fig.clientWidth); if (!W) return;
+      if (fig.dataset.w === String(W)) return;
+      fig.dataset.w = String(W);
+      const narrow = W < 520, H = narrow ? 260 : 290, L = 40, R = 10, T = 18, Bm = 26;
+      const pts = me.curve.concat(B0.band.map((b) => [b[0], b[3]]));
+      const x1 = Math.max(23, Math.ceil(Math.max(...pts.map((q) => q[0])) * 2) / 2 + 0.25), x0 = 18;
+      const x = (v) => L + (v - x0) / (x1 - x0) * (W - L - R);
+      const ylo = Math.log10(0.05), yhi = Math.log10(Math.max(30, ...pts.map((q) => q[1])) * 1.1);
+      const y = (v) => T + (yhi - Math.log10(Math.max(0.05, v))) / (yhi - ylo) * (H - T - Bm);
+      fig.textContent = '';
+      const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'tg-svg', 'aria-hidden': 'true' }, fig);
+      for (const v of [0.1, 1, 10]) { el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'tg-grid' }, svg); tx(String(v), { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', class: 'tg-ax' }, svg); }
+      tx('per 60', { x: L - 8, y: T - 6, 'text-anchor': 'end', class: 'tg-ax' }, svg);
+      el('line', { x1: L, x2: W - R, y1: y(1), y2: y(1), class: 'tg-hour' }, svg);
+      tx('Once every 60 minutes', { x: W - R, y: y(1) - 7, 'text-anchor': 'end', class: 'tg-lab' }, svg);
+      for (let v = 18; v <= Math.floor(x1); v += narrow ? 2 : 1) tx(v + (v + (narrow ? 2 : 1) > x1 ? ' mph' : ''), { x: x(v), y: H - 6, 'text-anchor': 'middle', class: 'tg-ax' }, svg);
+      const band = B0.band;
+      el('path', { d: 'M' + band.map((b) => `${x(b[0]).toFixed(1)} ${y(b[3]).toFixed(1)}`).join(' L') + ' L' + band.slice().reverse().map((b) => `${x(b[0]).toFixed(1)} ${y(b[1]).toFixed(1)}`).join(' L') + ' Z', class: 'tg-band' }, svg);
+      el('path', { d: 'M' + band.map((b) => `${x(b[0]).toFixed(1)} ${y(b[2]).toFixed(1)}`).join(' L'), class: 'tg-med' }, svg);
+      el('path', { d: 'M' + me.curve.map((q) => `${x(q[0]).toFixed(1)} ${y(q[1]).toFixed(1)}`).join(' L'), class: 'tg-line' }, svg);
+      const tops = me.curve.filter((q) => !me.marks.some((m) => m[0] === q[0]));
+      tops.forEach((q) => el('circle', { cx: x(q[0]), cy: y(q[1]), r: 3, class: 'tg-top', tabindex: 0, 'data-tip': `${q[0].toFixed(1)} mph: one of his ten fastest skates.` }, svg));
+      for (const [s, r] of me.marks) if (r > 0) el('circle', { cx: x(s), cy: y(r), r: 5.5, class: 'tg-mark', tabindex: 0, 'data-tip': `${r.toFixed(1)} times per 60 minutes at ${s} mph or faster.` }, svg);
+      if (me.hour != null) el('circle', { cx: x(me.hour), cy: y(1), r: 7, class: 'tg-ring', tabindex: 0, 'data-tip': `${me.hour.toFixed(1)} mph: the speed he reaches about once every 60 minutes${me.ok && me.hour_pct != null ? `, ${ord(me.hour_pct)} percentile` : ''}.` }, svg);
+    }
+    const all = () => document.querySelectorAll('.tg-fig').forEach(draw);
+    if (!window.lcTg) {
+      window.lcTg = true;
+      let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(all, 150); });
+      new MutationObserver(() => requestAnimationFrame(all)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+    }
+  })();
+</script>
+
+<style>
+  .tg { margin-top: 14px; display: grid; gap: 4px; }
+  .tg-sum { font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
+  .tg-sum strong { font-weight: 600; color: var(--ink); }
+  .tg-fig { margin: 8px 0 0; min-height: 260px; }
+  .tg-fig :global(.tg-svg) { display: block; overflow: visible; }
+  .tg-fig :global(.tg-grid) { stroke: var(--rule); stroke-width: 1; }
+  .tg-fig :global(.tg-hour) { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 2 4; }
+  .tg-fig :global(.tg-ax) { font: 400 12px var(--ui); fill: var(--ink-3); }
+  .tg-fig :global(.tg-lab) { font: 600 12px var(--ui); fill: var(--ink-2); }
+  .tg-fig :global(.tg-band) { fill: color-mix(in oklab, var(--ink-3) 22%, var(--sheet)); }
+  .tg-fig :global(.tg-med) { fill: none; stroke: var(--ink-3); stroke-width: 2; }
+  .tg-fig :global(.tg-line) { fill: none; stroke: var(--team); stroke-width: 2.5; stroke-linejoin: round; }
+  .tg-fig :global(.tg-mark) { fill: var(--team); stroke: var(--sheet); stroke-width: 1.5; cursor: help; outline: none; }
+  .tg-fig :global(.tg-top) { fill: var(--team); cursor: help; outline: none; }
+  .tg-fig :global(.tg-ring) { fill: var(--sheet); stroke: var(--team); stroke-width: 2.5; cursor: help; outline: none; }
+  .tg-fig :global(:focus-visible) { stroke: var(--ink); }
+</style>

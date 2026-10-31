@@ -1,0 +1,121 @@
+---
+// "Season by season" in the Value section: his wins above replacement per 82 games for every season since 2023-24,
+// over a cloud of every forward's (or defenseman's) season. Inspired by Post Hockey's Net Rating chart (Sora,
+// 2026-10-31); the numbers are ours (pipeline/metrics/war.py writes every season into war.json).
+// Drawn in the browser at the card's real width so the labels stay readable on phones. The cloud for each position
+// is one script, identical on every page of that position, so the build's slimming step shares it (site/slim).
+// Per 82 games so seasons of different lengths compare; this season, still a small sample, is an open dot.
+import { seasonName } from '../lib/stats';
+import { ordinal } from '../lib/format';
+
+interface Props { p: any; file: any }
+const { p, file } = Astro.props;
+const years = Object.keys(file?.seasons ?? {}).map(Number).sort((a, b) => a - b);
+const now = years[years.length - 1];
+const g = p.group === 'D' ? 'D' : 'F';
+const MIN_GP = (yr: number) => (yr === now ? 8 : 20); // the cloud: seasons of 20+ games, 8+ for the one under way
+const per82 = (x: any) => (x.war / x.gp) * 82;
+const mine = years.map((yr) => {
+  const x = file.seasons[String(yr)]?.players?.[String(p.id)];
+  return x && x.gp > 0 ? { yr, name: seasonName(yr), gp: x.gp, war: x.war, r: +per82(x).toFixed(2), lo: +((x.lo / x.gp) * 82).toFixed(2), hi: +((x.hi / x.gp) * 82).toFixed(2), rank: x.rank, of: x.of, now: yr === now } : null;
+}).filter(Boolean) as any[];
+const cloud = Object.fromEntries(years.map((yr) => [yr, Object.values(file.seasons[String(yr)]?.players ?? {})
+  .filter((x: any) => x.group === g && x.gp >= MIN_GP(yr)).map((x: any) => Math.round(per82(x) * 10) / 10).sort((a, b) => a - b)]));
+const show = mine.length >= 2;
+const who = g === 'D' ? 'defenseman' : 'forward';
+const cloudJs = `window.lcWarCloud=window.lcWarCloud||{};window.lcWarCloud.${g}=${JSON.stringify({ years: years.map(seasonName), now: seasonName(now), v: years.map((yr) => cloud[yr]) })};`;
+const fmt = (v: number) => { const r = Math.abs(v).toFixed(1); return Number(r) === 0 ? r : `${v > 0 ? '+' : '−'}${r}`; };
+const last = mine.filter((m) => !m.now).at(-1);
+---
+{show && (
+  <div class="card wvs">
+    <p class="chart-title">Season by season <span class="n">per 82 games</span></p>
+    <p class="wvs-sum">{mine.map((m) => `${m.name}: ${fmt(m.r)}${m.now ? ' so far' : ''}`).join(' · ')}</p>
+    <script is:inline set:html={cloudJs}></script>
+    <figure class="wvs-fig" data-g={g} data-me={JSON.stringify(mine)} data-who={who} aria-label={`Wins above replacement per 82 games by season, against every ${who}’s season`}></figure>
+    <p class="wvs-key"><span><i class="k-cloud"></i>Every {who}’s season (20+ games; 8+ this season)</span><span><i class="k-me"></i>{p.name}, with his likely range</span><span><i class="k-open"></i>This season so far</span><span><i class="k-zero"></i>Fill-in level</span></p>
+    <p class="n">Per 82 games, so a short season and a full one compare; the totals are in the cards above.{last && ` In ${last.name} he was ${ordinal(last.rank)} of ${last.of} ${who === 'forward' ? 'forwards' : 'defensemen'} in total.`} Our ratings start in 2023-24, so earlier seasons aren’t on it.</p>
+  </div>
+)}
+
+<script is:inline>
+  // Draws every season-by-season chart on the page at its real width, and again when the width changes.
+  (() => {
+    const NS = 'http://www.w3.org/2000/svg';
+    const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+    const tx = (s, a, p) => { const t = el('text', a, p); t.textContent = s; return t; };
+    const sign = (v, d) => { const r = Math.abs(v).toFixed(d); return Number(r) === 0 ? r : (v > 0 ? '+' : '−') + r; };
+    const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+    function draw(fig) {
+      const C = (window.lcWarCloud || {})[fig.dataset.g]; if (!C) return;
+      const me = JSON.parse(fig.dataset.me), W = Math.round(fig.clientWidth); if (!W) return;
+      const narrow = W < 520, H = narrow ? 280 : 320, L = 34, R = 8, T = 10, B = narrow ? 38 : 40;
+      // The scale covers the middle 98% of every season's cloud and his whole range; the rare season past it sits on the edge.
+      const q = (vals, f) => vals[Math.min(vals.length - 1, Math.floor(f * vals.length))] ?? 0;
+      const lo = Math.min(-1, Math.floor(Math.min(...C.v.map((v) => q(v, 0.01)), ...me.map((m) => m.lo))));
+      const hi = Math.max(2, Math.ceil(Math.max(...C.v.map((v) => q(v, 0.99)), ...me.map((m) => m.hi))));
+      const y = (v) => T + (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo) * (H - T - B);
+      const n = C.years.length, step = (W - L - R) / n, cx = (i) => L + step * (i + 0.5);
+      fig.textContent = '';
+      const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'wvs-svg', 'aria-hidden': 'true' }, fig);
+      for (let v = lo; v <= hi; v++) {
+        if (v !== 0) el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'wvs-grid' }, svg);
+        tx(v === 0 ? '0' : sign(v, 0), { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', class: 'wvs-ax' }, svg);
+      }
+      el('line', { x1: L, x2: W - R, y1: y(0), y2: y(0), class: 'wvs-zero' }, svg);
+      C.v.forEach((vals, i) => {
+        let s = 7 + i * 101;
+        const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+        const half = step * 0.38, med = vals[Math.floor(vals.length / 2)] ?? 0, sd = 0.9;
+        for (const v of vals) {
+          const dens = Math.exp(-((v - med) ** 2) / sd);
+          el('circle', { cx: (cx(i) + (rnd() * 2 - 1) * half * (0.2 + 0.8 * dens)).toFixed(1), cy: y(v).toFixed(1), r: narrow ? 1.7 : 2, class: 'wvs-c' }, svg);
+        }
+        const name = C.years[i], m = me.find((x) => x.name === name);
+        tx(narrow ? name.slice(2) : name + (name === C.now ? ' so far' : ''), { x: cx(i), y: H - B + 18, 'text-anchor': 'middle', class: 'wvs-yr' }, svg);
+        if (m) tx(`${m.gp} GP`, { x: cx(i), y: H - B + 33, 'text-anchor': 'middle', class: 'wvs-ax' }, svg);
+      });
+      const at = (m) => [cx(C.years.indexOf(m.name)), y(m.r)];
+      const runs = []; let run = [];
+      C.years.forEach((name) => { const m = me.find((x) => x.name === name); if (m) run.push(m); else if (run.length) { runs.push(run); run = []; } });
+      if (run.length) runs.push(run);
+      for (const r of runs) if (r.length > 1) el('path', { d: 'M' + r.map((m) => at(m).map((v) => v.toFixed(1)).join(' ')).join(' L'), class: 'wvs-line' }, svg);
+      for (const m of me) {
+        const [x0, y0] = at(m);
+        el('line', { x1: x0, x2: x0, y1: y(m.lo), y2: y(m.hi), class: 'wvs-rng' }, svg);
+        el('circle', { cx: x0, cy: y0, r: 6.5, class: m.now ? 'wvs-me open' : 'wvs-me', tabindex: 0,
+          'data-tip': `${m.name}${m.now ? ' so far' : ''}: ${sign(m.war, 2)} wins above replacement in ${m.gp} games, ${sign(m.r, 1)} per 82 (likely ${sign(m.lo, 1)} to ${sign(m.hi, 1)}). ${ord(m.rank)} of ${m.of} ${fig.dataset.who === 'forward' ? 'forwards' : 'defensemen'} in total.` }, svg);
+      }
+    }
+    const all = () => document.querySelectorAll('.wvs-fig').forEach(draw);
+    if (!window.lcWvs) {
+      window.lcWvs = true;
+      let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(all, 150); });
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+    }
+  })();
+</script>
+
+<style>
+  .wvs { margin-top: 14px; display: grid; gap: 4px; }
+  .wvs .chart-title .n { font: 400 14px var(--ui); color: var(--ink-3); margin-left: 4px; }
+  .wvs-sum { font: 400 14px/1.4 var(--ui); color: var(--ink-2); }
+  .wvs-fig { margin: 6px 0 0; min-height: 280px; }
+  .wvs-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 13px/1.4 var(--ui); color: var(--ink-3); margin-top: 4px; }
+  .wvs-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .k-cloud { background: color-mix(in oklab, var(--ink-3) 40%, var(--sheet)); }
+  .k-me { background: var(--team); }
+  .k-open { border: 2px solid var(--team); box-sizing: border-box; }
+  .wvs-key .k-zero { width: 14px; height: 0; border-radius: 0; border-top: 2px dotted var(--ink-3); vertical-align: 3px; }
+  .wvs-fig :global(.wvs-svg) { display: block; overflow: visible; }
+  .wvs-fig :global(.wvs-grid) { stroke: var(--rule); stroke-width: 1; }
+  .wvs-fig :global(.wvs-zero) { stroke: var(--ink-3); stroke-width: 2; stroke-dasharray: 2 4; }
+  .wvs-fig :global(.wvs-ax) { font: 400 12px var(--ui); fill: var(--ink-3); }
+  .wvs-fig :global(.wvs-yr) { font: 600 13px var(--ui); fill: var(--ink-2); }
+  .wvs-fig :global(.wvs-c) { fill: color-mix(in oklab, var(--ink-3) 40%, var(--sheet)); }
+  .wvs-fig :global(.wvs-line) { fill: none; stroke: var(--team); stroke-width: 2; }
+  .wvs-fig :global(.wvs-rng) { stroke: color-mix(in oklab, var(--team) 45%, transparent); stroke-width: 4; stroke-linecap: round; }
+  .wvs-fig :global(.wvs-me) { fill: var(--team); stroke: var(--sheet); stroke-width: 2; cursor: help; outline: none; }
+  .wvs-fig :global(.wvs-me.open) { fill: var(--sheet); stroke: var(--team); stroke-width: 2.5; }
+  .wvs-fig :global(.wvs-me:focus-visible) { stroke: var(--ink); }
+</style>
