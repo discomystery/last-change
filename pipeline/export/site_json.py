@@ -155,7 +155,7 @@ def clock(seconds: float) -> str:
 
 # a power-play or penalty-kill change against last season is news for its first few games with the club, then the
 # preview's Worth knowing stops repeating it (Sora, 2026-10-31: "Repeats every game!"); team pages keep it
-USAGE_FRESH = 3  # the note needs 3 games, so it is told in the one preview after the change shows
+USAGE_FRESH = 7  # the note needs 3 games, so it is told in at most five previews (Sora, 2026-10-31)
 SHUFFLED = 0.33  # listed forward lines covering less than this share of 5v5 trio time = a lineup in flux (league median ~0.5)
 
 
