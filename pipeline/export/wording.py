@@ -180,3 +180,20 @@ def initials(r: dict) -> str:
 def full(r: dict) -> str:
     return f"{r['first']} {r['last']}"
 
+
+
+INJURY_ENDS = ("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear", "concussion")
+# report "injuries" that are not injuries: told as they are, never with "injury" added (Sora, 2026-10-31: "Nikishin is
+# out (not injury related injury)")
+NOT_INJURY = ("not injury related", "non-injury related", "maintenance", "rest")
+
+
+def injury(text: str | None, undisclosed: bool = False) -> tuple[str, bool]:
+    """The injury words for a sentence ("upper body" -> "upper body injury") and whether it is a real injury.
+    "Undisclosed" gives nothing unless `undisclosed` asks for "undisclosed injury"."""
+    t = (text or "").strip()
+    if not t or ("undisclosed" in t.lower() and not undisclosed):
+        return "", True
+    if t.lower() in NOT_INJURY or "not injury" in t.lower():
+        return t, False
+    return (t if t.lower().endswith(INJURY_ENDS) else f"{t} injury"), True

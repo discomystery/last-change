@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-from pipeline.export import grammar
+from pipeline.export import grammar, wording
 from pipeline.export.grammar import and_list as _and, cap as _cap, num
 
 PERIODS = {1: "first", 2: "second", 3: "third"}
@@ -937,7 +937,7 @@ def _exit(gm: Game, x: dict) -> str:
 
 INJURY_SAID = {"ir": "was placed on injured reserve", "week": "was listed as week to week", "day": "was listed as day to day",
                "season": "was ruled out for the rest of the season", "out": "was ruled out"}
-INJURY_ENDS = ("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear", "concussion")
+from pipeline.export.wording import INJURY_ENDS  # noqa: E402,F401  (kept here for older callers)
 
 
 def injury_news(n: dict | None) -> str:
@@ -956,9 +956,9 @@ def injury_news(n: dict | None) -> str:
     if not said:
         return ""
     when = "The next day" if n["days"] <= 1 else "Two days later"
-    inj = (n.get("injury") or "").strip().lower().replace("upper body", "upper-body").replace("lower body", "lower-body")
-    if inj and not inj.endswith(INJURY_ENDS):
-        inj += " injury"
+    inj, real = wording.injury((n.get("injury") or "").lower().replace("upper body", "upper-body").replace("lower body", "lower-body"), undisclosed=True)
+    if not real:
+        inj = ""  # "not injury related": the list's news, without an injury it never named
     return f" {when}, he {said}{' with ' + grammar.article(inj) if inj else ''}."
 
 
