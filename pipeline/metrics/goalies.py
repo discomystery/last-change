@@ -9,6 +9,7 @@ from functools import lru_cache
 import numpy as np
 import polars as pl
 
+from pipeline import tables
 from pipeline.config import FULL_SEASONS, REGULAR, TABLES
 from pipeline.metrics.team_game import BREAKDOWN_XG
 
@@ -73,7 +74,18 @@ def shots(season: int) -> pl.DataFrame:
                           breakdown=pl.col("turnover") & (pl.col("xg") >= BREAKDOWN_XG), season=pl.lit(season))
 
 
+PER_GAME_FILES = ("games", "events", "shot_features", "shots_xg_own", "turnover_shots", "toi_check", "players", "stints")
+
+
 def per_game(season: int) -> pl.DataFrame:
+    """Each goalie's game: shots, goals, expected goals, tiers, waits, rebounds, starter. Kept for the run while the
+    tables it reads are unchanged (stories and absences ask for it once a game day)."""
+    d = TABLES / str(season)
+    return _per_game(season, tables.stamp(*(d / f"{n}.parquet" for n in PER_GAME_FILES)))
+
+
+@lru_cache(maxsize=8)
+def _per_game(season: int, _stamp: tuple) -> pl.DataFrame:
     d = TABLES / str(season)
     s = shots(season).sort("game_id", "goalie_id", "sec")
     # Wait before each shot on goal: since his previous shot on goal, or since the period began.

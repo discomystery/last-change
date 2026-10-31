@@ -1,0 +1,197 @@
+{
+ "kind": "preview",
+ "game_id": 2026020228,
+ "start_utc": "2026-11-01T20:30:00Z",
+ "venue": "Capital One Arena",
+ "away": {
+  "abbr": "MIN",
+  "name": "Minnesota Wild",
+  "place": "Minnesota",
+  "nickname": "Wild",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "John Hynes"
+ },
+ "home": {
+  "abbr": "WSH",
+  "name": "Washington Capitals",
+  "place": "Washington",
+  "nickname": "Capitals",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Spencer Carbery"
+ },
+ "form": {
+  "MIN": {
+   "record": "9-3-3",
+   "games": 15,
+   "run": "winless 1",
+   "last_ten": "6-2-2",
+   "last_five": [
+    {
+     "date": "2026-10-22",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "1-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": false,
+     "result": "W",
+     "score": "5-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "W",
+     "score": "3-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    }
+   ]
+  },
+  "WSH": {
+   "record": "8-4-0",
+   "games": 12,
+   "run": "won 3",
+   "last_ten": "7-3-0",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": true,
+     "result": "W",
+     "score": "4-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "PHI",
+     "opp_name": "Philadelphia Flyers",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "W",
+     "score": "4-3",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "MIN": "Jesper Wallstedt",
+  "WSH": "Logan Thompson"
+ },
+ "calls": [
+  {
+   "kind": "duel",
+   "about": "WSH",
+   "facts": [
+    "Washington: a 7.1% chance of scoring on the average shot, 1st of 32. Playing style, this season blended with last, 12 and 15 games this season.",
+    "Minnesota: a 6.1% chance of scoring on the average shot against, 7th of 32. Playing style, this season blended with last, 12 and 15 games this season."
+   ],
+   "what_we_check": "the average shot’s chance of going in, by expected goals",
+   "usual": 0.0634,
+   "league": 0.0634,
+   "direction": "above"
+  },
+  {
+   "kind": "matchup",
+   "about": "WSH",
+   "facts": [
+    "Washington’s L1 (Protas, Dubois and Wilson) at home: 61% of its 5-on-5 time against opponents’ first lines. Matchups, Washington home games this season, 8 games, 70 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face first lines about 36% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Washington L1's 5-on-5 time against Minnesota L1",
+   "usual": 61,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "MIN",
+   "facts": [
+    "Minnesota: 8.1 expected goals per 60 on the power play, 10th of 32. Playing style, this season blended with last, 15 and 12 games this season.",
+    "Washington: 8.3 expected goals allowed per 60 shorthanded, 27th of 32. Playing style, this season blended with last, 15 and 12 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 8.1122,
+   "league": 7.653,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "MIN",
+   "facts": [
+    "Minnesota: shot volume score 109, 7th of 32. Playing style, this season blended with last, 15 and 12 games this season.",
+    "Washington: shots-against score 103, 23rd of 32. Playing style, this season blended with last, 15 and 12 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 60.9134,
+   "league": 55.8839,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Even though Washington has home-ice advantage, Minnesota has been out-chancing opponents by a wide margin lately.",
+  "The Capitals can tip it if they get good looks.",
+  "Milestone: Kirill Kaprizov is one point from 500.",
+  "Out: The Wild have been without Marcus Foligno since Oct 8, and have had to make do without Filip Gustavsson and Brock Faber all season. Jesper Wallstedt is expected to start.",
+  "Owns them: Quinn Hughes has a point in six straight games against Washington.",
+  "Out: The Capitals have been without Rasmus Sandin for several games."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance."
+}

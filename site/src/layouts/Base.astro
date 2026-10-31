@@ -151,10 +151,39 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
           const wd = WEEKDAY.format(d);
           return [`on ${wd}`, wd];
         };
+        // Earlier games in that text are told from the game's day ("last night", "on Tuesday"); read on another day they
+        // are told from the reader's ("on Tuesday" read on Wednesday is "last night", "last night" read two days on is
+        // "on Thursday", and a week or more back the date, "on Oct 21").
+        const PAST = /\b(last night|on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\b/gi;
+        const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const pastWords = (start, phrase, wd) => {
+          const t = new Date(start);
+          if (isNaN(t)) return null;
+          const day = (d) => { const x = new Date(d - 3 * 3600e3); return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()); };
+          const g = day(t), now = day(Date.now());
+          if (now === g) return null;
+          let back = 1;  // days before the game
+          if (wd) {
+            back = (new Date(g).getUTCDay() - DAYS.indexOf(wd.toLowerCase()) + 7) % 7;
+            if (back < 2) return null;  // "on Saturday" about the game's own day or later is not a past game
+          }
+          const src = g - back * 864e5, gap = Math.round((now - src) / 864e5);
+          if (gap === back || gap < 1) return null;
+          const d = new Date(src);
+          if (gap === 1) return 'last night';
+          if (gap <= 6) return `on ${WEEKDAY.format(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))}`;
+          return `on ${MONTH_DAY.format(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))}`;
+        };
         const when = (s, el) => {
-          if (!/tonight/i.test(s)) return s;
+          if (!/tonight|last night|on [MTWFS][a-z]+day/i.test(s)) return s;
           const g = el && el.closest && el.closest('[data-game-start]');
-          const w = g && gameWords(g.dataset.gameStart);
+          if (!g) return s;
+          s = s.replace(PAST, (m, phrase, wd) => {
+            const out = pastWords(g.dataset.gameStart, phrase, wd);
+            if (!out) return m;
+            return m[0] === m[0].toUpperCase() ? out[0].toUpperCase() + out.slice(1) : out;
+          });
+          const w = gameWords(g.dataset.gameStart);
           if (!w) return s;
           return s.replace(NIGHT, (m, word, poss) => {
             const out = poss ? w[1] + poss : w[0];
@@ -191,7 +220,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         // serif; dates ("Oct 13"), seasons (2025-26) and term-like numbers ("5-on-5", "L1") stay in the serif. A number
         // keeps its unit in the same piece ("34 ft") so the metric switch above still sees them together; each piece is
         // split off before it is converted, so it keeps its own original.
-        const STAT = /(^|[^\w.\-–#])([+−-]?\d(?:[\d,]*\d)?(?:[.:]\d+)?(?:[-–]\d+)*(?:%|st|nd|rd|th)?(?:\s?(?:mph|ft|feet|miles?|km\/h|km|metres?))?)(?![\w\-–]|[.:]\d)/g;
+        const STAT = /(^|[^\w.\-–#])(\d+ G \/ \d+ A \/ \d+ P in \d+ GP|[+−-]?\d(?:[\d,]*\d)?(?:[.:]\d+)?(?:[-–]\d+)*(?:%|st|nd|rd|th)?(?:\s?(?:mph|ft|feet|miles?|km\/h|km|metres?))?)(?![\w\-–]|[.:]\d)/g;
         const DATE = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s$/;
         const serif = new WeakMap();
         // Only body-size serif text (13-24 px; "per 60" is a unit, not a stat): decorative numbers (the sweater number behind a portrait, big display figures) are
@@ -207,6 +236,7 @@ const teamInfo = Object.fromEntries(teamList.map((t) => [t.abbr, { c: teamPaint(
         };
         let styled = false;
         const later = [];
+        // A box-score line ("10 G / 4 A / 14 P in 13 GP", previews' scorers) is one stat, set in the sans whole.
         const sansNumbers = (t) => {
           const o = was.get(t);
           const s = o && t.data === o.out ? o.src : t.data;  // split the original, so each piece keeps its own

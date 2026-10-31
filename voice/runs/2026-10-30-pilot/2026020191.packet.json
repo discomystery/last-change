@@ -1,0 +1,609 @@
+{
+ "kind": "recap",
+ "game_id": 2026020191,
+ "date": "2026-10-27",
+ "venue": "Enterprise Center",
+ "away": {
+  "abbr": "MTL",
+  "name": "Montréal Canadiens",
+  "place": "Montréal",
+  "nickname": "Canadiens",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Martin St. Louis"
+ },
+ "home": {
+  "abbr": "STL",
+  "name": "St. Louis Blues",
+  "place": "St. Louis",
+  "nickname": "Blues",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Jim Montgomery"
+ },
+ "final": {
+  "MTL": 2,
+  "STL": 0,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 2,
+   "time_in_period": "8:37",
+   "time_left_in_period": "11:23",
+   "team": "MTL",
+   "scorer": "Zachary Bolduc",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Mike Matheson",
+    "Alexandre Texier"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 1,
+    "STL": 0
+   },
+   "chance_of_scoring": 5,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 3,
+   "time_in_period": "2:17",
+   "time_left_in_period": "17:43",
+   "team": "MTL",
+   "scorer": "Florian Xhekaj",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Mike Matheson",
+    "Kirby Dach"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "MTL": 2,
+    "STL": 0
+   },
+   "chance_of_scoring": 9,
+   "shot": "tip-in"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "MTL": 0,
+    "STL": 0
+   },
+   "shots": {
+    "MTL": 8,
+    "STL": 9
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "MTL": 1,
+    "STL": 0
+   },
+   "shots": {
+    "MTL": 9,
+    "STL": 13
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "MTL": 1,
+    "STL": 0
+   },
+   "shots": {
+    "MTL": 3,
+    "STL": 24
+   }
+  }
+ ],
+ "team_numbers": {
+  "MTL": {
+   "shots": 20,
+   "xg": 2.31,
+   "cf5": 36,
+   "hits": 19,
+   "pp_goals": 0,
+   "pp_opps": 3
+  },
+  "STL": {
+   "shots": 46,
+   "xg": 3.96,
+   "cf5": 55,
+   "hits": 26,
+   "pp_goals": 0,
+   "pp_opps": 3
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Jacob Fowler",
+   "team": "MTL",
+   "started": true,
+   "toi": "59:38",
+   "shots": 46,
+   "saves": 46,
+   "ga": 0,
+   "gsax": 3.96,
+   "sv": 1.0
+  },
+  {
+   "full": "Jordan Binnington",
+   "team": "STL",
+   "started": true,
+   "toi": "54:06",
+   "shots": 20,
+   "saves": 18,
+   "ga": 2,
+   "gsax": 0.31,
+   "sv": 0.9
+  }
+ ],
+ "players": [
+  {
+   "name": "Mike Matheson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "23:25",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Zachary Bolduc",
+   "team": "MTL",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "12:19",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Florian Xhekaj",
+   "team": "MTL",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "6:19",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Kirby Dach",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:11",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Alexandre Texier",
+   "team": "MTL",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "11:58",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Philip Broberg",
+   "team": "STL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "26:11",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Cam Fowler",
+   "team": "STL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "23:30",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Kaiden Guhle",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:47",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Lane Hutson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:04",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Pavel Buchnevich",
+   "team": "STL",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:57",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Colton Parayko",
+   "team": "STL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:46",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Robert Thomas",
+   "team": "STL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:47",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Alexandre Carrier",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:08",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Noah Dobson",
+   "team": "MTL",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:35",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Phillip Danault",
+   "team": "MTL",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:21",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Dylan Holloway",
+   "team": "STL",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:24",
+   "season_goals_after": 3.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "MTL": 37,
+   "STL": 63
+  }
+ },
+ "pregame_chance": {
+  "STL": 57,
+  "MTL": 43
+ },
+ "records_before": {
+  "MTL": {
+   "record": "6-3-2",
+   "games": 11,
+   "run": "won 2",
+   "last_ten": "5-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-14",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    }
+   ]
+  },
+  "STL": {
+   "record": "5-5-1",
+   "games": 11,
+   "run": "winless 1",
+   "last_ten": "4-5-1",
+   "last_five": [
+    {
+     "date": "2026-10-15",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": true,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "MTL": {
+   "record": "7-3-2",
+   "games": 12,
+   "run": "won 3",
+   "last_ten": "6-3-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "BUF",
+     "opp_name": "Buffalo Sabres",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": false,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "2-0",
+     "ended": "REG"
+    }
+   ]
+  },
+  "STL": {
+   "record": "5-6-1",
+   "games": 12,
+   "run": "winless 2",
+   "last_ten": "4-5-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": true,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "0-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "MTL": {
+   "points": 16,
+   "gp": 12,
+   "division": "Atlantic",
+   "division_place": 2,
+   "conference_place": 4,
+   "wild_card_place": null,
+   "league_place_by_points": 7
+  },
+  "STL": {
+   "points": 11,
+   "gp": 12,
+   "division": "Central",
+   "division_place": 6,
+   "conference_place": 10,
+   "wild_card_place": 4,
+   "league_place_by_points": 23
+  }
+ },
+ "firsts": [
+  {
+   "team": "MTL",
+   "goals": 1,
+   "kind": "first_goal",
+   "debut": false,
+   "nth": 9,
+   "undrafted": false,
+   "player": "Florian Xhekaj"
+  },
+  {
+   "team": "MTL",
+   "goals": 0,
+   "kind": "milestone",
+   "what": "game",
+   "mark": 700,
+   "have": 699,
+   "player": "Josh Anderson"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "goalie",
+   "fact": "Fowler stopped all 46 shots, worth 4.0 expected goals. That is more than Montréal’s winning margin. Starting goalies have a night this good about once every 500 starts. Most starters don’t get one a season."
+  },
+  {
+   "kind": "special",
+   "fact": "Montréal has a weaker power play than most. Even by those standards, this was a dry night: 1.1 expected goals per 60 on the power play, against their usual 7.1 (about 6.7 against St. Louis) and a league average of 7.7. A team strays this far about once every 45 games."
+  }
+ ],
+ "notes": [
+  "The Blues had the better of the chances.",
+  "Replay those chances a hundred times and the Blues win about six in ten.",
+  "Jacob Fowler was the difference, stopping 46 of 46.",
+  "Jordan Binnington stopped 18 of 20 for the Blues.",
+  "Fowler has won six straight starts.",
+  "The Canadiens moved to 7-3-2, climbing to second in the Atlantic.",
+  "The Blues dropped to 5-6-1, sixth in the Central.",
+  "Streak: Three straight wins for the Canadiens.",
+  "Against them: Robert Thomas’s five-game point streak against Montréal ended.",
+  "Milestone: The Canadiens’ Josh Anderson played his 700th NHL game.",
+  "Filling in: With Nick Suzuki out, Oliver Kapanen took his spot, though he won only 2 of 7 faceoffs."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

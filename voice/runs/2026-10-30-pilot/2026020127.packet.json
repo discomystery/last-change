@@ -1,0 +1,753 @@
+{
+ "kind": "recap",
+ "game_id": 2026020127,
+ "date": "2026-10-17",
+ "venue": "Little Caesars Arena",
+ "away": {
+  "abbr": "SJS",
+  "name": "San Jose Sharks",
+  "place": "San Jose",
+  "nickname": "Sharks",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Ryan Warsofsky"
+ },
+ "home": {
+  "abbr": "DET",
+  "name": "Detroit Red Wings",
+  "place": "Detroit",
+  "nickname": "Red Wings",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Todd McLellan"
+ },
+ "final": {
+  "SJS": 3,
+  "DET": 4,
+  "ended": "shootout"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "12:47",
+   "time_left_in_period": "7:13",
+   "team": "DET",
+   "scorer": "Justin Faulk",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Emmitt Finnie",
+    "Michael Rasmussen"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "SJS": 0,
+    "DET": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "snap"
+  },
+  {
+   "n": 2,
+   "period": 1,
+   "time_in_period": "17:59",
+   "time_left_in_period": "2:01",
+   "team": "SJS",
+   "scorer": "Dmitry Orlov",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Ivar Stenberg",
+    "Macklin Celebrini"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "SJS": 1,
+    "DET": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "slap"
+  },
+  {
+   "n": 3,
+   "period": 2,
+   "time_in_period": "4:55",
+   "time_left_in_period": "15:05",
+   "team": "SJS",
+   "scorer": "Macklin Celebrini",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Will Smith",
+    "Michael Kesselring"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "SJS": 2,
+    "DET": 1
+   },
+   "chance_of_scoring": 24,
+   "shot": "slap"
+  },
+  {
+   "n": 4,
+   "period": 3,
+   "time_in_period": "2:48",
+   "time_left_in_period": "17:12",
+   "team": "SJS",
+   "scorer": "Ivar Stenberg",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Alexander Wennberg",
+    "Macklin Celebrini"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "SJS": 3,
+    "DET": 1
+   },
+   "chance_of_scoring": 17,
+   "shot": "wrist"
+  },
+  {
+   "n": 5,
+   "period": 3,
+   "time_in_period": "5:00",
+   "time_left_in_period": "15:00",
+   "team": "DET",
+   "scorer": "Emmitt Finnie",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Michael Brandsegg-Nygård",
+    "Moritz Seider"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "SJS": 3,
+    "DET": 2
+   },
+   "chance_of_scoring": 10,
+   "shot": "tip-in"
+  },
+  {
+   "n": 6,
+   "period": 3,
+   "time_in_period": "18:27",
+   "time_left_in_period": "1:33",
+   "team": "DET",
+   "scorer": "Alex DeBrincat",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Viktor Arvidsson",
+    "Moritz Seider"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": true,
+   "score_after": {
+    "SJS": 3,
+    "DET": 3
+   },
+   "chance_of_scoring": 21,
+   "shot": "snap"
+  }
+ ],
+ "shootout": [
+  {
+   "team": "DET",
+   "shooter": "Alex DeBrincat",
+   "scored": false
+  },
+  {
+   "team": "SJS",
+   "shooter": "Will Smith",
+   "scored": false
+  },
+  {
+   "team": "DET",
+   "shooter": "Michael Brandsegg-Nygård",
+   "scored": false
+  },
+  {
+   "team": "SJS",
+   "shooter": "Macklin Celebrini",
+   "scored": false
+  },
+  {
+   "team": "DET",
+   "shooter": "Lucas Raymond",
+   "scored": true
+  },
+  {
+   "team": "SJS",
+   "shooter": "Ivar Stenberg",
+   "scored": false
+  }
+ ],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "SJS": 1,
+    "DET": 1
+   },
+   "shots": {
+    "SJS": 14,
+    "DET": 6
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "SJS": 1,
+    "DET": 0
+   },
+   "shots": {
+    "SJS": 8,
+    "DET": 10
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "SJS": 1,
+    "DET": 2
+   },
+   "shots": {
+    "SJS": 8,
+    "DET": 10
+   }
+  },
+  {
+   "label": "OT",
+   "goals": {
+    "SJS": 0,
+    "DET": 0
+   },
+   "shots": {
+    "SJS": 4,
+    "DET": 1
+   }
+  },
+  {
+   "label": "SO",
+   "goals": {
+    "SJS": 0,
+    "DET": 1
+   },
+   "shots": null
+  }
+ ],
+ "team_numbers": {
+  "SJS": {
+   "shots": 34,
+   "xg": 4.52,
+   "cf5": 49,
+   "hits": 18,
+   "pp_goals": 2,
+   "pp_opps": 6
+  },
+  "DET": {
+   "shots": 27,
+   "xg": 2.98,
+   "cf5": 35,
+   "hits": 28,
+   "pp_goals": 1,
+   "pp_opps": 4
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "John Gibson",
+   "team": "DET",
+   "started": true,
+   "toi": "64:20",
+   "shots": 34,
+   "saves": 31,
+   "ga": 3,
+   "gsax": 1.52,
+   "sv": 0.912
+  },
+  {
+   "full": "Alex Nedeljkovic",
+   "team": "SJS",
+   "started": true,
+   "toi": "64:38",
+   "shots": 27,
+   "saves": 24,
+   "ga": 3,
+   "gsax": -0.02,
+   "sv": 0.889
+  }
+ ],
+ "players": [
+  {
+   "name": "Macklin Celebrini",
+   "team": "SJS",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 2.0,
+   "points": 3.0,
+   "toi": "26:54",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Emmitt Finnie",
+   "team": "DET",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "18:45",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Ivar Stenberg",
+   "team": "SJS",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 1.0,
+   "points": 2.0,
+   "toi": "17:30",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Moritz Seider",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "29:46",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Dmitry Orlov",
+   "team": "SJS",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "20:09",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Justin Faulk",
+   "team": "DET",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "19:43",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Alex DeBrincat",
+   "team": "DET",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "19:16",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Will Smith",
+   "team": "SJS",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "25:11",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Alexander Wennberg",
+   "team": "SJS",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "23:00",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Viktor Arvidsson",
+   "team": "DET",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "20:58",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Michael Kesselring",
+   "team": "SJS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "20:23",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Michael Rasmussen",
+   "team": "DET",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:34",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Michael Brandsegg-Nygård",
+   "team": "DET",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "17:02",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Dylan Larkin",
+   "team": "DET",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "24:39",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Ben Chiarot",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:42",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Jacob Trouba",
+   "team": "SJS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "22:15",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Darnell Nurse",
+   "team": "SJS",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:47",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Andrew Copp",
+   "team": "DET",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:55",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Lucas Raymond",
+   "team": "DET",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:02",
+   "season_goals_after": 0.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "SJS": 57,
+   "DET": 43
+  }
+ },
+ "pregame_chance": {
+  "DET": 62,
+  "SJS": 38
+ },
+ "records_before": {
+  "SJS": {
+   "record": "4-3-0",
+   "games": 7,
+   "run": "won 1",
+   "last_ten": "4-3-0",
+   "last_five": [
+    {
+     "date": "2026-10-05",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "L",
+     "score": "0-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-08",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": true,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "SO"
+    }
+   ]
+  },
+  "DET": {
+   "record": "2-3-2",
+   "games": 7,
+   "run": "won 1",
+   "last_ten": "2-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-06",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": true,
+     "result": "W",
+     "score": "5-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-09",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": false,
+     "result": "OTL",
+     "score": "0-1",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": true,
+     "result": "OTL",
+     "score": "4-5",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "PHI",
+     "opp_name": "Philadelphia Flyers",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "SJS": {
+   "record": "4-3-1",
+   "games": 8,
+   "run": "winless 1",
+   "last_ten": "4-3-1",
+   "last_five": [
+    {
+     "date": "2026-10-08",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": true,
+     "result": "L",
+     "score": "1-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "W",
+     "score": "3-2",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    }
+   ]
+  },
+  "DET": {
+   "record": "3-3-2",
+   "games": 8,
+   "run": "won 2",
+   "last_ten": "3-3-2",
+   "last_five": [
+    {
+     "date": "2026-10-09",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": true,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-10",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": false,
+     "result": "OTL",
+     "score": "0-1",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": true,
+     "result": "OTL",
+     "score": "4-5",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "PHI",
+     "opp_name": "Philadelphia Flyers",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "SJS": {
+   "points": 9,
+   "gp": 8,
+   "division": "Pacific",
+   "division_place": 4,
+   "conference_place": 10,
+   "wild_card_place": 4,
+   "league_place_by_points": 20
+  },
+  "DET": {
+   "points": 8,
+   "gp": 8,
+   "division": "Atlantic",
+   "division_place": 7,
+   "conference_place": 12,
+   "wild_card_place": 6,
+   "league_place_by_points": 23
+  }
+ },
+ "firsts": [],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The Sharks had a little more of the play.",
+  "The Red Wings had the finish.",
+  "John Gibson, who gave up five goals against New Jersey in his last start, made 31 saves for the Red Wings, and Alex Nedeljkovic stopped 24 of 27.",
+  "The Sharks hit a post and the crossbar and still lost.",
+  "The Red Wings moved to 3-3-2, climbing off the bottom of the Atlantic, now seventh.",
+  "The Sharks fell to 4-3-1 but climbed to fourth in the Pacific.",
+  "Against them: Lucas Raymond’s six-game point streak against San Jose ended.",
+  "Finally: Dmitry Orlov scored his first goal of the season, his first since Mar 21 (21 games played since).",
+  "Milestone: Alex DeBrincat is now one goal from 300.",
+  "Lineup: Luca Cagnoni was in NHL.com’s projected lineup, but Darnell Nurse played instead."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

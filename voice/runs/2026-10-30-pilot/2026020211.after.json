@@ -1,0 +1,55 @@
+{
+ "head": "Zellweger returns to Anaheim",
+ "paras": [
+  "The Sabres (5-4-3) beat San Jose 2-0 on Tuesday, while the Ducks (5-6-1) lost 6-5 in overtime to Vancouver the same night. Going in, the Sabres are seventh in the Atlantic (tied for 19th in the NHL) and the Ducks fifth in the Pacific (tied for 23rd).",
+  "The Sabres get their shots through better than almost anyone (3rd) and rarely get pinned in their own end (4th), but don't block many shots (30th). The Ducks play some of the league’s fastest games (3rd) and give up a lot of dangerous shots (30th). They also are one of the league’s most physical teams (3rd), so the Ducks hit a lot, but the Sabres mostly don’t. Anaheim has allowed 3.58 goals a game, the fourth most in the league. That means the Sabres could find some good looks against the Ducks, who give up plenty of them.",
+  "Jack Quinn (6 G / 5 A / 11 P in 12 GP) is tied for the Sabres’ scoring lead, with seven points in his last five games. Owen Power (2 G / 9 A / 11 P in 12 GP) shares it. For the Ducks, Leo Carlsson (4 G / 11 A / 15 P in 12 GP) leads the way in scoring, and Beckett Sennecke (7 G / 3 A / 10 P in 12 GP) has a team-high seven goals.",
+  "Colten Ellis (2-1-0 / .902 SV% in 4 GS) is expected to go for Buffalo. Lukáš Dostál (4-4-1 / .872 SV% in 9 GS) has struggled for Anaheim so far, but is expected to start."
+ ],
+ "items": [
+  {
+   "tag": "Old team",
+   "text": "Olen Zellweger faces Anaheim for the first time since leaving."
+  },
+  {
+   "tag": "Out",
+   "text": "The Sabres are newly without Konsta Helenius and Jiří Kulich, and have had to make do without Alex Lyon and Conor Timmins all season. Colten Ellis is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Ducks are newly without Nikita Klepov, and have had to make do without Troy Terry all season."
+  },
+  {
+   "tag": "Missing",
+   "text": "Pavel Mintyukov has missed the Ducks’ last three games."
+  }
+ ],
+ "outlook": {
+  "ANA": {
+   "head": "A slightly uphill night for the Ducks",
+   "body": "Buffalo has been out-chancing opponents lately, but Anaheim has home-ice advantage. The Ducks’ best way to tip it is a power play that gets going."
+  },
+  "BUF": {
+   "head": "Leaning the Sabres’ way",
+   "body": "Buffalo has been out-chancing opponents lately, but Anaheim has home-ice advantage. The Ducks can still swing it if their power play gets going."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Ducks hit, the Sabres mostly don’t",
+   "body": "On physicality, Anaheim is one of the league’s best, but Buffalo is near the bottom. Expect most of the big hits to come from the Ducks."
+  },
+  {
+   "head": "The Ducks hunt in packs",
+   "body": "The Ducks hound the puck, but the Sabres sit back. Anaheim is near the top of the league for forecheck pressure, and Buffalo is near the bottom. Expect the Ducks to win more pucks back deep in the Sabres’ end."
+  }
+ ],
+ "ranks": [
+  "3rd of 32 in getting shots through",
+  "4th of 32 in avoiding long shifts",
+  "30th of 32 in blocking shots",
+  "3rd of 32 in pace: pace score 104 (100 is average)",
+  "30th of 32 in keeping dangerous shots away: a 6.7% chance of scoring on the average shot against",
+  "3rd of 32 in physicality: hit score 119 (100 is average)"
+ ]
+}

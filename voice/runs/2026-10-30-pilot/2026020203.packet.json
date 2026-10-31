@@ -1,0 +1,656 @@
+{
+ "kind": "recap",
+ "game_id": 2026020203,
+ "date": "2026-10-29",
+ "venue": "Little Caesars Arena",
+ "away": {
+  "abbr": "CHI",
+  "name": "Chicago Blackhawks",
+  "place": "Chicago",
+  "nickname": "Blackhawks",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Jeff Blashill"
+ },
+ "home": {
+  "abbr": "DET",
+  "name": "Detroit Red Wings",
+  "place": "Detroit",
+  "nickname": "Red Wings",
+  "division": "Atlantic",
+  "conference": "Eastern",
+  "coach": "Todd McLellan"
+ },
+ "final": {
+  "CHI": 1,
+  "DET": 4,
+  "ended": "regulation"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "5:59",
+   "time_left_in_period": "14:01",
+   "team": "CHI",
+   "scorer": "Connor Bedard",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Wyatt Kaiser",
+    "Roman Kantserov"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "CHI": 1,
+    "DET": 0
+   },
+   "chance_of_scoring": 14,
+   "shot": "backhand"
+  },
+  {
+   "n": 2,
+   "period": 2,
+   "time_in_period": "7:31",
+   "time_left_in_period": "12:29",
+   "team": "DET",
+   "scorer": "Viktor Arvidsson",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "William Wallinder",
+    "Alex DeBrincat"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "CHI": 1,
+    "DET": 1
+   },
+   "chance_of_scoring": 4,
+   "shot": "tip-in"
+  },
+  {
+   "n": 3,
+   "period": 3,
+   "time_in_period": "1:09",
+   "time_left_in_period": "18:51",
+   "team": "DET",
+   "scorer": "Lucas Raymond",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Moritz Seider",
+    "Viktor Arvidsson"
+   ],
+   "strength": "power play",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "CHI": 1,
+    "DET": 2
+   },
+   "chance_of_scoring": 9,
+   "shot": "snap"
+  },
+  {
+   "n": 4,
+   "period": 3,
+   "time_in_period": "15:26",
+   "time_left_in_period": "4:34",
+   "team": "DET",
+   "scorer": "Viktor Arvidsson",
+   "scorer_goal_tonight": 2,
+   "assists": [
+    "Alex DeBrincat",
+    "J.T. Compher"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "CHI": 1,
+    "DET": 3
+   },
+   "chance_of_scoring": 29,
+   "shot": "wrist"
+  },
+  {
+   "n": 5,
+   "period": 3,
+   "time_in_period": "16:45",
+   "time_left_in_period": "3:15",
+   "team": "DET",
+   "scorer": "Viktor Arvidsson",
+   "scorer_goal_tonight": 3,
+   "assists": [
+    "Emmitt Finnie"
+   ],
+   "strength": "empty net",
+   "against_pulled_goalie": true,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "CHI": 1,
+    "DET": 4
+   },
+   "chance_of_scoring": 60,
+   "shot": "wrist"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [
+  {
+   "shooter": "Frank Nazar",
+   "goalie": "John Gibson",
+   "period": 2,
+   "time_in_period": "11:18"
+  }
+ ],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "CHI": 1,
+    "DET": 0
+   },
+   "shots": {
+    "CHI": 8,
+    "DET": 8
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "CHI": 0,
+    "DET": 1
+   },
+   "shots": {
+    "CHI": 3,
+    "DET": 13
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "CHI": 0,
+    "DET": 3
+   },
+   "shots": {
+    "CHI": 8,
+    "DET": 8
+   }
+  }
+ ],
+ "team_numbers": {
+  "CHI": {
+   "shots": 19,
+   "xg": 1.89,
+   "cf5": 42,
+   "hits": 19,
+   "pp_goals": 0,
+   "pp_opps": 1
+  },
+  "DET": {
+   "shots": 29,
+   "xg": 4.32,
+   "cf5": 49,
+   "hits": 22,
+   "pp_goals": 1,
+   "pp_opps": 4
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Spencer Knight",
+   "team": "CHI",
+   "started": true,
+   "toi": "59:16",
+   "shots": 28,
+   "saves": 25,
+   "ga": 3,
+   "gsax": 1.32,
+   "sv": 0.893
+  },
+  {
+   "full": "John Gibson",
+   "team": "DET",
+   "started": true,
+   "toi": "60:00",
+   "shots": 19,
+   "saves": 18,
+   "ga": 1,
+   "gsax": 0.89,
+   "sv": 0.947
+  }
+ ],
+ "players": [
+  {
+   "name": "Viktor Arvidsson",
+   "team": "DET",
+   "pos": "L",
+   "goals": 3.0,
+   "assists": 1.0,
+   "points": 4.0,
+   "toi": "17:07",
+   "season_goals_after": 8.0
+  },
+  {
+   "name": "Alex DeBrincat",
+   "team": "DET",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 2.0,
+   "points": 2.0,
+   "toi": "18:00",
+   "season_goals_after": 6.0
+  },
+  {
+   "name": "Lucas Raymond",
+   "team": "DET",
+   "pos": "L",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "18:49",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Connor Bedard",
+   "team": "CHI",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "18:22",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Moritz Seider",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "24:17",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Wyatt Kaiser",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "22:36",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Emmitt Finnie",
+   "team": "DET",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "18:02",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Roman Kantserov",
+   "team": "CHI",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "17:41",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "William Wallinder",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "17:27",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "J.T. Compher",
+   "team": "DET",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "12:16",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Artyom Levshunov",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "24:24",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Ben Chiarot",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:09",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Ian Cole",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "21:03",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Justin Faulk",
+   "team": "DET",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:26",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Alex Vlasic",
+   "team": "CHI",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:44",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Andrew Copp",
+   "team": "DET",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:08",
+   "season_goals_after": 2.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "CHI": 30,
+   "DET": 70
+  }
+ },
+ "pregame_chance": {
+  "DET": 68,
+  "CHI": 32
+ },
+ "records_before": {
+  "CHI": {
+   "record": "4-8-0",
+   "games": 12,
+   "run": "won 1",
+   "last_ten": "4-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-15",
+     "opp": "WPG",
+     "opp_name": "Winnipeg Jets",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    }
+   ]
+  },
+  "DET": {
+   "record": "5-4-3",
+   "games": 12,
+   "run": "won 1",
+   "last_ten": "5-2-3",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "CHI": {
+   "record": "4-9-0",
+   "games": 13,
+   "run": "winless 1",
+   "last_ten": "4-6-0",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": true,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "MTL",
+     "opp_name": "Montréal Canadiens",
+     "home": true,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "DET": {
+   "record": "6-4-3",
+   "games": 13,
+   "run": "won 2",
+   "last_ten": "5-2-3",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "SEA",
+     "opp_name": "Seattle Kraken",
+     "home": false,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": false,
+     "result": "L",
+     "score": "1-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": true,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "DET": {
+   "points": 15,
+   "gp": 13,
+   "division": "Atlantic",
+   "division_place": 7,
+   "conference_place": 11,
+   "wild_card_place": 5,
+   "league_place_by_points": 18
+  },
+  "CHI": {
+   "points": 8,
+   "gp": 13,
+   "division": "Central",
+   "division_place": 8,
+   "conference_place": 15,
+   "wild_card_place": 9,
+   "league_place_by_points": 31
+  }
+ },
+ "firsts": [],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "chances",
+   "fact": "Detroit usually gets worse looks than most teams. Not tonight: an 8.9% chance of scoring on the average shot at 5-on-5, against their usual 6.0% and a league average of 6.3%. A team strays this far about once every 35 games."
+  }
+ ],
+ "notes": [
+  "The score was fair.",
+  "Replay this game’s chances a hundred times and the Red Wings win about seven in ten.",
+  "Spencer Knight stopped 25 of 28 for the Blackhawks.",
+  "The Wings moved to 6-4-3, climbing off the bottom of the Atlantic, now seventh.",
+  "The Blackhawks fell to 4-9-0, still last in the Central.",
+  "Old team: Patrick Kane played his first game back in Detroit.",
+  "Road run: The Blackhawks have lost five straight on the road.",
+  "Lineup: NHL.com had projected the Red Wings with 11 forwards and seven defensemen, but they dressed 12 and six.",
+  "Up next: Justin Faulk faces his old team, St. Louis, on Saturday."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

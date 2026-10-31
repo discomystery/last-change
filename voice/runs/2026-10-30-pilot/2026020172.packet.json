@@ -1,0 +1,726 @@
+{
+ "kind": "recap",
+ "game_id": 2026020172,
+ "date": "2026-10-24",
+ "venue": "PPG Paints Arena",
+ "away": {
+  "abbr": "NSH",
+  "name": "Nashville Predators",
+  "place": "Nashville",
+  "nickname": "Predators",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Andrew Brunette"
+ },
+ "home": {
+  "abbr": "PIT",
+  "name": "Pittsburgh Penguins",
+  "place": "Pittsburgh",
+  "nickname": "Penguins",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Dan Muse"
+ },
+ "final": {
+  "NSH": 2,
+  "PIT": 3,
+  "ended": "overtime"
+ },
+ "goals": [
+  {
+   "n": 1,
+   "period": 1,
+   "time_in_period": "9:24",
+   "time_left_in_period": "10:36",
+   "team": "NSH",
+   "scorer": "Steven Stamkos",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Matthew Wood",
+    "Ryan O'Reilly"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NSH": 1,
+    "PIT": 0
+   },
+   "chance_of_scoring": 16,
+   "shot": "deflected"
+  },
+  {
+   "n": 2,
+   "period": 2,
+   "time_in_period": "0:18",
+   "time_left_in_period": "19:42",
+   "team": "PIT",
+   "scorer": "Connor Dewar",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Elmer Söderblom"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NSH": 1,
+    "PIT": 1
+   },
+   "chance_of_scoring": 23,
+   "shot": "wrist"
+  },
+  {
+   "n": 3,
+   "period": 2,
+   "time_in_period": "6:40",
+   "time_left_in_period": "13:20",
+   "team": "NSH",
+   "scorer": "Jayden Struble",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Nils Höglander"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NSH": 2,
+    "PIT": 1
+   },
+   "chance_of_scoring": 13,
+   "shot": "snap"
+  },
+  {
+   "n": 4,
+   "period": 3,
+   "time_in_period": "18:54",
+   "time_left_in_period": "1:06",
+   "team": "PIT",
+   "scorer": "Rickard Rakell",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Sidney Crosby",
+    "Erik Karlsson"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": true,
+   "score_after": {
+    "NSH": 2,
+    "PIT": 2
+   },
+   "chance_of_scoring": 9,
+   "shot": "snap"
+  },
+  {
+   "n": 5,
+   "period": "OT",
+   "time_in_period": "3:44",
+   "time_left_in_period": "1:16",
+   "team": "PIT",
+   "scorer": "Ville Koivunen",
+   "scorer_goal_tonight": 1,
+   "assists": [
+    "Hendrix Lapierre",
+    "Kris Letang"
+   ],
+   "strength": "even strength",
+   "against_pulled_goalie": false,
+   "own_goalie_pulled": false,
+   "score_after": {
+    "NSH": 2,
+    "PIT": 3
+   },
+   "chance_of_scoring": 15,
+   "shot": "snap"
+  }
+ ],
+ "shootout": [],
+ "penalty_shots_stopped": [],
+ "periods": [
+  {
+   "label": "1st",
+   "goals": {
+    "NSH": 1,
+    "PIT": 0
+   },
+   "shots": {
+    "NSH": 7,
+    "PIT": 9
+   }
+  },
+  {
+   "label": "2nd",
+   "goals": {
+    "NSH": 1,
+    "PIT": 1
+   },
+   "shots": {
+    "NSH": 10,
+    "PIT": 16
+   }
+  },
+  {
+   "label": "3rd",
+   "goals": {
+    "NSH": 0,
+    "PIT": 1
+   },
+   "shots": {
+    "NSH": 9,
+    "PIT": 9
+   }
+  },
+  {
+   "label": "OT",
+   "goals": {
+    "NSH": 0,
+    "PIT": 1
+   },
+   "shots": {
+    "NSH": 0,
+    "PIT": 3
+   }
+  }
+ ],
+ "team_numbers": {
+  "NSH": {
+   "shots": 26,
+   "xg": 2.39,
+   "cf5": 40,
+   "hits": 26,
+   "pp_goals": 0,
+   "pp_opps": 1
+  },
+  "PIT": {
+   "shots": 37,
+   "xg": 4.38,
+   "cf5": 64,
+   "hits": 11,
+   "pp_goals": 0,
+   "pp_opps": 1
+  }
+ },
+ "team_numbers_key": "shots = shots on goal, xg = expected goals (empty nets out), cf5 = 5-on-5 shot attempts, pp = power-play goals of chances",
+ "goalies": [
+  {
+   "full": "Artūrs Šilovs",
+   "team": "PIT",
+   "started": true,
+   "toi": "61:29",
+   "shots": 26,
+   "saves": 24,
+   "ga": 2,
+   "gsax": 0.39,
+   "sv": 0.923
+  },
+  {
+   "full": "Juuse Saros",
+   "team": "NSH",
+   "started": true,
+   "toi": "63:44",
+   "shots": 37,
+   "saves": 34,
+   "ga": 3,
+   "gsax": 1.38,
+   "sv": 0.919
+  }
+ ],
+ "players": [
+  {
+   "name": "Rickard Rakell",
+   "team": "PIT",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "19:45",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Steven Stamkos",
+   "team": "NSH",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "19:00",
+   "season_goals_after": 5.0
+  },
+  {
+   "name": "Ville Koivunen",
+   "team": "PIT",
+   "pos": "R",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:28",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Jayden Struble",
+   "team": "NSH",
+   "pos": "D",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "16:09",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Connor Dewar",
+   "team": "PIT",
+   "pos": "C",
+   "goals": 1.0,
+   "assists": 0.0,
+   "points": 1.0,
+   "toi": "13:25",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Erik Karlsson",
+   "team": "PIT",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "26:12",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Kris Letang",
+   "team": "PIT",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "22:33",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Ryan O'Reilly",
+   "team": "NSH",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "19:42",
+   "season_goals_after": 4.0
+  },
+  {
+   "name": "Sidney Crosby",
+   "team": "PIT",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "19:38",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Hendrix Lapierre",
+   "team": "PIT",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "16:26",
+   "season_goals_after": 2.0
+  },
+  {
+   "name": "Matthew Wood",
+   "team": "NSH",
+   "pos": "R",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "14:18",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Elmer Söderblom",
+   "team": "PIT",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "13:52",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Nils Höglander",
+   "team": "NSH",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 1.0,
+   "points": 1.0,
+   "toi": "9:28",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Roman Josi",
+   "team": "NSH",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "28:37",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Adam Wilsby",
+   "team": "NSH",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "23:10",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Brady Skjei",
+   "team": "NSH",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:42",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Declan Carlile",
+   "team": "PIT",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "20:35",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Tommy Novak",
+   "team": "PIT",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:31",
+   "season_goals_after": 3.0
+  },
+  {
+   "name": "Filip Forsberg",
+   "team": "NSH",
+   "pos": "L",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "19:28",
+   "season_goals_after": 1.0
+  },
+  {
+   "name": "Spencer Stastney",
+   "team": "PIT",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:13",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Kaedan Korczak",
+   "team": "PIT",
+   "pos": "D",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:08",
+   "season_goals_after": 0.0
+  },
+  {
+   "name": "Mavrik Bourque",
+   "team": "NSH",
+   "pos": "C",
+   "goals": 0.0,
+   "assists": 0.0,
+   "points": 0.0,
+   "toi": "18:06",
+   "season_goals_after": 0.0
+  }
+ ],
+ "run_it_back": {
+  "wins_out_of_100": {
+   "NSH": 36,
+   "PIT": 64
+  }
+ },
+ "pregame_chance": {
+  "PIT": 62,
+  "NSH": 38
+ },
+ "records_before": {
+  "NSH": {
+   "record": "3-3-3",
+   "games": 9,
+   "run": "winless 1",
+   "last_ten": "3-3-3",
+   "last_five": [
+    {
+     "date": "2026-10-10",
+     "opp": "OTT",
+     "opp_name": "Ottawa Senators",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-13",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "0-6",
+     "ended": "REG"
+    }
+   ]
+  },
+  "PIT": {
+   "record": "4-6-1",
+   "games": 11,
+   "run": "won 1",
+   "last_ten": "3-6-1",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "CHI",
+     "opp_name": "Chicago Blackhawks",
+     "home": false,
+     "result": "L",
+     "score": "3-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-16",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "records_after": {
+  "NSH": {
+   "record": "3-3-4",
+   "games": 10,
+   "run": "winless 2",
+   "last_ten": "3-3-4",
+   "last_five": [
+    {
+     "date": "2026-10-13",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": true,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-15",
+     "opp": "SJS",
+     "opp_name": "San Jose Sharks",
+     "home": true,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "0-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    }
+   ]
+  },
+  "PIT": {
+   "record": "5-6-1",
+   "games": 12,
+   "run": "won 2",
+   "last_ten": "3-6-1",
+   "last_five": [
+    {
+     "date": "2026-10-16",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": false,
+     "result": "L",
+     "score": "2-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-17",
+     "opp": "VGK",
+     "opp_name": "Vegas Golden Knights",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-19",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": false,
+     "result": "L",
+     "score": "4-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": true,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "OT"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "standings_after": {
+  "PIT": {
+   "points": 11,
+   "gp": 12,
+   "division": "Metropolitan",
+   "division_place": 6,
+   "conference_place": 14,
+   "wild_card_place": 8,
+   "league_place_by_points": 24
+  },
+  "NSH": {
+   "points": 10,
+   "gp": 10,
+   "division": "Central",
+   "division_place": 7,
+   "conference_place": 11,
+   "wild_card_place": 5,
+   "league_place_by_points": 25
+  }
+ },
+ "firsts": [
+  {
+   "team": "NSH",
+   "goals": 1,
+   "kind": "club_goal",
+   "player": "Jayden Struble"
+  }
+ ],
+ "rare_scorers": [],
+ "surprises": [
+  {
+   "kind": "form",
+   "fact": "Nothing in this game strayed far from how these two usually play: the shot share, the quality of chances, special teams, hitting, ice time and goaltending all landed inside their normal night-to-night range."
+  }
+ ],
+ "notes": [
+  "The Penguins carried the play, outshooting the Predators 37-26, but needed overtime to win it.",
+  "Artūrs Šilovs made 24 saves for the Pens, and Juuse Saros stopped 34 of 37.",
+  "Nobody on the ice had a bigger night than Elmer Söderblom, even with Koivunen’s overtime winner in the game, by our Swing measure.",
+  "Only two penalties were called all night, something the league sees about once every 20 games.",
+  "The Penguins improved to 5-6-1, sixth in the Metropolitan.",
+  "The Predators fell to 3-3-4, seventh in the Central.",
+  "Haunts them: Steven Stamkos scored again against Pittsburgh, and has six goals in eight games against them since 2023-24.",
+  "Lineup: Reid Schaefer was in NHL.com’s projected lineup, but Vitali Pinchuk played instead.",
+  "The preview: One of the preview’s two calls held."
+ ],
+ "notes_rule": "True facts found by the detectors. Use any, in any order and in your own words, or leave them out."
+}

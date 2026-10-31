@@ -1,0 +1,735 @@
+{
+ "kind": "preview",
+ "game_id": 2026020220,
+ "start_utc": "2026-10-31T18:00:00Z",
+ "venue": "UBS Arena",
+ "away": {
+  "abbr": "EDM",
+  "name": "Edmonton Oilers",
+  "place": "Edmonton",
+  "nickname": "Oilers",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Mike Babcock"
+ },
+ "home": {
+  "abbr": "NYI",
+  "name": "New York Islanders",
+  "place": "NY Islanders",
+  "nickname": "Islanders",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Peter DeBoer"
+ },
+ "form": {
+  "EDM": {
+   "record": "9-2-2",
+   "games": 13,
+   "run": "won 1",
+   "last_ten": "7-2-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "6-5",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "L",
+     "score": "2-7",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "CGY",
+     "opp_name": "Calgary Flames",
+     "home": true,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NYI": {
+   "record": "7-4-2",
+   "games": 13,
+   "run": "won 2",
+   "last_ten": "6-2-2",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "ANA",
+     "opp_name": "Anaheim Ducks",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "LAK",
+     "opp_name": "Los Angeles Kings",
+     "home": true,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "DAL",
+     "opp_name": "Dallas Stars",
+     "home": false,
+     "result": "L",
+     "score": "3-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": false,
+     "result": "W",
+     "score": "4-3",
+     "ended": "OT"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "EDM": "Tristan Jarry",
+  "NYI": "Ilya Sorokin"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "NYI",
+   "facts": [
+    "NY Islanders’s P2 (DeAngelo and Kessel) at home: 47% of its 5-on-5 time against opponents’ fourth lines. Matchups, NY Islanders home games this season, 6 games, 40 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face fourth lines about 23% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of NY Islanders P2's 5-on-5 time against Edmonton L4",
+   "usual": 47,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "history",
+   "about": "NYI",
+   "facts": [
+    "Sorokin: .943 save percentage in 5 starts against Edmonton since 2023-24.",
+    "Sorokin: .906 save percentage against everyone else since 2023-24, on 5,080 shots."
+   ],
+   "what_we_check": null,
+   "usual": 0.9065,
+   "league": null,
+   "direction": "closer"
+  },
+  {
+   "kind": "clash",
+   "about": "EDM",
+   "facts": [
+    "Edmonton: 9.8 expected goals per 60 on the power play, 1st of 32. Playing style, this season blended with last, 13 and 13 games this season.",
+    "NY Islanders: 8.6 expected goals allowed per 60 shorthanded, 30th of 32. Playing style, this season blended with last, 13 and 13 games this season."
+   ],
+   "what_we_check": "expected goals per 60 on the power play",
+   "usual": 9.8485,
+   "league": 7.6345,
+   "direction": "above"
+  },
+  {
+   "kind": "physical",
+   "about": "EDM",
+   "facts": [
+    "Edmonton: hit score 112, 6th of 32. Playing style, this season blended with last, 13 and 13 games this season.",
+    "NY Islanders: hit score 109, 8th of 32. Playing style, this season blended with last, 13 and 13 games this season."
+   ],
+   "what_we_check": "hits per 60 in close games, both teams, as a score against league average (arena-adjusted)",
+   "usual": 110.5,
+   "league": 100,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Edmonton has been out-chancing opponents lately, while the Islanders will be without Barzal.",
+  "Then again, Edmonton will be without Hyman, and the Islanders have home-ice advantage.",
+  "The Islanders can tip it if they keep shots to a minimum.",
+  "Haunts them: Leon Draisaitl has seven goals in six games against the Islanders since 2023-24.",
+  "Out: The Oilers are newly without Zach Hyman, and have had to make do without Matt Savoie all season.",
+  "Out: The Islanders have been without Matias Maccelli since Oct 17, and have had to make do without Mathew Barzal all season. Counting how much each missing player usually brings, only the Maple Leafs are missing more right now.",
+  "Hot streak: Connor McDavid has a point in every game this season."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "EDM": {
+   "standing": {
+    "record": "9-2-2",
+    "points": 20,
+    "games": 13,
+    "division": "Pacific",
+    "division_place": 1,
+    "conference_place": 2,
+    "league_place_in_points": 3,
+    "home_record": "4-2-2",
+    "road_record": "5-0-0",
+    "last_ten": "7-2-1",
+    "streak": "W1",
+    "coach": "Mike Babcock"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 55,
+    "ga": 42,
+    "gfpg": 4.23,
+    "gapg": 3.23,
+    "diff": 13,
+    "ppg": 15,
+    "ppo": 42,
+    "pppct": 0.357,
+    "pkpct": 0.714,
+    "sfpg": 26.1,
+    "sapg": 26.8,
+    "fopct": 0.493
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 1,
+    "gapg": 18,
+    "pppct": 1,
+    "pkpct": 25,
+    "sfpg": 21,
+    "sapg": 14,
+    "fopct": 18
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Second chances",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Getting shots through",
+     "rank_of_32": 4,
+     "percentile": 89,
+     "low_end_word": "Blocked often",
+     "high_end_word": "Gets it through"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Connor McDavid",
+     "pos": "C",
+     "gp": 13,
+     "g": 8,
+     "a": 28,
+     "p": 36,
+     "ppp": 13,
+     "toi_per_game": "23:30",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 11,
+      "p": 13
+     }
+    },
+    {
+     "name": "Leon Draisaitl",
+     "pos": "C",
+     "gp": 13,
+     "g": 12,
+     "a": 12,
+     "p": 24,
+     "ppp": 8,
+     "toi_per_game": "21:43",
+     "last_five_games": {
+      "games": 5,
+      "g": 6,
+      "a": 4,
+      "p": 10
+     }
+    },
+    {
+     "name": "Evan Bouchard",
+     "pos": "D",
+     "gp": 13,
+     "g": 7,
+     "a": 15,
+     "p": 22,
+     "ppp": 7,
+     "toi_per_game": "26:10",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 5,
+      "p": 6
+     }
+    },
+    {
+     "name": "Vasily Podkolzin",
+     "pos": "R",
+     "gp": 13,
+     "g": 8,
+     "a": 5,
+     "p": 13,
+     "ppp": 6,
+     "toi_per_game": "18:54",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    },
+    {
+     "name": "Kasperi Kapanen",
+     "pos": "R",
+     "gp": 13,
+     "g": 4,
+     "a": 2,
+     "p": 6,
+     "ppp": 4,
+     "toi_per_game": "17:52",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 1,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Devon Levi",
+     "gp": 7,
+     "record": "6-1-0",
+     "sv_pct": 0.887,
+     "gaa": 3.11,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Tristan Jarry",
+     "gp": 6,
+     "record": "3-1-2",
+     "sv_pct": 0.889,
+     "gaa": 2.95,
+     "shutouts": 1,
+     "projected_starter": true
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Vasily Podkolzin",
+      "Connor McDavid",
+      "Leon Draisaitl"
+     ],
+     "games_together_recently": 10
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Colton Dach",
+      "Ryan Nugent-Hopkins",
+      "Kasperi Kapanen"
+     ],
+     "games_together_recently": 2
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Alex Formenton",
+      "Jason Dickinson",
+      "Mathieu Joseph"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Mattias Ekholm",
+      "Evan Bouchard"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Connor Murphy",
+      "Ryan Shea"
+     ],
+     "games_together_recently": 9
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Evan Bouchard (Quarterback)",
+      "Leon Draisaitl (Distributor)",
+      "Connor McDavid (Trigger)",
+      "Vasily Podkolzin (Net-front)",
+      "Ryan Nugent-Hopkins (Net-front)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Ryan Shea (Quarterback)",
+      "Kasperi Kapanen (Trigger)",
+      "Isaac Howard",
+      "Trent Frederic",
+      "Colton Dach"
+     ]
+    }
+   ]
+  },
+  "NYI": {
+   "standing": {
+    "record": "7-4-2",
+    "points": 16,
+    "games": 13,
+    "division": "Metropolitan",
+    "division_place": 4,
+    "conference_place": 9,
+    "league_place_in_points": 14,
+    "home_record": "4-1-1",
+    "road_record": "3-3-1",
+    "last_ten": "6-2-2",
+    "streak": "W2",
+    "coach": "Peter DeBoer"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 39,
+    "ga": 34,
+    "gfpg": 3.0,
+    "gapg": 2.62,
+    "diff": 5,
+    "ppg": 7,
+    "ppo": 40,
+    "pppct": 0.175,
+    "pkpct": 0.864,
+    "sfpg": 26.1,
+    "sapg": 26.2,
+    "fopct": 0.551
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 18,
+    "gapg": 5,
+    "pppct": 22,
+    "pkpct": 5,
+    "sfpg": 21,
+    "sapg": 10,
+    "fopct": 2
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    },
+    {
+     "trait": "Goaltending",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Sieve",
+     "high_end_word": "Wall"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Penalty kill",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Leaky",
+     "high_end_word": "Airtight"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 5,
+     "percentile": 86,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Off-turnover offense",
+     "rank_of_32": 26,
+     "percentile": 20,
+     "low_end_word": "Patient",
+     "high_end_word": "Opportunist"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 7,
+     "percentile": 80,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Bo Horvat",
+     "pos": "C",
+     "gp": 13,
+     "g": 7,
+     "a": 7,
+     "p": 14,
+     "ppp": 6,
+     "toi_per_game": "21:04",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Matthew Schaefer",
+     "pos": "D",
+     "gp": 13,
+     "g": 4,
+     "a": 10,
+     "p": 14,
+     "ppp": 4,
+     "toi_per_game": "26:58",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Brayden Schenn",
+     "pos": "C",
+     "gp": 13,
+     "g": 4,
+     "a": 5,
+     "p": 9,
+     "ppp": 2,
+     "toi_per_game": "16:28",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    },
+    {
+     "name": "Simon Holmström",
+     "pos": "R",
+     "gp": 13,
+     "g": 4,
+     "a": 3,
+     "p": 7,
+     "ppp": 2,
+     "toi_per_game": "18:12",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Jean-Gabriel Pageau",
+     "pos": "C",
+     "gp": 13,
+     "g": 1,
+     "a": 6,
+     "p": 7,
+     "ppp": 0,
+     "toi_per_game": "15:39",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 3,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Ilya Sorokin",
+     "gp": 9,
+     "record": "6-3-0",
+     "sv_pct": 0.915,
+     "gaa": 2.34,
+     "shutouts": 1,
+     "projected_starter": true
+    },
+    {
+     "name": "Semyon Varlamov",
+     "gp": 4,
+     "record": "1-1-2",
+     "sv_pct": 0.891,
+     "gaa": 2.4,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Simon Holmström",
+      "Bo Horvat",
+      "Kyle Palmieri"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Emil Heineman",
+      "Brayden Schenn",
+      "Victor Eklund"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Ondřej Palát",
+      "Jean-Gabriel Pageau",
+      "Anthony Duclair"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Logan Stanley",
+      "Matthew Schaefer"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Tony DeAngelo",
+      "Matthew Kessel"
+     ],
+     "games_together_recently": 6
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Matthew Schaefer (Quarterback)",
+      "Bo Horvat (Trigger)",
+      "Kyle Palmieri (Net-front)",
+      "Brayden Schenn",
+      "Simon Holmström (Distributor)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Tony DeAngelo (Quarterback)",
+      "Victor Eklund",
+      "Anthony Duclair (Net-front)",
+      "Emil Heineman (Trigger)",
+      "Ondřej Palát"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

@@ -2,7 +2,7 @@
 each team's record").
 
 Every goal a team scores or allows this season is split into five parts that add up to its goal difference exactly:
-the chances at 5-on-5, the chances on special teams (both as expected goals for minus against), shooting (goals minus
+the chances at 5-on-5, the chances on special teams (both as expected goals for minus against), finishing (goals minus
 expected goals, empty nets out), goaltending (expected goals against minus goals against, empty nets out) and
 empty-net goals. Rule-based checks then read those parts and write behind.json for team pages, the Standings page and
 one preview item:
@@ -12,7 +12,7 @@ one preview item:
    "playing better than their record", and the biggest one or two parts on that side are the reason. Tested on
    2023-24 to 2025-26: after 15 games the chances predicted the rest of the season better than the record did
    (r 0.59 against 0.42), and teams .100 ahead of their chances went on to finish near what the chances said.
-2. Shooting holding them back (4.5+ goals under the chances) or running hot (6+ over), naming the shooters furthest off.
+2. Finishing holding them back (4.5+ goals under the chances) or running hot (6+ over), naming the shooters furthest off.
 3. Goalies: one at +3 and another at -3 or worse goals saved above expected (3+ starts each), a goalie covering for a
    team that has been outplayed, or goaltending costing them 6+ goals.
 4. Lines: one forward line with 58%+ of the 5-on-5 chances while the rest of the lineup has 47% or less, or the depth
@@ -31,7 +31,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import CURRENT_SEASON, FULL_SEASONS, REGULAR, SITE_DATA, TABLES
-from pipeline.export.grammar import and_list as _and, cap as _cap
+from pipeline.export.grammar import and_list as _and, cap as _cap, num
 from pipeline.export.intros import _poss
 
 MIN_GAMES = 8  # games before a team gets the checks
@@ -39,7 +39,7 @@ GAP = 0.08  # points percentage between the record and what the chances are wort
 SMALL_GAP = 0.05  # "a little ahead" / "a little behind"
 REASON = 2.5  # goals a part needs to count as a reason for the gap
 CLOSE_REASON = 1.5  # points from one-goal and overtime games that count as a reason
-COLD, HOT = -4.5, 6.0  # shooting: goals under / over the chances
+COLD, HOT = -4.5, 6.0  # finishing: goals under / over the chances
 GOALIE_SPLIT, GOALIE_STARTS = 3.0, 3  # goals saved above expected, either way, and starts each
 GOALIE_TEAM = 6.0  # goaltending covering for them or costing them
 SHOOTER = 1.5  # a shooter this far off his chances gets named
@@ -52,7 +52,7 @@ EN = ("EN", "EA")
 
 TAGS = {
     "ahead": "Record ahead of their play", "behind": "Playing better than their record",
-    "cold": "Shooting holding them back", "hot": "Shooting running hot",
+    "cold": "Finishing holding them back", "hot": "Finishing running hot",
     "split": "Goalies pulling apart", "covering": "Goalie covering for them", "costing": "Goaltending costing them",
     "carrying": "One line carrying them", "depth_up": "Depth driving it", "depth_down": "Depth being outplayed",
 }
@@ -124,14 +124,17 @@ def summary(season: int = CURRENT_SEASON, before: str | None = None) -> dict[str
         gp = r["gp"]
         pp = r["pts"] / (2 * gp)
         play = k["play"][0] + k["play"][1] * (r["ev"] + r["st"]) / gp
-        by_goals = k["goals"][0] + k["goals"][1] * r["gd"] / gp
+        # Empty-net goals come after the game is mostly decided (a team chasing pulls its goalie), so they move the goal
+        # difference but hardly the points: leave them out of what the goals say, and they show up as one-goal results.
+        by_goals = k["goals"][0] + k["goals"][1] * (r["gd"] - r["en"]) / gp
         out[r["ab"]] = {**r, "pp": pp, "play": play, "gap": pp - play, "close": (pp - by_goals) * 2 * gp}
     return out
 
 
 def reasons(r: dict, sign: int) -> list[tuple[float, str]]:
-    """The parts on the side of the gap, biggest first: (size, kind), kind one of gk / fin / en / close."""
-    out = [(r[k] * sign, k) for k in ("gk", "fin", "en") if r[k] * sign >= REASON]
+    """The parts on the side of the gap, biggest first: (size, kind), kind one of gk / fin / close. Empty-net goals are
+    never a reason for points (Sora, 2026-10-30): they go into the close-game part instead."""
+    out = [(r[k] * sign, k) for k in ("gk", "fin") if r[k] * sign >= REASON]
     if r["close"] * sign >= CLOSE_REASON:
         out.append((r["close"] * sign * 1.6, "close"))  # a point is worth about 1.6 goals of difference over a season
     return sorted(out, reverse=True)
@@ -267,7 +270,7 @@ def team_checks(t: dict, r: dict, shooters: pl.DataFrame, goalies: list[dict], l
             return f", {'led by' if sign > 0 else 'most of all'} {_shooter_list(rows, who)}" if rows else ""
         return ""
 
-    word = {"gk": "goaltending", "fin": "shooting",
+    word = {"gk": "goaltending", "fin": "finishing",
             "en": "empty-net goals" if sign > 0 else "empty-net goals against",
             "close": f"{'winning' if sign > 0 else 'losing'} more than their share of one-goal and overtime games"}
     said, why = set(), []
@@ -301,11 +304,11 @@ def team_checks(t: dict, r: dict, shooters: pl.DataFrame, goalies: list[dict], l
         checks.append({"kind": verdict, "text": f"{_cap(_poss(t))} record ({p3(r['pp'])}) {how} what their chances at 5-on-5 and on special teams are worth ({p3(r['play'])})."})
     big = verdict in ("ahead", "behind")
 
-    # shooting
+    # finishing
     if "fin" not in said:
         even_so = (big and sign < 0 and r["fin"] >= HOT) or (big and sign > 0 and r["fin"] <= COLD)
         if r["fin"] <= COLD:
-            text = f"shooting has cost them about {g1(r['fin'])} goals against the chances they’ve had" + (f", most of all {_shooter_list(cold[:2], who)}" if cold else "") + "."
+            text = f"finishing has cost them about {g1(r['fin'])} goals against the chances they’ve had" + (f", most of all {_shooter_list(cold[:2], who)}" if cold else "") + "."
             checks.append({"kind": "cold", "text": ("Even so, " if even_so else "") + (text if even_so else _cap(text))})
             tags.append("cold")
         elif r["fin"] >= HOT:
@@ -401,11 +404,139 @@ def preview_item(team: str, season: int, before: str, W) -> dict | None:
     sign = 1 if r["gap"] > 0 else -1
     why = reasons(r, sign)
     if sign > 0:
-        word = {"gk": "their goaltending", "fin": "their shooting", "en": "empty-net goals", "close": "a good run in one-goal and overtime games"}
+        word = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "a good run in one-goal and overtime games"}
         tail = f", largely thanks to {word[why[0][1]]}" if why else ""
         text = f"{_cap(W.poss(team))} record ({p3(r['pp'])}) is well ahead of what their chances are worth ({p3(r['play'])}){tail}."
     else:
-        word = {"gk": "their goaltending has", "fin": "their shooting has", "en": "empty-net goals against have", "close": "one-goal and overtime losses have"}
+        word = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "one-goal and overtime losses have"}
         text = f"{_cap(W.the(team))} have played better than their record ({p3(r['pp'])}): their chances are worth about {p3(r['play'])}"
         text += f", and {word[why[0][1]]} held them back." if why else "."
     return {"tag": "Behind the record", "text": text, "score": 58 + min(abs(r["gap"]), 0.2) * 50}
+
+
+# ---------------------------------------------------------------- shooters whose luck may turn (previews)
+
+LUCK_HOT, LUCK_COLD = 3.0, 2.5  # goals over / under what his chances and his own usual finishing would give
+LUCK_MIN_XG = 3.0               # chances worth at least this many goals before a cold run is worth telling
+FINISH_K = 20.0                 # expected goals of weight pulling his finishing from the last two seasons toward average
+
+
+@lru_cache(maxsize=4)
+def _finishing(season: int) -> dict[int, float]:
+    """Each skater's usual finishing over the two seasons before: goals per expected goal, pulled toward 1."""
+    rows = []
+    for s in (season - 1, season - 2):
+        p = TABLES / str(s) / "player_game.parquet"
+        if p.exists():
+            rows.append(pl.read_parquet(p, columns=["game_id", "player_id", "g_net", "ixg_net"]).join(_games(s).select("game_id"), on="game_id"))
+    if not rows:
+        return {}
+    f = pl.concat(rows).group_by("player_id").agg(g=pl.col("g_net").sum(), xg=pl.col("ixg_net").sum())
+    return {r["player_id"]: (r["g"] + FINISH_K) / (r["xg"] + FINISH_K) for r in f.iter_rows(named=True)}
+
+
+def luck_items(away: str, home: str, season: int, before: str, W, names: dict[int, str]) -> list[dict]:
+    """Who to watch: a shooter on either club scoring far above or below his chances, counted against his own usual
+    finishing so a sniper is not called lucky for being a sniper (Sora, 2026-10-30: "whose luck may turn"). Only
+    players who dressed in their club's last game, from games before the preview's day."""
+    g = _games(season).filter(pl.col("date") < before[:10])
+    if g.is_empty():
+        return []
+    pg = pl.read_parquet(TABLES / str(season) / "player_game.parquet",
+                         columns=["game_id", "player_id", "team_id", "g_net", "ixg_net"]).join(g.select("game_id", "date"), on="game_id")
+    fin = _finishing(season)
+    out = []
+    for t in (away, home):
+        ids = set(g.filter(pl.col("home") == t)["home_id"].to_list()) | set(g.filter(pl.col("away") == t)["away_id"].to_list())
+        mine = pg.filter(pl.col("team_id").is_in(list(ids)))
+        if mine.is_empty():
+            continue
+        last = mine.filter(pl.col("date") == mine["date"].max())["player_id"].to_list()
+        s = (mine.filter(pl.col("player_id").is_in(last)).group_by("player_id")
+             .agg(g=pl.col("g_net").sum(), xg=pl.col("ixg_net").sum()))
+        best = None
+        for r in s.iter_rows(named=True):
+            exp = r["xg"] * fin.get(r["player_id"], 1.0)
+            d = r["g"] - exp
+            ok = (d >= LUCK_HOT and r["g"] >= 1.6 * exp) or (d <= -LUCK_COLD and r["xg"] >= LUCK_MIN_XG)
+            if ok and r["player_id"] in names and (best is None or abs(d) > abs(best[0])):
+                best = (d, r)
+        if best:
+            d, r = best
+            who, n = names[r["player_id"]], int(r["g"])
+            goals = f"{num(n)} goal{'' if n == 1 else 's'}" if n else "no goals"
+            if d > 0:
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well above what his finishing usually turns "
+                        f"chances into. Runs like that tend to cool off.")
+            else:
+                text = (f"{who} has {goals} on chances worth about {r['xg']:.1f} goals, well below what his finishing usually "
+                        f"turns chances into. If the chances keep coming, so should the goals.")
+            out.append({"tag": "Luck may turn", "text": text, "pid": r["player_id"], "d": abs(d)})
+    out.sort(key=lambda i: -i.pop("d"))
+    for i, x in enumerate(out):  # one a preview usually makes the list; the other club's only when there is room
+        x["score"] = 72 if i == 0 else 61
+    return out
+
+
+TEXT_GAP = 0.05  # a record this far from the chances is worth a clause in the preview's opening paragraph
+
+
+APART, ALIKE = 0.150, 0.050  # records this far apart on chances this close: "much closer in the standings"
+
+
+def preview_sentence(away: str, home: str, season: int, before: str, W) -> str | None:
+    """Each club's record against what its chances are worth, for the preview's opening paragraph (Sora, 2026-10-30:
+    "a team by team over/underperformance note in the text"). A club near its chances gets a short clause only when
+    the other one is told."""
+    s = summary(season, before)
+    rows = {t: s.get(t) for t in (away, home)}
+    if any(r is None or r["gp"] < MIN_GAMES for r in rows.values()):
+        return None
+    if all(abs(r["gap"]) < TEXT_GAP for r in rows.values()):
+        return None
+
+    up = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "pulling off wins in one-goal games"}
+    down = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "losses in one-goal games have"}
+
+    def why(r):
+        sign = 1 if r["gap"] > 0 else -1
+        w = reasons(r, sign)
+        if not w:
+            return ""
+        return f", largely thanks to {up[w[0][1]]}" if sign > 0 else f", and {down[w[0][1]]} held them back"
+
+    def clause(t, r):
+        if abs(r["gap"]) < TEXT_GAP:
+            return f"{W.poss(t)} record ({p3(r['pp'])}) is about what their chances are worth"
+        if r["gap"] > 0:
+            return f"{W.poss(t)} record ({p3(r['pp'])}) is running ahead of what their chances are worth ({p3(r['play'])}){why(r)}"
+        return f"{W.the(t)} have played better than their record ({p3(r['pp'])}) says: their chances are worth about {p3(r['play'])}{why(r)}"
+    ra, rh = rows[away], rows[home]
+    side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
+    # records far apart on chances worth about the same (Sora, 2026-10-30): say what that means for tonight
+    tail = ""
+    near = [t for t, r in ((away, ra), (home, rh)) if abs(r["gap"]) < TEXT_GAP]
+    off = [t for t in (away, home) if t not in near]
+    # the figures the reader sees: a club near its chances is shown by its record only, so the other club's chances are
+    # set beside that record (Sora, 2026-10-30: the Oilers' .622 would still be well ahead of the Rangers' .536)
+    told = lambda t: rows[t]["pp"] if t in near and len(near) == 1 else rows[t]["play"]
+    if abs(ra["pp"] - rh["pp"]) >= APART and abs(told(away) - told(home)) <= ALIKE:
+        # one club already matches its chances (Sora, 2026-10-30): "If the Kraken’s record were closer to their chances,
+        # like the Flames’, ..."
+        lead = (f"If {W.poss(off[0])} record were closer to their chances, like {W.poss(near[0])}," if len(near) == 1
+                else "If their records matched their chances,")
+        tail = (f" {lead} these teams would be much closer in the standings, so don’t be surprised if this one is closer"
+                " than the records suggest.")
+    a = clause(away, ra)
+    if side(ra) == side(rh) != 0:  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
+        h = (f"So is {W.poss(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh)}" if side(rh) > 0 else
+             f"So have {W.the(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh).replace(', and ', ', where ', 1)}")
+        return f"{cap_(a)}. {h}.{tail}"
+    h = clause(home, rh)
+    if "," in a or "," in h:
+        return f"{cap_(a)}. {cap_(h)}.{tail}"
+    return f"{cap_(a)}{', and ' if side(ra) == side(rh) else ', while '}{h}.{tail}"
+
+
+def cap_(s: str) -> str:
+    return s[:1].upper() + s[1:]

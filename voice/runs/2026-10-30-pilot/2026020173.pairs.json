@@ -1,0 +1,125 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "Tuch sparks a Capitals comeback"
+  ],
+  "rewrite": [
+   "Tuch sparks a Capitals comeback"
+  ],
+  "part": -2
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Jack Quinn and Josh Doan scored just over four minutes apart early in the first to put the Sabres up 2-0."
+  ],
+  "rewrite": [
+   "Jack Quinn and Josh Doan scored just over four minutes apart early in the first to put the Sabres up 2-0."
+  ],
+  "part": 0
+ },
+ {
+  "op": "split",
+  "site": [
+   "Alex Tuch got the Capitals on the board late in the period, in his first game against Buffalo since leaving."
+  ],
+  "rewrite": [
+   "Alex Tuch, in his first game against Buffalo since leaving, got the Capitals on the board late in the period."
+  ],
+  "part": 0
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Dylan Strome tied it 2-2 early in the second, and he struck again late in the period to put the Caps ahead 3-2."
+  ],
+  "rewrite": [
+   "Dylan Strome then took over: he tied it 2-2 early in the second and struck again late in the period to put the Caps ahead 3-2."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Noah Östlund made it 3-3 for Buffalo early in the third.",
+   "Tuch won it with his second goal of the night in overtime."
+  ],
+  "rewrite": [
+   "Noah Östlund made it 3-3 for Buffalo early in the third, and Tuch won it in overtime with his second goal of the night."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Strome added an assist for a three-point night."
+  ],
+  "rewrite": [
+   "Strome added an assist for a three-point night."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Capitals owned the chances, outshooting the Sabres 34-21, and still had to sweat it out in overtime.",
+   "The Sabres hit a post and the crossbar and still lost."
+  ],
+  "rewrite": [
+   "The Capitals owned the chances, outshooting the Sabres 34-21, and still had to sweat it out in overtime, even with the Sabres hitting a post and the crossbar."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Charlie Lindgren made 18 saves for the Capitals, and Ukko-Pekka Luukkonen stopped 30 of 34."
+  ],
+  "rewrite": [
+   "Charlie Lindgren made 18 saves for the Capitals, and Ukko-Pekka Luukkonen stopped 30 of 34."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Capitals improved to 6-4-0, climbing to fourth in the Metropolitan.",
+   "The Sabres fell to 4-4-3, still last in the Atlantic."
+  ],
+  "rewrite": [
+   "The Capitals improved to 6-4-0 and climbed to fourth in the Metropolitan, while the Sabres fell to 4-4-3, still last in the Atlantic."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Slump: The Sabres are winless in three (0-1-2)."
+  ],
+  "rewrite": [
+   "Slump: The Sabres are winless in three (0-1-2)."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Back: The Capitals’ Pierre-Luc Dubois was back in the lineup after missing five games."
+  ],
+  "rewrite": [
+   "Back: The Capitals’ Pierre-Luc Dubois was back in the lineup after missing five games."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "The preview: The preview’s call didn’t hold."
+  ],
+  "rewrite": [
+   "The preview: The preview’s call didn’t hold."
+  ],
+  "part": -1
+ }
+]

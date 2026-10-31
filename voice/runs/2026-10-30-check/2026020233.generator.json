@@ -1,0 +1,53 @@
+{
+ "head": "DeBrincat’s favorite opponent",
+ "paras": [
+  "Both teams have won two in a row.",
+  "It’s strength against strength: the Red Wings are one of the league’s best for the power play, but the Panthers are one of the best at the penalty kill. At home, Paul Maurice likes to pick matchups, so watch who goes out against the Wings’ first line."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Panthers have been without Jacob Markström, Aleksander Barkov and Brad Marchand for several games. Akira Schmid is expected to start."
+  },
+  {
+   "tag": "Owns them",
+   "text": "Alex DeBrincat has a point in seven straight games against Florida."
+  },
+  {
+   "tag": "Out",
+   "text": "The Red Wings are newly without Dylan Larkin, and have had to make do without Simon Edvinsson all season."
+  },
+  {
+   "tag": "Filling in",
+   "text": "With Dylan Larkin out, Emmitt Finnie took 14 faceoffs in the Red Wings’ last game. He had been taking about three a game."
+  }
+ ],
+ "outlook": {
+  "FLA": {
+   "head": "Leaning the Panthers’ way",
+   "body": "The two have been about even at out-chancing opponents lately. Florida has home-ice advantage, but they will be without Barkov. Still, it’s close: the Red Wings can make it interesting if they keep dangerous shots away."
+  },
+  "DET": {
+   "head": "Close, but the Panthers have the slight edge",
+   "body": "The two have been about even at out-chancing opponents lately. Florida has home-ice advantage, but they will be without Barkov. The Red Wings’ best way to tip it is keeping dangerous shots away."
+  }
+ },
+ "calls": [
+  {
+   "head": "The matchup inside the matchup",
+   "body": "The Red Wings are one of the league’s best for the power play, but the Panthers are one of the best at the penalty kill. Our lean: the Red Wings’ power play wins out. Power plays usually beat kills in these spots. The Panthers take a lot of penalties and the Red Wings draw plenty of them, so their power play should get its chances."
+  },
+  {
+   "head": "Ekblad and Forsling get the DeBrincat assignment",
+   "body": "At home, the Panthers keep sending Ekblad and Forsling out against opponents’ first lines, far more often than chance would suggest. Paul Maurice has been picking a defense pair for the other team’s top line. Tonight the Red Wings’ first line is DeBrincat, Finnie and Arvidsson."
+  },
+  {
+   "head": "Trench warfare",
+   "body": "The Red Wings play some of the league’s slowest games, and so do the Panthers. We think this one is even quieter than either team’s usual."
+  },
+  {
+   "head": "Bodies will fly",
+   "body": "The Red Wings and the Panthers are both among the league’s heaviest hitters, even after adjusting for each arena’s scorer. Keep your head up."
+  }
+ ]
+}

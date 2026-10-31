@@ -1,0 +1,741 @@
+{
+ "kind": "preview",
+ "game_id": 2026020226,
+ "start_utc": "2026-11-01T02:00:00Z",
+ "venue": "Ball Arena",
+ "away": {
+  "abbr": "CGY",
+  "name": "Calgary Flames",
+  "place": "Calgary",
+  "nickname": "Flames",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Ryan Huska"
+ },
+ "home": {
+  "abbr": "COL",
+  "name": "Colorado Avalanche",
+  "place": "Colorado",
+  "nickname": "Avalanche",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Jared Bednar"
+ },
+ "form": {
+  "CGY": {
+   "record": "5-7-0",
+   "games": 12,
+   "run": "winless 1",
+   "last_ten": "5-5-0",
+   "last_five": [
+    {
+     "date": "2026-10-18",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "COL": {
+   "record": "7-5-1",
+   "games": 13,
+   "run": "won 1",
+   "last_ten": "5-4-1",
+   "last_five": [
+    {
+     "date": "2026-10-19",
+     "opp": "PHI",
+     "opp_name": "Philadelphia Flyers",
+     "home": false,
+     "result": "L",
+     "score": "2-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": false,
+     "result": "L",
+     "score": "3-4",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-23",
+     "opp": "TBL",
+     "opp_name": "Tampa Bay Lightning",
+     "home": true,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "NSH",
+     "opp_name": "Nashville Predators",
+     "home": false,
+     "result": "L",
+     "score": "2-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "NJD",
+     "opp_name": "New Jersey Devils",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [
+  {
+   "date": "2026-10-08",
+   "winner": "COL",
+   "score": "7-3",
+   "where": "CGY"
+  }
+ ],
+ "projected_goalies": {
+  "CGY": "Dustin Wolf"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "COL",
+   "facts": [
+    "Colorado’s L3 (Landeskog, Nelson and Roy) at home: 40% of its 5-on-5 time against opponents’ second lines. Matchups, Colorado home games this season, 7 games, 45 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face second lines about 29% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Colorado L3's 5-on-5 time against Calgary L2",
+   "usual": 40,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "rest",
+   "about": "COL",
+   "facts": [
+    "Calgary played yesterday. Schedule, back-to-backs over 2023-24 to 2025-26 (809 games).",
+    "Colorado had 2 days off before this game.",
+    "Colorado’s usual share of 5-on-5 expected goals: 56.3%, adjusted for score and venue."
+   ],
+   "what_we_check": "share of 5-on-5 expected goals, adjusted for score and venue",
+   "usual": 0.563,
+   "league": 0.5,
+   "direction": "above"
+  },
+  {
+   "kind": "history",
+   "about": "COL",
+   "facts": [
+    "Blackwood: .939 save percentage in 5 starts against Calgary since 2023-24.",
+    "Blackwood: .905 save percentage against everyone else since 2023-24, on 3,808 shots."
+   ],
+   "what_we_check": null,
+   "usual": 0.9047,
+   "league": null,
+   "direction": "closer"
+  },
+  {
+   "kind": "clash",
+   "about": "COL",
+   "facts": [
+    "Colorado: shot volume score 119, 2nd of 32. Playing style, this season blended with last, 13 and 12 games this season.",
+    "Calgary: shots-against score 109, 28th of 32. Playing style, this season blended with last, 13 and 12 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 66.6146,
+   "league": 55.9787,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Colorado has been out-chancing opponents by a wide margin lately and has home-ice advantage.",
+  "It’s on the Flames to make it a game, and they can if they keep dangerous shots away.",
+  "Out: The Flames are newly without Devin Cooley, and have been without Samuel Honzek, Maxim Tsyplakov, Joel Hanley and Connor Zary for several games. Dustin Wolf is expected to start.",
+  "Owns them: Nathan MacKinnon has a point in five straight games against Calgary, with a goal in each of the last four, and 20 points in his last ten against them.",
+  "Hot streak: Artturi Lehkonen has a point in eight straight games.",
+  "Club history: Mikael Backlund is one point from passing Johnny Gaudreau for fifth on the Flames’ all-time scoring list."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "CGY": {
+   "standing": {
+    "record": "5-7-0",
+    "points": 10,
+    "games": 12,
+    "division": "Pacific",
+    "division_place": 6,
+    "conference_place": 13,
+    "league_place_in_points": 28,
+    "home_record": "4-3-0",
+    "road_record": "1-4-0",
+    "last_ten": "5-5-0",
+    "streak": "L1",
+    "coach": "Ryan Huska"
+   },
+   "team_stats": {
+    "gp": 12,
+    "gf": 28,
+    "ga": 45,
+    "gfpg": 2.33,
+    "gapg": 3.75,
+    "diff": -17,
+    "ppg": 9,
+    "ppo": 31,
+    "pppct": 0.29,
+    "pkpct": 0.838,
+    "sfpg": 28.8,
+    "sapg": 30.5,
+    "fopct": 0.492
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 30,
+    "gapg": 31,
+    "pppct": 5,
+    "pkpct": 9,
+    "sfpg": 9,
+    "sapg": 29,
+    "fopct": 20
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Joel Farabee",
+     "pos": "L",
+     "gp": 12,
+     "g": 3,
+     "a": 8,
+     "p": 11,
+     "ppp": 6,
+     "toi_per_game": "18:50",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "Matt Coronato",
+     "pos": "R",
+     "gp": 12,
+     "g": 2,
+     "a": 8,
+     "p": 10,
+     "ppp": 5,
+     "toi_per_game": "17:38",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 6,
+      "p": 6
+     }
+    },
+    {
+     "name": "Matvei Gridin",
+     "pos": "R",
+     "gp": 12,
+     "g": 4,
+     "a": 4,
+     "p": 8,
+     "ppp": 4,
+     "toi_per_game": "15:42",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 2,
+      "p": 6
+     }
+    },
+    {
+     "name": "Morgan Frost",
+     "pos": "C",
+     "gp": 12,
+     "g": 3,
+     "a": 4,
+     "p": 7,
+     "ppp": 4,
+     "toi_per_game": "15:06",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Šimon Nemec",
+     "pos": "D",
+     "gp": 12,
+     "g": 0,
+     "a": 5,
+     "p": 5,
+     "ppp": 0,
+     "toi_per_game": "21:32",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 2,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Devin Cooley",
+     "gp": 7,
+     "record": "4-3-0",
+     "sv_pct": 0.914,
+     "gaa": 2.69,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Dustin Wolf",
+     "gp": 6,
+     "record": "1-4-0",
+     "sv_pct": 0.839,
+     "gaa": 4.81,
+     "shutouts": 0,
+     "projected_starter": true
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Joel Farabee",
+      "Mikael Backlund",
+      "Matt Coronato"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Matvei Gridin",
+      "Martin Pospíšil",
+      "Ryan Strome"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Yegor Sharangovich",
+      "Morgan Frost",
+      "Aydar Suniev"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Kevin Bahl",
+      "Šimon Nemec"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Jake Middleton",
+      "Zach Whitecloud"
+     ],
+     "games_together_recently": 5
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Zayne Parekh (Quarterback)",
+      "Joel Farabee (Net-front)",
+      "Matvei Gridin (Distributor)",
+      "Morgan Frost (Net-front)",
+      "Matt Coronato (Trigger)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Šimon Nemec (Quarterback)",
+      "Ryan Strome",
+      "Yegor Sharangovich (Trigger)",
+      "Aydar Suniev",
+      "Adam Klapka (Net-front)"
+     ]
+    }
+   ]
+  },
+  "COL": {
+   "standing": {
+    "record": "7-5-1",
+    "points": 15,
+    "games": 13,
+    "division": "Central",
+    "division_place": 3,
+    "conference_place": 6,
+    "league_place_in_points": 16,
+    "home_record": "5-1-1",
+    "road_record": "2-4-0",
+    "last_ten": "5-4-1",
+    "streak": "W1",
+    "coach": "Jared Bednar"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 54,
+    "ga": 41,
+    "gfpg": 4.15,
+    "gapg": 3.15,
+    "diff": 13,
+    "ppg": 8,
+    "ppo": 41,
+    "pppct": 0.195,
+    "pkpct": 0.769,
+    "sfpg": 30.5,
+    "sapg": 28.0,
+    "fopct": 0.469
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 2,
+    "gapg": 16,
+    "pppct": 20,
+    "pkpct": 21,
+    "sfpg": 4,
+    "sapg": 18,
+    "fopct": 27
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    },
+    {
+     "trait": "Shots from defensemen",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Forward-led",
+     "high_end_word": "Active D"
+    },
+    {
+     "trait": "Point shots allowed",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Point covered",
+     "high_end_word": "Guard the net"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Icing the puck",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Ices often",
+     "high_end_word": "Rarely ices"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Nathan MacKinnon",
+     "pos": "C",
+     "gp": 13,
+     "g": 8,
+     "a": 14,
+     "p": 22,
+     "ppp": 3,
+     "toi_per_game": "20:45",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Martin Nečas",
+     "pos": "C",
+     "gp": 13,
+     "g": 6,
+     "a": 10,
+     "p": 16,
+     "ppp": 2,
+     "toi_per_game": "19:57",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Artturi Lehkonen",
+     "pos": "L",
+     "gp": 13,
+     "g": 10,
+     "a": 5,
+     "p": 15,
+     "ppp": 2,
+     "toi_per_game": "18:55",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 3,
+      "p": 7
+     }
+    },
+    {
+     "name": "Devon Toews",
+     "pos": "D",
+     "gp": 13,
+     "g": 4,
+     "a": 7,
+     "p": 11,
+     "ppp": 4,
+     "toi_per_game": "20:41",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 3,
+      "p": 5
+     }
+    },
+    {
+     "name": "Cale Makar",
+     "pos": "D",
+     "gp": 12,
+     "g": 3,
+     "a": 8,
+     "p": 11,
+     "ppp": 2,
+     "toi_per_game": "22:26",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 2,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Mackenzie Blackwood",
+     "gp": 9,
+     "record": "6-3-0",
+     "sv_pct": 0.894,
+     "gaa": 2.81,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Scott Wedgewood",
+     "gp": 4,
+     "record": "1-2-1",
+     "sv_pct": 0.889,
+     "gaa": 3.48,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Artturi Lehkonen",
+      "Nathan MacKinnon",
+      "Martin Nečas"
+     ],
+     "games_together_recently": 6
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Jaden Schwartz",
+      "Nazem Kadri",
+      "T.J. Hughes"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Gabriel Landeskog",
+      "Brock Nelson",
+      "Nicolas Roy"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Devon Toews",
+      "Cale Makar"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Brett Kulak",
+      "Sam Malinski"
+     ],
+     "games_together_recently": 7
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Cale Makar (Quarterback)",
+      "Nathan MacKinnon (Trigger)",
+      "Nazem Kadri (Net-front)",
+      "T.J. Hughes (Net-front)",
+      "Martin Nečas (Distributor)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Devon Toews (Quarterback)",
+      "Martin Nečas (Trigger)",
+      "Gabriel Landeskog (Net-front)",
+      "Brock Nelson (Distributor)",
+      "Artturi Lehkonen (Net-front)"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}

@@ -1,0 +1,65 @@
+{
+ "head": "Somebody warn the Kraken’s goalie",
+ "paras": [
+  "Seattle has won both meetings this season. The Kraken (8-4-1) beat Toronto 5-4 on Wednesday, while the Flames (5-7-0) lost 4-0 to Edmonton the same night. This is a Pacific Division matchup, with the Kraken third (tied for eighth in the NHL) and the Flames sixth (tied for 27th). The Pacific has been the weakest of the four divisions so far.",
+  "The Kraken’s record (.654) is running ahead of what their chances are worth (.435), largely thanks to their finishing. The Flames’ record (.417) is about what their chances are worth. If the Kraken’s record were closer to their chances, like the Flames’, these teams would be much closer in the standings, so don’t be surprised if this one is closer than the records suggest.",
+  "The Kraken keep dangerous shots away better than anyone (1st), but rarely threaten on the penalty kill (32nd). They also give up a lot of shots (32nd), so the Flames are likely to get plenty of pucks to the net against them. The Flames rarely get pinned in their own end (3rd), but take a lot of low-quality shots (32nd). Calgary has scored 2.33 goals a game, the third fewest in the league, and allowed 3.75, the second most. Both teams like to play fast, especially the Flames (2nd), so expect an open game.",
+  "Chandler Stephenson (2 G / 9 A / 11 P in 13 GP) leads the Kraken in scoring, with a point in six straight games against Calgary. Frédérick Gaudreau (6 G / 3 A / 9 P in 13 GP) has a team-high six goals. For the Flames, Joel Farabee (3 G / 8 A / 11 P in 12 GP) leads the way in scoring, with seven points in his last five games. Matvei Gridin (4 G / 4 A / 8 P in 12 GP) has a team-high four goals.",
+  "Dustin Wolf (1-4-0 / .839 SV% in 5 GS) has struggled for Calgary so far, but will likely start. Seattle has two options in net: Philipp Grubauer (5-1-1 / .898 SV% in 7 GS) and Joey Daccord (3-3-0 / .882 SV% in 6 GS). Grubauer has started six of their last ten games, including the last one on Wednesday. It’s anyone’s guess who gets the net. Wolf has a .855 save percentage in six starts against the Kraken, well under his usual .902. Don’t read much into it: a goalie’s record against one team rarely holds up.",
+  "At home, Ryan Huska likes to send Farabee, Backlund and Coronato out against the other team’s top line, so watch for them against McMann, Beniers and Eberle."
+ ],
+ "items": [
+  {
+   "tag": "Out",
+   "text": "The Flames are newly without Devin Cooley, have been without Samuel Honzek, Maxim Tsyplakov and Joel Hanley for several games, and have had to make do without Jonathan Huberdeau all season. Dustin Wolf is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Kraken are newly without Jared McCann."
+  },
+  {
+   "tag": "Luck may turn",
+   "text": "Mackie Samoskevich has five goals on chances worth about 2.0 goals, well above what his finishing usually turns chances into. Runs like that tend to cool off."
+  },
+  {
+   "tag": "Milestone",
+   "text": "Brandon Montour is two goals from 100."
+  }
+ ],
+ "outlook": {
+  "CGY": {
+   "head": "A slightly uphill night for the Flames",
+   "body": "The two have been about even at out-chancing opponents lately. Seattle will be without McCann, while Calgary has home-ice advantage. The Flames can tip it if they keep the shots coming."
+  },
+  "SEA": {
+   "head": "The Kraken start a half-step ahead",
+   "body": "The two have been about even at out-chancing opponents lately. Seattle will be without McCann, while Calgary has home-ice advantage. Still, it’s close: the Flames can make it interesting if they keep the shots coming."
+  }
+ },
+ "calls": [
+  {
+   "head": "The Flames want Coronato head to head with Eberle",
+   "body": "At home, the Flames keep sending Coronato’s line (Farabee, Backlund and Coronato) out against opponents’ first lines, far more often than chance would suggest. Ryan Huska has been choosing strength on strength. Tonight the Kraken’s first line is McMann, Beniers and Eberle."
+  },
+  {
+   "head": "The Kraken don’t own Wolf",
+   "body": "Wolf has been shaky against the Kraken since 2023-24, well below his usual. But three seasons of data say a goalie’s record against one team tells us nothing about the next meeting, so don’t be surprised if he looks like himself tonight."
+  },
+  {
+   "head": "Somebody warn the Kraken’s goalie",
+   "body": "The Flames love to shoot, and the Kraken keep letting teams do it. Get ready for a shooting gallery."
+  },
+  {
+   "head": "Nobody’s sitting back in this one",
+   "body": "The Kraken play some of the league’s fastest games, and so do the Flames. We think this one runs hotter than either team’s usual."
+  }
+ ],
+ "ranks": [
+  "1st of 32 in keeping dangerous shots away: a 5.9% chance of scoring on the average shot against",
+  "32nd of 32 in shorthanded threat",
+  "32nd of 32 in shot suppression: shots-against score 114 (100 is average)",
+  "3rd of 32 in avoiding long shifts",
+  "32nd of 32 in shot quality: a 5.5% chance of scoring on the average shot",
+  "2nd of 32 in pace: pace score 106 (100 is average)"
+ ]
+}

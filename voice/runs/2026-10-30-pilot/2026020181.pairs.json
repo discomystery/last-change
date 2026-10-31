@@ -1,0 +1,142 @@
+[
+ {
+  "op": "kept",
+  "site": [
+   "The Stars pour it on late"
+  ],
+  "rewrite": [
+   "The Stars pour it on late"
+  ],
+  "part": -2
+ },
+ {
+  "op": "new",
+  "site": [],
+  "rewrite": [
+   "Tyler Seguin got the scoring started for the Stars midway through the first, and it went back and forth from there."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Tyler Seguin got the scoring started for the Stars midway through the first, but Matthew Schaefer tied it 1-1 for the Islanders a little over two minutes later.",
+   "Jason Robertson put the Stars ahead 2-1, 49 seconds later."
+  ],
+  "rewrite": [
+   "Matthew Schaefer tied it 1-1 for the Islanders a little over two minutes later, and Jason Robertson put the Stars back ahead 2-1 just 49 seconds after that."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Kyle Palmieri made it 2-2 for the Islanders early in the second, and Justin Hryckowian put the Stars up 3-2 on the power play midway through the period.",
+   "Brayden Schenn tied it up for the Islanders late in the period, but the Islanders didn’t score again."
+  ],
+  "rewrite": [
+   "Kyle Palmieri tied it again early in the second, Justin Hryckowian restored the lead on the power play midway through the period, and Brayden Schenn answered late in the period to make it 3-3."
+  ],
+  "part": 0
+ },
+ {
+  "op": "new",
+  "site": [],
+  "rewrite": [
+   "That was the last goal the Islanders would get."
+  ],
+  "part": 0
+ },
+ {
+  "op": "merged",
+  "site": [
+   "Wyatt Johnston gave the Stars the lead early in the third.",
+   "Robertson and Mikko Rantanen scored a little over three minutes apart midway through the period to make it 6-3, and the Islanders never had an answer."
+  ],
+  "rewrite": [
+   "Wyatt Johnston gave the Stars the lead early in the third, and Robertson and Mikko Rantanen scored a little over three minutes apart midway through the period to pull away, 6-3."
+  ],
+  "part": 0
+ },
+ {
+  "op": "kept",
+  "site": [
+   "The Stars carried the play, outshooting the Islanders 38-20, and got the result to match."
+  ],
+  "rewrite": [
+   "The Stars carried the play, outshooting the Islanders 38-20, and got the result to match."
+  ],
+  "part": 1
+ },
+ {
+  "op": "reworded",
+  "site": [
+   "Jake Oettinger made 17 saves for the Stars, and Ilya Sorokin allowed six goals on 38 shots."
+  ],
+  "rewrite": [
+   "Jake Oettinger made 17 saves, while Ilya Sorokin allowed six goals on 38 shots."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "By our Swing measure, Lian Bichsel had the best night of anyone."
+  ],
+  "rewrite": [
+   "By our Swing measure, Lian Bichsel had the best night of anyone."
+  ],
+  "part": 1
+ },
+ {
+  "op": "merged",
+  "site": [
+   "The Stars improved to 7-3-1, third in the Central.",
+   "The Isles fell to 5-4-2, fifth in the Metropolitan."
+  ],
+  "rewrite": [
+   "The Stars improved to 7-3-1, third in the Central, and the Isles fell to 5-4-2, fifth in the Metropolitan."
+  ],
+  "part": 1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak: The Stars are rolling: five straight wins."
+  ],
+  "rewrite": [
+   "Streak: The Stars are rolling: five straight wins."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Snapped: The Islanders’ five-game point streak is over."
+  ],
+  "rewrite": [
+   "Snapped: The Islanders’ five-game point streak is over."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Haunts them: Jason Robertson scored twice more against the Islanders, and has eight goals in seven games against them since 2023-24."
+  ],
+  "rewrite": [
+   "Haunts them: Jason Robertson scored twice more against the Islanders, and has eight goals in seven games against them since 2023-24."
+  ],
+  "part": -1
+ },
+ {
+  "op": "kept",
+  "site": [
+   "Streak: Mikko Rantanen has a point in five straight games."
+  ],
+  "rewrite": [
+   "Streak: Mikko Rantanen has a point in five straight games."
+  ],
+  "part": -1
+ }
+]

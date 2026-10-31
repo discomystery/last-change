@@ -1,0 +1,185 @@
+{
+ "kind": "preview",
+ "game_id": 2026020245,
+ "start_utc": "2026-11-04T01:00:00Z",
+ "venue": "Bridgestone Arena",
+ "away": {
+  "abbr": "CAR",
+  "name": "Carolina Hurricanes",
+  "place": "Carolina",
+  "nickname": "Hurricanes",
+  "division": "Metropolitan",
+  "conference": "Eastern",
+  "coach": "Rod Brind'Amour"
+ },
+ "home": {
+  "abbr": "NSH",
+  "name": "Nashville Predators",
+  "place": "Nashville",
+  "nickname": "Predators",
+  "division": "Central",
+  "conference": "Western",
+  "coach": "Andrew Brunette"
+ },
+ "form": {
+  "CAR": {
+   "record": "11-2-2",
+   "games": 15,
+   "run": "won 3",
+   "last_ten": "8-1-1",
+   "last_five": [
+    {
+     "date": "2026-10-20",
+     "opp": "VAN",
+     "opp_name": "Vancouver Canucks",
+     "home": false,
+     "result": "W",
+     "score": "6-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "OTL",
+     "score": "5-6",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "STL",
+     "opp_name": "St. Louis Blues",
+     "home": false,
+     "result": "W",
+     "score": "4-0",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "CBJ",
+     "opp_name": "Columbus Blue Jackets",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    }
+   ]
+  },
+  "NSH": {
+   "record": "4-4-5",
+   "games": 13,
+   "run": "winless 2",
+   "last_ten": "3-3-4",
+   "last_five": [
+    {
+     "date": "2026-10-22",
+     "opp": "BOS",
+     "opp_name": "Boston Bruins",
+     "home": false,
+     "result": "L",
+     "score": "0-6",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "PIT",
+     "opp_name": "Pittsburgh Penguins",
+     "home": false,
+     "result": "OTL",
+     "score": "2-3",
+     "ended": "OT"
+    },
+    {
+     "date": "2026-10-25",
+     "opp": "COL",
+     "opp_name": "Colorado Avalanche",
+     "home": true,
+     "result": "W",
+     "score": "6-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-27",
+     "opp": "NYI",
+     "opp_name": "New York Islanders",
+     "home": true,
+     "result": "OTL",
+     "score": "3-4",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-29",
+     "opp": "WSH",
+     "opp_name": "Washington Capitals",
+     "home": true,
+     "result": "L",
+     "score": "3-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [],
+ "projected_goalies": {
+  "CAR": "Pyotr Kochetkov",
+  "NSH": "Juuse Saros"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "NSH",
+   "facts": [
+    "Nashville’s L4 (Höglander, Wood and Forsberg) at home: 32% of its 5-on-5 time against opponents’ third lines. Matchups, Nashville home games this season, 8 games, 35 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face third lines about 18% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Nashville L4's 5-on-5 time against Carolina L3",
+   "usual": 32,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "clash",
+   "about": "CAR",
+   "facts": [
+    "Carolina: shot volume score 121, 1st of 32. Playing style, this season blended with last, 15 and 13 games this season.",
+    "Nashville: shots-against score 108, 27th of 32. Playing style, this season blended with last, 15 and 13 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 67.8975,
+   "league": 56.1136,
+   "direction": "above"
+  },
+  {
+   "kind": "pace",
+   "about": "CAR",
+   "facts": [
+    "Carolina: pace score 102, 9th of 32. Playing style, this season blended with last, 15 and 13 games this season.",
+    "Nashville: pace score 103, 5th of 32. Playing style, this season blended with last, 15 and 13 games this season."
+   ],
+   "what_we_check": "shots per 60 at 5-on-5 (blocked shots left out), both teams combined, adjusted for score and venue",
+   "usual": 83.7,
+   "league": 81.28,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "Even though Nashville has home-ice advantage, Carolina has been out-chancing opponents by a wide margin lately.",
+  "The Predators’ best way through is getting good looks.",
+  "In net: Pyotr Kochetkov has won all nine of his starts this season, already the longest winning run to open a season by any goalie in franchise history.",
+  "Haunts them: Sebastian Aho has six goals in six games against Nashville since 2023-24.",
+  "Out: The Hurricanes have been without Taylor Hall since Oct 13.",
+  "Hot streak: Jackson Blake and Nikolaj Ehlers have a point in five straight games."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance."
+}

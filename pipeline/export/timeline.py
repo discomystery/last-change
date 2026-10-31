@@ -17,6 +17,7 @@ and clock-based otherwise; the last five minutes read "with 2:10 left".
 Never why a player left, never a reason for a goalie change: the data can't say (the rules in stories.py)."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -109,6 +110,12 @@ class Game:
     naturals: set = field(default_factory=set)  # scorers of a natural hat trick (three straight goals of the game)
     droughts: list = field(default_factory=list)  # stories.shot_droughts rows: a team's long stretch without a shot on goal
 
+    def names(self, s: str) -> str:
+        """Fill in names an attachment left as placeholders, at the moment the sentence is told, so a player's full name
+        comes on his first mention in the story ("Cirelli and John Carlson scored ..." used his surname first because the
+        assist note named him before the story reached him; voice loop, 2026-10-30)."""
+        return re.sub("\x00(\\d+)\x00", lambda m: self.name(int(m.group(1))), s)
+
     def side(self, g: dict) -> str:
         return self.home if g["home"] else self.away
 
@@ -182,7 +189,9 @@ def paragraph(gm: Game) -> list[str]:
             period_now = p_now
             if p_now in busy and not (out and out[-1][1]["kind"] == "wiped"):  # "It was a busy second period." (Sora's own line for CAR at CHI)
                 n_ = busy[p_now]
-                pool = ([f"It was a busy {PERIODS[p_now]} period.", f"The {PERIODS[p_now]} period was a wild one."] if n_ == 4 else
+                sides = {gm.side(g) for g in goals if g["period"] == p_now}
+                owned = [f"The {PERIODS[p_now]} period belonged to {W.the(sides.pop())}."] if len(sides) == 1 and p_now <= 3 else []
+                pool = owned or ([f"It was a busy {PERIODS[p_now]} period.", f"The {PERIODS[p_now]} period was a wild one."] if n_ == 4 else
                         [f"The {PERIODS[p_now]} period brought {num(n_)} goals.", f"There were {num(n_)} goals in the {PERIODS[p_now]} period alone."])
                 # each wording once a story: "was a wild one" for both the second and the third read canned (outside
                 # notes, Oct 22, four games); a repeat falls back to the goal count
@@ -413,7 +422,15 @@ def _join(items: list[tuple[str, dict]]) -> list[str]:
                 second = b if b[:1].isupper() and not b.startswith(("The ", "It ")) else b[:1].lower() + b[1:]
                 if ma.get("scorer") and ma.get("scorer") == mb.get("scorer") and b.startswith(mb.get("last", "\0") + " "):
                     second = "he " + b[len(mb["last"]) + 1:]  # "Lehkonen got the Avalanche on the board, and he struck again"
-                out.append(f"{a[:-1]}, {word} {second}")
+                at_a, at_b = _PERIOD_AT.search(a), _PERIOD_AT.search(second)
+                if at_a and at_b and at_a.group(0) == at_b.group(0) and word == "and":
+                    # "late in the first" once, up front: "Late in the first, Kolesar and Goodrow fought, and Orlov tied
+                    # it up", not the same clock twice in one sentence (voice loop, round two)
+                    cut = lambda t, m_: (t[: m_.start()].rstrip(" ,") + t[m_.end():]).replace(" ,", ",")
+                    a, second = cut(a, at_a), cut(second, at_b)
+                    out.append(f"{_cap(at_a.group(0))}, {a[:1].lower() + a[1:] if a.startswith(('The ', 'It ')) else a}"[:-1] + f", {word} {second}")
+                else:
+                    out.append(f"{a[:-1]}, {word} {second}")
                 just = True
                 i += 2
                 continue
@@ -604,6 +621,12 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
             fin, inf = f"put {T} ahead for good{how}", f"to put {T} ahead for good"
         elif t == gm.winner and down_most >= 2 and i == ahead_i:
             fin, inf = f"put {T} ahead{how} to complete the comeback", f"to put {T} ahead and complete the comeback"
+        elif i >= 2 and gm.side(goals[i - 1]) != t and gm.score(goals[i - 2], t)[0] > gm.score(goals[i - 2], t)[1]:
+            # they led, the other side tied it, and this one took the lead back: "put the Stars back ahead 2-1" (voice loop)
+            pool = [f"put {T} back ahead {m}-{th_}{how}", f"restored {W.poss(t)} lead{how}"]
+            fin = gm.pk([x for x in pool if x.split(" ")[0] not in gm.said] or pool[:1], "relead", i)
+            gm.said.add(fin.split(" ")[0])  # each wording once a story
+            inf = f"to put {T} back ahead {m}-{th_}"
         else:
             fin = gm.pk([f"put {T} ahead {m}-{th_}{how}", f"gave {T} the lead{how}", f"put {T} up {m}-{th_}{how}"], "lead", i)
             inf = f"to put {T} ahead {m}-{th_}"
@@ -653,12 +676,12 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     else:  # "tied it 1-1, 1:27 later": a comma keeps the score and the clock apart
         body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm_fin[:1].isdigit() else ''} {tm_fin}"
     body = " ".join(body.split())
-    tail = [dent] if dent else []
+    tail = [dent] if dent and not pre else []  # a first goal's "to make it 5-2" already gave the score ("..., bringing it to 5-2", ANA at NYR)
     if (g["period"], g["sec"]) in stood:
         x = stood[(g["period"], g["sec"])]
         tail.append(f"and the goal stood after {W.the(other)} challenged for {x['why']}")
     if att.get("tail"):
-        tail.append(att["tail"])
+        tail.append(gm.names(att["tail"]))
     if gw_i == i and ahead_i != i and margin <= 2 and g["strength"] != "en" and g["period"] <= 3 and gm.end == "REG":
         # "the eventual winner" hung off the verb (Sora: it should modify a goal), so the goal is named
         tail.append(gm.pk(["and that one stood up as the winner", "and that goal turned out to be the winner"], "gw", i))
@@ -726,7 +749,8 @@ def _last_word(gm: Game, i: int, body: str = "") -> str:
     names = {W.the(other), W.place(other), W.nick.get(other, other)}
     T = W.the(t) if any(n and n in body for n in names) else "they"  # "they" only when no other team is named before it
     if m > th_:  # still ahead
-        return gm.pk([f"but {T} didn’t score again", f"and {T} didn’t score again"], "lastw", i)
+        # "and that was all they would get" after the opener (voice loop, round two: the same line in three stories)
+        return gm.pk([f"but {T} didn’t score again", f"and that was all {T} would get"], "lastw", i)
     if m == th_ and at(rest[0]) - at(g) <= 120:
         return ""  # the go-ahead came right back; "they didn’t score again" then reads oddly (PIT at WPG, Oct 20)
     if m == th_:  # level: "they didn't score again" could be either side, so the team is named
@@ -998,7 +1022,8 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             elif goals[j]["p1"] == pid:
                 att.setdefault(j, {})["tail"] = f"his {th(x['mark'])} NHL {x['what']}"
             else:
-                att.setdefault(j, {})["tail"] = f"with {gm.name(pid)} picking up his {th(x['mark'])} NHL {x['what']} on the assist"
+                # "... on the goal", not "... on the assist" (voice loop, 2026-10-30)
+                att.setdefault(j, {})["tail"] = f"with \x00{pid}\x00 picking up his {th(x['mark'])} NHL {x['what']} on the goal"
             told.add(pid)
     for i, g in enumerate(goals):  # his 30th of the season
         pid = g["p1"]

@@ -1,0 +1,45 @@
+{
+ "head": "Panarin’s favorite opponent",
+ "paras": [
+  "The Sabres come in at 5-4-3, the Kings at 3-6-2.",
+  "At home, Peter Laviolette likes to pick matchups, so watch who goes out against the Sabres’ first line. The Sabres’ defensemen shoot a lot, and the Kings’ not so much."
+ ],
+ "items": [
+  {
+   "tag": "Owns them",
+   "text": "Artemi Panarin has a point in at least nine straight games against Buffalo."
+  },
+  {
+   "tag": "Out",
+   "text": "The Sabres are newly without Konsta Helenius, and have had to make do without Alex Lyon all season. Ukko-Pekka Luukkonen is expected to start."
+  },
+  {
+   "tag": "Out",
+   "text": "The Kings are newly without Mats Zuccarello, have been without Alex Turcotte since Oct 6, and have had to make do without Kevin Fiala all season."
+  },
+  {
+   "tag": "Missing",
+   "text": "Drew Doughty has missed the Kings’ latest game."
+  }
+ ],
+ "outlook": {
+  "LAK": {
+   "head": "A genuine toss-up",
+   "body": "The two have been about even at out-chancing opponents lately. Los Angeles has home-ice advantage, but they will be without Fiala. The Kings can tip it if they keep dangerous shots away."
+  },
+  "BUF": {
+   "head": "Too close to call",
+   "body": "The two have been about even at out-chancing opponents lately. Los Angeles has home-ice advantage, but they will be without Fiala. For the Sabres, the difference could be keeping dangerous shots away."
+  }
+ },
+ "calls": [
+  {
+   "head": "A tough night ahead for Quinn",
+   "body": "At home, the Kings keep sending Doughty and Edmundson out against opponents’ first lines, far more often than chance would suggest. Peter Laviolette has been picking a defense pair for the other team’s top line. Tonight the Sabres’ first line is Doan, Östlund and Quinn."
+  },
+  {
+   "head": "The Sabres’ defense joins the attack, the Kings’ stays home",
+   "body": "On shots from defensemen, Buffalo is near the top of the league, but Los Angeles is one of the worst. Watch the Sabres’ defensemen jump into the play."
+  }
+ ]
+}

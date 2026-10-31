@@ -1,0 +1,138 @@
+{
+ "goalie-line-every-game": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR",
+  "note": "Kept in every story (Sora, 2026-10-17), but a losing goalie 1.0+ goals above expected now \"kept them in it\", and a winner who faced 18 or fewer shots and allowed one or none \"needed only N saves\"."
+ },
+ "posts-line-placement": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR"
+ },
+ "choppy-fairness-pair": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR"
+ },
+ "ended-streak-vs-opponent": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR",
+  "note": "An ended point streak against one club is told only from seven games (one that goes on still from five)."
+ },
+ "double-score-clause": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR"
+ },
+ "assist-milestone-wording": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR",
+  "note": "Full name on first mention; the milestone now reads \"with Cirelli picking up his 200th NHL assist on the goal\" (round one's rewording was undone, Sora 2026-10-30)."
+ },
+ "two-winners": {
+  "status": "kept",
+  "since": "2026-10-30-pilot",
+  "note": "Round one dropped \"stood up as the winner\" after \"ahead for good\"; Sora found it a step back (WPG at TBL), so it is back. Only \"assist on the assist\" was fixed."
+ },
+ "preview-form-bare": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR",
+  "note": "A team with no streak to tell gets its record and last result; a last game against tonight's opponent is left to the meetings sentence (it was told twice on WPG at FLA)."
+ },
+ "preview-story-echoes-calls": {
+  "status": "partly",
+  "since": "2026-10-30-pilot",
+  "fix": "this PR",
+  "note": "The matchup sentence now names both groups. The other call summaries still repeat the cards below them: proposal."
+ },
+ "busy-period-filler": {
+  "status": "kept",
+  "note": "\"It was a busy second period\" is Sora's own line (CAR at CHI); each wording is already used once a story."
+ },
+ "didnt-score-again": {
+  "status": "kept",
+  "note": "Sora asked for the story to say when a team's scoring stopped (review, round 2). Variety could still improve: proposal."
+ },
+ "lineup-projection-item": {
+  "status": "proposed",
+  "note": "Sora asked for these (2026-10-16). Proposal: only when a regular or a star is involved."
+ },
+ "lead-not-the-story": {
+  "status": "proposed",
+  "note": "Needs Sora: hot opening lines are limited to 3-goal comebacks, goalie-pulled ties that won and 6-goal routs (2026-10-14). Proposal: a plain one-line lead naming the game's shape."
+ },
+ "shape-not-named": {
+  "status": "proposed",
+  "note": "Same change as lead-not-the-story."
+ },
+ "standings-pair-template": {
+  "status": "proposed",
+  "note": "Proposal: one sentence for both clubs when neither took a place from the other."
+ },
+ "goal-by-goal-in-routs": {
+  "status": "proposed",
+  "note": "Proposal: three or more unanswered goals in a decided game as one sentence naming the scorers."
+ },
+ "rw-standings-one-sentence": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "One sentence; the winner's move is a verb when it moved."
+ },
+ "rw-back-ahead": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"put them back ahead\" / \"restored the lead\", each once a story."
+ },
+ "rw-goalie-other-end": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"... stopped 24 of 27 at the other end\"."
+ },
+ "rw-posts-with-play": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "Folded into the loser's \"had a little more of the play\" sentence."
+ },
+ "rw-one-clock": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "The joining pass fronts a shared period time."
+ },
+ "rw-period-belonged": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"The second period belonged to X\" when one team scored every goal of a busy period."
+ },
+ "rw-pronoun": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"He added three assists\" after a sentence about him (point-night line)."
+ },
+ "rw-join-goal-pairs": {
+  "status": "open",
+  "since": "2026-10-30-pilot-rewrite",
+  "note": "Next round: let the joining pass take a sentence that already has one \"but\", within the word limit."
+ },
+ "rw-implied-score": {
+  "status": "open",
+  "since": "2026-10-30-pilot-rewrite",
+  "note": "Next round: drop the score after \"tied it\" when the score is obvious from the sentence before."
+ },
+ "rw-quiet-scoring-end": {
+  "status": "fixed",
+  "since": "2026-10-30-pilot-rewrite",
+  "fix": "this PR (round two)",
+  "note": "\"and that was all they would get\" joins \"but they didn't score again\" in the pool."
+ }
+}

@@ -14,9 +14,11 @@ Notes, most important first: out (regulars only), back (returned in the latest g
 after missing games) and new (joined from another club or added to the roster in the last two weeks and dressed).
 """
 from datetime import date as Date, timedelta
+from functools import lru_cache
 
 import polars as pl
 
+from pipeline import tables
 from pipeline.config import REGULAR, TABLES
 from pipeline.export import wording
 from pipeline.metrics import patterns
@@ -34,7 +36,9 @@ STATUS_WORDS = {
 OUT_STATUSES = {"injured", "suspended", "personal", "scratched", "off_roster", "not_listed"}
 LONG_GONE = 4  # a listed player with nothing reported who has missed this many games in a row counts as out (Demko, Hyman)
 UNREPORTED_MIN_MISSED = 2  # a scratch or roster move with nothing reported needs this many games in a row to count
-TOP = {"F": 9, "D": 4}  # regulars worth a note: top nine forwards, top four defensemen by ice time
+# regulars worth a note: top twelve forwards, top six defensemen by ice time, as the league-ranked absences count them
+# (Sora, 2026-10-30: Staal, Carolina's third-line center, and Nikishin were missing from the Hurricanes' Out line)
+TOP = {"F": 12, "D": 6}
 NEW_DAYS = 14
 MAX_OUT = 4
 LONG_OUT = 20  # games missed after which only a star is still listed as out
@@ -57,7 +61,14 @@ def _team_ids(season: int) -> dict[str, int]:
 def _roles(season: int, before: str | None = None) -> dict[int, dict[int, dict]]:
     """Per team id, per skater: usual 5v5 seconds a game, ice-time rank at his position (F or D), how much he is worth
     (expected goals a game) and his rank on the team by worth. This season's games (before `before`, for a past
-    preview) when he has 3+, else last season's."""
+    preview) when he has 3+, else last season's. Kept for the run while the tables are unchanged (Out notes and the
+    post-game "Filling in" item both ask for the same day). Read only: callers must not change what comes back."""
+    files = [TABLES / str(s) / f for s in (season - 2, season - 1, season) for f in ("player_game.parquet", "games.parquet")]
+    return _roles_for(season, before, tables.stamp(*files))
+
+
+@lru_cache(maxsize=16)
+def _roles_for(season: int, before: str | None, _stamp: tuple) -> dict[int, dict[int, dict]]:
     from pipeline.metrics import win_model
 
     have = [s for s in (season - 2, season - 1, season) if (TABLES / str(s) / "player_game.parquet").exists()]
@@ -137,10 +148,8 @@ def _usual(tid: int, pid: int, kind: str, units_now, units_old, games_with: list
     return usual or patterns._mates(units_old, tid, old_games, pid, kind)
 
 
-def _cover(tid: int, pid: int, kind: str, units_now, units_old, games_with: list[int], games_without: list[int], old_games: list[int], names: dict,
-           away: set[int]) -> str | None:
-    """Who has played beside his usual linemates since he last played."""
-    usual = _usual(tid, pid, kind, units_now, units_old, games_with, old_games)
+def _cover(tid: int, pid: int, kind: str, units_now, usual, games_without: list[int], names: dict, away: set[int]) -> str | None:
+    """Who has played beside his usual linemates (`_usual`) since he last played."""
     if usual is None or not games_without:
         return None
     partners = usual[0]
@@ -192,6 +201,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
         game_ids, game_dates = games["game_id"].to_list(), games["date"].to_list()
         old_games = g_old.filter((pl.col("home_id") == tid) | (pl.col("away_id") == tid))["game_id"].to_list()[-patterns.LOOKBACK:]
         dressed = d_now.filter(pl.col("team_id") == tid)
+        un, uo = u_now.filter(pl.col("team_id") == tid), u_old.filter(pl.col("team_id") == tid)  # the club's units, cut once
         played = {pid: set(g["game_id"]) for (pid,), g in dressed.group_by(["player_id"])}
         found = []
 
@@ -206,6 +216,10 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 continue
             if not reported and (r["games_missed"] or 0) < UNREPORTED_MIN_MISSED:
                 continue
+            # off the NHL roster with nothing said is a player in the minors, not one who is out (Unger Sörum, a call-up
+            # sent back down, once depth players counted)
+            if r["status"] in ("not_listed", "off_roster") and not r["report_status"] and not star:
+                continue
             # out a long time or sent down: no longer part of what the team is now (eye test on 2025-26: Engvall after 79
             # games and Rinzel in the AHL were "one of their most valuable skaters"), so only stars are still told
             long_out = (r["games_missed"] or 0) >= LONG_OUT or r["report_status"] == "assigned" or r["status"] == "off_roster"
@@ -219,8 +233,8 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             kind = "D" if (ro["grp"] if ro else ("D" if r["pos"] == "D" else "F")) == "D" else "F"
             with_ids = [g for g in game_ids if g in played.get(pid, set())]
             without = [g for g, d in zip(game_ids, game_dates) if g not in played.get(pid, set()) and (r["last_played"] is None or d > r["last_played"])]
-            cover = _cover(tid, pid, kind, u_now, u_old, with_ids, without, old_games, names, away)
-            usual = _usual(tid, pid, kind, u_now, u_old, with_ids, old_games)
+            usual = _usual(tid, pid, kind, un, uo, with_ids, old_games)
+            cover = _cover(tid, pid, kind, un, usual, without, names, away)
             if cover:
                 text += " " + cover
             found.append({"pid": pid, "last_played": r["last_played"], "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
@@ -262,7 +276,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 src = f"from {m['from_team']}" if m["from_team"] else "to the roster"
                 text = f"{who} joined {src} on {when}" if m["from_team"] else f"{who} was added to the roster on {when}"
                 kind = "D" if (role.get(pid) or {}).get("grp") == "D" else "F"
-                mates = patterns._mates(u_now, tid, sorted(played[pid]), pid, kind)
+                mates = patterns._mates(un, tid, sorted(played[pid]), pid, kind)
                 text += f" and has played beside {' and '.join(names.get(x, '?') for x in mates[0])}." if mates and mates[0] else "."
                 found.append({"player": who, "pid": pid, "kind": "new", "change": "new", "now": 100, "before": 0, "games": gp, "text": text, "order": 50})
         if found:

@@ -1,0 +1,763 @@
+{
+ "kind": "preview",
+ "game_id": 2026020216,
+ "start_utc": "2026-10-31T00:00:00Z",
+ "venue": "Scotiabank Saddledome",
+ "away": {
+  "abbr": "SEA",
+  "name": "Seattle Kraken",
+  "place": "Seattle",
+  "nickname": "Kraken",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Lane Lambert"
+ },
+ "home": {
+  "abbr": "CGY",
+  "name": "Calgary Flames",
+  "place": "Calgary",
+  "nickname": "Flames",
+  "division": "Pacific",
+  "conference": "Western",
+  "coach": "Ryan Huska"
+ },
+ "form": {
+  "SEA": {
+   "record": "8-4-1",
+   "games": 13,
+   "run": "won 1",
+   "last_ten": "6-3-1",
+   "last_five": [
+    {
+     "date": "2026-10-17",
+     "opp": "FLA",
+     "opp_name": "Florida Panthers",
+     "home": false,
+     "result": "L",
+     "score": "3-8",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-20",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "W",
+     "score": "4-3",
+     "ended": "SO"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "UTA",
+     "opp_name": "Utah Mammoth",
+     "home": true,
+     "result": "W",
+     "score": "5-3",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "L",
+     "score": "1-5",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "W",
+     "score": "5-4",
+     "ended": "REG"
+    }
+   ]
+  },
+  "CGY": {
+   "record": "5-7-0",
+   "games": 12,
+   "run": "winless 1",
+   "last_ten": "5-5-0",
+   "last_five": [
+    {
+     "date": "2026-10-18",
+     "opp": "CAR",
+     "opp_name": "Carolina Hurricanes",
+     "home": true,
+     "result": "W",
+     "score": "3-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-22",
+     "opp": "MIN",
+     "opp_name": "Minnesota Wild",
+     "home": true,
+     "result": "W",
+     "score": "2-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-24",
+     "opp": "DET",
+     "opp_name": "Detroit Red Wings",
+     "home": true,
+     "result": "W",
+     "score": "4-1",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-26",
+     "opp": "TOR",
+     "opp_name": "Toronto Maple Leafs",
+     "home": true,
+     "result": "W",
+     "score": "5-2",
+     "ended": "REG"
+    },
+    {
+     "date": "2026-10-28",
+     "opp": "EDM",
+     "opp_name": "Edmonton Oilers",
+     "home": false,
+     "result": "L",
+     "score": "0-4",
+     "ended": "REG"
+    }
+   ]
+  }
+ },
+ "earlier_meetings_this_season": [
+  {
+   "date": "2026-10-01",
+   "winner": "SEA",
+   "score": "6-1",
+   "where": "CGY"
+  },
+  {
+   "date": "2026-10-04",
+   "winner": "SEA",
+   "score": "6-1",
+   "where": "SEA"
+  }
+ ],
+ "projected_goalies": {
+  "CGY": "Dustin Wolf"
+ },
+ "calls": [
+  {
+   "kind": "matchup",
+   "about": "CGY",
+   "facts": [
+    "Calgary’s L1 (Farabee, Backlund and Coronato) at home: 67% of its 5-on-5 time against opponents’ first lines. Matchups, Calgary home games this season, 7 games, 68 minutes for this group at 5-on-5.",
+    "With no line matching, this group would face first lines about 38% of the time, about as often as those lines are on the ice."
+   ],
+   "what_we_check": "share of Calgary L1's 5-on-5 time against Seattle L1",
+   "usual": 67,
+   "league": null,
+   "direction": "above"
+  },
+  {
+   "kind": "history",
+   "about": "CGY",
+   "facts": [
+    "Wolf: .855 save percentage in 6 starts against Seattle since 2023-24.",
+    "Wolf: .902 save percentage against everyone else since 2023-24, on 3,509 shots."
+   ],
+   "what_we_check": null,
+   "usual": 0.9017,
+   "league": null,
+   "direction": "closer"
+  },
+  {
+   "kind": "clash",
+   "about": "CGY",
+   "facts": [
+    "Calgary: shot volume score 109, 6th of 32. Playing style, this season blended with last, 12 and 13 games this season.",
+    "Seattle: shots-against score 114, 32nd of 32. Playing style, this season blended with last, 12 and 13 games this season."
+   ],
+   "what_we_check": "5-on-5 shot attempts per 60, adjusted for score and venue",
+   "usual": 60.9592,
+   "league": 55.9259,
+   "direction": "above"
+  },
+  {
+   "kind": "pace",
+   "about": "SEA",
+   "facts": [
+    "Seattle: pace score 102, 10th of 32. Playing style, this season blended with last, 13 and 12 games this season.",
+    "Calgary: pace score 106, 2nd of 32. Playing style, this season blended with last, 13 and 12 games this season."
+   ],
+   "what_we_check": "shots per 60 at 5-on-5 (blocked shots left out), both teams combined, adjusted for score and venue",
+   "usual": 85.96,
+   "league": 81.18,
+   "direction": "above"
+  }
+ ],
+ "calls_rule": "Each call is a measured matchup the page will grade after the game. Mention any; the numbers are in `facts`.",
+ "notes": [
+  "The two have been about even at out-chancing opponents lately.",
+  "Seattle will be without McCann, while Calgary has home-ice advantage.",
+  "The Flames can tip it if they keep the shots coming.",
+  "Out: The Flames are newly without Devin Cooley, and have been without Samuel Honzek, Maxim Tsyplakov, Joel Hanley and Connor Zary for several games. Dustin Wolf is expected to start.",
+  "Out: The Kraken are newly without Jared McCann.",
+  "Owns them: Chandler Stephenson has a point in six straight games against Calgary.",
+  "Milestone: Brandon Montour is two goals from 100."
+ ],
+ "notes_rule": "True facts found by the detectors (who leans which way and why, who is out, storylines). Never state a win chance.",
+ "teams": {
+  "SEA": {
+   "standing": {
+    "record": "8-4-1",
+    "points": 17,
+    "games": 13,
+    "division": "Pacific",
+    "division_place": 3,
+    "conference_place": 5,
+    "league_place_in_points": 9,
+    "home_record": "4-2-0",
+    "road_record": "4-2-1",
+    "last_ten": "6-3-1",
+    "streak": "W1",
+    "coach": "Lane Lambert"
+   },
+   "team_stats": {
+    "gp": 13,
+    "gf": 48,
+    "ga": 46,
+    "gfpg": 3.69,
+    "gapg": 3.54,
+    "diff": 2,
+    "ppg": 10,
+    "ppo": 44,
+    "pppct": 0.227,
+    "pkpct": 0.676,
+    "sfpg": 25.5,
+    "sapg": 31.1,
+    "fopct": 0.513
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 5,
+    "gapg": 28,
+    "pppct": 12,
+    "pkpct": 27,
+    "sfpg": 26,
+    "sapg": 30,
+    "fopct": 9
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    },
+    {
+     "trait": "Dangerous shots allowed",
+     "rank_of_32": 1,
+     "percentile": 98,
+     "low_end_word": "Exposed",
+     "high_end_word": "Sheltered"
+    },
+    {
+     "trait": "Shorthanded threat",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Bunkered",
+     "high_end_word": "Predatory"
+    },
+    {
+     "trait": "Depth",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Top-heavy",
+     "high_end_word": "Deep"
+    },
+    {
+     "trait": "Penalty kill",
+     "rank_of_32": 31,
+     "percentile": 5,
+     "low_end_word": "Leaky",
+     "high_end_word": "Airtight"
+    },
+    {
+     "trait": "Forecheck pressure",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Passive",
+     "high_end_word": "Hounding"
+    },
+    {
+     "trait": "Physicality",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Finesse",
+     "high_end_word": "Bruising"
+    },
+    {
+     "trait": "Shot volume",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Selective",
+     "high_end_word": "Relentless"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Chandler Stephenson",
+     "pos": "C",
+     "gp": 13,
+     "g": 2,
+     "a": 9,
+     "p": 11,
+     "ppp": 5,
+     "toi_per_game": "17:26",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Berkly Catton",
+     "pos": "C",
+     "gp": 13,
+     "g": 4,
+     "a": 6,
+     "p": 10,
+     "ppp": 1,
+     "toi_per_game": "14:56",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 4,
+      "p": 6
+     }
+    },
+    {
+     "name": "Jordan Eberle",
+     "pos": "R",
+     "gp": 13,
+     "g": 4,
+     "a": 6,
+     "p": 10,
+     "ppp": 6,
+     "toi_per_game": "16:46",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 2,
+      "p": 3
+     }
+    },
+    {
+     "name": "Brandon Montour",
+     "pos": "D",
+     "gp": 12,
+     "g": 3,
+     "a": 7,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "24:00",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 2,
+      "p": 5
+     }
+    },
+    {
+     "name": "Kaapo Kakko",
+     "pos": "R",
+     "gp": 13,
+     "g": 2,
+     "a": 8,
+     "p": 10,
+     "ppp": 2,
+     "toi_per_game": "14:09",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 4,
+      "p": 4
+     }
+    },
+    {
+     "name": "Frédérick Gaudreau",
+     "pos": "C",
+     "gp": 13,
+     "g": 6,
+     "a": 3,
+     "p": 9,
+     "ppp": 0,
+     "toi_per_game": "15:20",
+     "last_five_games": {
+      "games": 5,
+      "g": 2,
+      "a": 1,
+      "p": 3
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Philipp Grubauer",
+     "gp": 8,
+     "record": "5-1-1",
+     "sv_pct": 0.898,
+     "gaa": 2.93,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Joey Daccord",
+     "gp": 6,
+     "record": "3-3-0",
+     "sv_pct": 0.882,
+     "gaa": 3.95,
+     "shutouts": 0,
+     "projected_starter": false
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Bobby McMann",
+      "Matty Beniers",
+      "Jordan Eberle"
+     ],
+     "games_together_recently": 1
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Kaapo Kakko",
+      "Berkly Catton",
+      "Shane Wright"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Jani Nyman",
+      "Chandler Stephenson",
+      "Mackie Samoskevich"
+     ],
+     "games_together_recently": 0
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Brandon Montour",
+      "Ryker Evans"
+     ],
+     "games_together_recently": 9
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Adam Larsson",
+      "Vince Dunn"
+     ],
+     "games_together_recently": 10
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Vince Dunn (Quarterback)",
+      "Chandler Stephenson",
+      "Jordan Eberle (Trigger)",
+      "Bobby McMann",
+      "Jared McCann (Distributor)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Brandon Montour (Quarterback)",
+      "Matty Beniers (Trigger)",
+      "Berkly Catton",
+      "Kaapo Kakko (Net-front)",
+      "Shane Wright"
+     ]
+    }
+   ]
+  },
+  "CGY": {
+   "standing": {
+    "record": "5-7-0",
+    "points": 10,
+    "games": 12,
+    "division": "Pacific",
+    "division_place": 6,
+    "conference_place": 13,
+    "league_place_in_points": 28,
+    "home_record": "4-3-0",
+    "road_record": "1-4-0",
+    "last_ten": "5-5-0",
+    "streak": "L1",
+    "coach": "Ryan Huska"
+   },
+   "team_stats": {
+    "gp": 12,
+    "gf": 28,
+    "ga": 45,
+    "gfpg": 2.33,
+    "gapg": 3.75,
+    "diff": -17,
+    "ppg": 9,
+    "ppo": 31,
+    "pppct": 0.29,
+    "pkpct": 0.838,
+    "sfpg": 28.8,
+    "sapg": 30.5,
+    "fopct": 0.492
+   },
+   "team_stat_ranks_of_32": {
+    "gfpg": 30,
+    "gapg": 31,
+    "pppct": 5,
+    "pkpct": 9,
+    "sfpg": 9,
+    "sapg": 29,
+    "fopct": 20
+   },
+   "style_most_distinctive": [
+    {
+     "trait": "Shot quality",
+     "rank_of_32": 32,
+     "percentile": 2,
+     "low_end_word": "Hopeful",
+     "high_end_word": "Dangerous"
+    },
+    {
+     "trait": "Pace",
+     "rank_of_32": 2,
+     "percentile": 95,
+     "low_end_word": "Slog",
+     "high_end_word": "Track meet"
+    },
+    {
+     "trait": "Caught on long shifts",
+     "rank_of_32": 3,
+     "percentile": 92,
+     "low_end_word": "Pinned",
+     "high_end_word": "Fresh legs"
+    },
+    {
+     "trait": "Power play",
+     "rank_of_32": 30,
+     "percentile": 8,
+     "low_end_word": "Harmless",
+     "high_end_word": "Lethal"
+    },
+    {
+     "trait": "Second chances",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "One-and-done",
+     "high_end_word": "Crashers"
+    },
+    {
+     "trait": "Shots from in close",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "From distance",
+     "high_end_word": "In close"
+    },
+    {
+     "trait": "Breakdowns avoided",
+     "rank_of_32": 29,
+     "percentile": 11,
+     "low_end_word": "Fire drill",
+     "high_end_word": "Composed"
+    },
+    {
+     "trait": "Shot suppression",
+     "rank_of_32": 28,
+     "percentile": 14,
+     "low_end_word": "Porous",
+     "high_end_word": "Stingy"
+    }
+   ],
+   "top_scorers": [
+    {
+     "name": "Joel Farabee",
+     "pos": "L",
+     "gp": 12,
+     "g": 3,
+     "a": 8,
+     "p": 11,
+     "ppp": 6,
+     "toi_per_game": "18:50",
+     "last_five_games": {
+      "games": 5,
+      "g": 3,
+      "a": 4,
+      "p": 7
+     }
+    },
+    {
+     "name": "Matt Coronato",
+     "pos": "R",
+     "gp": 12,
+     "g": 2,
+     "a": 8,
+     "p": 10,
+     "ppp": 5,
+     "toi_per_game": "17:38",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 6,
+      "p": 6
+     }
+    },
+    {
+     "name": "Matvei Gridin",
+     "pos": "R",
+     "gp": 12,
+     "g": 4,
+     "a": 4,
+     "p": 8,
+     "ppp": 4,
+     "toi_per_game": "15:42",
+     "last_five_games": {
+      "games": 5,
+      "g": 4,
+      "a": 2,
+      "p": 6
+     }
+    },
+    {
+     "name": "Morgan Frost",
+     "pos": "C",
+     "gp": 12,
+     "g": 3,
+     "a": 4,
+     "p": 7,
+     "ppp": 4,
+     "toi_per_game": "15:06",
+     "last_five_games": {
+      "games": 5,
+      "g": 1,
+      "a": 3,
+      "p": 4
+     }
+    },
+    {
+     "name": "Šimon Nemec",
+     "pos": "D",
+     "gp": 12,
+     "g": 0,
+     "a": 5,
+     "p": 5,
+     "ppp": 0,
+     "toi_per_game": "21:32",
+     "last_five_games": {
+      "games": 5,
+      "g": 0,
+      "a": 2,
+      "p": 2
+     }
+    }
+   ],
+   "goalies": [
+    {
+     "name": "Devin Cooley",
+     "gp": 7,
+     "record": "4-3-0",
+     "sv_pct": 0.914,
+     "gaa": 2.69,
+     "shutouts": 0,
+     "projected_starter": false
+    },
+    {
+     "name": "Dustin Wolf",
+     "gp": 6,
+     "record": "1-4-0",
+     "sv_pct": 0.839,
+     "gaa": 4.81,
+     "shutouts": 0,
+     "projected_starter": true
+    }
+   ],
+   "usual_lines": [
+    {
+     "unit": "L1",
+     "players": [
+      "Joel Farabee",
+      "Mikael Backlund",
+      "Matt Coronato"
+     ],
+     "games_together_recently": 3
+    },
+    {
+     "unit": "L2",
+     "players": [
+      "Matvei Gridin",
+      "Martin Pospíšil",
+      "Ryan Strome"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "L3",
+     "players": [
+      "Yegor Sharangovich",
+      "Morgan Frost",
+      "Aydar Suniev"
+     ],
+     "games_together_recently": 5
+    },
+    {
+     "unit": "P1",
+     "players": [
+      "Kevin Bahl",
+      "Šimon Nemec"
+     ],
+     "games_together_recently": 8
+    },
+    {
+     "unit": "P2",
+     "players": [
+      "Jake Middleton",
+      "Zach Whitecloud"
+     ],
+     "games_together_recently": 5
+    }
+   ],
+   "power_play_units": [
+    {
+     "unit": "PP1",
+     "players": [
+      "Zayne Parekh (Quarterback)",
+      "Joel Farabee (Net-front)",
+      "Matvei Gridin (Distributor)",
+      "Morgan Frost (Net-front)",
+      "Matt Coronato (Trigger)"
+     ]
+    },
+    {
+     "unit": "PP2",
+     "players": [
+      "Šimon Nemec (Quarterback)",
+      "Ryan Strome",
+      "Yegor Sharangovich (Trigger)",
+      "Aydar Suniev",
+      "Adam Klapka (Net-front)"
+     ]
+    }
+   ]
+  }
+ },
+ "teams_rule": "Each club's season so far, read before the game: use any of it. Style ranks are of 32 (1 = furthest toward the high-end word)."
+}
