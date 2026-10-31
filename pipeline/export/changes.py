@@ -40,8 +40,18 @@ UNREPORTED_MIN_MISSED = 2  # a scratch or roster move with nothing reported need
 # (Sora, 2026-10-30: Staal, Carolina's third-line center, and Nikishin were missing from the Hurricanes' Out line)
 TOP = {"F": 12, "D": 6}
 NEW_DAYS = 14
+GONE_FROM_ROSTER = {"not_listed", "off_roster", "no_club"}  # today's statuses that mean he is no longer with the club
+SHARE_MIN_SEC = 1800  # 30 minutes together at 5-on-5 before a line's share of the chances is told
+SHARE_GAP = 5  # points: closer than this to the old group's share reads "about what it had"
+RELIST_GRACE = 2  # days a listing can trail the lineup: dressing this close before a move still counts as new
 MAX_OUT = 4
 LONG_OUT = 20  # games missed after which only a star is still listed as out
+
+
+def clock(seconds: float) -> str:
+    """Ice time as minutes:seconds (site_json.clock; kept here so this module stays light to import)."""
+    s = round(seconds)
+    return f"{s // 60}:{s % 60:02d}"
 
 
 def _name(r: dict) -> str:
@@ -116,9 +126,8 @@ def _matters(role: dict | None, team_size: int) -> str | None:
 
 
 def _injury(text: str | None) -> str:
-    if not text or "undisclosed" in text:
-        return ""
-    return f" ({text})" if text.endswith(("injury", "surgery", "illness", "fracture", "strain", "sprain", "issue", "tear")) else f" ({text} injury)"
+    words, _ = wording.injury(text)
+    return f" ({words})" if words else ""
 
 
 def _status_text(r: dict, now_games: int) -> str:
@@ -148,7 +157,8 @@ def _usual(tid: int, pid: int, kind: str, units_now, units_old, games_with: list
     return usual or patterns._mates(units_old, tid, old_games, pid, kind)
 
 
-def _cover(tid: int, pid: int, kind: str, units_now, usual, games_without: list[int], names: dict, away: set[int]) -> str | None:
+def _cover(tid: int, pid: int, kind: str, units_now, usual, games_without: list[int], names: dict, away: set[int],
+           games_with: list[int] | None = None) -> str | None:
     """Who has played beside his usual linemates (`_usual`) since he last played."""
     if usual is None or not games_without:
         return None
@@ -159,7 +169,37 @@ def _cover(tid: int, pid: int, kind: str, units_now, usual, games_without: list[
     if not cover or cover[0][1] < 240:
         return None
     mates = " and ".join(names.get(x, "?") for x in partners)
-    return f"{names.get(cover[0][0], '?')} has taken his spot beside {mates}."
+    text = f"{names.get(cover[0][0], '?')} has taken his spot beside {mates}."
+    return text + _how_its_gone(tid, pid, kind, units_now, partners, cover[0][0], games_without, games_with or [], names)
+
+
+def _share(units, tid: int, kind: str, members: set[int], game_ids: list[int]) -> tuple[float, float] | None:
+    """Seconds together at 5-on-5 and their share of the expected goals, for exactly this group over these games."""
+    rows = units.filter((pl.col("team_id") == tid) & (pl.col("kind") == kind) & pl.col("game_id").is_in(game_ids))
+    sec = xgf = xga = 0.0
+    for r in rows.iter_rows(named=True):
+        if {int(x) for x in r["unit"].split("-")} == members:
+            sec, xgf, xga = sec + r["sec"], xgf + r["xgf"], xga + r["xga"]
+    return (sec, xgf / (xgf + xga)) if xgf + xga > 0 else None
+
+
+def _how_its_gone(tid: int, pid: int, kind: str, units, partners: tuple[int, ...], fill: int, games_without: list[int],
+                  games_with: list[int], names: dict) -> str:
+    """How the line has done with the fill-in, and beside how it did with him this season (Sora, 2026-10-31: "Has it
+    been working?"). Shares of 5-on-5 chances; told only with SHARE_MIN_SEC together, and the comparison only when
+    the old group had that much too. Facts about the chances, never a verdict on the fill-in."""
+    now = _share(units, tid, kind, set(partners) | {fill}, games_without)
+    if not now or now[0] < SHARE_MIN_SEC:
+        return ""
+    group = "line" if kind == "F" else "pair"
+    text = f" That {group} has had {round(100 * now[1])}% of the chances at 5-on-5 in {clock(now[0])} together"
+    before = _share(units, tid, kind, set(partners) | {pid}, games_with) if games_with else None
+    if before and before[0] >= SHARE_MIN_SEC:
+        last = names.get(pid, "him").split(" ", 1)[-1]
+        gap = round(100 * now[1]) - round(100 * before[1])
+        text += (f", about what it had with {last} ({round(100 * before[1])}%)" if abs(gap) < SHARE_GAP else
+                 f", {'up' if gap > 0 else 'down'} from {round(100 * before[1])}% with {last}")
+    return text + "."
 
 
 def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
@@ -188,6 +228,11 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 names[r["player_id"]] = _name(r)
     names |= wording.number_clashes(season, wording.full)  # "Albert Johansson (#47)" when two teammates match
     moves = pl.read_parquet(moves_path) if moves_path.exists() else None
+    last_gp: dict[tuple[int, int], int] = {}  # (team id, player) -> games dressed for that club last season
+    f = TABLES / str(season - 1) / "players.parquet"
+    if f.exists():
+        for r in pl.read_parquet(f, columns=["team_id", "player_id"]).group_by("team_id", "player_id").len().iter_rows(named=True):
+            last_gp[(r["team_id"], r["player_id"])] = r["len"]
     since = (Date.fromisoformat(day) - timedelta(days=NEW_DAYS)).isoformat()
 
     out: dict[str, list[dict]] = {}
@@ -234,7 +279,7 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
             with_ids = [g for g in game_ids if g in played.get(pid, set())]
             without = [g for g, d in zip(game_ids, game_dates) if g not in played.get(pid, set()) and (r["last_played"] is None or d > r["last_played"])]
             usual = _usual(tid, pid, kind, un, uo, with_ids, old_games)
-            cover = _cover(tid, pid, kind, un, usual, without, names, away)
+            cover = _cover(tid, pid, kind, un, usual, without, names, away, with_ids)
             if cover:
                 text += " " + cover
             found.append({"pid": pid, "last_played": r["last_played"], "player": who, "kind": "absence", "change": "out", "now": 100, "before": 0, "games": r["games_missed"] or 0,
@@ -264,12 +309,24 @@ def notes(season: int, day: str | None = None) -> dict[str, list[dict]] | None:
                 text += " Their recent numbers were built mostly without him."
             found.append({"player": who, "pid": pid, "kind": "back", "change": "back", "now": 100, "before": 0, "games": n, "text": text, "order": ro["worth_rank"]})
 
-        # New: joined in the last two weeks and has dressed.
+        # New: joined in the last two weeks, has dressed, and is still with the club.
         if moves is not None:
-            for m in moves.filter((pl.col("to_team") == team) & (pl.col("date") >= since)).iter_rows(named=True):
+            here = set(rows.filter(~pl.col("status").is_in(list(GONE_FROM_ROSTER)))["player_id"].to_list())
+            date_of = dict(zip(game_ids, game_dates))
+            for m in moves.filter((pl.col("to_team") == team) & (pl.col("date") >= since)).sort("date").unique("player_id", keep="last", maintain_order=True).iter_rows(named=True):
                 pid = m["player_id"]
                 gp = len(played.get(pid, set()))
                 if gp == 0:
+                    continue
+                # sent back down or moved on since (Sora, 2026-10-31: Unger Sörum and Brind'Amour were still "added to
+                # the roster" a week after going back to the minors)
+                if pid not in here:
+                    continue
+                # back on the listing after injured reserve or a stint away, not new: a player the club dressed before
+                # the move (a couple of days' grace, as listings lag the lineup) or 20+ times last season (Jarvis and
+                # Nikishin read "added to the roster" when they came off injured reserve)
+                cut = (Date.fromisoformat(m["date"]) - timedelta(days=RELIST_GRACE)).isoformat()
+                if not m["from_team"] and (any(date_of.get(g, "9") < cut for g in played.get(pid, set())) or last_gp.get((tid, pid), 0) >= 20):
                     continue
                 who = names.get(pid) or _name(m)
                 when = Date.fromisoformat(m["date"]).strftime("%b %-d")

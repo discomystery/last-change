@@ -106,7 +106,8 @@ const heat = (v: number | null) => (v === null ? '' : `--h:${v}`);
 const hot = (v: number | null) => ({ hot: (v ?? 0) >= 36, hotter: (v ?? 0) >= 46 });
 const homeMu = LN[home]?.matchups?.home;
 // With a story at the top, the lineup notes move down into Lines (the faceoff note already shows in Special teams).
-const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })));
+// A power-play or penalty-kill usage change is told for its first few games only (`fresh`, pipeline/export/site_json.py).
+const lineNotes = order.flatMap((a) => (LN[a]?.notes ?? []).filter((n) => (n as any).fresh !== false).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })));
 const notes = order.flatMap((a) => [...(LN[a]?.notes ?? []).map((n) => ({ a, text: n.text, names: (n as any).names as string[] | undefined })), ...(LN[a]?.special?.faceoff ? [{ a, text: LN[a].special!.faceoff!.text, names: (LN[a].special!.faceoff as any).names as string[] | undefined }] : [])]);
 const wkTeams = order.map((a) => ({ a, label: place(a), cls: `t-${side(a)}`, href: `${base}team/${a}/` }));
 

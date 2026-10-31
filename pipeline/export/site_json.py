@@ -153,6 +153,9 @@ def clock(seconds: float) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
+# a power-play or penalty-kill change against last season is news for its first few games with the club, then the
+# preview's Worth knowing stops repeating it (Sora, 2026-10-31: "Repeats every game!"); team pages keep it
+USAGE_FRESH = 7  # the note needs 3 games, so it is told in at most five previews (Sora, 2026-10-31)
 SHUFFLED = 0.33  # listed forward lines covering less than this share of 5v5 trio time = a lineup in flux (league median ~0.5)
 
 
@@ -282,10 +285,10 @@ def export_lines(season: int) -> int:
                 cur, old = r[f"{kind}_share"], r[f"{kind}_share_last"]
                 doing, label = words[kind]
                 if cur >= started and old < 0.08:
-                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "fresh": r["gp"] <= USAGE_FRESH, "change": "new", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
                                   "text": f'{names[r["player_id"]]} has started {doing}: on the ice for {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, up from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
                 elif old >= stopped and cur < 0.05:
-                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
+                    notes.append({"player": names[r["player_id"]], "pid": r["player_id"], "kind": kind, "fresh": r["gp"] <= USAGE_FRESH, "change": "gone", "now": round(100 * cur), "before": round(100 * old), "games": r["gp"],
                                   "text": f'{names[r["player_id"]]} is no longer {doing}: {round(100 * cur)}% of the team\u2019s {label} time in {r["gp"]} games, down from {round(100 * old)}% {"with his old team " if r["moved"] else ""}last season.'})
         for n in missing.get(tid, []):
             rk = n.get("rank")
