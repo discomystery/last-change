@@ -30,7 +30,7 @@ def run(season: int) -> dict:
     from pipeline.export import roster
     roster.run(season)  # every club's full roster and who is out, from availability.parquet
     from pipeline.metrics import war
-    war.run(season)  # wins above replacement for every skater, this season and last (player pages, Leaders)
+    war.run(season)  # wins above replacement for every skater, every season since 2023-24 (player pages, Leaders)
     from pipeline.export import players
     n_players = players.run(season)  # reads lines.json and goalies.json written above
     from pipeline.export import similar

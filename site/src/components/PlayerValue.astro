@@ -3,6 +3,7 @@
 // last, with its parts. Data: `war` in his player JSON and each season's lane in war.json (pipeline/metrics/war.py).
 // Seasons stand on their own, so this section doesn't follow the Seasons setting.
 import Section from './Section.astro';
+import WarSeasons from './WarSeasons.astro';
 import { ordinal } from '../lib/format';
 import { seasonName } from '../lib/stats';
 
@@ -59,6 +60,7 @@ const PARTS: [string, string, (yw: string) => string][] = [
       );
     })}
   </ul>
+  <WarSeasons p={p} file={file} />
   <p class="note">{w.last && p.moved_from ? `Last season counts his games for every club he played for. ` : ''}See who leads the league on the <a href={`${import.meta.env.BASE_URL}players/leaders/?g=${isD ? 'D' : 'F'}&s=war`}>Leaders page</a>.</p>
 </Section>
 )}
