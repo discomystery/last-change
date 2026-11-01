@@ -4,6 +4,8 @@
 // in his player JSON (pipeline/export/finishing.py: running goals and league-scaled expected goals, and the pull K).
 // Inspired by Post Hockey's implied shooter talent chart (Sora, 2026-10-31); our own shots and chance model only.
 // Drawn in the browser at the card's real width so the labels stay readable on phones.
+import Explain from './Explain.astro';
+
 interface Props { p: any }
 const { p } = Astro.props;
 const f = p.finish;
@@ -21,11 +23,13 @@ const raw = end ? end[1] - end[2] : 0;
 ---
 {show && end && (
   <div class="card fin">
-    <p class="chart-title">How well he finishes</p>
+    <Explain id="fin" tag="p" class="chart-title" title="How well he finishes">
+      <p class="n">Goals he scored against what his chances were worth, as our best guess after every game since 2023-24. The line is that guess, the shaded band his likely range (80%), and the dotted lines where the best and worst 10% of finishers sit. Point at the chart to see where it stood after any game.</p>
+      <p class="n">Finishing is a small, slow skill: even the best finishers score only about 10–15% more than their chances are worth, so it takes a few seasons of shots before a player’s own record says much, and a hot or cold month barely moves the line. Empty-net goals are left out, and each season is measured against that season’s league, since scoring rates move year to year.</p>
+    </Explain>
     <p class="fin-sum">Best guess: <strong>{word}</strong>. Likely range {sgn(pct(m - Z * sd))}% to {sgn(pct(m + Z * sd))}%, from {end[1]} {end[1] === 1 ? 'goal' : 'goals'} on chances worth {end[2].toFixed(1)} since 2023-24 ({raw >= 0 ? `${raw.toFixed(1)} above` : `${(-raw).toFixed(1)} below`}).</p>
     <figure class="fin-fig" data-k={K} data-pts={JSON.stringify(pts)} aria-label={`${p.name}’s finishing, best guess after each game since 2023-24: ${word} now`}></figure>
-    <p class="n">Line: our best guess after each game. Shaded: his likely range (80%). Dotted: where the best and worst 10% of finishers sit. Finishing is a small, slow skill: even the best finishers score only about 10–15% more than their chances are worth, so it takes a few seasons of shots before a player’s own record says much, and a hot or cold month barely moves the line. Empty-net goals left out; each season measured against that season’s league, since scoring rates move year to year.</p>
-  </div>
+ </div>
 )}
 
 <script is:inline>

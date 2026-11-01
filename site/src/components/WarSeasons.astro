@@ -7,6 +7,7 @@
 // Per 82 games so seasons of different lengths compare; this season, still a small sample, is an open dot.
 import { seasonName } from '../lib/stats';
 import { ordinal } from '../lib/format';
+import Explain from './Explain.astro';
 
 interface Props { p: any; file: any }
 const { p, file } = Astro.props;
@@ -29,12 +30,13 @@ const last = mine.filter((m) => !m.now).at(-1);
 ---
 {show && (
   <div class="card wvs">
-    <p class="chart-title">Season by season <span class="n">per 82 games</span></p>
-    <p class="wvs-sum">{mine.map((m) => `${m.name}: ${fmt(m.r)}${m.now ? ' so far' : ''}`).join(' · ')}</p>
+    <Explain id="wvs" tag="p" class="chart-title" title="Season by season">
+      <p class="wvs-key"><span><i class="k-cloud"></i>Every {who}’s season (20+ games; 8+ this season)</span><span><i class="k-me"></i>{p.name}, with his likely range</span><span><i class="k-open"></i>This season so far</span><span><i class="k-zero"></i>Fill-in level</span></p>
+      <p class="n">Per 82 games, so a short season and a full one compare; the totals are in the cards above.{last && ` In ${last.name} he was ${ordinal(last.rank)} of ${last.of} ${who === 'forward' ? 'forwards' : 'defensemen'} in total.`} Our ratings start in 2023-24, so earlier seasons aren’t on it.</p>
+    </Explain>
+    <p class="wvs-sum">Per 82 games: {mine.map((m) => `${m.name}: ${fmt(m.r)}${m.now ? ' so far' : ''}`).join(' · ')}</p>
     <script is:inline set:html={cloudJs}></script>
     <figure class="wvs-fig" data-g={g} data-me={JSON.stringify(mine)} data-who={who} aria-label={`Wins above replacement per 82 games by season, against every ${who}’s season`}></figure>
-    <p class="wvs-key"><span><i class="k-cloud"></i>Every {who}’s season (20+ games; 8+ this season)</span><span><i class="k-me"></i>{p.name}, with his likely range</span><span><i class="k-open"></i>This season so far</span><span><i class="k-zero"></i>Fill-in level</span></p>
-    <p class="n">Per 82 games, so a short season and a full one compare; the totals are in the cards above.{last && ` In ${last.name} he was ${ordinal(last.rank)} of ${last.of} ${who === 'forward' ? 'forwards' : 'defensemen'} in total.`} Our ratings start in 2023-24, so earlier seasons aren’t on it.</p>
   </div>
 )}
 

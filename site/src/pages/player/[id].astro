@@ -29,6 +29,7 @@ import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
 import Finishing from '../../components/Finishing.astro';
+import Explain from '../../components/Explain.astro';
 import { teamPaint } from '../../lib/teams';
 import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../lib/traits';
@@ -422,7 +423,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                         <AreaMap id={`ac-${m}`} cls="v-cmp" areas={a.areas} tone={(x) => ((x.ratio ?? 1) >= 1 ? 'more' : 'less')}
                           tip={(k, x) => x ? `${areaName[k]}: ${(x.per60 ?? 0).toFixed(2)} shots per 60 minutes, against ${(x.typ60 ?? 0).toFixed(2)} for a typical ${typical} (${x.shots} ${x.shots === 1 ? 'shot' : 'shots'}, ${x.goals} ${x.goals === 1 ? 'goal' : 'goals'}). About ${(x.ratio ?? 1).toFixed(1)} times as often, after pulling toward typical so a few shots can’t color an area.` : areaName[k]}
                           label={(x) => `${(x.ratio ?? 1).toFixed(1)}×`} shade={(x) => Math.min(1, Math.abs(Math.log2(x.ratio ?? 1)) / 1.1)} />
-                        <p class="n mapcap v-cmp">How often he shoots from each area per 60 minutes, {mw}, against a typical {typical}: team color where he shoots more, blue where he shoots less, deeper the bigger the gap. {a.n} shots in {Math.round(a.hours)} hours of ice time, from his point of view.</p>
+                        <div class="n mapcap v-cmp">Team color where he shoots more than a typical {typical}, blue where he shoots less. <Explain id={`ac-${m}`}><p class="n">How often he shoots from each area per 60 minutes of his ice time, {mw}, all situations, against the typical {typical}. The number in each area is how many times as often (1.5× = half again as often); the deeper the color, the bigger the gap. Each area is pulled toward typical by a few shots, so a handful of shots can’t color it on their own. {a.n} shots in {Math.round(a.hours)} hours of ice time, seen from his point of view.</p></Explain></div>
                       </>
                     )}
                   </div>
