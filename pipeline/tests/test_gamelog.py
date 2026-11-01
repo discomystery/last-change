@@ -65,3 +65,16 @@ def test_net_newest_first_per_team(tmp_path, monkeypatch):
     assert net["CAR"][0][2:7] == ["WSH", 1, 2, 3, "OT"]
     assert net["CAR"][0][7] == 30 and net["CAR"][0][8] == []
     assert "WSH" not in net  # no goalie lines on that side
+
+
+def test_missing_decision_filled_from_inferred(tmp_path, monkeypatch):
+    monkeypatch.setattr(gamelog, "RAW", tmp_path)
+    b = _box(2026020004, "2026-11-01", 7, 0)
+    b["gameState"] = "FINAL"  # saved at the horn: no decisions or starter flags yet
+    for g in b["playerByGameStats"]["homeTeam"]["goalies"]:
+        g.pop("starter")
+        g.pop("decision", None)
+    _write(tmp_path, [b])
+    assert dict(zip(gamelog.GOALIE, gamelog.lines([2026])[30][0]))["dec"] is None
+    out = gamelog.lines([2026], {2026020004: {30: "W", 99: "L"}})
+    assert dict(zip(gamelog.GOALIE, out[30][0]))["dec"] == "W"
