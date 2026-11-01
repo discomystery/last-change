@@ -418,7 +418,8 @@ def preview_item(team: str, season: int, before: str, W) -> dict | None:
 
 LUCK_HOT, LUCK_COLD = 3.0, 2.5  # goals over / under what his chances and his own usual finishing would give
 LUCK_MIN_XG = 3.0               # chances worth at least this many goals before a cold run is worth telling
-FINISH_K = 20.0                 # expected goals of weight pulling his finishing from the last two seasons toward average
+FINISH_K = 90.0                 # expected goals of weight pulling his finishing from the last two seasons toward average
+                                # (the same pull as the player page's finishing chart, export/finishing.py K; Sora, 2026-11-01)
 
 
 @lru_cache(maxsize=4)

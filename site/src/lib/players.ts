@@ -3,7 +3,7 @@
 export type Est = { v: number; pct: number; lo: number; hi: number; ok: boolean; of: number; rank: number; vs?: string; index?: number | null; raw?: number; raw_pct?: number };
 export type EdgeEst = { v: number; pct: number; ok: boolean; of: number; avg: number; vs?: string; rank?: number };
 export type Mode = 'blend' | 'season';
-export type Area = { shots: number; goals: number; share: number; avg: number };
+export type Area = { shots: number; goals: number; share: number; avg: number; per60?: number; typ60?: number; ratio?: number };
 export type Misses = { n: number; wide: number; high: number; post: number; short: number; other: number; left: number; right: number; crossbar: number } | null;
 export type Unit = { label: string; role?: string | null; both?: boolean; share?: number; mates: { id: number; name: string }[] };
 export type Role = {
@@ -28,8 +28,11 @@ export type Skater = {
   id: number; name: string; first: string; last: string; number: number | null; pos: string; team: string; shoots: string | null; age: number | null;
   group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; zone_starts?: ZoneStarts | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
-  shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
+  shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; hours?: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
+  finish?: Finish | null;
 };
+/** Finishing, game by game since 2023-24: [date, goals so far, league-scaled expected goals so far] (pipeline/export/finishing.py). */
+export type Finish = { k: number; pts: [string, number, number][] };
 
 export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
 export const groupWord = { F: 'forwards', D: 'defensemen' } as const;

@@ -3,7 +3,7 @@
 // Two layers: areas of the zone shaded by how much of his shooting comes from each, and every unblocked shot.
 // Areas are rings and wedges around the middle of the net with softened corners (lib/areaShapes.ts). Their outlines
 // live once per page in AreaShapes.astro, which a page using this map must include.
-interface AreaStat { shots: number; goals: number; share: number; avg: number }
+interface AreaStat { shots: number; goals: number; share: number; avg: number; per60?: number; typ60?: number; ratio?: number }
 interface Props {
   id: string;
   areas: Record<string, AreaStat>;
@@ -11,19 +11,23 @@ interface Props {
   tip: (key: string, a: AreaStat) => string;
   label: (a: AreaStat) => string;
   shade: (a: AreaStat) => number; // 0..1
+  // A two-way map (against a typical player): each area leans 'more' (team color) or 'less' (pale blue), shade = how far.
+  tone?: (a: AreaStat) => 'more' | 'less';
+  cls?: string;
 }
-const { id, areas, shots = [], tip, label, shade } = Astro.props;
+const { id, areas, shots = [], tip, label, shade, tone, cls } = Astro.props;
+const blank = { shots: 0, goals: 0, share: 0, avg: 0 };
 import { sx, sy, AREA_KEYS, shapeId, areaCentre } from '../lib/areaShapes';
 const centre = areaCentre;
 const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
 ---
-<figure class="areamap" id={id}>
+<figure class:list={['areamap', cls, { 'am-two': !!tone }]} id={id}>
   <svg viewBox="-1 -1 87 78" role="img" aria-label="Where his shots come from">
     <defs><clipPath id={`${id}-clip`}><path d={`${board} Z`} /></clipPath></defs>
     <path class="rk-board" d={board} />
     <g clip-path={`url(#${id}-clip)`} class="am-areas">
       {AREA_KEYS.map((k, i) => (
-        <g class="am-area" data-i={i} data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? { shots: 0, goals: 0, share: 0, avg: 0 })}`}>
+        <g class:list={['am-area', tone && tone(areas[k] ?? blank)]} data-i={i} data-tip={tip(k, areas[k])} tabindex="0" style={`--s:${shade(areas[k] ?? blank)}`}>
           <use href={`#${shapeId(k)}`} />
         </g>
       ))}
@@ -34,7 +38,7 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
     <path class="rk-crease" d="M36.5 11 A6 6 0 0 0 48.5 11" />
     <rect class="rk-net" x="39.5" y="8" width="6" height="3" />
     <g class="am-labels">
-      {AREA_KEYS.map((k, i) => { const [x, y] = centre(k); const a = areas[k]; return a && a.shots > 0 && <text data-i={i} x={+x.toFixed(1)} y={+(y + 1.3).toFixed(1)} class:list={{ dark: shade(a) > 0.55 }}>{label(a)}</text>; })}
+      {AREA_KEYS.map((k, i) => { const [x, y] = centre(k); const a = areas[k]; return a && (tone ? a.ratio != null : a.shots > 0) && <text data-i={i} x={+x.toFixed(1)} y={+(y + 1.3).toFixed(1)} class:list={{ dark: shade(a) > 0.55 && (!tone || tone(a) === 'more') }}>{label(a)}</text>; })}
     </g>
     <g class="am-shots">
       {shots.filter((s) => s[0] >= 25).map(([x, y, xg, goal, cur]) => <circle class:list={['ps', { goal: goal === 1, old: cur === 0 }]} cx={sx(y)} cy={sy(x)} r={+(0.7 + Math.sqrt(xg / 1000) * 3.6).toFixed(2)} />)}
@@ -88,6 +92,11 @@ const board = 'M0 75 V26 A26 26 0 0 1 26 0 H59 A26 26 0 0 1 85 26 V75';
   .areamap svg { width: 100%; height: auto; display: block; }
   .am-area use { fill: color-mix(in oklab, var(--ink) calc(var(--s) * 62%), var(--sheet)); stroke: var(--sheet); stroke-width: 0.7; stroke-linejoin: round; }
   .am-area { cursor: help; outline: none; }
+  /* Two-way map: more than typical in his team's color, less in a pale blue (never red and green: neither is better). */
+  .areamap { --am-less: #6f8fb0; }
+  @media (prefers-color-scheme: dark) { .areamap { --am-less: #5d7a9c; } }
+  .am-area.more use { fill: color-mix(in oklab, var(--team, var(--ink)) calc(var(--s) * 82%), var(--sheet)); }
+  .am-area.less use { fill: color-mix(in oklab, var(--am-less) calc(var(--s) * 70%), var(--sheet)); }
   .am-rings use { fill: none; stroke: var(--ink); stroke-width: 0.6; stroke-linejoin: round; pointer-events: none; display: none; }
   .areamap.dots .am-rings { display: none; }
   /* One rule per area, in SHAPES order (15 areas). */

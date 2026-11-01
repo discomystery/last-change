@@ -125,10 +125,12 @@ def scale(players: dict[int, dict]) -> dict[str, dict]:
 
 
 def run(season: int = CURRENT_SEASON) -> dict:
-    """war.json: this season's and last season's WAR for every skater who played, plus the constants used."""
+    """war.json: every season's WAR for every skater who played, from rapm.FIRST_SEASON (the first season the ratings
+    reach) to this one, plus the constants used. Pages show this season and last; the player page's season-by-season
+    chart reads them all."""
     x = pyth_x()
     out = {"pyth_x": round(x, 3), "replacement": REPLACEMENT, "seasons": {}}
-    for s in (season, season - 1):
+    for s in range(season, rapm.FIRST_SEASON - 1, -1):
         if (TABLES / str(s) / "player_game.parquet").exists():
             players = season_war(s, x)
             out["seasons"][str(s)] = {"goals_per_win": round(goals_per_win(s, x), 2), "scale": scale(players), "players": {str(k): v for k, v in players.items()}}
