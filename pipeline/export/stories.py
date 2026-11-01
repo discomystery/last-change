@@ -1228,13 +1228,25 @@ def _game_day(nhl: dict | None, away: str, home: str, day: str, W: "Words", N: d
         mine = proj.get(t) or {}
         habit = ((fp or {}).get(t, {}).get("lineup") or {})
         eleven = said("eleven", t)
-        if mine.get("eleven") or any(f["sure"] for f in eleven):
+        last = (lines.get(t) or {}).get("shape") or {}
+        if said("twelve", t):  # its own words win over a lineup it may not have rewritten since last game
+            if last.get("f", 12) <= 11:
+                items.append({"tag": "Lineup", "score": 50, "text": f"NHL.com expects {W.the(t)} to go back to 12 forwards and six defensemen, "
+                                                                    f"after dressing 11 and {num(last.get('d', 7))} last game."})
+        elif mine.get("eleven") or any(f["sure"] for f in eleven):
             tail = ("" if not habit.get("habit") else f", as in all {num(habit['games'])} of their games so far" if habit["eleven"] == habit["games"]
                     else f", as in {num(habit['eleven'])} of their {num(habit['games'])} games so far")
             items.append({"tag": "Lineup", "score": 40 if habit.get("habit") else 66,
                           "text": f"NHL.com projects {W.the(t)} to dress 11 forwards and seven defensemen{tail}."})
         elif eleven:
             items.append({"tag": "Lineup", "score": 58, "text": f"{_cap(W.the(t))} could go with 11 forwards and seven defensemen, NHL.com says."})
+        elif mine.get("lines") and last.get("f", 12) <= 11 and last.get("d", 6) >= 7:
+            # NHL.com's lines say 12 and 6 but last game was 11 and 7, and it doesn't say why: about half of these went
+            # 11 and 7 again (4 of 8, 2026-27 to Nov 1), so the reader gets both facts and no call
+            n, of = last.get("eleven", 1), last.get("of", 1)
+            run = "" if n <= 1 else f" (and in all {num(of)} of their last {num(of)})" if n == of else f" (and in {num(n)} of their last {num(of)})"
+            items.append({"tag": "Lineup", "score": 46, "text": f"NHL.com’s projection has {W.the(t)} back at 12 forwards and six defensemen, "
+                                                                f"but they dressed 11 and {num(last['d'])} last game{run}, so keep an eye on it."})
         elif said("same", t):
             items.append({"tag": "Lineup", "score": 30, "text": f"NHL.com expects {W.the(t)} to dress the same lineup as last game."})
         for f in said("gtd", t)[:2]:

@@ -1369,6 +1369,9 @@ def nhl_lineup(g: dict, rebuilt: bool = False) -> dict | None:
         if x["kind"] == "eleven" and x["team"] is None:
             x["team"] = next((t for t, v in out["teams"].items() if v["eleven"]), None)
     out["facts"] = [x for x in facts if x["team"]]
+    for x in out["facts"]:  # "expected to dress a conventional lineup": no 11-and-7 tag on lines it hasn't rewritten
+        if x["kind"] == "twelve" and x["team"] in out["teams"]:
+            out["teams"][x["team"]]["eleven"] = False
     return out if out["teams"] or out["facts"] else None
 
 

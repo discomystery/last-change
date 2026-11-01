@@ -376,6 +376,13 @@ SUSP_LAST = re.compile(r"\b(?:final|last) game of\b", re.I)
 HEALTHY = re.compile(r"\bhealthy scratch", re.I)
 WORDS_N = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 CERTAIN = re.compile(r"\bwill\b|\bexpected to\b|\bare going\b", re.I)
+# "...a conventional lineup after using 11 forwards and seven defensemen in a 4-3 win on Saturday" is about last game,
+# and says the opposite of 11 and 7 tonight (DET and NYI, 2026-10); "Each team dressed 11 ... and could do so again" is a
+# maybe. Anything after "after" or "when", or straight after a past-tense verb, is last game.
+PAST_CUE = re.compile(r"(?:\b(?:after|when)\b[^,;]*|\b(?:dressed|used|went with|gone with|played with)\s+)$", re.I)
+AGAIN = re.compile(r"\b(?:could|might|may|would) (?:do so|do that|do it|go that way) again\b", re.I)
+MAYBE = re.compile(r"\bcould\b|\bmight\b|\bconsider|\bif\b|\bpossibl[ey]\b|\bchance\b", re.I)
+TWELVE_SAID = re.compile(r"\bconventional lineup\b|\b(12|twelve)[- ]forwards?,? and (6|six)[- ]defensem[ae]n\b", re.I)
 
 
 def _n(word: str | None) -> int | None:
@@ -423,9 +430,17 @@ def status_facts(text: str | None, aliases: dict[str, list[str]], people: dict[i
     for s in sentences(text or ""):
         who = _who(s, people)
         teams = _teams(s, aliases, who, people)
-        if ELEVEN_SAID.search(s):
-            for t in teams or [None]:  # no club named ("The Lighting are expected to..."): the projection decides
-                out.append({"kind": "eleven", "team": t, "players": [], "sure": bool(CERTAIN.search(s)) and not re.search(r"\bcould\b|\bconsider", s, re.I)})
+        m = ELEVEN_SAID.search(s)
+        if m:
+            past = bool(PAST_CUE.search(s[:m.start()]))
+            if not past or AGAIN.search(s):
+                sure = not past and bool(CERTAIN.search(s)) and not MAYBE.search(s)
+                for t in teams or [None]:  # no club named ("The Lighting are expected to..."): the projection decides
+                    out.append({"kind": "eleven", "team": t, "players": [], "sure": sure})
+        m = TWELVE_SAID.search(s)
+        if m and not PAST_CUE.search(s[:m.start()]) and CERTAIN.search(s) and not MAYBE.search(s):
+            for t in teams:  # "expected to dress a conventional lineup" (12 forwards and 6 defensemen)
+                out.append({"kind": "twelve", "team": t, "players": []})
         if SAME_SAID.search(s) and len(teams) == 1:
             out.append({"kind": "same", "team": teams[0], "players": []})
         if GTD_SAID.search(s):
