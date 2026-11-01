@@ -88,6 +88,7 @@ def team_games(season: int) -> pl.DataFrame:
     ])
     side = side.with_columns(
         pts=pl.when(pl.col("gf") > pl.col("ga")).then(2).when(pl.col("last_period") != "REG").then(1).otherwise(0),
+        win=pl.col("gf") > pl.col("ga"), one=(pl.col("gf") - pl.col("ga")).abs() == 1, ext=pl.col("last_period") != "REG",
     )
     return side.join(w, on=["game_id", "team_id"], how="left").fill_null(0)
 
@@ -96,6 +97,9 @@ def _totals(d: pl.DataFrame) -> pl.DataFrame:
     return d.group_by("team_id", "ab").agg(
         gp=pl.len(), pts=pl.col("pts").sum(), gd=pl.col("gd").sum(),
         ev=pl.col("ev").sum(), st=pl.col("st").sum(), fin=pl.col("fin").sum(), gk=pl.col("gk").sum(), en=pl.col("en").sum(),
+        # one-goal games (final score, overtime included) and games past regulation, for what "close games" means
+        w1=(pl.col("one") & pl.col("win")).sum(), l1=(pl.col("one") & ~pl.col("win")).sum(),
+        xw=(pl.col("ext") & pl.col("win")).sum(), xl=(pl.col("ext") & ~pl.col("win")).sum(),
     )
 
 
@@ -133,11 +137,31 @@ def summary(season: int = CURRENT_SEASON, before: str | None = None) -> dict[str
 
 def reasons(r: dict, sign: int) -> list[tuple[float, str]]:
     """The parts on the side of the gap, biggest first: (size, kind), kind one of gk / fin / close. Empty-net goals are
-    never a reason for points (Sora, 2026-10-30): they go into the close-game part instead."""
-    out = [(r[k] * sign, k) for k in ("gk", "fin") if r[k] * sign >= REASON]
+    never a reason for points (Sora, 2026-10-30): they go into the close-game part instead.
+
+    Finishing and goaltending are weighed together (Sora, 2026-11-01, the Jets: finishing had cost them 4.6 goals and
+    their goalies had saved 4.6, yet the preview blamed finishing): a part counts only for what is left of it once the
+    other has been set against it, so two that cancel explain nothing and the close games are named instead."""
+    net = (r["gk"] + r["fin"]) * sign
+    out = [(min(r[k] * sign, net), k) for k in ("gk", "fin") if min(r[k] * sign, net) >= REASON]
     if r["close"] * sign >= CLOSE_REASON:
         out.append((r["close"] * sign * 1.6, "close"))  # a point is worth about 1.6 goals of difference over a season
     return sorted(out, reverse=True)
+
+
+def close_words(r: dict, sign: int) -> str | None:
+    """What the close games were, in plain facts: "they’ve lost all three games that went past regulation", or
+    "they’re 3-6 in one-goal games". None when the record in them does not point the gap's way."""
+    if "w1" not in r:
+        return None
+    xw, xl, w1, l1 = int(r["xw"]), int(r["xl"]), int(r["w1"]), int(r["l1"])
+    mine, theirs = (xl, xw) if sign < 0 else (xw, xl)
+    verb = "lost" if sign < 0 else "won"
+    if mine >= 2 and theirs == 0:
+        return f"they’ve {verb} {'both' if mine == 2 else 'all ' + num(mine)} games that went past regulation"
+    if (l1 - w1) * -sign >= 2 and w1 + l1 >= 4:
+        return f"they’re {w1}-{l1} in one-goal games"
+    return None
 
 
 # ---------------------------------------------------------------- the people behind the parts
@@ -307,14 +331,25 @@ def team_checks(t: dict, r: dict, shooters: pl.DataFrame, goalies: list[dict], l
     # finishing
     if "fin" not in said:
         even_so = (big and sign < 0 and r["fin"] >= HOT) or (big and sign > 0 and r["fin"] <= COLD)
+        # goaltending pulling the other way evens it out (Sora, 2026-11-01: the Jets' finishing was blamed while their
+        # goalies had saved as much as it cost): said in the same check, and no tag when little is left of it
+        evened = abs(r["fin"] + r["gk"]) < REASON
         if r["fin"] <= COLD:
             text = f"finishing has cost them about {g1(r['fin'])} goals against the chances they’ve had" + (f", most of all {_shooter_list(cold[:2], who)}" if cold else "") + "."
+            if r["gk"] >= REASON:
+                text += (f" Their goaltending has given about {g1(r['gk'])} back by saving more than expected"
+                         + (", so the two have evened out." if evened else "."))
             checks.append({"kind": "cold", "text": ("Even so, " if even_so else "") + (text if even_so else _cap(text))})
-            tags.append("cold")
+            if not evened:
+                tags.append("cold")
         elif r["fin"] >= HOT:
             text = f"they’ve scored about {g1(r['fin'])} more goals than their chances usually bring" + (f", led by {_shooter_list(hot[:2], who)}" if hot else "") + "."
+            if r["gk"] <= -REASON:
+                text += (f" Their goaltending has given about {g1(r['gk'])} of it back"
+                         + (", so the two have evened out." if evened else "."))
             checks.append({"kind": "hot", "text": ("Even so, " if even_so else "") + (text if even_so else _cap(text))})
-            tags.append("hot")
+            if not evened:
+                tags.append("hot")
 
     # goalies
     regular = [g for g in gs if g[1] >= GOALIE_STARTS]
@@ -406,11 +441,18 @@ def preview_item(team: str, season: int, before: str, W) -> dict | None:
     if sign > 0:
         word = {"gk": "their goaltending", "fin": "their finishing", "en": "empty-net goals", "close": "a good run in one-goal and overtime games"}
         tail = f", largely thanks to {word[why[0][1]]}" if why else ""
+        if why and why[0][1] == "close" and close_words(r, sign):
+            tail = f", largely because {close_words(r, sign)}"
         text = f"{_cap(W.poss(team))} record ({p3(r['pp'])}) is well ahead of what their chances are worth ({p3(r['play'])}){tail}."
     else:
         word = {"gk": "their goaltending has", "fin": "their finishing has", "en": "empty-net goals against have", "close": "one-goal and overtime losses have"}
-        text = f"{_cap(W.the(team))} have played better than their record ({p3(r['pp'])}): their chances are worth about {p3(r['play'])}"
-        text += f", and {word[why[0][1]]} held them back." if why else "."
+        lead = (f"{_cap(W.the(team))} haven’t played well, but their record ({p3(r['pp'])}) is worse than their play" if r["play"] < POOR_PLAY
+                else f"{_cap(W.the(team))} have played better than their record ({p3(r['pp'])})")
+        text = f"{lead}: their chances are worth about {p3(r['play'])}"
+        if why and why[0][1] == "close" and close_words(r, sign):
+            text += f", mostly because {close_words(r, sign)}."
+        else:
+            text += f", and {word[why[0][1]]} held them back." if why else "."
     return {"tag": "Behind the record", "text": text, "score": 58 + min(abs(r["gap"]), 0.2) * 50}
 
 
@@ -479,6 +521,7 @@ def luck_items(away: str, home: str, season: int, before: str, W, names: dict[in
     return out
 
 
+POOR_PLAY = 0.47  # chances worth less than this are a losing team's, whatever the record says
 TEXT_GAP = 0.05  # a record this far from the chances is worth a clause in the preview's opening paragraph
 
 
@@ -504,6 +547,8 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
         w = reasons(r, sign)
         if not w:
             return ""
+        if w[0][1] == "close" and close_words(r, sign):  # the facts themselves (Sora, 2026-11-01: more of the real picture)
+            return f", {'largely' if sign > 0 else 'mostly'} because {close_words(r, sign)}"
         return f", largely thanks to {up[w[0][1]]}" if sign > 0 else f", and {down[w[0][1]]} held them back"
 
     def clause(t, r):
@@ -511,6 +556,9 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
             return f"{W.poss(t)} record ({p3(r['pp'])}) is about what their chances are worth"
         if r["gap"] > 0:
             return f"{W.poss(t)} record ({p3(r['pp'])}) is running ahead of what their chances are worth ({p3(r['play'])}){why(r)}"
+        if r["play"] < POOR_PLAY:  # chances that are themselves a losing team's: never "have played better" (the Jets, .451)
+            return (f"{W.the(t)} haven’t played well, but their record ({p3(r['pp'])}) is worse than their play: their chances "
+                    f"are worth about {p3(r['play'])}{why(r)}")
         return f"{W.the(t)} have played better than their record ({p3(r['pp'])}) says: their chances are worth about {p3(r['play'])}{why(r)}"
     ra, rh = rows[away], rows[home]
     side = lambda r: 0 if abs(r["gap"]) < TEXT_GAP else (1 if r["gap"] > 0 else -1)
@@ -529,7 +577,8 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
         tail = (f" {lead} these teams would be much closer in the standings, so don’t be surprised if this one is closer"
                 " than the records suggest.")
     a = clause(away, ra)
-    if side(ra) == side(rh) != 0:  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
+    poor = lambda r: r["gap"] < 0 and r["play"] < POOR_PLAY
+    if side(ra) == side(rh) != 0 and poor(ra) == poor(rh):  # the same story twice reads as a list: "So is the Islanders’ (.615 on chances worth .521)"
         h = (f"So is {W.poss(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh)}" if side(rh) > 0 else
              f"So have {W.the(home)} ({p3(rh['pp'])} on chances worth {p3(rh['play'])}){why(rh).replace(', and ', ', where ', 1)}")
         return f"{cap_(a)}. {h}.{tail}"
@@ -541,3 +590,104 @@ def preview_sentence(away: str, home: str, season: int, before: str, W) -> str |
 
 def cap_(s: str) -> str:
     return s[:1].upper() + s[1:]
+
+
+# ---------------------------------------------------------------- where the goals have gone (previews)
+
+RUN_MIN = 5          # a winning or winless run this long is told by where its goals came from
+ST_SHARE = 0.5       # special teams carry the goal difference: at least half of it, and
+ST_MIN = 3           # at least this many goals of it
+EV_MIN = 6           # a 5-on-5 goal difference this big, with special teams level or the same way, is told as 5-on-5's
+SEASON_GD = 8        # with no run, a season goal difference this big gets the same split
+
+
+@lru_cache(maxsize=8)
+def _strength_goals(season: int) -> pl.DataFrame:
+    """One row per team-game: goals and seconds at 5-on-5, on special teams (power play and penalty kill apart)."""
+    g = _games(season)
+    tg = pl.read_parquet(TABLES / str(season) / "team_game.parquet").join(g.select("game_id", "date"), on="game_id")
+    s = pl.col("strength")
+    return tg.group_by("game_id", "team_id", "date").agg(
+        ev_gf=pl.col("gf").filter(s == "5v5").sum(), ev_ga=pl.col("ga").filter(s == "5v5").sum(),
+        pp_gf=pl.col("gf").filter(s.is_in(PP)).sum(), pp_ga=pl.col("ga").filter(s.is_in(PP)).sum(),
+        pk_gf=pl.col("gf").filter(s.is_in(PK)).sum(), pk_ga=pl.col("ga").filter(s.is_in(PK)).sum(),
+        pk_sec=pl.col("sec").filter(s.is_in(PK)).sum(), pk_xga=pl.col("xga").filter(s.is_in(PK)).sum(),
+        pp_sec=pl.col("sec").filter(s.is_in(PP)).sum(), pp_xgf=pl.col("xgf").filter(s.is_in(PP)).sum(),
+        gf=pl.col("gf").sum(), ga=pl.col("ga").sum(),
+    )
+
+
+def _special_ranks(season: int, before: str) -> dict[int, dict[str, int]]:
+    """Each club's rank among 32 in power-play chances created and penalty-kill chances allowed per 60 (1 = best)."""
+    d = _strength_goals(season).filter(pl.col("date") < before[:10]).group_by("team_id").agg(
+        pl.col("pk_sec").sum(), pl.col("pk_xga").sum(), pl.col("pp_sec").sum(), pl.col("pp_xgf").sum())
+    d = d.filter((pl.col("pk_sec") > 0) & (pl.col("pp_sec") > 0)).with_columns(
+        pk=(pl.col("pk_xga") / pl.col("pk_sec")).rank("min"), pp=(pl.col("pp_xgf") / pl.col("pp_sec")).rank("min", descending=True))
+    n = d.height
+    return {r["team_id"]: {"pk": int(r["pk"]), "pp": int(r["pp"]), "n": n} for r in d.iter_rows(named=True)}
+
+
+def goal_story(team: str, season: int, before: str, W) -> str | None:
+    """Where a club's goal difference has come from, for the preview's record paragraph (Sora, 2026-11-01: make the
+    previews react to what is really going on; the Jets' 0-6-2 run was 14-12 at 5-on-5 and 3-10 on special teams).
+    Over the run it is on when that is five or more games either way, else over the season when the difference is big.
+    Told only when one part carries it: special teams, or 5-on-5. Facts only, never a reason or a forecast."""
+    d = team_games(season)
+    if d.is_empty():
+        return None
+    d = d.filter((pl.col("ab") == team) & (pl.col("date") < before[:10])).sort("date")
+    if d.height < MIN_GAMES:
+        return None
+    wins = d["win"].to_list()
+    n = 0
+    for w in reversed(wins):
+        if w != wins[-1]:
+            break
+        n += 1
+    tid = d["team_id"][0]
+    sg = _strength_goals(season).filter((pl.col("team_id") == tid) & (pl.col("date") < before[:10])).sort("date")
+    run = n >= RUN_MIN
+    part = sg.tail(n) if run else sg
+    t = {k: int(part[k].sum()) for k in ("ev_gf", "ev_ga", "pp_gf", "pp_ga", "pk_gf", "pk_ga", "gf", "ga")}
+    gd = t["gf"] - t["ga"]
+    if not run and abs(gd) < SEASON_GD:
+        return None
+    if gd == 0:
+        return None
+    sign = 1 if gd > 0 else -1
+    ev = t["ev_gf"] - t["ev_ga"]
+    sf, sa = t["pp_gf"] + t["pk_gf"], t["pp_ga"] + t["pk_ga"]
+    st = sf - sa
+    if run:
+        what = "winning streak" if wins[-1] else "skid"
+        span = f"In their {num(n)}-game {what}"
+    else:
+        span = "This season"
+    total = (f"{W.the(team)} have outscored teams {t['gf']}-{t['ga']}" if gd > 0 else
+             f"{W.the(team)} have been outscored {t['ga']}-{t['gf']}")
+    ranks = _special_ranks(season, before).get(tid, {})
+    if st * sign >= ST_MIN and st * sign >= ST_SHARE * abs(gd) and abs(ev) < abs(st):
+        hi, lo = max(t["ev_gf"], t["ev_ga"]), min(t["ev_gf"], t["ev_ga"])
+        if ev == 0:
+            lead = f"{span}, {total}, but they’re even at {hi}-{lo} at 5-on-5."
+        elif ev * sign > 0:
+            lead = f"{span}, {total}, but only {hi}-{lo} at 5-on-5."
+        else:
+            other = "outscored teams" if ev > 0 else "been outscored"
+            lead = f"{span}, {total}, even though they’ve {other} {hi}-{lo} at 5-on-5."
+        when = " in that time" if run else ""
+        side = (f"On special teams, opponents have outscored them {sa}-{sf}{when}" if sign < 0 else
+                f"On special teams, they’ve outscored teams {sf}-{sa}{when}")
+        rk, n32 = (ranks.get("pk"), ranks.get("n", 32)) if sign < 0 else (ranks.get("pp"), ranks.get("n", 32))
+        if sign < 0 and rk and rk >= n32 - 2 and t["pk_ga"] >= t["pp_ga"]:
+            worse = n32 - rk
+            side += (", and no team allows more chances on the penalty kill" if worse == 0 else
+                     f", and only {num(worse)} {'team allows' if worse == 1 else 'teams allow'} more chances on the penalty kill")
+        if sign > 0 and rk and rk <= 3 and t["pp_gf"] >= t["pk_gf"]:
+            side += (", and no team creates more chances on the power play" if rk == 1 else
+                     f", and only {num(rk - 1)} {'team creates' if rk == 2 else 'teams create'} more chances on the power play")
+        return f"{lead} {side}."
+    if run and ev * sign >= EV_MIN and st * sign >= 0 and ev * sign >= ST_SHARE * abs(gd):  # the usual case over a season
+        five = f"{t['ev_gf']}-{t['ev_ga']}" if gd > 0 else f"{t['ev_ga']}-{t['ev_gf']}"
+        return f"{span}, {total}, including {five} at 5-on-5."
+    return None

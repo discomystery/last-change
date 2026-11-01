@@ -1492,6 +1492,8 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
     luck = behind.preview_sentence(away, home, season, start[:10], W)  # records against the chances, both clubs
     if luck:  # its own paragraph, after where they stand (Sora, 2026-10-30)
         items = [i for i in items if i["tag"] != "Behind the record"]
+    # where each club's goals have gone over its run or season, when one part carries it (Sora, 2026-11-01)
+    goals_told = " ".join(x for x in (behind.goal_story(t, season, start[:10], W) for t in (away, home)) if x) or None
     told_tags = set().union(*more["told"].values()) if more["told"] else set()
     items = [i for i in items if not (i["tag"] in told_tags and i.get("pid") in more["used"])]  # the scorers' paragraph tells it
     picked, per, seen = [], {}, set()
@@ -1523,7 +1525,7 @@ def preview_story(gid: int, away: str, home: str, start: str, places: dict, clai
             hist = hist.replace(f"{named.group(1)} {named.group(2)}", named.group(2), 1)
         net += " " + (hist[len("In goal, "):][:1].upper() + hist[len("In goal, ") + 1:] if hist.startswith("In goal, ") else hist)
         look = [x for x in look if x[0] != "history"]
-    paras += [x for x in (luck, more["play"], more["scoring"], net) if x]
+    paras += [x for x in (luck, goals_told, more["play"], more["scoring"], net) if x]
     if look:  # separate ideas, so each gets its own way in (Sora, 2026-10-30: two lines side by side read as related)
         look.sort(key=lambda x: {"matchup": 0, "history": 1}.get(x[0], 2))
         out_ = [look[0][1]]
