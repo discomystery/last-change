@@ -149,3 +149,41 @@ def test_status_facts_name_the_facts_and_nothing_else():
     assert ("same", "SEA") in facts
     assert facts[("lines", "SEA")]["players"] == [IDS["McCann"], IDS["Beniers"]]
     assert all(k != "healthy" for k, _ in facts)
+
+
+def test_a_defenseman_written_into_a_forward_line_is_the_seventh():
+    # NHL.com's WPG at CAR preview, 2026-11-01: Bauer, a defenseman, on the fourth line, and Winnipeg dressed 11 and 7
+    row = lambda *names: [[(IDS[n], PEOPLE[n][1])] for n in names]
+    got = nhl_previews._place([row("Hagel", "Cirelli", "Kucherov"), row("Viel", "James", "Hedman"), row("Moser", "Carlson")], [], [])
+    assert got["lines"] == [[IDS["Hagel"], IDS["Cirelli"], IDS["Kucherov"]], [IDS["Viel"], IDS["James"]]]
+    assert got["pairs"] == [[IDS["Moser"], IDS["Carlson"]]] and got["extra_d"] == [IDS["Hedman"]]
+
+
+def test_last_games_eleven_is_not_tonights():
+    aliases = {"DET": ["Detroit", "Red Wings"], "NYI": ["NY Islanders", "Islanders"], "TBL": ["Tampa Bay", "Lightning"],
+               "NSH": ["Nashville", "Predators"], "CBJ": ["Columbus", "Blue Jackets"]}
+    kinds = lambda text: [(f["kind"], f["team"], f.get("sure")) for f in nhl_previews.status_facts(
+        text, {t: a for t, a in aliases.items() if t in ("TBL", "NSH") or "Each" not in text}, {})]
+    # NHL.com, 2026-10: the opposite of 11 and 7 tonight
+    assert kinds("The Red Wings are expected to dress a conventional lineup after using 11 forwards and seven defensemen in a "
+                 "4-3 shootout win against the San Jose Sharks on Saturday.") == [("twelve", "DET", None)]
+    assert kinds("The Red Wings held an optional morning skate, and likely will use 12 forwards and six defensemen, after going "
+                 "with 11 forwards and seven defensemen in a 4-1 loss at the Calgary Flames on Saturday") == [("twelve", "DET", None)]
+    assert kinds("Each team dressed 11 forwards and seven defensemen in its last game Thursday and could do so again; the Lightning "
+                 "defeated the Winnipeg Jets 6-4 and the Predators lost to the Washington Capitals 4-3.") == [("eleven", "TBL", False), ("eleven", "NSH", False)]
+    assert kinds("Columbus likely will dress 11 forwards and seven defensemen if Provorov is in the lineup.") == [("eleven", "CBJ", False)]
+    assert kinds("The Red Wings are expected to dress 11 forwards and seven defensemen, as they have done for most of the season.") == [("eleven", "DET", True)]
+
+
+def test_preview_lineup_items_follow_what_nhl_com_said_and_last_game():
+    from pipeline.export import stories
+    W = stories.Words({"WPG": "Winnipeg", "CAR": "Carolina"})
+    p = lambda *ids: [{"id": i, "name": f"P. {i}"} for i in ids]
+    proj = {"lines": [p(1, 2, 3)] * 4, "pairs": [p(4, 5)] * 3, "extra_d": [], "eleven": False}
+    lines = {"WPG": {"shape": {"f": 11, "d": 7, "eleven": 2, "of": 10}, "units": []}, "CAR": {"shape": {"f": 12, "d": 6, "eleven": 0, "of": 10}, "units": []}}
+    run = lambda facts: [i["text"] for i in stories._game_day({"teams": {"WPG": proj, "CAR": proj}, "facts": facts}, "WPG", "CAR", "2026-11-01",
+                                                               W, {}, lines, {}, 2026)[0] if i["tag"] == "Lineup"]
+    said = run([])  # 12 and 6 on NHL.com's lines, 11 and 7 last game: both facts, no call
+    assert len(said) == 1 and "back at 12 forwards" in said[0] and "11 and seven last game (and in two of their last ten)" in said[0]
+    said = run([{"kind": "twelve", "team": "WPG", "players": []}])
+    assert said == ["NHL.com expects the Jets to go back to 12 forwards and six defensemen, after dressing 11 and seven last game."]
