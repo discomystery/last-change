@@ -186,7 +186,8 @@ def lineups_from(body: str, away: str, home: str, known: dict) -> dict[str, dict
 
 def _place(rows: list[list[list[tuple[int, str]]]], scratched: list, injured: list, single: list[bool] | None = None) -> dict:
     """Matched rows (each name's candidates) sorted into lines, pairs, a seventh defenseman and goalies (told apart by
-    the players' listed positions, a two-forward row being the fourth line of an 11-forward lineup), then the scratched
+    the players' listed positions, a two-forward row being the fourth line of an 11-forward lineup, and a defenseman
+    written into a forward line being the seventh defenseman), then the scratched
     and injured lists. A name shared by two teammates on those lists is the one not already in the lineup."""
     got = {"lines": [], "pairs": [], "extra_d": [], "goalies": [], "scratched": [], "injured": [], "missed": 0}
     used: set[int] = set()
@@ -207,6 +208,12 @@ def _place(rows: list[list[list[tuple[int, str]]]], scratched: list, injured: li
                 got["lines"].append([pid])
             continue
         kind = "pairs" if sum(p == "D" for p in pos) * 2 > len(pos) else "lines"
+        if kind == "lines" and len(ids) == 3 and pos.count("D") == 1 and not got["extra_d"]:
+            # NHL.com sometimes writes an 11-forward lineup's seventh defenseman into the fourth line (WPG, 2026-11-01:
+            # "Cole Koepke -- Morgan Barron -- Tyrel Bauer"), so the two forwards are the line and he is the extra D
+            got["lines"].append([i for i, p in ids if p != "D"])
+            got["extra_d"] += [i for i, p in ids if p == "D"]
+            continue
         got[kind].append([i for i, _ in ids])
     for key, names_ in (("scratched", scratched), ("injured", injured)):
         for c in names_:

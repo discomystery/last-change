@@ -149,3 +149,11 @@ def test_status_facts_name_the_facts_and_nothing_else():
     assert ("same", "SEA") in facts
     assert facts[("lines", "SEA")]["players"] == [IDS["McCann"], IDS["Beniers"]]
     assert all(k != "healthy" for k, _ in facts)
+
+
+def test_a_defenseman_written_into_a_forward_line_is_the_seventh():
+    # NHL.com's WPG at CAR preview, 2026-11-01: Bauer, a defenseman, on the fourth line, and Winnipeg dressed 11 and 7
+    row = lambda *names: [[(IDS[n], PEOPLE[n][1])] for n in names]
+    got = nhl_previews._place([row("Hagel", "Cirelli", "Kucherov"), row("Viel", "James", "Hedman"), row("Moser", "Carlson")], [], [])
+    assert got["lines"] == [[IDS["Hagel"], IDS["Cirelli"], IDS["Kucherov"]], [IDS["Viel"], IDS["James"]]]
+    assert got["pairs"] == [[IDS["Moser"], IDS["Carlson"]]] and got["extra_d"] == [IDS["Hedman"]]
