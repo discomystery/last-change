@@ -46,9 +46,11 @@ def _boxes(season: int):
             yield box
 
 
-def lines(seasons: list[int]) -> dict[int, list[list]]:
-    """player id -> his boxscore lines over these seasons, oldest first."""
+def lines(seasons: list[int], decided: dict[int, dict[int, str]] | None = None) -> dict[int, list[list]]:
+    """player id -> his boxscore lines over these seasons, oldest first. `decided` (game id -> {goalie: W / L / O}) fills
+    in a decision the saved boxscore doesn't have yet: the NHL adds them a little after the horn."""
     out: dict[int, list[list]] = {}
+    decided = decided or {}
     for season in seasons:
         for box in _boxes(season):
             end = (box.get("gameOutcome") or {}).get("lastPeriodType") or "REG"
@@ -72,7 +74,7 @@ def lines(seasons: list[int]) -> dict[int, list[list]]:
                     sa = pl.get("shotsAgainst", 0)
                     ga = pl.get("goalsAgainst", 0)
                     out.setdefault(pl["playerId"], []).append(game + [
-                        pl.get("decision"), int(bool(pl.get("starter")) if flagged else pl is first), sa, pl.get("saves", sa - ga), ga, toi])
+                        pl.get("decision") or decided.get(box["id"], {}).get(pl["playerId"]), int(bool(pl.get("starter")) if flagged else pl is first), sa, pl.get("saves", sa - ga), ga, toi])
     for rows in out.values():
         rows.sort(key=lambda r: (r[1], r[0]))
     return out
@@ -105,7 +107,13 @@ def run(season: int = CURRENT_SEASON) -> dict:
     if not index.exists():
         return {"skipped": "no players index"}
     players = json.loads(index.read_text())
-    every = lines([season - 1, season])
+    from pipeline.export.goalie_streaks import decisions
+    try:  # this season's decisions worked out from the play-by-play, for a game whose boxscore doesn't carry them yet
+        decided = decisions(season)
+    except Exception as exc:
+        print(f"gamelog: no inferred decisions: {exc!r}")
+        decided = {}
+    every = lines([season - 1, season], decided)
     OUT.mkdir(parents=True, exist_ok=True)
     keep = set()
     for pl_ in players:

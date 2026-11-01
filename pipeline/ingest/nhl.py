@@ -6,6 +6,7 @@ fills shift charts in during and after play, so one saved soon after the final h
 until they cover the whole game. The play-by-play and boxscore are fetched once more after the game has settled
 (`SETTLE_HOURS` after puck drop): the NHL edits them after the horn (2026-10-14: DAL at COL's coach's challenge was
 saved as a plain offside and only later marked as a challenge that took a goal off; 9 of 18 games that week changed).
+A boxscore saved before the NHL added the goalies' decisions is fetched again on each run until it has them (`undecided`).
 Raw responses are stored gzipped, untouched.
 """
 from datetime import datetime, timedelta, timezone
@@ -125,14 +126,36 @@ def settle_due(season: int, game_id: int, start_utc: str | None, now: datetime |
     return timedelta(hours=SETTLE_HOURS) <= now - start <= timedelta(days=SETTLE_DAYS)
 
 
+def undecided(season: int, game_id: int, start_utc: str | None, now: datetime | None = None) -> bool:
+    """True when the saved boxscore of a recent game has no goalie decisions yet. The NHL marks a game FINAL at the horn
+    and fills in the goalies' W / L / OTL and starter flags a little later, when it turns the game OFF (2026-11-01: WPG at
+    CAR was saved at FINAL, so Kochetkov's win showed with no decision on his player page until the 6-hour settle). Such a
+    boxscore is fetched again on every run, one request a game, until the decisions are there or SETTLE_DAYS pass."""
+    path = raw_path(season, "box", game_id)
+    if not start_utc or not path.exists():
+        return False
+    now = now or datetime.now(timezone.utc)
+    if now - datetime.fromisoformat(start_utc.replace("Z", "+00:00")) > timedelta(days=SETTLE_DAYS):
+        return False
+    try:
+        box = read_raw(season, "box", game_id)
+    except (OSError, ValueError):
+        return True
+    if box.get("gameState") == "OFF":
+        return False
+    stats = box.get("playerByGameStats") or {}
+    return not any(g.get("decision") for side in ("homeTeam", "awayTeam") for g in (stats.get(side) or {}).get("goalies", []))
+
+
 def fetch_game(season: int, game_id: int, start_utc: str | None = None) -> int:
     """Download whatever is missing for one final game. Returns the number of requests made."""
     made = 0
     fresh = False  # the shift chart was fetched in this call
     settle = settle_due(season, game_id, start_utc)
+    again = {"pbp", "box"} if settle else {"box"} if undecided(season, game_id, start_utc) else set()
     for kind, url in KINDS.items():
         path = raw_path(season, kind, game_id)
-        if path.exists() and not (kind == "shifts" and _unfinished(season, game_id)) and not (settle and kind in ("pbp", "box")):
+        if path.exists() and not (kind == "shifts" and _unfinished(season, game_id)) and kind not in again:
             continue
         _write(path, get(url(game_id)).json())
         made += 1
