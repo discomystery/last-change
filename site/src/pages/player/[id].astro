@@ -28,7 +28,7 @@ import { playerIntro, nextGame } from '../../lib/intros';
 import teams from '../../../public/data/teams.json';
 import goalieData from '../../../public/data/goalies.json';
 import { clock, compared } from '../../lib/format';
-import TopGear from '../../components/TopGear.astro';
+import Finishing from '../../components/Finishing.astro';
 import { teamPaint } from '../../lib/teams';
 import { TRAITS, EDGE, GROUPS, groupWord, peerWord, peerOf, posWord, ordinal, most, standouts, roleTip, pkRoleWord, pkRoleTip, rankTag, rankTip, type Skater, type Mode, type Area } from '../../lib/players';
 import { goalieTraitInfo } from '../../lib/traits';
@@ -399,7 +399,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
           ))}
         </Section>
 
-        <Section id="shots" title="Shots" placeholder={false} takeaway="Where his shots come from, and how his misses miss.">
+        <Section id="shots" title="Shots" placeholder={false} takeaway="Where his shots come from, how his misses miss, and how well he finishes.">
           <Fragment slot="explain">
             <p class="note">The NHL’s game data records how a shot missed, but not where in the net a goal or save went (glove side, blocker, five-hole). That needs paid camera tracking, so we don’t show it.</p>
           </Fragment>
@@ -474,6 +474,7 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
               })}
             </div>
           </div>
+          <Finishing p={p} />
         </Section>
 
         <Section id="edge" title="Skating and shot" placeholder={false} takeaway={`Speed, bursts, shot power and where he spends his shifts, from the NHL’s own tracking (NHL EDGE).`}>
@@ -499,7 +500,6 @@ const shareable = isG ? (p.goalie?.blend?.starts ?? 0) > 0 : !!(p.traits && p.st
                   );
                 })}
               </ul>
-              <TopGear p={p} />
             </>
           ) : <p class="note">No NHL EDGE tracking data for him yet.</p>}
         </Section>

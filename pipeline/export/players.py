@@ -14,7 +14,7 @@ import numpy as np
 import polars as pl
 
 from pipeline.config import REGULAR, SITE_DATA, TABLES, season_id
-from pipeline.export import carries, top_gear
+from pipeline.export import carries, finishing
 from pipeline.ingest import careers, edge, names, official_stats, rosters
 from pipeline.metrics import players as rating
 from pipeline.metrics import war
@@ -278,12 +278,8 @@ def run(season: int) -> int:
                                                                          "of": int(len(pool)), "avg": round(float(pool.mean()), 2), "vs": g,
                                                                          "rank": int((pool > v).sum() + 1 if higher else (pool < v).sum() + 1)}
 
-    # Top gear (Skating and shot): how often he reaches each speed, from EDGE's speed detail (export/top_gear.py).
-    gear = top_gear.run(season, {pid: {"group": rec["group"]} for pid, rec in r["players"].items()},
-                        {pid: {"now": rec["totals"]["season"]["sec"] / 3600, "last": (rec["totals"]["last"]["sec"] / 3600) if rec["totals"]["last"] else None}
-                         for pid, rec in r["players"].items()},
-                        {mode: {pid for pid, rec in r["players"].items() if rec["games"] + (rec["games_last"] if mode == "blend" else 0) >= POOL_GAMES[mode]}
-                         for mode in ("blend", "season")})
+    # How well he finishes (Shots section): goals against his chances, game by game since 2023-24 (export/finishing.py).
+    finish = finishing.run(season, set(r["players"]))
 
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -336,7 +332,7 @@ def run(season: int) -> int:
             base |= {"group": rec["group"], "sub": rec["sub"], "traits": rec["traits"], "competition": rec.get("competition"),
                      "zone_starts": {**rec["zone_starts"], "coach": whole_season.get(team)} if rec.get("zone_starts") else None, "moved_from": abbr.get(rec["moved_from"]) if rec.get("moved_from") else None, "games": rec["games"], "games_last": rec["games_last"],
                      "role": None if pid in unplayed else _role(pid, row, lines.get(team) or {}, per, team_games.get(tid, 0), shift_table),
-                     "edge": edge_pct.get(pid), "gear": gear.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
+                     "edge": edge_pct.get(pid), "finish": finish.get(pid), "edge_raw": {m: edge_vals[pid][m] for m in ("blend", "season")}, "carries": carried.get(pid), "war": war_of(pid)}
             mine = shots.filter(pl.col("p1") == pid)
             base["shots"] = [[int(s_["x_norm"]), int(s_["y_norm"]), round(1000 * s_["xg"]), int(s_["type"] == "goal"), int(s_["season"] == season)]
                              for s_ in mine.select("x_norm", "y_norm", "xg", "type", "season").iter_rows(named=True)]

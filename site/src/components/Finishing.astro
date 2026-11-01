@@ -1,0 +1,108 @@
+---
+// "How well he finishes" in the Shots section: our best guess at his finishing (goals against what his chances were
+// worth, 1 = an average finisher of his time) after every game since 2023-24, with an 80% likely range. Data: `finish`
+// in his player JSON (pipeline/export/finishing.py: running goals and league-scaled expected goals, and the pull K).
+// Inspired by Post Hockey's implied shooter talent chart (Sora, 2026-10-31); our own shots and chance model only.
+// Drawn in the browser at the card's real width so the labels stay readable on phones.
+interface Props { p: any }
+const { p } = Astro.props;
+const f = p.finish;
+const pts: [string, number, number][] = f?.pts ?? [];
+const K: number = f?.k ?? 90;
+const end = pts.at(-1);
+const show = !!end && end[2] >= 3 && pts.length >= 10;
+const Z = 1.2816;
+const est = (g: number, x: number) => [(g + K) / (x + K), Math.sqrt(g + K) / (x + K)];
+const [m, sd] = end ? est(end[1], end[2]) : [1, 0];
+const pct = (v: number) => Math.round(100 * (v - 1));
+const sgn = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+const word = Math.abs(m - 1) < 0.02 ? 'about average' : `${Math.abs(pct(m))}% ${m > 1 ? 'more' : 'fewer'} goals than his chances are worth`;
+const raw = end ? end[1] - end[2] : 0;
+---
+{show && end && (
+  <div class="card fin">
+    <p class="chart-title">How well he finishes</p>
+    <p class="fin-sum">Best guess: <strong>{word}</strong>. Likely range {sgn(pct(m - Z * sd))}% to {sgn(pct(m + Z * sd))}%, from {end[1]} {end[1] === 1 ? 'goal' : 'goals'} on chances worth {end[2].toFixed(1)} since 2023-24 ({raw >= 0 ? `${raw.toFixed(1)} above` : `${(-raw).toFixed(1)} below`}).</p>
+    <figure class="fin-fig" data-k={K} data-pts={JSON.stringify(pts)} aria-label={`${p.name}’s finishing, best guess after each game since 2023-24: ${word} now`}></figure>
+    <p class="n">Line: our best guess after each game. Shaded: his likely range (80%). Dotted: where the best and worst 10% of finishers sit. Finishing is a small, slow skill: even the best finishers score only about 10–15% more than their chances are worth, so it takes a few seasons of shots before a player’s own record says much, and a hot or cold month barely moves the line. Empty-net goals left out; each season measured against that season’s league, since scoring rates move year to year.</p>
+  </div>
+)}
+
+<script is:inline>
+  // Draws every finishing chart on the page at its real width, and again when the width changes.
+  (() => {
+    const NS = 'http://www.w3.org/2000/svg', Z = 1.2816;
+    const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+    const tx = (s, a, p) => { const t = el('text', a, p); t.textContent = s; return t; };
+    const sgn = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + -n : '0');
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = (d) => `${MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}, ${d.slice(0, 4)}`;
+    const season = (d) => { const y = +d.slice(0, 4) - (+d.slice(5, 7) < 8 ? 1 : 0); return `${y}-${String(y + 1).slice(2)}`; };
+    function draw(fig) {
+      const pts = JSON.parse(fig.dataset.pts), K = +fig.dataset.k, W = Math.round(fig.clientWidth); if (!W || pts.length < 2) return;
+      if (fig.dataset.w === String(W)) return;
+      fig.dataset.w = String(W);
+      const narrow = W < 520, H = narrow ? 250 : 280, L = 46, R = 8, T = 12, B = 26;
+      const est = pts.map(([d, g, x]) => [(g + K) / (x + K), Math.sqrt(g + K) / (x + K)]);
+      const spread = Z / Math.sqrt(K);
+      const lo = Math.min(0.8, ...est.map(([m, s]) => m - Z * s)) - 0.02, hi = Math.max(1.2, ...est.map(([m, s]) => m + Z * s)) + 0.02;
+      const y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+      const x = (i) => L + i / (pts.length - 1) * (W - L - R);
+      fig.textContent = '';
+      const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'fin-svg', 'aria-hidden': 'true' }, fig);
+      for (let v = Math.ceil(lo * 10) / 10; v <= hi + 1e-9; v = Math.round((v + 0.1) * 10) / 10) {
+        el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: Math.abs(v - 1) < 1e-9 ? 'fin-avg' : 'fin-grid' }, svg);
+        tx(Math.abs(v - 1) < 1e-9 ? 'Average' : sgn(Math.round(100 * (v - 1))) + '%', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'fin-ax' }, svg);
+      }
+      for (const [v, w] of [[1 + spread, 'Top 10% of finishers'], [1 - spread, 'Bottom 10%']]) {
+        el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'fin-ref' }, svg);
+        tx(w, { x: W - R, y: y(v) - 6, 'text-anchor': 'end', class: 'fin-lab' }, svg);
+      }
+      let prev = null;
+      pts.forEach((p, i) => {
+        const s = season(p[0]); if (s === prev) return;
+        if (prev !== null) el('line', { x1: x(i), x2: x(i), y1: T, y2: H - B, class: 'fin-grid' }, svg);
+        const lab = narrow ? s.slice(2) : s, room = narrow ? 34 : 50;
+        tx(lab, x(i) + 5 + room > W ? { x: W - R, y: H - 8, 'text-anchor': 'end', class: 'fin-yr' } : { x: x(i) + 5, y: H - 8, class: 'fin-yr' }, svg);
+        prev = s;
+      });
+      const up = est.map(([m, s], i) => `${x(i).toFixed(1)} ${y(m + Z * s).toFixed(1)}`);
+      const dn = est.map(([m, s], i) => `${x(i).toFixed(1)} ${y(m - Z * s).toFixed(1)}`).reverse();
+      el('path', { d: `M${up.join(' L')} L${dn.join(' L')} Z`, class: 'fin-band' }, svg);
+      el('path', { d: 'M' + est.map(([m], i) => `${x(i).toFixed(1)} ${y(m).toFixed(1)}`).join(' L'), class: 'fin-line' }, svg);
+      const [mE] = est.at(-1);
+      el('circle', { cx: x(pts.length - 1), cy: y(mE), r: 5.5, class: 'fin-dot' }, svg);
+      // One invisible strip per game for the tooltip: where the line stood after that game.
+      const w = (W - L - R) / Math.max(1, pts.length - 1);
+      pts.forEach(([d, g, xg], i) => {
+        const [m] = est[i], v = Math.round(100 * (m - 1));
+        el('rect', { x: (x(i) - w / 2).toFixed(1), y: T, width: Math.max(1, w).toFixed(1), height: H - T - B, class: 'fin-hit',
+          'data-tip': `After ${day(d)}: ${g} ${g === 1 ? 'goal' : 'goals'} on chances worth ${xg.toFixed(1)} since 2023-24. Best guess ${Math.abs(v) < 2 ? 'about average' : `${Math.abs(v)}% ${v > 0 ? 'more' : 'fewer'} goals than his chances are worth`}.` }, svg);
+      });
+    }
+    const all = () => document.querySelectorAll('.fin-fig').forEach(draw);
+    if (!window.lcFin) {
+      window.lcFin = true;
+      let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(all, 150); });
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+    }
+  })();
+</script>
+
+<style>
+  .fin { margin-top: 14px; display: grid; gap: 4px; }
+  .fin-sum { font: 400 15px/1.45 var(--ui); color: var(--ink-2); }
+  .fin-sum strong { font-weight: 600; color: var(--ink); }
+  .fin-fig { margin: 8px 0 0; min-height: 250px; }
+  .fin-fig :global(.fin-svg) { display: block; overflow: visible; }
+  .fin-fig :global(.fin-grid) { stroke: var(--rule); stroke-width: 1; }
+  .fin-fig :global(.fin-avg) { stroke: var(--ink-3); stroke-width: 2; opacity: 0.6; }
+  .fin-fig :global(.fin-ref) { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 2 4; }
+  .fin-fig :global(.fin-ax) { font: 400 12px var(--ui); fill: var(--ink-3); }
+  .fin-fig :global(.fin-lab) { font: 600 12px var(--ui); fill: var(--ink-2); paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; stroke-linejoin: round; }
+  .fin-fig :global(.fin-yr) { font: 600 12px var(--ui); fill: var(--ink-2); }
+  .fin-fig :global(.fin-band) { fill: color-mix(in oklab, var(--team) 16%, transparent); }
+  .fin-fig :global(.fin-line) { fill: none; stroke: var(--team); stroke-width: 2.5; stroke-linejoin: round; }
+  .fin-fig :global(.fin-dot) { fill: var(--team); stroke: var(--sheet); stroke-width: 1.5; }
+  .fin-fig :global(.fin-hit) { fill: transparent; cursor: help; outline: none; }
+</style>

@@ -29,10 +29,10 @@ export type Skater = {
   group: 'F' | 'D'; moved_from: string | null; sub: 'C' | 'W' | 'D'; competition: Competition | null; zone_starts?: ZoneStarts | null; games: number; games_last: number; generated_at: string; stats: { season?: Stats; last?: Stats };
   traits: Record<string, Record<Mode, Est>>; role: Role; edge: Record<Mode, Record<string, EdgeEst>> | null;
   shots: [number, number, number, number, number][]; areas: Record<Mode, { n: number; hours?: number; areas: Record<string, Area> }>; misses: Record<Mode, Misses>;
-  gear?: Partial<Record<Mode, Gear>> | null;
+  finish?: Finish | null;
 };
-/** Top gear: times per 60 at or above each speed (pipeline/export/top_gear.py). */
-export type Gear = { curve: [number, number][]; marks: [number, number][]; hour: number | null; hour_pct: number | null; c20: number; c20_pct: number; hours: number; ok: boolean };
+/** Finishing, game by game since 2023-24: [date, goals so far, league-scaled expected goals so far] (pipeline/export/finishing.py). */
+export type Finish = { k: number; pts: [string, number, number][] };
 
 export const posWord: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
 export const groupWord = { F: 'forwards', D: 'defensemen' } as const;
