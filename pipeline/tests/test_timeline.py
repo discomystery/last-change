@@ -155,3 +155,11 @@ def test_a_colourful_lead_verb_is_used_once():
     gm.pk = lambda pool, *k: pool[1] if len(pool) > 1 else pool[0]  # always reach for "stretched the lead"
     text = " ".join(timeline.paragraph(gm))
     assert text.count("stretched the lead") <= 1, text
+
+
+def test_a_second_first_goal_for_a_new_club_reads_differently_in_game_order():
+    gm = _game([(1, 300, True, 3, "ev"), (1, 900, True, 4, "ev"), (2, 300, True, 5, "ev")])
+    found = [{"kind": "club_goal", "pid": 5, "team": "NYR", "goal": 2}, {"kind": "club_goal", "pid": 4, "team": "NYR", "goal": 1}]
+    att, _ = timeline.attachments(gm, found, {})
+    assert att[1]["pre"] == "scored his first goal for the Rangers"
+    assert att[2]["pre"] == "scored for the first time since joining the Rangers"

@@ -263,7 +263,8 @@ def paragraph(gm: Game) -> list[str]:
             g, h = goals[x], goals[nxt[3]]
             mins = -(-(1200 - g["sec"]) // 60)
             pre = (gm.attach.get(x) or {}).get("pre") or ""
-            first = f", the first of them his {pre.split(' his ', 1)[1]}" if " his " in pre and pre.startswith("scored his") else ""
+            first = (f", the first of them his {pre.split(' his ', 1)[1]}" if " his " in pre and pre.startswith("scored his") else
+                     f", the first of them his first since joining {pre.rsplit(' joining ', 1)[1]}" if pre.startswith("scored for the first time since joining ") else "")
             m_, th_ = gm.score(h, gm.side(h))
             out.append((f"{gm.name(g['p1'])} then scored into the empty net twice in the last {num(mins)} minutes{first}, and it finished {m_}-{th_}.",
                         {"kind": "goal", "team": gm.side(h), "fixed": True, "period": 3}))
@@ -1014,11 +1015,7 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             for n_, j in enumerate([j for j, g in enumerate(goals) if g["p1"] == pid][1:3], start=2):
                 att.setdefault(j, {})["pre"] = f"scored his {nth_word(n_)} NHL goal"  # "Knuble scored his second NHL goal"
         elif k == "club_goal" and i is not None:
-            # a second newcomer's first goal in one story reads differently ("Dorofeyev scored his first goal for the
-            # Rangers ... Tolvanen scored his first goal for the Rangers ...", NYR 5-1 TBL)
-            again = any("first goal for" in (v.get("pre") or "") for v in att.values())
-            att.setdefault(i, {})["pre"] = (f"scored for the first time since joining {gm.W.place(x['team'])}" if again
-                                            else f"scored his first goal for {gm.W.place(x['team'])}")
+            att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"
             told.add(pid)
         elif k == "return" and i is not None and rides_on_goal(x) and not (att.get(i) or {}).get("tail"):
             # "Zucker got the Sabres on the board ..., in his first game of the season" (outside notes, Oct 21: told
@@ -1056,6 +1053,11 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
         n = season_goals.get(pid, 0) + sum(1 for h in goals[:i] if h["p1"] == pid) + 1
         if n in SEASON_MARKS:
             att.setdefault(i, {})["pre"] = f"scored his {th(n)} of the season"
+    # a second newcomer's first goal in one story, in game order, reads differently ("Dorofeyev scored his first goal
+    # for the Rangers ... Tolvanen scored his first goal for the Rangers ...", NYR 5-1 TBL)
+    club = [i for i in sorted(att) if (att[i].get("pre") or "").startswith("scored his first goal for ")]
+    for i in club[1:]:
+        att[i]["pre"] = att[i]["pre"].replace("scored his first goal for ", "scored for the first time since joining ", 1)
     return att, told
 
 
