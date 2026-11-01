@@ -43,7 +43,7 @@ def test_goals_are_told_in_order_and_runs_merge():
     gm = _game([(2, 130, False, 1, "ev"), (2, 234, False, 2, "ev"), (3, 500, True, 3, "ev"), (3, 785, True, 4, "ev"), (3, 832, False, 2, "ev")])
     out = timeline.paragraph(gm)
     assert out == ["Alex Newhook and Cole Caufield scored less than two minutes apart early in the second to put the Canadiens up 2-0.",
-                   "Adam Fox and Will Cuylle scored less than five minutes apart midway through the third to tie it 2-2.",  # no "luck ran out" when the go-ahead came right back
+                   "Adam Fox scored midway through the third, and Will Cuylle followed less than five minutes after that to tie it 2-2.",  # a second pair, built differently  # no "luck ran out" when the go-ahead came right back
                    "Caufield struck again 47 seconds later to put the Canadiens ahead for good."]
 
 
@@ -130,3 +130,28 @@ def test_shot_droughts_from_puck_drop_and_to_the_horn():
     assert timeline._drought(_game([]), a) == ["\x01The Canadiens didn’t get their first shot on goal until late in the first, "
                                                "more than 18 minutes into the game, even with a power play in that stretch."]
     assert timeline._drought(_game([]), b) == ["\x01The Rangers didn’t get a shot on goal over the final 16 minutes of regulation."]
+
+
+def test_a_blowout_does_not_repeat_itself():
+    # CAR 7-0 WPG, 2026-11-01 as it went (home = Rangers here): one goal, then three two-goal runs. The story said
+    # "and the Jets had no answer" three times and built every run "X and Y scored ... apart ... to make it" (Sora:
+    # "really repetitive")
+    gm = _game([(1, 200, True, 3, "sh"), (2, 100, True, 4, "ev"), (2, 124, True, 5, "ev"), (2, 600, True, 1, "ev"),
+                (2, 690, True, 2, "ev"), (3, 200, True, 3, "ev"), (3, 300, True, 4, "ev")])
+    gm.pk = lambda pool, *k: pool[0]
+    out = timeline.paragraph(gm)
+    text = " ".join(out)
+    assert text.count("answer") == 1, text
+    runs = [s for s in out if " apart " in s or " followed " in s]
+    assert len(runs) >= 2
+    assert len({s.split(" ", 2)[1] for s in runs}) == len(runs) or len({s[:12] for s in runs}) == len(runs), runs
+    from pipeline.export import textcheck
+    repeated = [f for f in textcheck.check_story({"paras": [text]}) if f["why"] == "same phrase twice in one story"]
+    assert not repeated, repeated
+
+
+def test_a_colourful_lead_verb_is_used_once():
+    gm = _game([(1, 100, True, 3, "ev"), (1, 900, True, 4, "ev"), (2, 500, True, 5, "ev"), (3, 100, True, 1, "ev"), (3, 700, True, 2, "ev")])
+    gm.pk = lambda pool, *k: pool[1] if len(pool) > 1 else pool[0]  # always reach for "stretched the lead"
+    text = " ".join(timeline.paragraph(gm))
+    assert text.count("stretched the lead") <= 1, text
