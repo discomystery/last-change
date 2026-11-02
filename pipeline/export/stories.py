@@ -991,8 +991,12 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
             who = plain  # the club is in the sentence
             club = W.nick.get(x["team"], x["team"])
             n = x.get("seasons") or 0
+            # a second or third debut in the same game is built differently (season openers had four in a row:
+            # "X made his Penguins debut, after six seasons with the Maple Leafs. Y made his Penguins debut, ...")
+            nth_debut = sum(1 for s_ in said if isinstance(s_, str) and s_.startswith("club-debut#"))  # across calls
+            said.add(f"club-debut#{nth_debut}")
             if x.get("from") and n >= 2:
-                was = f", after {num(n)} seasons with {W.the(x['from'])}"
+                was = f", after {num(n)} seasons {W.at(x['from'])}" if nth_debut % 2 else f", after {num(n)} seasons with {W.the(x['from'])}"
             elif x.get("from"):
                 was = f", after starting the season with {W.the(x['from'])}" if x.get("moved") else f", after playing for {W.the(x['from'])}"
             else:
@@ -1000,7 +1004,8 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
             pts, gs = x.get("points") or 0, x.get("goals") or 0
             tail = (("" if goals_told else f" and scored{' twice' if gs == 2 else ' ' + num(gs) + ' times' if gs > 2 else ''}") if gs else
                     f" and picked up {'an assist' if pts == 1 else num(pts) + ' assists'}" if pts else "")
-            out.append(f"{_cap(who)} made his {club} debut{was}{',' if was and tail else ''}{tail}.")
+            verb = [f"made his {club} debut", f"played his first game for {W.the(x['team'])}", f"was another new face for {W.the(x['team'])}"][nth_debut % 3]
+            out.append(f"{_cap(who)} {verb}{was}{',' if was and tail else ''}{tail}.")
         elif k == "club_goal":
             many = sum(1 for g in _goals_of(gid, season, pid)) >= 2
             n_ = sum(1 for g in _goals_of(gid, season, pid))  # "They were his first goals" read wrong before the second was told
@@ -2687,6 +2692,34 @@ def record_line(G: pl.DataFrame, day: str, winner: str, loser: str, W, season: i
     return " ".join([line, *alone])
 
 
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"])")
+TEAM_SUBJECT = re.compile(r"^(The (?:[A-Z][\w.’]+ ){1,2})(are|have|were|had|is) ")
+PERSON_SUBJECT = re.compile(r"^((?:[A-Z][\w’'.\-]+ )+([A-Z][\w’'.\-]+))(?: \(#\d+\))?(?:,| (?!and\b|or\b|with\b)[a-z])")
+OTHER_SUBJECT = re.compile(r"(?:,|\b) ?(?:and|while|but) (?:[A-Z][\w’'.\-]+ [A-Z]|the [A-Z])")
+
+
+def one_subject(text: str) -> str:
+    """Two sentences in a row about the same subject read as written by a person, not stamped twice: "The Jets are
+    seventh in the Central. They are winless in nine", "Sean Walker ... scored twice. He opened the scoring" (CAR 7-0
+    WPG, 2026-11-01, Sora: "really repetitive"). Only when the earlier sentence has no second subject a "they" or "he"
+    could point to ("Kochetkov made 24 saves, and Greaves stopped 24 of 27. Kochetkov ..." keeps the name)."""
+    parts = SENTENCE_BREAK.split(text)
+    for k in range(1, len(parts)):
+        prev, cur = parts[k - 1], parts[k]
+        if re.search(r"\b(?:St|Jr|Sr|Mr)\.$", prev) or OTHER_SUBJECT.search(prev):
+            continue
+        t_prev, t_cur = TEAM_SUBJECT.match(prev), TEAM_SUBJECT.match(cur)
+        if t_prev and t_cur and t_prev.group(1) == t_cur.group(1):
+            parts[k] = "They " + ("are" if t_cur.group(2) == "is" else t_cur.group(2)) + cur[t_cur.end() - 1:]
+            continue
+        who = PERSON_SUBJECT.match(prev)
+        if who and not prev.startswith("The "):  # his surname after his full name ("Los Angeles ... Los Angeles" never matches)
+            said = who.group(2)
+            if re.match(re.escape(said) + r" (?!and\b|or\b)[a-z]", cur):
+                parts[k] = "He" + cur[len(said):]
+    return " ".join(parts)
+
+
 QUIET_SHOTS = 18  # a winning goalie's shots faced at or under which his saves read "needed only"
 KEPT_GSAX = 1.0  # goals saved above expected for a losing goalie who "kept them in it"
 
@@ -3564,7 +3597,8 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if len(picked) < MIN_ITEMS and not rec:
         res = results(G.filter(pl.col("date") <= r["date"]), winner, season)
         picked.append({"tag": "Record", "text": f"{_cap(W.the(winner))} are now {record(res)}."})
-    return {"kicker": "What happened", "head": head, "paras": W.nicknames([p for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p], r.get("game_id")),
+    paras = [one_subject(p) for p in (" ".join(s1), " ".join(s2), " ".join(s3)) if p]
+    return {"kicker": "What happened", "head": head, "paras": W.nicknames(paras, r.get("game_id")),
             "list_head": "What it means", "items": picked}
 
 

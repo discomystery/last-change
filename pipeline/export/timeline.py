@@ -103,6 +103,8 @@ class Game:
     relief: dict = field(default_factory=dict)  # goal index -> how to say a goal taken off didn't cost them
     relieved: set = field(default_factory=set)  # teams whose goal taken off the chronology already answered
     so_relief: bool = False  # the winners' goal taken off is answered on the shootout line
+    pairs: int = 0  # two-scorer runs told so far, to build the next one differently
+    no_answer: bool = False  # "and the Jets had no answer" told already (once a story)
     cuts: int = 0  # goals told so far that cut a lead, to vary how the next one is said
     used: dict = field(default_factory=dict)  # pool -> the verb last picked from it
     broke: bool = False  # something other than a goal was told since the last goal, so "x later" would mislead
@@ -261,7 +263,8 @@ def paragraph(gm: Game) -> list[str]:
             g, h = goals[x], goals[nxt[3]]
             mins = -(-(1200 - g["sec"]) // 60)
             pre = (gm.attach.get(x) or {}).get("pre") or ""
-            first = f", the first of them his {pre.split(' his ', 1)[1]}" if " his " in pre and pre.startswith("scored his") else ""
+            first = (f", the first of them his {pre.split(' his ', 1)[1]}" if " his " in pre and pre.startswith("scored his") else
+                     f", the first of them his first since joining {pre.rsplit(' joining ', 1)[1]}" if pre.startswith("scored for the first time since joining ") else "")
             m_, th_ = gm.score(h, gm.side(h))
             out.append((f"{gm.name(g['p1'])} then scored into the empty net twice in the last {num(mins)} minutes{first}, and it finished {m_}-{th_}.",
                         {"kind": "goal", "team": gm.side(h), "fixed": True, "period": 3}))
@@ -637,7 +640,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
             fin = gm.pk([f"added insurance{how} with {left} left", f"made it {m}-{th_}{for_}{how} with {left} left, and that was that"], "ins", i)
             inf, tm_fin = f"to make it {m}-{th_}{for_}", ""  # the clock is in the beat
         else:
-            fin = _vary(gm, "more", [f"made it {m}-{th_}{for_}{how}", f"stretched the lead to {m}-{th_}{how}", f"made it {m}-{th_}{for_}{how}"], i)
+            fin = _vary(gm, "more", [f"made it {m}-{th_}{for_}{how}", f"stretched the lead to {m}-{th_}{how}", f"made it {m}-{th_}{for_}{how}",
+                                     f"pushed the lead to {m}-{th_}{how}", f"extended the lead to {m}-{th_}{how}"], i)
             inf = f"to make it {m}-{th_}{for_}"
     else:  # cutting into a lead
         if m == th_ - 1 and g["period"] >= 3:  # late, the gap matters more than the first goal
@@ -800,7 +804,8 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
         else:
             did = f"to put {T} up {ma}-{ta}" if mb or run[0] else f"to put {T} up {ma}-{ta}"
     else:
-        did = "to " + _vary(gm, "more", [f"make it {ma}-{ta}", f"stretch the lead to {ma}-{ta}"], run[0])
+        did = "to " + _vary(gm, "more", [f"make it {ma}-{ta}", f"stretch the lead to {ma}-{ta}", f"push the lead to {ma}-{ta}",
+                                         f"extend the lead to {ma}-{ta}"], run[0])
     if t == gm.winner and down_most >= 2 and run[-1] == ahead_i and ma > ta and gm.end == "REG" and margin <= 2:
         did = f"to put {T} ahead for good and complete the comeback"
     kinds = {g["strength"] for g in gs}
@@ -815,7 +820,10 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
     other = gm.away if t == gm.home else gm.home
     after_ = goals[run[-1] + 1:]
     tail = ""
-    if t == gm.winner and not any(gm.side(h) == other for h in after_) and ma - ta >= 3:
+    if t == gm.winner and not any(gm.side(h) == other for h in after_) and ma - ta >= 3 and not gm.no_answer:
+        # once a story: in a shutout every run after the third goal qualifies, and CAR 7-0 WPG (2026-11-01) said it
+        # three times in one paragraph (Sora: "really repetitive")
+        gm.no_answer = True
         tail = gm.pk([f", and {W.the(other)} never had an answer", f", and {W.the(other)} had no answer"], "noans", run[0])
     elif t == gm.loser and not after_ and gm.end == "REG" and ta - ma == 1:
         tail = gm.pk([f", but {W.the(t)} couldn’t find another", f", but {W.the(gm.winner)} held on"], "runheld", run[0])
@@ -827,6 +835,14 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
         return _cap(f"{who} scored {tm} and again {gap} later{how} {did}{tail}.").replace("  ", " ")
     if len(gs) == 2:
         a, b = gm.name(names[0]), gm.name(names[1])
+        # each later two-scorer run is built a different way, so a blowout doesn't read "X and Y scored ... apart ... to
+        # make it" three times over (CAR 7-0 WPG, 2026-11-01)
+        n = gm.pairs
+        gm.pairs += 1
+        if n % 3 == 1 and not tail.startswith(", and"):
+            return _cap(f"{a} scored{how} {tm}, and {b} followed {gap} after that {did}{tail}.").replace("  ", " ")
+        if n % 3 == 2:
+            return _cap(f"{tm}, {a} and {b} struck{how} {gap} apart {did}{tail}.").replace("  ", " ")
         return _cap(f"{a} and {b} scored{how.replace(' on the power play', ' power-play goals')} {gap} apart {tm} {did}{tail}.").replace("  ", " ")
     if len(set(names)) < len(names):  # "Zibanejad scored twice and Panarin once in less than six minutes"
         counts = {p: names.count(p) for p in dict.fromkeys(names)}
@@ -842,10 +858,15 @@ def _vary(gm: Game, key: str, pool: list[str], i: int) -> str:
     """The pool's pick for this goal, unless it opens with the same verb as the last pick from the pool ("stretched the
     lead to 4-1 ... stretched the lead to 5-1"), then the next option that doesn't."""
     pick = gm.pk(pool, key, i)
-    verb = lambda t: t.split()[0].replace("make", "made").replace("stretch", "stretched")
-    if gm.used.get(key) == verb(pick):
-        pick = next((x for x in pool if verb(x) != gm.used[key]), pick)
+    past = {"make": "made", "stretch": "stretched", "push": "pushed", "extend": "extended"}
+    verb = lambda t: past.get(t.split()[0], t.split()[0])
+    # a colourful verb once a story ("stretched the lead" three times in EDM 9-7 VAN); plain "made it" may come back,
+    # just never twice in a row
+    spent = gm.used.setdefault(key + "+", set())
+    if gm.used.get(key) == verb(pick) or (verb(pick) != "made" and verb(pick) in spent):
+        pick = next((x for x in pool if verb(x) != gm.used.get(key) and (verb(x) == "made" or verb(x) not in spent)), pick)
     gm.used[key] = verb(pick)
+    spent.add(verb(pick))
     return pick
 
 
@@ -1032,6 +1053,11 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
         n = season_goals.get(pid, 0) + sum(1 for h in goals[:i] if h["p1"] == pid) + 1
         if n in SEASON_MARKS:
             att.setdefault(i, {})["pre"] = f"scored his {th(n)} of the season"
+    # a second newcomer's first goal in one story, in game order, reads differently ("Dorofeyev scored his first goal
+    # for the Rangers ... Tolvanen scored his first goal for the Rangers ...", NYR 5-1 TBL)
+    club = [i for i in sorted(att) if (att[i].get("pre") or "").startswith("scored his first goal for ")]
+    for i in club[1:]:
+        att[i]["pre"] = att[i]["pre"].replace("scored his first goal for ", "scored for the first time since joining ", 1)
     return att, told
 
 

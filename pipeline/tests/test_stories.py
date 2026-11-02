@@ -363,3 +363,17 @@ def test_five_on_five_shots_ride_beside_the_total_when_the_loser_lived_on_the_po
     monkeypatch.setattr(stories.tables, "read", lambda *a, **k: ev)
     monkeypatch.setattr(stories, "TABLES", type("T", (), {"__truediv__": lambda self, x: self, "exists": lambda self: True})())
     assert stories._even_shots(189, 2026, "CAR", "BOS") == {"CAR": 25, "BOS": 9}
+
+
+def test_one_subject_per_pair_of_sentences():
+    # CAR 7-0 WPG, 2026-11-01: "The Jets are seventh in the Central. The Jets are winless in nine (0-7-2)."
+    from pipeline.export.stories import one_subject
+    assert one_subject("The Jets are seventh in the Central. The Jets are winless in nine (0-7-2).") == \
+        "The Jets are seventh in the Central. They are winless in nine (0-7-2)."
+    assert one_subject("Sean Walker, who scores in about 1 game in 11, scored twice. Walker opened the scoring.") == \
+        "Sean Walker, who scores in about 1 game in 11, scored twice. He opened the scoring."
+    # a second subject in the sentence before keeps the name, and so does a pair
+    keep = "Pyotr Kochetkov made 24 saves, and Jet Greaves stopped 24 of 27. Kochetkov has won all nine."
+    assert one_subject(keep) == keep
+    keep = "Alex Newhook and Cole Caufield scored. Newhook struck again."
+    assert one_subject(keep) == keep
