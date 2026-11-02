@@ -72,6 +72,7 @@ def update(season: int) -> dict:
         out["moneypuck_match_pct"] = join_xg.run(season)["match_rate_pct"]  # shots_xg.parquet, for xg_model.evaluate
     shot_features.build(season)
     out["shots_rated"] = xg_model.score_season(xg_model.saved(), season)
+    xg_model.saved_live()  # the live feed's model: trained once if missing, then kept on the data branch for the live site
     refresh_saved(season)
     team_game.build(season)
     units.game_units(season)

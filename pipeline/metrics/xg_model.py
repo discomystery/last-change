@@ -25,35 +25,37 @@ NUMERIC = ["dist", "angle", "x", "y_abs", "own_skaters", "opp_skaters", "score_d
 FLAGS = ["empty_net", "prev_same_team", "is_home", "rebound", "penalty_shot", "own_net_empty", "delayed_pen"]
 CATEGORICAL = ["shot_type", "prev_type"]
 MODEL_PATH = DATA / "models" / "xg_v2.pkl"
+# The live feed's model (Sora, 2026-11-02: shot map and flow chart while a game is on). The NHL fills the shift chart in
+# late, so during a game nobody's time on the ice is known: the same model without the three shift-time features.
+SHIFT_FEATURES = ["def_shift_avg", "def_shift_max", "att_shift_avg"]
+LIVE_NUMERIC = [c for c in NUMERIC if c not in SHIFT_FEATURES]
+LIVE_PATH = DATA / "models" / "xg_live_v1.pkl"
 TRAIN_SEASONS = [2023, 2024, 2025]
 
 
 def load(season: int) -> pl.DataFrame:
-    return pl.read_parquet(TABLES / str(season) / "shot_features.parquet").filter(pl.col("type") != "blocked-shot").with_columns(
-        prev_speed=pl.col("prev_dist") / pl.col("prev_gap").clip(1, 60),
-        rebound=(pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3),
-        sec=pl.col("sec").clip(0, 3900))
+    return with_derived(pl.read_parquet(TABLES / str(season) / "shot_features.parquet"))
 
 
-def _design(df: pl.DataFrame, levels: dict[str, list[str]]) -> np.ndarray:
-    cols = [df[c].cast(pl.Float64).to_numpy() for c in NUMERIC + FLAGS]
+def _design(df: pl.DataFrame, levels: dict[str, list[str]], numeric: list[str] = NUMERIC) -> np.ndarray:
+    cols = [df[c].cast(pl.Float64).to_numpy() for c in numeric + FLAGS]
     for c in CATEGORICAL:
         index = {v: i for i, v in enumerate(levels[c])}
         cols.append(np.array([index.get(v, len(index)) for v in df[c].to_list()], dtype=float))
     return np.column_stack(cols)
 
 
-def fit(train: pl.DataFrame) -> dict:
+def fit(train: pl.DataFrame, numeric: list[str] = NUMERIC) -> dict:
     levels = {c: sorted(train[c].unique().to_list()) for c in CATEGORICAL}
-    n = len(NUMERIC) + len(FLAGS)
+    n = len(numeric) + len(FLAGS)
     model = HistGradientBoostingClassifier(max_iter=600, learning_rate=0.03, max_leaf_nodes=31, min_samples_leaf=100, l2_regularization=1.0,
                                            early_stopping=False, categorical_features=list(range(n, n + len(CATEGORICAL))), random_state=7)
-    model.fit(_design(train, levels), train["goal"].to_numpy())
-    return {"model": model, "levels": levels}
+    model.fit(_design(train, levels, numeric), train["goal"].to_numpy())
+    return {"model": model, "levels": levels, "numeric": numeric}
 
 
 def predict(bundle: dict, df: pl.DataFrame) -> np.ndarray:
-    return bundle["model"].predict_proba(_design(df, bundle["levels"]))[:, 1]
+    return bundle["model"].predict_proba(_design(df, bundle["levels"], bundle.get("numeric", NUMERIC)))[:, 1]
 
 
 def evaluate(train_seasons: list[int], test_season: int) -> dict:
@@ -73,6 +75,25 @@ def evaluate(train_seasons: list[int], test_season: int) -> dict:
                          "ours_auc": round(roc_auc_score(yy, both["ours"].to_numpy()), 4), "moneypuck_auc": round(roc_auc_score(yy, both["xGoal"].to_numpy()), 4),
                          "shot_level_correlation": round(float(np.corrcoef(both["ours"].to_numpy(), both["xGoal"].to_numpy())[0, 1]), 3)}
     return out
+
+
+def with_derived(df: pl.DataFrame) -> pl.DataFrame:
+    """Feature rows (shot_features.rows) -> the unblocked shots with the columns `load` adds, as the model reads them."""
+    return df.filter(pl.col("type") != "blocked-shot").with_columns(
+        prev_speed=pl.col("prev_dist") / pl.col("prev_gap").clip(1, 60),
+        rebound=(pl.col("prev_type") == "shot-on-goal") & pl.col("prev_same_team") & (pl.col("prev_gap") <= 3),
+        sec=pl.col("sec").clip(0, 3900))
+
+
+def saved_live() -> dict:
+    """The live feed's model, trained from the saved seasons the first time it is missing (a few minutes; the nightly
+    keeps it on the data branch, where the live site's workflow downloads it)."""
+    if LIVE_PATH.exists():
+        return pickle.loads(LIVE_PATH.read_bytes())
+    bundle = fit(pl.concat([load(s) for s in TRAIN_SEASONS]), LIVE_NUMERIC)
+    LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LIVE_PATH.write_bytes(pickle.dumps(bundle))
+    return bundle
 
 
 def train_final(seasons: list[int]) -> dict:

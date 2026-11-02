@@ -1,0 +1,77 @@
+---
+// Live game page (Sora, 2026-11-02): the score, the clock and the game flow chart with its shot map while a game is on,
+// from the live feed (lib/live.ts, pipeline/live). One page per game around the build; the chart fetches the game's file
+// again every minute. Shots are rated by the live chance model (no shift chart yet), so the page says the numbers are a
+// first read and points to the post-game page once the game is over.
+import Base from '../../layouts/Base.astro';
+import Section from '../../components/Section.astro';
+import Rink from '../../components/Rink.astro';
+import GameTrail from '../../components/GameTrail.astro';
+import GameFlow from '../../components/GameFlow.astro';
+import '../../styles/blocks.css';
+import { matchupPaint } from '../../lib/teams';
+import { LIVE_FEED, liveWindow } from '../../lib/live';
+import teamsData from '../../../public/data/teams.json';
+import schedule from '../../../public/data/schedule.json';
+import previewIndex from '../../../public/data/previews/index.json';
+
+export async function getStaticPaths() {
+  if (!LIVE_FEED) return [];
+  return schedule.games.filter((g) => liveWindow(g.start)).map((g) => ({ params: { gameId: String(g.id) }, props: { g } }));
+}
+const { g } = Astro.props as { g: (typeof schedule.games)[number] };
+const { away, home } = g;
+const base = import.meta.env.BASE_URL;
+const T = Object.fromEntries(teamsData.map((t) => [t.abbr, t]));
+const colours = matchupPaint(away, home);
+const colourCss = `:root{--away:${colours.away};--home:${colours.home}}.t-away{--team:var(--away)}.t-home{--team:var(--home)}`;
+const dateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(g.start));
+const hasPreview = previewIndex.some((p) => p.id === g.id);
+---
+<Base section="games" title={`${away} at ${home}, live`} description={`${T[away]?.name ?? away} at ${T[home]?.name ?? home}: every shot and chance as the game goes.`}>
+  <style is:inline set:html={colourCss}></style>
+  <section class="hero" aria-label="Live score">
+    <GameTrail id={g.id} part="crumbs" />
+    <Rink centre="live" sides={[away, home].map((a) => ({ abbr: a, cls: `t-${a === away ? 'away' : 'home'}`, full: T[a]?.name ?? a, score: 0, home: a === home, href: `${base}team/${a}/` }))} />
+    <GameTrail id={g.id} part="around" names={Object.fromEntries([away, home].map((a) => [a, { full: T[a]?.nick ?? T[a]?.name ?? a }]))}>
+      <p class="when-day">{dateStr}</p>
+      <p><strong id="lv-state" data-start={g.start}>Live</strong> · {g.venue}</p>
+      <p class="gamelinks">{hasPreview && <a href={`${base}preview/${g.id}/`}>Preview</a>}<a id="lv-recap" href={`${base}recap/${g.id}/`} hidden>Post-game</a></p>
+    </GameTrail>
+  </section>
+
+  <Section id="flow" title="Game flow" placeholder={false} lead takeaway="Every shot on goal or wide of the net so far, in game time, and where it came from. It updates every couple of minutes and runs a few minutes behind the broadcast.">
+    <p class="lv-note" id="lv-note">Chances here are a first read, rated before the NHL has posted who was on the ice. The post-game page has the full numbers, Swing and report cards once the game is over.</p>
+    <GameFlow id={g.id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[0, 0]} end="REG" live={LIVE_FEED!} />
+    <p class="lv-made" id="lv-made" aria-live="polite"></p>
+  </Section>
+</Base>
+
+<style>
+  .lv-note { font: 400 15px/1.5 var(--body); color: var(--ink-2); margin: 0 0 12px; max-width: 70ch; }
+  .lv-made { font: 500 13px var(--ui); color: var(--ink-3); margin-top: 10px; min-height: 1em; }
+  .gamelinks a + a { margin-left: 14px; }
+</style>
+
+<script>
+  // Before puck drop: the start time in the visitor's own zone. Once the feed has the game: the clock and score in the
+  // header, when the file was made, and the post-game link at the final horn.
+  const state = document.getElementById('lv-state') as HTMLElement;
+  const start = Date.parse(state.dataset.start!);
+  if (start > Date.now()) state.textContent = `Starts at ${new Date(start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  let made = 0;
+  const ago = () => { if (!made) return; const m = Math.round((Date.now() - made) / 60000); (document.getElementById('lv-made') as HTMLElement).textContent = m < 1 ? 'Updated just now.' : `Updated ${m} minute${m > 1 ? 's' : ''} ago.`; };
+  setInterval(ago, 30000);
+  document.addEventListener('lc-live', (e: Event) => {
+    const l = (e as CustomEvent).detail;
+    const final = l.state === 'FINAL' || l.state === 'OFF';
+    state.textContent = final ? (l.ptype === 'OT' ? 'Final in overtime' : l.ptype === 'SO' ? 'Final in a shootout' : 'Final') : l.word;
+    document.querySelectorAll<HTMLElement>('.rink .side').forEach((el, i) => { const s = el.querySelector('.score'); if (s) { s.textContent = String(l.score[i]); (s as HTMLElement).dataset.to = String(l.score[i]); } });
+    const cc = document.querySelector('.rink .cc-score b');
+    if (cc) cc.innerHTML = `${l.score[0]}<i>–</i>${l.score[1]}`;
+    document.querySelectorAll('.rink .cc-score small, .rink .cc-word').forEach((w) => (w.textContent = final ? 'final' : 'live'));
+    (document.getElementById('lv-recap') as HTMLElement).hidden = !final;
+    if (final) (document.getElementById('lv-note') as HTMLElement).textContent = 'The game is over. The post-game page has the full numbers, Swing and report cards; it goes up within minutes of the final horn.';
+    made = Date.parse(l.made); ago();
+  });
+</script>
