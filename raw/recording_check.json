@@ -1,0 +1,92 @@
+{
+ "season": 2026,
+ "baseline": [
+  2023,
+  2024,
+  2025
+ ],
+ "shots": 18947,
+ "checks": [
+  {
+   "name": "quick_goal_rate",
+   "label": "goal rate of shots within 1 s of the previous play",
+   "value": 0.0276,
+   "training": [
+    0.0322,
+    0.0235,
+    0.0289
+   ],
+   "allowed": [
+    0.0132,
+    0.0432
+   ],
+   "ok": true
+  },
+  {
+   "name": "quick_share",
+   "label": "share of shots within 1 s of the previous play",
+   "value": 0.0802,
+   "training": [
+    0.0794,
+    0.0731,
+    0.0769
+   ],
+   "allowed": [
+    0.0705,
+    0.0825
+   ],
+   "ok": true
+  },
+  {
+   "name": "distance",
+   "label": "average shot distance (ft)",
+   "value": 33.8501,
+   "training": [
+    35.2288,
+    35.8192,
+    34.5227
+   ],
+   "allowed": [
+    33.6902,
+    36.6902
+   ],
+   "ok": true
+  },
+  {
+   "name": "goals_per_xg",
+   "label": "goals per expected goal",
+   "value": 0.9885,
+   "training": [
+    1.0253,
+    1.01,
+    0.9645
+   ],
+   "allowed": [
+    0.9197,
+    1.0802
+   ],
+   "ok": true
+  },
+  {
+   "name": "no_previous",
+   "label": "shots with no previous play recorded",
+   "value": 0.0,
+   "allowed": [
+    0,
+    0.01
+   ],
+   "ok": true
+  },
+  {
+   "name": "no_location",
+   "label": "shots with no location recorded",
+   "value": 0.0,
+   "allowed": [
+    0,
+    0.01
+   ],
+   "ok": true
+  }
+ ],
+ "status": "ok"
+}
