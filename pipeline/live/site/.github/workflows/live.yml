@@ -42,7 +42,8 @@ jobs:
       - name: Get the live chance model and name spellings
         run: |
           mkdir -p app/data/models app/data/raw/names
-          curl -fsSL -o app/data/models/xg_live_v1.pkl https://raw.githubusercontent.com/discomystery/last-change/data/models/xg_live_v1.pkl
+          curl -fsSL -o app/data/models/xg_live_v1.pkl https://raw.githubusercontent.com/discomystery/last-change/data/models/xg_live_v1.pkl \
+            || echo "::notice::The live model is not on the data branch yet (the first full update after the live code merges saves it)"
           for f in countries wikidata; do
             curl -fsSL -o "app/data/raw/names/$f.json" "https://raw.githubusercontent.com/discomystery/last-change/data/raw/names/$f.json" || true
           done
@@ -51,4 +52,9 @@ jobs:
         working-directory: app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run --project pipeline python -m pipeline.live.loop --out ../feed --publish "bash ../live/publish.sh ../feed"
+        run: |
+          if [ ! -f data/models/xg_live_v1.pkl ] || [ ! -d pipeline/live ]; then
+            echo "::notice::Not ready yet: the live code or model is missing, so nothing to follow. A scheduled start will try again."
+            exit 0
+          fi
+          uv run --project pipeline python -m pipeline.live.loop --out ../feed --publish "bash ../live/publish.sh ../feed"
