@@ -26,6 +26,8 @@ from pipeline.export.grammar import and_list as _and, cap as _cap, num
 
 PERIODS = {1: "first", 2: "second", 3: "third"}
 RUN_GAP = 300  # seconds between two goals by one team that read as one sentence
+LEAD_LASTED = 180  # seconds: a lead the other side wiped out this fast gets no "and that was all they would get"
+LATE_ALONE = 1080  # third-period second after which a goal keeps its own sentence (a late tie isn't folded into a run)
 RELATIVE = 300  # a goal this soon after the last one told is "x:xx later"
 LATE = 480  # the last eight minutes of the third read "with six minutes left" (outside notes, Oct 20: 6:22 left read "late in the third")
 HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty shot", "dp": " on a delayed penalty"}
@@ -281,6 +283,9 @@ def paragraph(gm: Game) -> list[str]:
             if (gm.side(a) != gm.side(b) or at(b) - at(a) > RUN_GAP or b["period"] != a["period"] or b["period"] > 3 or len(run) >= 3
                     or any(goals[i]["strength"] in ("ps", "en") for i in (run[-1], j)) or j in gm.attach or run[-1] in gm.attach
                     or j in gm.hat3 or x in gm.hat3
+                    # a late tying or go-ahead goal, or one with the goalie pulled, is the moment: "Zegras and Drysdale
+                    # scored less than five minutes apart ... to tie it" hid an 11-seconds-left equalizer (CBJ at PHI, Oct 27)
+                    or (b["period"] == 3 and (b["sec"] >= LATE_ALONE or b.get("own_extra")))
                     # a shorthanded goal keeps its own sentence (Cowan's read as even strength inside a run, Oct 20)
                     or ("sh" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
                     or j in gm.relief or run[-1] in gm.relief or got_back in (run[-1], j)
@@ -417,7 +422,7 @@ def _join(items: list[tuple[str, dict]]) -> list[str]:
             plain = lambda t: not any(w in t for w in (" but ", ", and ", ": ", "; ", "No harm done", " while "))
             fits = (ma["kind"] in ("goal", "fight") and mb["kind"] in ("goal", "fight") and na <= JOIN_WORDS and nb <= JOIN_WORDS
                     and na + nb <= JOIN_MAX and plain(a) and plain(b) and not ma.get("fixed") and not mb.get("fixed")
-                    and not b.startswith(("They ", "With the goalie pulled")) and max(ma.get("period", 9), mb.get("period", 9)) <= 3
+                    and not b.startswith(("They ", "With the goalie pulled", "With the goalie still pulled")) and max(ma.get("period", 9), mb.get("period", 9)) <= 3
                     and (ma["kind"] == mb["kind"] or ma.get("period") == mb.get("period")))
             if fits:
                 answer = mb["kind"] == "goal" and ma["kind"] == "goal" and mb["team"] != ma["team"] and mb.get("cut")
@@ -680,7 +685,9 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     else:  # "tied it 1-1, 1:27 later": a comma keeps the score and the clock apart
         body = f"{who} {fin}{',' if fin[-1:].isdigit() and tm_fin[:1].isdigit() else ''} {tm_fin}"
     body = " ".join(body.split())
-    tail = [dent] if dent and not pre else []  # a first goal's "to make it 5-2" already gave the score ("..., bringing it to 5-2", ANA at NYR)
+    # a first goal's or a second goal's "to make it 5-2" already gave the score ("..., bringing it to 5-2", ANA at NYR;
+    # "Brown struck again ... to make it 5-2, bringing it to 5-2", NJD at COL, outside notes Oct 28)
+    tail = [dent] if dent and not pre and not (again and i != 0 and g["period"] <= 3) else []
     if (g["period"], g["sec"]) in stood:
         x = stood[(g["period"], g["sec"])]
         tail.append(f"and the goal stood after {W.the(other)} challenged for {x['why']}")
@@ -704,7 +711,10 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     if tail:
         body += ", " + ", ".join(tail)
     if pulled and not relief:
-        body = f"With the goalie pulled{pulled_at}, " + body
+        p_ = goals[i - 1] if i else None
+        # the second of two pulled-goalie goals in a row: "With the goalie still pulled ..." (Lekkerimäki's two, VAN 6-5 ANA)
+        still = " still" if p_ and gm.side(p_) == t and p_["period"] == 3 and p_.get("own_extra") else ""
+        body = f"With the goalie{still} pulled{pulled_at}, " + body
     if relief == "en":
         body = f"No harm done, {W.the(t)} won anyway, and " + body
     elif relief:
@@ -753,6 +763,11 @@ def _last_word(gm: Game, i: int, body: str = "") -> str:
     names = {W.the(other), W.place(other), W.nick.get(other, other)}
     T = W.the(t) if any(n and n in body for n in names) else "they"  # "they" only when no other team is named before it
     if m > th_:  # still ahead
+        nxt = rest[0] if rest else None
+        if nxt and gm.side(nxt) != t and at(nxt) - at(g) <= LEAD_LASTED and gm.score(nxt, t)[0] == gm.score(nxt, t)[1]:
+            # the other side tied it right back: "and that was all they would get" read as if the lead held (Stone and
+            # Barbashev's 2-1, tied 54 seconds later; outside notes, Oct 30). The tie's own "54 seconds later" tells it.
+            return ""
         # "and that was all they would get" after the opener (voice loop, round two: the same line in three stories)
         return gm.pk([f"but {T} didn’t score again", f"and that was all {T} would get"], "lastw", i)
     if m == th_ and at(rest[0]) - at(g) <= 120:

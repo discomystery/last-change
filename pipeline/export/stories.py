@@ -83,8 +83,9 @@ def streak_text(gn: int, pn: int, games: int, vs: str = "", atleast: bool = Fals
     leads whenever there is one). `gn` straight games with a goal, `pn` with a point, `games` played in all; `vs` is
     " against Dallas" or empty. "has" / "have" is left to the caller."""
     if gn >= GOAL_RUN and gn >= pn:
-        return "scored in every game this season" if gn == games and not vs else f"scored in {'at least ' if atleast else ''}{num(gn)} straight games{vs}"
-    run = "every game this season" if pn == games and not vs else f"{'at least ' if atleast else ''}{num(pn)} straight games{vs}"
+        return f"scored in all {num(gn)} games this season" if gn == games and not vs else f"scored in {'at least ' if atleast else ''}{num(gn)} straight games{vs}"
+    # the count, not just "every game this season": McDavid's 14 straight was NHL.com's lead (outside notes, Oct 26-31)
+    run = f"all {num(pn)} games this season" if pn == games and not vs else f"{'at least ' if atleast else ''}{num(pn)} straight games{vs}"
     if gn >= GOAL_RUN:
         return f"a point in {run}, with a goal in each of the last {num(gn)}"
     return f"a point in {run}"
@@ -918,7 +919,10 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
     debuts = [x for x in found if x["kind"] == "debut" and not x.get("goalie") and x["pid"] in N and x["pid"] not in skip
               and (kinds is None or "debut" in kinds)]
     if len(debuts) >= 2:  # "The Rangers’ Noah Laba and the Penguins’ Ben Kindel both played their first NHL game."
-        who_ = [f"{W.poss(x['team'])} {name(x['pid'])}" for x in debuts[:3]]
+        nm_ = [name(x["pid"]) for x in debuts[:3]]
+        who_ = [f"{W.poss(x['team'])} {n_}" for x, n_ in zip(debuts, nm_)]
+        if len({x["team"] for x in debuts[:3]}) == 1:  # one club named once (outside notes, Oct 25: "the Stars’ ... and the Stars’ ...")
+            who_ = [f"{W.poss(debuts[0]['team'])} {nm_[0]}"] + nm_[1:]
         out.append(f"{_cap(_and(who_))} {'both' if len(who_) == 2 else 'all'} played their first NHL game.")
         found = [x for x in found if x not in debuts[:3]]
     for x in found:
@@ -2354,7 +2358,7 @@ def two_man_kills(gid: int, season: int, home_id: int, home: str, away: str, goa
     return out[:1]
 
 
-def posts_line(gid: int, season: int, ids: dict, winner: str, loser: str, margin: int, W) -> list[str]:
+def posts_line(gid: int, season: int, ids: dict, winner: str, loser: str, margin: int, W, end: str = "REG") -> list[str]:
     """"The Hurricanes hit four posts and still lost." Outside notes, 2026-10-18 (Brind'Amour: "three or four
     goalposts"). Shots off the iron are misses to our chance model, so this is told as luck, never "should have scored"."""
     try:
@@ -2372,7 +2376,9 @@ def posts_line(gid: int, season: int, ids: dict, winner: str, loser: str, margin
     what = (f"{num(n)} posts" if not bar else f"the crossbar {'twice' if bar == 2 else num(bar) + ' times'}" if bar == n
             else f"{num(n - bar) if n - bar > 1 else 'a'} post{'s' if n - bar > 1 else ''} and {'the crossbar' if bar == 1 else 'the crossbar ' + ('twice' if bar == 2 else num(bar) + ' times')}")
     Lt = _cap(W.the(loser))
-    pool = [f"{Lt} hit {what} and still lost.", f"{Lt} hit {what} and came up a goal short."] if margin == 1 else \
+    # not "came up a goal short" after overtime: the Penguins had led with 25 seconds left (UTA at PIT, outside notes Oct 29)
+    pool = [f"{Lt} hit {what} and still lost."] if end != "REG" else \
+        [f"{Lt} hit {what} and still lost.", f"{Lt} hit {what} and came up a goal short."] if margin == 1 else \
         [f"{Lt} hit {what} and still lost.", f"{Lt} hit {what}, and the bounces never came."]
     return [_pick(pool, "iron", gid)]
 
@@ -2724,6 +2730,47 @@ QUIET_SHOTS = 18  # a winning goalie's shots faced at or under which his saves r
 KEPT_GSAX = 1.0  # goals saved above expected for a losing goalie who "kept them in it"
 
 
+NEW_CLUB_GAMES = 2  # a goalie's first and second games for a new club say where he came from
+
+
+@lru_cache(maxsize=2)
+def _goalie_games_by_club(season: int) -> pl.DataFrame | None:
+    """Every goalie appearance of this season and last: goalie, game, date, club abbreviation."""
+    from pipeline.metrics import goalies
+    parts = []
+    for s_ in (season - 1, season):
+        gp = TABLES / str(s_) / "games.parquet"
+        if not (TABLES / str(s_) / "events.parquet").exists() or not gp.exists():
+            continue
+        g = pl.read_parquet(gp, columns=["home_id", "home", "away_id", "away"])
+        ab = dict(g.select("home_id", "home").unique().iter_rows()) | dict(g.select("away_id", "away").unique().iter_rows())
+        d = goalies.per_game(s_).filter(pl.col("sec") > 0).select("goalie_id", "game_id", "date", "team_id")
+        parts.append(d.with_columns(pl.col("team_id").replace_strict(ab, default=None, return_dtype=pl.Utf8).alias("team"), pl.lit(s_).alias("season")))
+    return pl.concat(parts).sort("date", "game_id") if parts else None
+
+
+def goalie_new_club(gid: int, season: int, pid: int) -> tuple[int, str] | None:
+    """(nth game for his club, the club he came from) for a goalie in his first or second game for a club he joined
+    after the season began or moved to during it: Hellebuyck's Devils debut and Daws' first start for Winnipeg led
+    NHL.com's recaps, ours said only the saves (outside notes, Oct 27 and 30). Never how he moved."""
+    d = _goalie_games_by_club(season)
+    if d is None:
+        return None
+    mine = d.filter(pl.col("goalie_id") == pid)
+    now = mine.filter(pl.col("game_id") == gid)
+    if now.is_empty() or now["team"][0] is None:
+        return None
+    t, day = now["team"][0], now["date"][0]
+    before = mine.filter((pl.col("date") < day) | ((pl.col("date") == day) & (pl.col("game_id") < gid)))
+    here, other = before.filter(pl.col("team") == t), before.filter(pl.col("team") != t)
+    if here.height >= NEW_CLUB_GAMES or other.is_empty() or other["team"][-1] is None:
+        return None
+    club_games = d.filter((pl.col("season") == season) & (pl.col("team") == t) & (pl.col("date") < day))["game_id"].n_unique()
+    if not (other.filter(pl.col("season") == season).height or club_games >= 3):
+        return None  # a summer move on opening night is no story
+    return here.height + 1, other["team"][-1]
+
+
 def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: str, pk=None, season: int | None = None) -> list[str]:
     """Both starters' nights in one sentence, in every story (Sora's review of 2025-26 against NHL.com and AP,
     2026-10-17: the goalies were the most-missed fact, 530 games). The winner's goalie "made 30 saves"; a shutout
@@ -2738,6 +2785,9 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
     ls = r["score"][loser]
 
     def nm(g, good=False):
+        new = goalie_new_club(r["game_id"], season, g["id"]) if season else None
+        if new:  # "Connor Hellebuyck, in his first game since coming over from Winnipeg, needed only 17 saves"
+            return f"{name(g['id']) or g['name']}, in his {grammar.ordinal_word(new[0])} game since coming over from {W.place(new[1])},"
         back = bounced_back(r["game_id"], season, g["id"], W) if good and season else None
         return (name(g["id"]) or g["name"]) + (back or "")
     if wg and wg.get("id") not in said and (wg.get("shots") or 0) > 0:
@@ -2882,7 +2932,10 @@ def _first_items(later: list[dict], night: pl.DataFrame, N: dict, W: "Words", lo
     items = []
     debuts = [x for x in later if x["kind"] == "debut" and N.get(x["pid"])]
     if debuts:
-        who = _and([f"{W.poss(x['team'])} {N[x['pid']]}" for x in debuts[:3]])
+        teams_ = {x["team"] for x in debuts[:3]}
+        # "the Stars’ Matthew Seminoff and Dylan Hryckowian", not "the Stars’ ... and the Stars’ ..." (outside notes, Oct 25)
+        who = (f"{W.poss(debuts[0]['team'])} {_and([N[x['pid']] for x in debuts[:3]])}" if len(teams_) == 1 else
+               _and([f"{W.poss(x['team'])} {N[x['pid']]}" for x in debuts[:3]]))
         text = f"{_cap(who)} played his first NHL game." if len(debuts) == 1 else \
             f"{_cap(who)} {'both' if len(debuts) == 2 else 'all'} played their first NHL game."
         items.append({"tag": "Debut", "text": text, "score": 50})
@@ -2907,7 +2960,8 @@ def _first_items(later: list[dict], night: pl.DataFrame, N: dict, W: "Words", lo
             n = x.get("seasons") or 0
             was = f", after {num(n)} seasons with {W.the(x['from'])}" if x.get("from") and n >= 2 else \
                 f", after starting the season with {W.the(x['from'])}" if x.get("from") and x.get("moved") else ""
-            items.append({"tag": "New club", "text": f"{N[pid]} made his {club} debut{was}.", "score": 40})
+            # above a plain "Back": Perron's first game for Dallas, 13 games in, read only as a season debut (outside notes, Oct 31)
+            items.append({"tag": "New club", "text": f"{N[pid]} made his {club} debut{was}.", "score": 46})
     return items
 
 
@@ -3207,8 +3261,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     later_firsts = [x for x in found if _later_first(x, night, fighters)]
     # A debut, club debut or return whose only mark is an assist waits until after the goals, beside the big nights
     # (Sora, 2026-10-21: Välimäki's first game for Carolina after 600+ days is news, but not the game's lead)
+    # A first-round pick's pointless debut waits there too: "Filip Bystedt played his first NHL game." opened a comeback
+    # story before any goal (outside notes, Oct 29)
     after_goals = [x for x in found if x not in later_firsts and x["kind"] in ("debut", "club_debut", "return")
-                   and x.get("points") and not x.get("goals") and not x.get("first_round")]
+                   and not x.get("goals") and not x.get("goalie")
+                   and ((x.get("points") and not x.get("first_round")) or (x["kind"] == "debut" and x.get("first_round") and not x.get("points")))]
+    if any(x["kind"] == "debut" and x not in later_firsts and x not in after_goals for x in found):
+        # a debut told up front keeps the night's other debuts beside it ("Bauer and Björck both played their first NHL game")
+        after_goals = [x for x in after_goals if not (x["kind"] == "debut" and not x.get("points"))]
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first,
                        found=[x for x in found if x not in later_firsts and x not in after_goals
                               # a games-played milestone of a goal scorer rides on his goal ("in his 700th NHL game")
@@ -3388,7 +3448,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if slow:  # the plain shot counts behind "shake off a slow start"
         s2.append(slow)
     # posts and crossbars belong with who had the better of the play, not at the head of the penalty paragraph (voice loop)
-    iron = posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W)
+    iron = posts_line(gid, season, {home_id: home, row["away_id"][0]: away}, winner, loser, ws - ls, W, end)
     hit = re.match(r".+? hit (.+?)(?: and still lost| and came up a goal short|, and the bounces never came)\.$", iron[0]) if iron else None
     if hit and s2 and s2[-1].startswith(f"{_cap(Ln)} had ") and ", but " in s2[-1]:
         # "The Sharks had a little more of the play and hit a post and the crossbar, but the Red Wings had the finish."
@@ -3896,6 +3956,10 @@ def _night_heads(night, winner: str, W, L_: str, last, N, found: list[dict] | No
     return out
 
 
+LATE_WINNER = 1020  # third-period second after which the winner's go-ahead-for-good goal leads (the last three minutes)
+LAST_MINUTE = 60  # seconds left in regulation for a tying goal that leads the headline when its team won after it
+
+
 def _clutch_heads(goals: list[dict], side, winner: str, end: str, W, W_: str, L_: str, last, N, pk) -> list[tuple[int, str]]:
     """A late winner leads (outside notes, Oct 22: Stecher put Toronto ahead for good with 28 seconds left; our headline
     went to the loser's four-point night), and so does one player tying it late and winning it in overtime (Hintz)."""
@@ -3904,11 +3968,12 @@ def _clutch_heads(goals: list[dict], side, winner: str, end: str, W, W_: str, L_
     if end == "REG" and reg:
         # the goal that put them ahead for good, in the last two minutes of the third
         for i, g in enumerate(reg):
-            if side(g) == winner and g["period"] == 3 and g["sec"] >= 1080 and g["strength"] != "en" and g["p1"] in N:
+            if side(g) == winner and g["period"] == 3 and g["sec"] >= LATE_WINNER and g["strength"] != "en" and g["p1"] in N:
                 before = (g["hs"] - (1 if g["home"] else 0), g["as"] - (0 if g["home"] else 1))
                 if before[0] == before[1] and all(side(h) == winner or h["strength"] == "en" for h in reg[i + 1:]):
                     left = grammar.time_left(1200 - g["sec"])
-                    out.append((92 if g["sec"] >= 1140 else 88,
+                    # Eller's go-ahead with 2:23 left went under "The Panthers beat the Blackhawks" (outside notes, Oct 25)
+                    out.append((92 if g["sec"] >= 1140 else 88 if g["sec"] >= 1080 else 86,
                                 pk([f"{last(g['p1'])} wins it with {left} left", f"{last(g['p1'])} scores with {left} left to lift {W.the(winner)}"], "late")))
                 break
     ot = next((g for g in goals if g["period"] > 3), None)
@@ -3916,6 +3981,16 @@ def _clutch_heads(goals: list[dict], side, winner: str, end: str, W, W_: str, L_
         tie = next((g for g in reversed(reg) if g["hs"] == g["as"] and g["period"] == 3 and g["sec"] >= 900 and g["p1"] == ot["p1"]), None)
         if tie:
             out.append((92, f"{last(ot['p1'])} ties it late and wins it in overtime"))
+    if end in ("OT", "SO") and reg:
+        # a tie in the last minute of regulation that the same team then won leads (Geekie with 12 seconds left, Drysdale
+        # with 11: outside notes, Oct 27 and 31, where our headline went to the goal that started the comeback)
+        g = reg[-1]
+        if side(g) == winner and g["period"] == 3 and g["sec"] >= 1200 - LAST_MINUTE and g["hs"] == g["as"] and g["p1"] in N \
+                and not (end == "OT" and ot and ot["p1"] == g["p1"]):
+            left = grammar.time_left(1200 - g["sec"])
+            how = "in overtime" if end == "OT" else "in a shootout"
+            out.append((91, pk([f"{last(g['p1'])} ties it with {left} left, and {W.the(winner)} win it {how}",
+                                f"{last(g['p1'])} forces {'overtime' if end == 'OT' else 'a shootout'} with {left} left, and {W.the(winner)} win it"], "late-tie")))
     return out
 
 

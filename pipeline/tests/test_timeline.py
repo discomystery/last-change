@@ -163,3 +163,16 @@ def test_a_second_first_goal_for_a_new_club_reads_differently_in_game_order():
     att, _ = timeline.attachments(gm, found, {})
     assert att[1]["pre"] == "scored his first goal for the Rangers"
     assert att[2]["pre"] == "scored for the first time since joining the Rangers"
+
+
+def test_late_tie_keeps_its_own_sentence_and_a_quick_answer_drops_the_closer():
+    # CBJ at PHI, Oct 27: a cut with five minutes left and the tie with 11 seconds left were one "run" ending "to tie it"
+    gm = _game([(1, 300, False, 1, "ev"), (1, 400, False, 2, "ev"), (3, 904, True, 3, "ev"), (3, 1189, True, 4, "ev"), (4, 150, False, 5, "ev")], end="OT")
+    gm.goals[3]["own_extra"] = True
+    out = " ".join(timeline.paragraph(gm))
+    assert "apart" not in out.split("Adam Fox")[1].split(".")[0]
+    assert "With the goalie pulled and 11 seconds left, Will Cuylle tied it" in out
+    # NJD at VGK, Oct 30: a 2-1 lead tied 54 seconds later is not "and that was all they would get"
+    gm = _game([(1, 100, True, 3, "ev"), (1, 900, False, 1, "ev"), (1, 990, False, 2, "ev"), (1, 1044, True, 4, "ev"), (2, 300, True, 3, "ev")])
+    out = " ".join(timeline.paragraph(gm))
+    assert "all they would get" not in out and "didn’t score again" not in out

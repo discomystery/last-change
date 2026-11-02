@@ -46,8 +46,8 @@ def places(ps: dict[str, str]) -> dict[str, str]:
 # "Blueshirts" is rarer and longer than the name, and "Rags" is tongue in cheek (Sora, 2026-10-13). Plural verbs, like the names.
 SHORT = {"Hurricanes": "Canes", "Lightning": "Bolts", "Maple Leafs": "Leafs", "Canadiens": "Habs", "Senators": "Sens",
          "Penguins": "Pens", "Capitals": "Caps", "Blue Jackets": "Jackets", "Islanders": "Isles", "Predators": "Preds",
-         "Avalanche": "Avs", "Blackhawks": "Hawks", "Red Wings": "Wings", "Golden Knights": "Knights", "Panthers": "Cats",
-         "Oilers": "Oil"}
+         "Avalanche": "Avs", "Blackhawks": "Hawks", "Red Wings": "Wings", "Golden Knights": "Knights", "Panthers": "Cats"}
+# Not "the Oil" for the Oilers: it read clipped beside "the Oilers" everywhere else (outside notes, Oct 26 and 31).
 _SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9“\"])")
 
 

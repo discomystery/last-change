@@ -1094,14 +1094,14 @@ def rest_claim(gid: int, away: str, home: str, places: dict, rest: dict, usual: 
         "body": _fmt(_pick(REST_BODIES, gid, "rest", "body"), **w),
         "call": _fmt("{R} get a bigger share of the 5-on-5 chances than they usually do.", **w),
         "nums": f"{places[t]} played yesterday · {places[r]} {'had a day' if days == 1 else f'had {days} days'} off · "
-                f"{places[r]}’s usual share of 5-on-5 expected goals: {100 * usual:.1f}%",
+                f"{_poss(places[r])} usual share of 5-on-5 expected goals: {100 * usual:.1f}%",
         "gist": _fmt("{T} played last night; {R} are rested.", **w),
         "cite": "Schedule · back-to-backs over 2023-24 to 2025-26 (809 games)",
         "chips": [
             {"team": t, "text": "played yesterday", "tip": f"{places[t]} played yesterday. Schedule, back-to-backs over 2023-24 to 2025-26 (809 games)."},
             {"team": r, "text": "a day off" if days == 1 else f"{days} days off", "tip": f"{places[r]} {'had a day' if days == 1 else f'had {days} days'} off before this game."},
             {"team": r, "text": f"usually {100 * usual:.0f}% of the chances",
-             "tip": f"{places[r]}’s usual share of 5-on-5 expected goals: {100 * usual:.1f}%, adjusted for score and venue."},
+             "tip": f"{_poss(places[r])} usual share of 5-on-5 expected goals: {100 * usual:.1f}%, adjusted for score and venue."},
         ],
         "check": {"metric": "rest", "measure": "share of 5-on-5 expected goals, adjusted for score and venue", "team": r,
                   "baseline": round(usual, 4), "league": 0.5, "direction": "above",

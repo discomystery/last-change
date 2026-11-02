@@ -61,7 +61,7 @@ def test_shared_surnames_get_initials():
 def test_goal_streaks_lead():
     assert stories.run_of([1, 0, 2, 1, 1]) == 3
     assert stories.streak_text(4, 4, 10) == "scored in four straight games"
-    assert stories.streak_text(5, 5, 5) == "scored in every game this season"
+    assert stories.streak_text(5, 5, 5) == "scored in all five games this season"
     assert stories.streak_text(3, 7, 10) == "a point in seven straight games, with a goal in each of the last three"
     assert stories.streak_text(2, 6, 10) == "a point in six straight games"
     assert stories.streak_text(3, 3, 9, " against Dallas") == "scored in three straight games against Dallas"
@@ -377,3 +377,27 @@ def test_one_subject_per_pair_of_sentences():
     assert one_subject(keep) == keep
     keep = "Alex Newhook and Cole Caufield scored. Newhook struck again."
     assert one_subject(keep) == keep
+
+
+def test_last_minute_tie_leads_when_its_team_wins_after_it():
+    # CHI at BOS, Oct 31: Geekie tied it with 12 seconds left and Lindholm won it in overtime
+    goals = [{"period": 3, "sec": 1188, "home": True, "p1": 7, "hs": 4, "as": 4, "strength": "ev"},
+             {"period": 4, "sec": 150, "home": True, "p1": 8, "hs": 5, "as": 4, "strength": "ev"}]
+
+    class W_:
+        def the(self, t):
+            return "the Bruins"
+    heads = stories._clutch_heads(goals, lambda g: "BOS" if g["home"] else "CHI", "BOS", "OT", W_(), "The Bruins", "the Blackhawks",
+                                  lambda p: {7: "Geekie", 8: "Lindholm"}[p], {7: "Morgan Geekie", 8: "Elias Lindholm"}, lambda pool, *k: pool[0])
+    assert (91, "Geekie ties it with 12 seconds left, and the Bruins win it in overtime") in heads
+
+
+def test_a_goalie_new_to_his_club_says_where_he_came_from(monkeypatch):
+    import polars as pl
+    rows = pl.DataFrame({"goalie_id": [9, 9, 9], "game_id": [1, 2, 3], "date": ["2026-03-01", "2026-10-25", "2026-10-27"],
+                         "team_id": [52, 1, 1], "team": ["WPG", "NJD", "NJD"], "season": [2025, 2026, 2026]})
+    club = pl.DataFrame({"goalie_id": [5] * 6, "game_id": [10, 11, 12, 13, 14, 15], "date": ["2026-10-0%d" % i for i in range(1, 7)],
+                         "team_id": [1] * 6, "team": ["NJD"] * 6, "season": [2026] * 6})
+    monkeypatch.setattr(stories, "_goalie_games_by_club", lambda season: pl.concat([rows, club]).sort("date", "game_id"))
+    assert stories.goalie_new_club(2, 2026, 9) == (1, "WPG")
+    assert stories.goalie_new_club(3, 2026, 9) == (2, "WPG")
