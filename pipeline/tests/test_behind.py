@@ -27,7 +27,7 @@ def test_parts_add_up_to_goal_difference():
 def test_reasons_follow_the_side_of_the_gap():
     r = _row()
     assert [k for _, k in behind.reasons(r, 1)] == ["fin"]  # goaltending pulled the other way
-    assert [k for _, k in behind.reasons(r, -1)] == ["gk"]
+    assert behind.reasons(r, -1) == []  # goaltending cost 8.2 but finishing gave more back: nothing left to name
 
 
 def test_big_gap_names_the_reason_and_small_gap_says_so():
@@ -52,3 +52,20 @@ def test_no_luck_or_prediction_words():
         text = " ".join(c["text"] for c in out["checks"]).lower()
         for word in ("luck", "deserve", "will ", "should "):
             assert word not in text
+
+
+def test_finishing_and_goaltending_that_cancel_name_the_close_games():
+    # the Jets on Nov 1, 2026: finishing -4.6, goaltending +4.6, 0-3 past regulation (Sora: the preview blamed finishing)
+    r = _row(gp=14, pts=11, pp=0.393, play=0.451, gap=-0.058, ev=-6.0, st=-2.0, fin=-4.6, gk=4.6, en=-5, gd=-13,
+             close=-1.62, w1=3, l1=6, xw=0, xl=3)
+    assert [k for _, k in behind.reasons(r, -1)] == ["close"]
+    assert behind.close_words(r, -1) == "they’ve lost all three games that went past regulation"
+    out = behind.team_checks(TEAM, r, EMPTY, [], None, {})
+    assert "Finishing holding them back" not in out["tags"]
+    assert "evened out" in " ".join(c["text"] for c in out["checks"])
+
+
+def test_one_goal_record_only_when_it_points_the_gaps_way():
+    assert behind.close_words(_row(w1=2, l1=4, xw=1, xl=2), -1) == "they’re 2-4 in one-goal games"
+    assert behind.close_words(_row(w1=5, l1=2, xw=1, xl=1), -1) is None
+    assert behind.close_words(_row(w1=5, l1=2, xw=3, xl=0), 1) == "they’ve won all three games that went past regulation"
