@@ -34,43 +34,15 @@ def _goalie_in_net(code: str | None, home: bool, from_shifts: int | None, last: 
     return faced or last
 
 
-def build_game(season: int, game: dict) -> dict:
-    gid = game["game_id"]
-    pbp, box = (nhl.read_raw(season, k, gid) for k in ("pbp", "box"))
-    shift_rows, shift_source = nhl.read_shifts(season, gid)
-    home_id, away_id = pbp["homeTeam"]["id"], pbp["awayTeam"]["id"]
-    roster = {r["playerId"]: r for r in pbp["rosterSpots"]}
-    team_of = {pid: r["teamId"] for pid, r in roster.items()}
-    goalies = {pid for pid, r in roster.items() if r["positionCode"] == "G"}
-    # Regular-season period 5 is the shootout; it is excluded from everything.
-    max_period = 4 if game["game_type"] == REGULAR else 99
-    shifts = clean_shifts(shift_rows, home_id, goalies, max_period=max_period)
+def pbp_events(pbp: dict, shifts: list[Shift], live: bool = False) -> tuple[list[dict], int]:
+    """Every play (shootout left out) as an event row, each team's shots turned to attack the +x end.
 
-    players = [
-        {"game_id": gid, "player_id": pid, "team_id": r["teamId"], "is_home": r["teamId"] == home_id, "pos": r["positionCode"],
-         **dict(zip(("first", "last"), names.spell(pid, r["firstName"], r["lastName"]))), "number": r.get("sweaterNumber")}
-        for pid, r in roster.items()
-    ]
-
-    # Ice time from shifts against the official boxscore.
-    shift_toi: dict[int, int] = {}
-    for s in shifts:
-        shift_toi[s.player_id] = shift_toi.get(s.player_id, 0) + s.end - s.start
-    toi_rows = []
-    for side in ("homeTeam", "awayTeam"):
-        for group in ("forwards", "defense", "goalies"):
-            for p in box["playerByGameStats"][side][group]:
-                official = clock_to_seconds(p.get("toi") or "0:00")  # no toi for a dressed player who never took a shift
-                if official == 0 and p["playerId"] not in shift_toi:
-                    continue
-                toi_rows.append({"game_id": gid, "player_id": p["playerId"], "goalie": group == "goalies", "box_toi": official, "shift_toi": shift_toi.get(p["playerId"], 0)})
-
-    stints = []
-    for st in build_stints(shifts):
-        hs, as_ = st["home_skaters"], st["away_skaters"]
-        stints.append({"game_id": gid, "period": st["start"] // 1200 + 1, **st, "duration": st["end"] - st["start"],
-                       "n_home": len(hs), "n_away": len(as_), "flag": not (3 <= len(hs) <= 6 and 3 <= len(as_) <= 6)})
-
+    `live` (the live game feed, pipeline/live): no shift chart yet, so who is on the ice comes from the play-by-play
+    situation code alone. Skater lists then hold placeholders (-1 per skater; only their count is used) and a goalie the
+    code says is in net is the one named on the shot, else -1."""
+    gid = pbp["id"]
+    home_id = pbp["homeTeam"]["id"]
+    team_of = {r["playerId"]: r["teamId"] for r in pbp["rosterSpots"]}
     events, hs_, as_ = [], 0, 0
     last_goalie = {True: None, False: None}  # each side's goalie at its last event, from the shifts
     for p in sorted(pbp["plays"], key=lambda x: x["sortOrder"]):
@@ -90,6 +62,12 @@ def build_game(season: int, game: dict) -> dict:
         ag = next((s.player_id for s in on if not s.home and s.goalie), None)
         hg, ag = (_goalie_in_net(p.get("situationCode"), home, g, last_goalie[home], d.get("goalieInNetId") if is_home is (not home) else None)
                   for home, g in ((True, hg), (False, ag)))
+        if live:
+            code = p.get("situationCode") or ""
+            if len(code) == 4 and code.isdigit():
+                away_on, home_on = [-1] * int(code[1]), [-1] * int(code[2])
+                hg = (hg or -1) if code[3] == "1" else None
+                ag = (ag or -1) if code[0] == "1" else None
         last_goalie[True], last_goalie[False] = hg or last_goalie[True], ag or last_goalie[False]
         x, y = d.get("xCoord"), d.get("yCoord")
         side = p.get("homeTeamDefendingSide")
@@ -121,6 +99,46 @@ def build_game(season: int, game: dict) -> dict:
     for e in events:
         xn = e["x_norm"]
         e["zone"] = None if xn is None else ("O" if xn > 25 else "D" if xn < -25 else "N")
+    return events, flips
+
+
+def build_game(season: int, game: dict) -> dict:
+    gid = game["game_id"]
+    pbp, box = (nhl.read_raw(season, k, gid) for k in ("pbp", "box"))
+    shift_rows, shift_source = nhl.read_shifts(season, gid)
+    home_id, away_id = pbp["homeTeam"]["id"], pbp["awayTeam"]["id"]
+    roster = {r["playerId"]: r for r in pbp["rosterSpots"]}
+    goalies = {pid for pid, r in roster.items() if r["positionCode"] == "G"}
+    # Regular-season period 5 is the shootout; it is excluded from everything.
+    max_period = 4 if game["game_type"] == REGULAR else 99
+    shifts = clean_shifts(shift_rows, home_id, goalies, max_period=max_period)
+
+    players = [
+        {"game_id": gid, "player_id": pid, "team_id": r["teamId"], "is_home": r["teamId"] == home_id, "pos": r["positionCode"],
+         **dict(zip(("first", "last"), names.spell(pid, r["firstName"], r["lastName"]))), "number": r.get("sweaterNumber")}
+        for pid, r in roster.items()
+    ]
+
+    # Ice time from shifts against the official boxscore.
+    shift_toi: dict[int, int] = {}
+    for s in shifts:
+        shift_toi[s.player_id] = shift_toi.get(s.player_id, 0) + s.end - s.start
+    toi_rows = []
+    for side in ("homeTeam", "awayTeam"):
+        for group in ("forwards", "defense", "goalies"):
+            for p in box["playerByGameStats"][side][group]:
+                official = clock_to_seconds(p.get("toi") or "0:00")  # no toi for a dressed player who never took a shift
+                if official == 0 and p["playerId"] not in shift_toi:
+                    continue
+                toi_rows.append({"game_id": gid, "player_id": p["playerId"], "goalie": group == "goalies", "box_toi": official, "shift_toi": shift_toi.get(p["playerId"], 0)})
+
+    stints = []
+    for st in build_stints(shifts):
+        hs, as_ = st["home_skaters"], st["away_skaters"]
+        stints.append({"game_id": gid, "period": st["start"] // 1200 + 1, **st, "duration": st["end"] - st["start"],
+                       "n_home": len(hs), "n_away": len(as_), "flag": not (3 <= len(hs) <= 6 and 3 <= len(as_) <= 6)})
+
+    events, flips = pbp_events(pbp, shifts)
 
     return {"players": players, "toi": toi_rows, "stints": stints, "events": events, "direction_flips": flips, "shift_source": shift_source}
 

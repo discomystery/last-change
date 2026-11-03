@@ -1,0 +1,60 @@
+# Live feed: follows tonight's NHL games in shifts and rewrites each live game's file every two minutes
+# (discomystery/last-change, pipeline/live/loop.py). GitHub stops a job after 6 hours, so each shift starts the next one
+# itself; between nights it waits for the next slate. The scheduled starts only revive the chain if it ever breaks: one
+# that lands while a shift is running waits in this queue, where a newer start replaces it.
+name: Live feed
+
+on:
+  schedule:
+    - cron: "40 15 * * *"
+    - cron: "10 22 * * *"
+    - cron: "40 2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  actions: write  # to start deploy.yml and the next shift
+  contents: write  # to push the feed branch
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  follow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: live
+
+      - uses: actions/checkout@v4
+        with:
+          repository: discomystery/last-change
+          ref: main
+          path: app
+          sparse-checkout: pipeline
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Get the live chance model and name spellings
+        run: |
+          mkdir -p app/data/models app/data/raw/names
+          curl -fsSL -o app/data/models/xg_live_v1.pkl https://raw.githubusercontent.com/discomystery/last-change/data/models/xg_live_v1.pkl \
+            || echo "::notice::The live model is not on the data branch yet (the first full update after the live code merges saves it)"
+          for f in countries wikidata; do
+            curl -fsSL -o "app/data/raw/names/$f.json" "https://raw.githubusercontent.com/discomystery/last-change/data/raw/names/$f.json" || true
+          done
+
+      - name: Follow tonight's games
+        working-directory: app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f data/models/xg_live_v1.pkl ] || [ ! -d pipeline/live ]; then
+            echo "::notice::Not ready yet: the live code or model is missing, so nothing to follow. A scheduled start will try again."
+            exit 0
+          fi
+          uv run --project pipeline python -m pipeline.live.loop --out ../feed --publish "bash ../live/publish.sh ../feed"

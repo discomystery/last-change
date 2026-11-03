@@ -3,11 +3,12 @@
 // buttons are always current. "My team's games" shows the whole season for the visitor's team instead.
 import Base from '../layouts/Base.astro';
 import { cardTable } from '../lib/teams';
+import { LIVE_FEED } from '../lib/live';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="games" title="Games" description="Every NHL game: previews before puck drop, post-game pages after.">
   <header class="page-top"><h1>Games</h1></header>
-  <div class="pick" id="games-pick" data-base={base}>
+  <div class="pick" id="games-pick" data-base={base} data-live-pages={LIVE_FEED ? '1' : undefined}>
     <span>Show</span>
     <select id="games-scope" aria-label="Which games"><option value="all">every game</option></select>
     <span class="pick-pair"><span>in</span><select id="games-month" aria-label="Which month"></select></span>
@@ -94,7 +95,7 @@ const base = import.meta.env.BASE_URL;
       const done = day.filter((g) => stOf(g) === 'post');
       const live = on.map((g) => {
         const li = el('li', 'g-live');
-        li.append(L.card(g, { colour: colourOf, nick: (a) => T[a]?.nick, player: names(), href: PREVIEWS.has(g.id) ? `${base}preview/${g.id}/` : null }));
+        li.append(L.card(g, { colour: colourOf, nick: (a) => T[a]?.nick, player: names(), ...(host.dataset.livePages ? { href: `${base}live/${g.id}/`, label: 'Live chart ›' } : { href: PREVIEWS.has(g.id) ? `${base}preview/${g.id}/` : null }) }));
         return li;
       });
       return [

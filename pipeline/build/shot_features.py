@@ -46,12 +46,11 @@ def _on_for(starts: dict, player: int, sec: int) -> int | None:
     return sec - iv[i][0]
 
 
-def build(season: int) -> dict:
-    d = TABLES / str(season)
-    events = pl.read_parquet(d / "events.parquet").sort("game_id", "sort")
-    shifts = shift_starts(pl.read_parquet(d / "stints.parquet"))
+def rows(events, shifts: dict) -> list[dict]:
+    """One feature row per shot attempt, from event rows sorted by game and play order (dicts as games.pbp_events writes
+    them) and each game's shifts (`shift_starts`; empty for the live feed, which leaves the shift features at -1)."""
     rows, prev, game, faceoff = [], None, None, None
-    for e in events.iter_rows(named=True):
+    for e in events:
         if e["game_id"] != game:
             game, prev, faceoff = e["game_id"], None, None
             code, code_since, delayed, pens = None, 0, None, []
@@ -113,6 +112,13 @@ def build(season: int) -> dict:
                 min(live, key=lambda p: p[1])[2] = s
         if e["x_norm"] is not None and e["is_home"] is not None:
             prev = {"type": typ, "is_home": e["is_home"], "x": float(e["x_norm"]), "y": float(e["y_norm"]), "sec": e["sec"], "period": e["period"]}
-    out = pl.DataFrame(rows)
+    return rows
+
+
+def build(season: int) -> dict:
+    d = TABLES / str(season)
+    events = pl.read_parquet(d / "events.parquet").sort("game_id", "sort")
+    shifts = shift_starts(pl.read_parquet(d / "stints.parquet"))
+    out = pl.DataFrame(rows(events.iter_rows(named=True), shifts))
     out.write_parquet(d / "shot_features.parquet")
     return {"season": season, "attempts": out.height, "unblocked": out.filter(pl.col("type") != "blocked-shot").height}

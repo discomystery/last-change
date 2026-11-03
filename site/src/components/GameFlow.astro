@@ -10,11 +10,12 @@
 // Design (Sora, 2026-10-14, mock-up "How It Unfolded, Revised"): the chart runs the full width and slides over to line up
 // with the shift chart when that opens (which then takes the on-ice table's place); penalties live only in the calls strip,
 // tinted with the soft version of the penalized team's color; hovering the rink moves the chart, never the page under it.
-interface Props { id: number; away: string; home: string; awayName: string; homeName: string; score: [number, number]; end: string }
-const { id, away, home, awayName, homeName, score, end } = Astro.props;
+// `live` (live/{id}/ pages): the file comes from the live feed instead (lib/live.ts) and is fetched again every minute.
+interface Props { id: number; away: string; home: string; awayName: string; homeName: string; score: [number, number]; end: string; live?: string }
+const { id, away, home, awayName, homeName, score, end, live } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
-<div class="card gflow" id="gflow" data-src={`${base}data/flow/${id}.json`} data-away={away} data-home={home} data-an={awayName} data-hn={homeName} data-score={score.join(',')} data-end={end}>
+<div class="card gflow" id="gflow" data-live={live ? '1' : undefined} data-src={live ? `${live}${id}.json` : `${base}data/flow/${id}.json`} data-away={away} data-home={home} data-an={awayName} data-hn={homeName} data-score={score.join(',')} data-end={end}>
   <div class="pick gf-pick"><span>Show the game as</span><select id="gf-view" aria-label="Chart"><option value="pile">chances piling up</option><option value="ice">who had the ice</option></select><span class="gf-blk" hidden>with</span><select id="gf-blk" class="gf-blk" aria-label="Blocked shots" hidden><option value="0">shots only</option><option value="1">blocked shots too</option></select></div>
   <div class="gf-bar">
     <button class="gf-play" type="button" id="gf-play" aria-label="Play the game"><svg viewBox="0 0 10 10" id="gf-pi" aria-hidden="true"><path d="M1.5 0.5 9.5 5 1.5 9.5Z" /></svg></button>
@@ -173,7 +174,7 @@ const base = import.meta.env.BASE_URL;
   type Block = { t: number; h: number; x: number; y: number; who: string; shooter: string };
   type Attempt = { h: number; who: string; gk: string; res: number; type: string };
   type Flow = { game_id: number; len: number; shots: any[][]; pp: number[][]; players: { id: number; n: string; h: number; grp: string; s: number[] }[]; goalies: { id: number; n: string; h: number; s: number[] }[];
-    blocks?: any[][]; pens?: any[][]; str?: number[][]; so?: any[][]; names?: Record<string, string> };
+    blocks?: any[][]; pens?: any[][]; str?: number[][]; so?: any[][]; names?: Record<string, string>; pulled?: number[][] };
 
   const host = document.getElementById('gflow') as HTMLElement | null;
   if (host) start(host);
@@ -205,8 +206,30 @@ const base = import.meta.env.BASE_URL;
     let soN = Infinity; // shootout attempts on show
     let shiftOpen = false;
 
+    // Live games (live/{id}/ pages, data-live): the file comes from the live feed (pipeline/live) and is fetched again every
+    // minute; a new version is drawn unless the reader is playing the game back or has picked a moment.
+    const LIVE = ds.live === '1';
+    let madeAt = '';
+    function liveWord(l: any) {
+      if (l.state === 'FINAL' || l.state === 'OFF') return 'Final';
+      const p = l.ptype === 'SO' ? 'Shootout' : l.ptype === 'OT' ? 'OT' : ['1st', '2nd', '3rd'][(l.period ?? 1) - 1] ?? `P${l.period}`;
+      if (l.break) return l.ptype === 'REG' && l.period < 3 ? `${p} intermission` : `End of ${p}`;
+      return l.ptype === 'SO' ? p : `${p} ${(l.left ?? '').replace(/^0(\d)/, '$1')}`;
+    }
+    function refresh() {
+      setTimeout(() => {
+        if (anim || paused || pinned != null) return refresh();
+        fetch(`${ds.src}?t=${Math.floor(Date.now() / 30000)}`).then((r) => (r.ok ? r.json() : null)).then((f) => { if (f && f.live?.made !== madeAt) apply(f); else refresh(); }).catch(() => refresh());
+      }, 60000);
+    }
     function load() {
-      fetch(ds.src!).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }).then((f: Flow) => {
+      fetch(LIVE ? `${ds.src}?t=${Math.floor(Date.now() / 30000)}` : ds.src!).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }).then(apply).catch(() => {
+        if (LIVE) { stage.innerHTML = '<p class="gf-wait">The live chart starts once the puck drops, and updates every couple of minutes.</p>'; btn.hidden = true; refresh(); return; }
+        stage.innerHTML = '<p class="gf-wait">The game’s shots could not be loaded.</p>'; btn.hidden = true;
+      });
+    }
+    function apply(f: Flow & { live?: any }) {
+      {
         const names: Record<string, string> = { ...(f.names ?? {}) };
         for (const p of [...f.players, ...f.goalies]) names[p.id] = p.n;
         const nm = (id: any) => (id == null ? '' : names[String(id)] ?? '');
@@ -235,10 +258,18 @@ const base = import.meta.env.BASE_URL;
         g.pulled = [];
         for (const gk of g.gk) for (let i = 1; i < gk.s.length; i++) { const a = gk.s[i - 1][1], b = gk.s[i][0]; if (b - a >= 10 && Math.floor(a / 1200) === Math.floor((b - 1) / 1200)) g.pulled.push({ h: gk.h, a, b }); }
         if (g.blocks.length) host.querySelectorAll('.gf-blk').forEach((e) => (e as HTMLElement).hidden = false);
+        if (LIVE && f.live) {
+          // the score and clock come with the file; empty nets from the skater counts, since there are no goalie shifts yet
+          g.live = f.live; g.score = f.live.score; g.now = f.live.sec; g.final = f.live.state === 'FINAL' || f.live.state === 'OFF';
+          if (!g.gk.length) g.pulled = (f.pulled ?? []).map(([h, a, b]: number[]) => ({ h, a, b }));
+          madeAt = f.live.made;
+          btn.hidden = false;
+        }
         T = END; soN = g.so.length;
         draw();
-        watchForPlay();
-      }).catch(() => { stage.innerHTML = '<p class="gf-wait">The game’s shots could not be loaded.</p>'; btn.hidden = true; });
+        if (g.live) document.dispatchEvent(new CustomEvent('lc-live', { detail: { ...g.live, word: liveWord(g.live) } }));
+        if (LIVE) { if (!g.final) refresh(); } else watchForPlay();
+      }
     }
 
     function tipFor(box: HTMLElement) { let t = box.querySelector(':scope > .gf-tip') as HTMLElement; if (!t) { t = document.createElement('div'); t.className = 'gf-tip'; box.append(t); } return { show(x: number, y: number, html: string) { t.innerHTML = html; const w = t.offsetWidth, bw = box.clientWidth; t.style.left = Math.max(w / 2, Math.min(bw - w / 2, x)) + 'px'; t.style.top = y + 'px'; t.classList.add('on'); }, hide() { t.classList.remove('on'); } }; }
@@ -301,7 +332,7 @@ const base = import.meta.env.BASE_URL;
         const ymax = Math.max(2, Math.ceil(Math.max(cum(0, END), cum(1, END)) + 0.3)); const Y = (v: number) => B - (B - T0) * v / ymax;
         for (let v = 0; v <= ymax; v++) { mk('line', { x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: 'var(--rule)' }, svg); txt(svg, L - 6, Y(v) + 4, v, 'gf-ax', 'end'); }
         txt(svg, L, T0 - 8 - nAll * 16 + 2, 'EXPECTED GOALS', 'gf-axh');
-        curves = lines.map((pts, h) => { let d = `M${X(0)},${Y(0)}`; for (const [t, v] of pts.slice(1)) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`; d += `H${X(END)}`; return mk('path', { d, fill: 'none', stroke: C[h], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg); });
+        curves = lines.map((pts, h) => { let d = `M${X(0)},${Y(0)}`; for (const [t, v] of pts.slice(1)) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`; d += `H${X(g.live && !g.final ? Math.min(g.now, END) : END)}`; return mk('path', { d, fill: 'none', stroke: C[h], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg); });
         names = goalRows(svg, goals, X, T0 - 10 - (nAll - 1) * 16, W).els;
         yAt = (s) => Y(cum(s.h, s.t));
       } else {
@@ -342,6 +373,7 @@ const base = import.meta.env.BASE_URL;
       // every shift, folded away right under the chart so the two time lines meet
       const L2 = d0.Lshift, X2 = (t: number) => L2 + (d0.R - L2) * t / END;
       const SH = shifts(d0.W, L2, d0.R, X2, END, () => dots);
+      if (!g.players.length) SH.fold.hidden = true;  // a live game has no shift chart yet
 
       // the rink, marked like a real one and clipped to the boards so nothing runs past them
       const rw = document.createElement('div'); rw.className = 'gf-rink'; stage.append(rw);
@@ -439,7 +471,7 @@ const base = import.meta.env.BASE_URL;
         const n = [0, 0]; for (const s of goals) if (s.t <= t) n[s.h]++;
         const final = t >= END && soN >= g.so.length;
         if (final) { n[0] = g.score[0]; n[1] = g.score[1]; }
-        $('gf-clk').textContent = final ? (g.end ? `Final (${g.end})` : 'Final') : t >= END ? 'Shootout' : clock(t);
+        $('gf-clk').textContent = final ? (g.live ? liveWord(g.live) : g.end ? `Final (${g.end})` : 'Final') : t >= END ? 'Shootout' : clock(t);
         const box = $('gf-sc');
         if (!box.dataset.ready) { box.dataset.ready = '1'; box.innerHTML = `<span class="gf-pp" id="gf-pp0" style="--c:${C[0]}">PP</span><span style="color:${C[0]}">${g.away}</span><span class="gf-n" id="gf-n0">0</span><span>–</span><span class="gf-n" id="gf-n1">0</span><span style="color:${C[1]}">${g.home}</span><span class="gf-pp" id="gf-pp1" style="--c:${C[1]}">PP</span>`; ppShown = -2; }
         [0, 1].forEach((h) => { const el = $('gf-n' + h); if (el.textContent !== String(n[h])) el.textContent = String(n[h]); });
@@ -523,7 +555,7 @@ const base = import.meta.env.BASE_URL;
       const ORDER = ['L1', 'L2', 'L3', 'L4', 'XF', 'P1', 'P2', 'P3', 'XD'];
       const onAt = <P extends { s: [number, number][] }>(list: P[], t: number) => list.filter((p) => p.s.some(([a, b]) => t >= a && t < b));
       const iceAt = (t: number | null) => {
-        if (t == null || t >= END || shiftOpen) { ice.classList.remove('on'); return; }
+        if (t == null || t >= END || shiftOpen || !g.players.length) { ice.classList.remove('on'); return; }
         const cols = [0, 1].map((h) => {
           const gk = onAt(g.gk.filter((p: any) => p.h === h), t)[0] as any;
           // on a change the shift records can overlap by a second; keep the most recent arrivals

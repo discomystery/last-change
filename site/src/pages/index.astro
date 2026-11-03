@@ -5,10 +5,11 @@
 // home.json (export/home.py), the schedule and the standings, so the visitor's team and division can lift games.
 import Base from '../layouts/Base.astro';
 import { cardTable } from '../lib/teams';
+import { LIVE_FEED } from '../lib/live';
 const base = import.meta.env.BASE_URL;
 ---
 <Base section="home" title="Spare Line Change">
-  <div id="home" data-base={base}>
+  <div id="home" data-base={base} data-live-pages={LIVE_FEED ? '1' : undefined}>
     <section id="pick" hidden>
       <h1 class="page-top">Pick your team</h1>
       <p class="lede">Choose a team and this page becomes theirs. Your choice is remembered on this device, and you can change it from the team pill in the top menu (on a phone, the settings row at the bottom).</p>
@@ -386,7 +387,7 @@ const base = import.meta.env.BASE_URL;
         const on = next && L.get(next.id);
         const liveBox = document.getElementById('mine-live');
         if (on && (on.st === 'in' || on.st === 'post')) {
-          liveBox.replaceChildren(el('span', 'eyebrow', on.st === 'in' ? 'On now' : 'Just finished'), L.card(next, { wide: true, colour: colourOf, nick: (a) => byAbbr[a]?.nick, player: names(), href: PREVIEWS.has(next.id) ? `${base}preview/${next.id}/` : null }));
+          liveBox.replaceChildren(el('span', 'eyebrow', on.st === 'in' ? 'On now' : 'Just finished'), L.card(next, { wide: true, colour: colourOf, nick: (a) => byAbbr[a]?.nick, player: names(), ...(root.dataset.livePages && on.st === 'in' ? { href: `${base}live/${next.id}/`, label: 'Live chart ›' } : { href: PREVIEWS.has(next.id) ? `${base}preview/${next.id}/` : null }) }));
           liveBox.hidden = false;
           // The Next game ticket moves on to the game after this one.
           next = mine.find((g) => !g.final && g.t > next.t);
