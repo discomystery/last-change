@@ -46,6 +46,7 @@ jobs:
     env:
       GIT_AUTHOR_NAME: github-actions[bot]
       GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      PUBLIC_LIVE_FEED: https://discomystery.github.io/last-change-live/  # live game pages (pipeline/live/site)
     steps:
       - uses: actions/checkout@v4
         with:
