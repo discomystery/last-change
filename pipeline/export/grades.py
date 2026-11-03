@@ -268,7 +268,7 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
                                tip=f"{places[claim['team']]} tonight (the filled dot) against the league average (the tick). The call needed the dot "
                                    f"{'above' if chk.get('direction') == 'above' else 'below'} the average. The ring is where they usually sit.")
             if scaled:
-                out["happened"] = f"{previews.SCORES[m].capitalize()} {f(sc(v))}, against a league average of 100. They came in at {f(sc(usual))}."
+                out["happened"] = f"{previews.SCORES[m].capitalize()} {f(sc(v))} tonight, against a league average of 100. They usually sit at {f(sc(usual))}."
                 out |= {"usual": f"score {f(sc(usual))}", "tonight": f"score {f(sc(v))}", "league": "score 100"}
         else:
             name = previews.CHANGED.get(m, (m,))[0]
@@ -348,7 +348,7 @@ def _present(S, gid: int, claim: dict, res: dict, places: dict, fp: dict) -> dic
             if verdict == "held":
                 rel = f"against {B}’s usual {ub}"
             elif tv == ub:  # compared as shown, never "100, below the league average of 100"
-                rel = f"a hair {'under' if up else 'over'} {B}’s usual {ub}"
+                rel = f"a hair {'under' if up else 'over'} {B}’s usual"  # "105, a hair under Calgary's usual 105" read as a slip (outside notes, Oct 26)
             else:
                 rel = f"{'short of' if up else 'above'} {B}’s usual {ub}"
             out["happened"] = (f"Pace score {tv}, {rel}"

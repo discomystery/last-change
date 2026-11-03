@@ -196,6 +196,13 @@ def recap_notes(gid: int, season: int, teams: dict[int, str], W, name, fights_to
     if ej_names:
         r, who = ej_names[0]
         what = "a match penalty" if r["pen_type"] == "MAT" else "a game misconduct"
+        # the major that came with it is a penalty fact, not a reason he left ("a five-minute major for kneeing and a game
+        # misconduct"; outside notes, Oct 31: Heineman's ejection read as if it came from nothing)
+        maj = p.filter((pl.col("p1") == r["p1"]) & (pl.col("sec") == r["sec"]) & (pl.col("pen_type") == "MAJ")
+                       & (pl.col("pen_desc") != "fighting"))
+        if maj.height and r["pen_type"] != "MAT":
+            d = maj["pen_desc"][0]
+            what = f"a five-minute major for {d if d in ('cross-checking', 'high-sticking') else d.replace('-', ' ')} and a game misconduct"
         if len(ej_names) == 1:
             notes.append((90, f"{who} was thrown out with {what} {_when(r['period'], r['sec'])}."))
         else:

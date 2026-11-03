@@ -46,6 +46,7 @@ WEIGHT = {"first_goal": 90, "first_win": 88, "first_shutout": 86, "milestone": 8
           "return": 70, "first_point": 65, "club_debut": 62, "club_goal": 60}
 WIN_SINCE_DAYS = 300  # a goalie's win after this long without one is told with the date of the last
 RETURN_GAMES = 5  # team games a regular missed before a mid-season return is told (10 until 2026-10-15; a regular rarely sits)
+LATE_JOIN_GAMES = 3  # team games already played when a newcomer's first game for the club is told as his club debut
 SEASON_DEBUT_GAMES = 2  # ... and before a regular's first game of the season is told
 DEPTH_DEBUT_GAMES = 3  # a depth player's season debut: only when he scored, after this many team games
 LONG_AWAY_DAYS = 300  # past this, "his first NHL game since <date>" instead of a count
@@ -292,7 +293,11 @@ def for_game(gid: int, season: int, G: pl.DataFrame, P: pl.DataFrame) -> list[di
             elsewhere = his.filter(pl.col("team") != t)
             if name and name not in base["clubs"] and here.is_empty():
                 moved = mine.filter(pl.col("team") != t).height > 0  # played for someone else earlier this season
-                if moved or pts_now:
+                # or joined after the season was under way: Perron's first game for Dallas, 13 games in, read "played
+                # his first game of the season" (outside notes, Oct 31)
+                late = mine.is_empty() and G.filter((pl.col("season") == season) & (pl.col("date") < day)
+                                                    & ((pl.col("home") == t) | (pl.col("away") == t))).height >= LATE_JOIN_GAMES
+                if moved or pts_now or late:
                     old = elsewhere["team"][-1] if elsewhere.height else None
                     old_name = club.get(old) if old else base.get("last_club")
                     n = base["seasons"].get(old_name, 0) + (1 if old and elsewhere.filter((pl.col("team") == old) & (pl.col("season") == season)).height else 0)

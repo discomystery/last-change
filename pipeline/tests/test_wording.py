@@ -46,9 +46,9 @@ def test_nickname_once_is_sparing():
     # never in a sentence that also has the full name or the place
     assert wording.nickname_once(["The Hurricanes won.", "The Hurricanes beat Carolina’s rivals."], "k",
                                  places={"Hurricanes": "Carolina"}) == ["The Hurricanes won.", "The Hurricanes beat Carolina’s rivals."]
-    # possessives follow the nickname: "the Avalanche’s" becomes "the Avs’", "the Oilers’" becomes "the Oil’s"
+    # possessives follow the nickname: "the Avalanche’s" becomes "the Avs’"; the Oilers keep their name (no "the Oil")
     assert wording.nickname_para("The Avalanche won. The Avalanche’s kill held.", "k") == "The Avalanche won. The Avs’ kill held."
-    assert wording.nickname_para("The Oilers won. The Oilers’ kill held.", "k") == "The Oilers won. The Oil’s kill held."
+    assert wording.nickname_para("The Oilers won. The Oilers’ kill held.", "k") == "The Oilers won. The Oilers’ kill held."
     # a club with no common nickname keeps its name
     assert wording.nickname_para("The Kings won. The Kings scored.", "k") == "The Kings won. The Kings scored."
     assert wording.nickname_para("The Rangers won. The Rangers scored.", "k") == "The Rangers won. The Rangers scored."

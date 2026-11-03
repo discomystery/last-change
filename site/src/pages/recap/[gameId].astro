@@ -155,6 +155,8 @@ const tallyWords = (h: number, p: number, m: number) => {
 const sayCount = (n: number, one: string) => `${n} ${one}`;
 const takeaway = r.pending && r.calls.length
   ? 'The calls are checked once the NHL finishes filling in who was on the ice.'
+  : graded.length === 1  // not "Of the 1 calls the preview made, we called 1." (outside notes, Oct 27)
+  ? `The preview made one call, and ${count('held') ? 'we called it' : count('partly') ? 'it came close' : 'it missed'}.`
   : graded.length
   ? `Of the ${graded.length} calls the preview made, we called ${tallyWords(count('held'), count('partly'), count('missed'))}.`
   : r.preview ? 'None of the preview’s calls could be judged from this game.' : 'No preview was saved for this game.';

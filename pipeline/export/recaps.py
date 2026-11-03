@@ -275,7 +275,9 @@ def measure(S: Season, gid: int, claim: dict, places: dict, fp: dict) -> dict:
         if claim["kind"] == "duel":  # graded against the league average alone: which side of it the attack landed on
             usual = chk.get("usual", base)
             what = {"volume": "5-on-5 shot attempts", "quality": "chance quality", "pp": "the power play", "turnover": "chances off turnovers"}[m]
-            txt = f"On {what}, {team} had {fmt(v)}. The league average is {fmt(base)}, and they came in at {fmt(usual)}."
+            # tonight first, then the bar, then their usual, each named: "they came in at 6.7%" read as tonight's figure
+            # (OTT at VGK, outside notes Oct 27)
+            txt = f"On {what}, {team} had {fmt(v)} tonight, against a league average of {fmt(base)}. They usually sit at {fmt(usual)}."
             return {"verdict": grade(v, base, None, chk["direction"]), "happened": txt, "usual": fmt(usual), "tonight": fmt(v), "league": fmt(base), "_v": v}
         out = {"verdict": grade(v, base, league, chk["direction"]), "happened": txt, "usual": fmt(base), "tonight": fmt(v), "_v": v}
         if league is not None:
