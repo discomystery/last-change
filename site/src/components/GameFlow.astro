@@ -265,6 +265,12 @@ const base = import.meta.env.BASE_URL;
           madeAt = f.live.made;
           btn.hidden = false;
         }
+        // how far the game has got: the clock, or the latest shot if the file's clock lags its plays; the final = END
+        g.NOW = END;
+        if (g.live && !g.final) {
+          const lastShot = (g.shots as Shot[]).reduce((m, s) => Math.max(m, s.t), 0);
+          g.NOW = Math.min(END, Math.max(g.now ?? 0, lastShot));
+        }
         T = END; soN = g.so.length;
         draw();
         if (g.live) document.dispatchEvent(new CustomEvent('lc-live', { detail: { ...g.live, word: liveWord(g.live) } }));
@@ -332,7 +338,7 @@ const base = import.meta.env.BASE_URL;
         const ymax = Math.max(2, Math.ceil(Math.max(cum(0, END), cum(1, END)) + 0.3)); const Y = (v: number) => B - (B - T0) * v / ymax;
         for (let v = 0; v <= ymax; v++) { mk('line', { x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: 'var(--rule)' }, svg); txt(svg, L - 6, Y(v) + 4, v, 'gf-ax', 'end'); }
         txt(svg, L, T0 - 8 - nAll * 16 + 2, 'EXPECTED GOALS', 'gf-axh');
-        curves = lines.map((pts, h) => { let d = `M${X(0)},${Y(0)}`; for (const [t, v] of pts.slice(1)) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`; d += `H${X(g.live && !g.final ? Math.min(g.now, END) : END)}`; return mk('path', { d, fill: 'none', stroke: C[h], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg); });
+        curves = lines.map((pts, h) => { let d = `M${X(0)},${Y(0)}`; for (const [t, v] of pts.slice(1)) d += `H${X(t).toFixed(1)}V${Y(v).toFixed(1)}`; d += `H${X(g.NOW)}`; return mk('path', { d, fill: 'none', stroke: C[h], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg); });
         names = goalRows(svg, goals, X, T0 - 10 - (nAll - 1) * 16, W).els;
         yAt = (s) => Y(cum(s.h, s.t));
       } else {
@@ -340,11 +346,11 @@ const base = import.meta.env.BASE_URL;
         T0 = 34 + nUp * 16; B = T0 + 210; const M = (T0 + B) / 2; VH = B + 46 + nDn * 16 + 8;
         svg.setAttribute('aria-label', 'Each team’s pressure through the game. Arrow keys step from shot to shot.');
         frame(T0, B);
-        const STEP = 15, HALF = 150, grid: number[] = []; for (let t = 0; t <= END; t += STEP) grid.push(t);
+        const STEP = 15, HALF = 150, grid: number[] = []; for (let t = 0; t <= g.NOW; t += STEP) grid.push(t); if (grid[grid.length - 1] < g.NOW) grid.push(g.NOW);
         const dens = [0, 1].map((h) => grid.map((t) => g.shots.reduce((sum: number, s: Shot) => { if (s.h !== h || s.en) return sum; const d = Math.abs(s.t - t); return d < HALF ? sum + s.xg * (1 - d / HALF) : sum; }, 0)));
         const ymax = Math.max(0.45, ...dens.flat()) * 1.05, H = (v: number) => (M - T0 - 6) * v / ymax;
         mk('line', { x1: L, x2: R, y1: M, y2: M, stroke: 'var(--ink-3)' }, svg);
-        curves = [0, 1].map((h) => { const sg = h ? 1 : -1; let d = `M${X(0)},${M}`; grid.forEach((t, i) => d += `L${X(t).toFixed(1)},${(M + sg * H(dens[h][i])).toFixed(1)}`); d += `L${X(END)},${M}Z`; return mk('path', { d, fill: C[h], 'fill-opacity': 0.75, stroke: C[h], 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, svg); });
+        curves = [0, 1].map((h) => { const sg = h ? 1 : -1; let d = `M${X(0)},${M}`; grid.forEach((t, i) => d += `L${X(t).toFixed(1)},${(M + sg * H(dens[h][i])).toFixed(1)}`); d += `L${X(g.NOW)},${M}Z`; return mk('path', { d, fill: C[h], 'fill-opacity': 0.75, stroke: C[h], 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, svg); });
         txt(svg, L, T0 - 8 - nUp * 16 + 2, `${g.an.toUpperCase()} PRESSING ↑`, 'gf-axh'); txt(svg, L, VH - 2, `↓ ${g.hn.toUpperCase()} PRESSING`, 'gf-axh');
         names = [...goalRows(svg, up, X, T0 - 10 - (nUp - 1) * 16, W).els, ...goalRows(svg, dn, X, B + 42, W).els];
         yAt = (s) => (s.h ? B - 10 : T0 + 10);
@@ -355,10 +361,14 @@ const base = import.meta.env.BASE_URL;
       for (const [a, b, l] of per) txt(svg, (X(a) + X(b)) / 2, B + 16, l, 'gf-axh', 'middle');
       if (g.so.length) txt(svg, (R + 8 + W - 2) / 2, B + 16, 'SO', 'gf-axh', 'middle');
       svg.setAttribute('viewBox', `0 0 ${W} ${VH}`);
+      // the curves are uncovered up to the moment on show by a clip in the chart's own units (a CSS inset() would be
+      // measured on each curve's own box, which on a live game stops at the clock, not at the end of the game)
+      const clip = mk('rect', { x: 0, y: 0, width: W, height: VH }, mk('clipPath', { id: `gf-cc-${g.away}${g.home}` }, mk('defs', {}, svg)));
+      for (const c of curves) c.setAttribute('clip-path', `url(#gf-cc-${g.away}${g.home})`);
       const goalMarks: [Shot, any][] = goals.map((s) => [s, mk('circle', { cx: X(s.t), cy: yAt(s), r: 6, fill: 'var(--sheet)', stroke: C[s.h], 'stroke-width': 3, class: 'gf-gp', 'data-shot': g.shots.indexOf(s), style: 'cursor:pointer' }, svg)]);
       const fx = mk('g', {}, svg);
       const cur = mk('line', { y1: T0, y2: B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: 0, 'pointer-events': 'none' }, svg);
-      return { W, L, R, X, T: T0, B, VH, curves, names, goalMarks, fx, cur, cum, yAt };
+      return { W, L, R, X, T: T0, B, VH, curves, clip, names, goalMarks, fx, cur, cum, yAt };
     }
 
     function draw() {
@@ -498,9 +508,8 @@ const base = import.meta.env.BASE_URL;
       };
 
       // ---- show the game up to time t (no effects) ----
-      const clipFor = (t: number) => (t >= END ? '' : `inset(0 ${(100 - (CH.X(t) - CH.L) / (CH.R - CH.L) * 100).toFixed(2)}% 0 0)`);
       const chartAt = (t: number) => {
-        CH.curves.forEach((p: any) => p.style.clipPath = clipFor(t));
+        CH.clip.setAttribute('width', t >= END ? CH.W : Math.max(0, CH.X(t)));
         for (const [s, e] of CH.goalMarks) e.style.opacity = s.t <= t ? 1 : 0;
         for (const [s, e] of CH.names) e.style.opacity = s.t <= t ? 1 : 0;
         svg.querySelectorAll('.gf-gstem').forEach((e: any) => e.style.opacity = +e.dataset.t <= t ? 1 : 0);
@@ -546,7 +555,7 @@ const base = import.meta.env.BASE_URL;
       const realAt = new Float64Array(END + 2); let acc = 0; const gsec = new Set(goals.map((s: Shot) => Math.floor(s.t)));
       for (let t = 0; t <= END; t++) { realAt[t] = acc; acc += per[t] * msPer + (gsec.has(t) ? PAUSE : 0); }
       realAt[END + 1] = acc;
-      const total = acc + (g.so.length ? g.so.length * SO_STEP + 300 : 0);
+      const total = g.NOW < END ? realAt[Math.floor(g.NOW)] : acc + (g.so.length ? g.so.length * SO_STEP + 300 : 0);  // a live game plays back to now
       const gameAt = (ms: number) => { let lo = 0, hi = END + 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (realAt[mid] <= ms) lo = mid; else hi = mid - 1; } if (lo > END) return END; const span = per[lo] * msPer, into = ms - realAt[lo]; return Math.min(END, lo + Math.min(1, into / span)); };
       const soAt = (ms: number) => (ms < realAt[END + 1] ? 0 : Math.min(g.so.length, Math.floor((ms - realAt[END + 1]) / SO_STEP) + 1));
 
@@ -575,7 +584,7 @@ const base = import.meta.env.BASE_URL;
       const tip = tipFor(stage), rinkTip = tipFor(rw);
       const restAt = () => pinned ?? (paused ? paused.t : null);
       const shotOf = (el: Element | null) => { const e = el?.closest('[data-shot]') as HTMLElement | SVGElement | null; return e ? g.shots[+(e as any).dataset.shot] as Shot : null; };
-      const tAt = (e: PointerEvent) => { const b = svg.getBoundingClientRect(); const x = (e.clientX - b.left) / b.width * CH.W; return Math.max(0, Math.min(END, (x - CH.L) / (CH.R - CH.L) * END)); };
+      const tAt = (e: PointerEvent) => { const b = svg.getBoundingClientRect(); const x = (e.clientX - b.left) / b.width * CH.W; return Math.max(0, Math.min(g.NOW, (x - CH.L) / (CH.R - CH.L) * END)); };
 
       // the chart: a tap, click or drag pins that moment until another one or a replay; plain mouse hover only previews it.
       // Pointing at a goal names it and rings its shot on the rink.
