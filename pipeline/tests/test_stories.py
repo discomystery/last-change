@@ -401,3 +401,24 @@ def test_a_goalie_new_to_his_club_says_where_he_came_from(monkeypatch):
     monkeypatch.setattr(stories, "_goalie_games_by_club", lambda season: pl.concat([rows, club]).sort("date", "game_id"))
     assert stories.goalie_new_club(2, 2026, 9) == (1, "WPG")
     assert stories.goalie_new_club(3, 2026, 9) == (2, "WPG")
+
+
+def test_a_third_period_winner_in_a_one_goal_game_names_its_scorer():
+    # NYI at CAR, Nov 5: Carrier broke a 1-1 tie in the third, over "The Hurricanes edge the Islanders"
+    class W_:
+        def the(self, t):
+            return "the Hurricanes"
+    side = lambda g: "CAR" if g["home"] else "NYI"
+    args = (side, "CAR", "REG", W_(), "The Hurricanes", "the Islanders", lambda p: {7: "Carrier", 8: "Aho"}[p],
+            {7: "William Carrier", 8: "Sebastian Aho"}, lambda pool, *k: pool[0])
+    def g(sec, p1, hs, as_, strength="ev"):
+        return {"period": 3, "sec": sec, "home": True, "p1": p1, "hs": hs, "as": as_, "strength": strength}
+    tie = [{"period": 1, "sec": 300, "home": False, "p1": 9, "hs": 0, "as": 1, "strength": "ev"},
+           {"period": 2, "sec": 300, "home": True, "p1": 8, "hs": 1, "as": 1, "strength": "ev"}]
+    late = stories._clutch_heads(tie + [g(950, 7, 2, 1)], *args)
+    assert (36, "Carrier’s late goal lifts the Hurricanes past the Islanders") in late
+    early = stories._clutch_heads(tie + [g(400, 7, 2, 1)], *args)
+    assert (28, "Carrier’s third-period goal lifts the Hurricanes past the Islanders") in early  # under a two-goal night (30)
+    # an empty-netter after it still leaves a one-goal game; a real two-goal win does not get the line
+    assert any("lifts" in h for _, h in stories._clutch_heads(tie + [g(950, 7, 2, 1), g(1170, 8, 3, 1, "en")], *args))
+    assert not any("lifts" in h for _, h in stories._clutch_heads(tie + [g(400, 7, 2, 1), g(900, 8, 3, 1)], *args))

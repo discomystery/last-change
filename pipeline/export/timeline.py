@@ -286,6 +286,9 @@ def paragraph(gm: Game) -> list[str]:
                     # a late tying or go-ahead goal, or one with the goalie pulled, is the moment: "Zegras and Drysdale
                     # scored less than five minutes apart ... to tie it" hid an 11-seconds-left equalizer (CBJ at PHI, Oct 27)
                     or (b["period"] == 3 and (b["sec"] >= LATE_ALONE or b.get("own_extra")))
+                    # so is the third-period winner: "Dorofeyev and Kartye scored a minute and a half apart" never said
+                    # whose goal won it (outside notes, Nov 5)
+                    or (j == ahead_i and b["period"] == 3 and gm.end == "REG" and margin <= 2)
                     # a shorthanded goal keeps its own sentence (Cowan's read as even strength inside a run, Oct 20)
                     or ("sh" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
                     or j in gm.relief or run[-1] in gm.relief or got_back in (run[-1], j)
@@ -345,7 +348,8 @@ def _flurries(gm: Game) -> tuple[dict, dict]:
             leads = [start[0] - start[1]] + [gm.score(goals[i], t)[0] - gm.score(goals[i], t)[1] for i in idx]
             theirs = [i for i in idx if i not in mine]
             if (len(mine) >= SUMMARY_GOALS and len(goals) >= SUMMARY_GAME and min(leads) >= SUMMARY_LEAD
-                    and all(i > mine[-1] for i in theirs) and not any(goals[i]["strength"] in ("en", "ps") for i in mine)):
+                    and all(i > mine[-1] for i in theirs) and not any(goals[i]["strength"] in ("en", "ps") for i in mine)
+                    and not any(((gm.attach.get(i) or {}).get("tail") or "").startswith("with ") for i in mine)):
                 summ[p] = (t, mine)
         if p not in summ and len(idx) >= BUSY:
             busy[p] = len(idx)
@@ -381,6 +385,9 @@ def _summary(gm: Game, mine: list[int], scored_before: dict) -> str:
             verb = " scored"
         if att.get("tail") and att["tail"].startswith("his "):
             how += f" for {att['tail']}"
+        elif att.get("tail") and att["tail"].startswith("in his "):
+            # "Nikishin scored, in his first game of the season," (it was dropped, and his return went untold: Nov 7)
+            how += f", {att['tail']},"
         clauses.append((verb, how, pid))
     parts = []
     j = 0
@@ -628,7 +635,11 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         if i == ahead_i and margin <= 2 and gm.end == "REG":
             fin, inf = f"put {T} ahead for good{how}", f"to put {T} ahead for good"
         elif t == gm.winner and down_most >= 2 and i == ahead_i:
-            fin, inf = f"put {T} ahead{how} to complete the comeback", f"to put {T} ahead and complete the comeback"
+            # the tie finished the comeback; this one is the lead ("complete the comeback" for Gauthier's go-ahead after
+            # Caulfield had tied it: outside notes, Nov 1)
+            led = any(gm.score(goals[j], t)[0] > gm.score(goals[j], t)[1] for j in range(i))
+            fin, inf = ((f"put {T} back ahead{how}", f"to put {T} back ahead") if led else
+                        (f"put {T} ahead for the first time{how}", f"to put {T} ahead for the first time"))
         elif i >= 2 and gm.side(goals[i - 1]) != t and gm.score(goals[i - 2], t)[0] > gm.score(goals[i - 2], t)[1]:
             # they led, the other side tied it, and this one took the lead back: "put the Stars back ahead 2-1" (voice loop)
             pool = [f"put {T} back ahead {m}-{th_}{how}", f"restored {W.poss(t)} lead{how}"]
@@ -912,6 +923,8 @@ def _change(gm: Game, c: tuple) -> str:
     if came.get("back"):
         return f"{who(rl)} filled in for {who(f)} for {rl['toi']}{per} before {W.place(t)} went back to {who(f)}."
     rest = per.replace(" in ", " for the rest of ", 1) if per.startswith(" in ") else per  # both played in that period
+    if pulled == "break":
+        return f"{who(rl)} took over from {who(f)} in net for {W.place(t)}{rest}, after {goals_n(f['ga'])} against."
     if pulled:
         return f"{_cap(W.place(t))} pulled {who(f)} after {goals_n(f['ga'])} and turned to {who(rl)}{rest}."
     if came.get("how") == "mid":
@@ -1029,6 +1042,13 @@ def attachments(gm: Game, found: list[dict], season_goals: dict[int, int]) -> tu
             told.add(pid)
             for n_, j in enumerate([j for j, g in enumerate(goals) if g["p1"] == pid][1:3], start=2):
                 att.setdefault(j, {})["pre"] = f"scored his {nth_word(n_)} NHL goal"  # "Knuble scored his second NHL goal"
+        elif k == "first_point" and pid not in told:
+            # an assist on a goal rides on that goal ("Viggo Björck picked up his first NHL point." opened the story,
+            # before any goal: outside notes, Nov 1 and 5)
+            j = next((j for j, g in enumerate(goals) if pid in (g.get("p2"), g.get("p3"))), None)
+            if j is not None and not (att.get(j) or {}).get("tail") and gm.N.get(pid):
+                att.setdefault(j, {})["tail"] = f"with \x00{pid}\x00 picking up his first NHL point on the goal"
+                told.add(pid)
         elif k == "club_goal" and i is not None:
             att.setdefault(i, {})["pre"] = f"scored his first goal for {gm.W.place(x['team'])}"
             told.add(pid)

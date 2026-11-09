@@ -2929,6 +2929,9 @@ def _later_first(x: dict, night: pl.DataFrame, fighters: set) -> bool:
     return False
 
 
+BACK_TOI = 16 * 60  # a regular's night: a return after 5+ games leads What it means with this much ice time or a point
+
+
 def _first_items(later: list[dict], night: pl.DataFrame, N: dict, W: "Words", loser: str) -> list[dict]:
     """What it means items for the firsts kept out of the opening paragraph."""
     items = []
@@ -2956,7 +2959,11 @@ def _first_items(later: list[dict], night: pl.DataFrame, N: dict, W: "Words", lo
         elif k == "return":
             text = (f"{_cap(who)} played his first game of the season, after missing the first {num(x['missed'])}." if x.get("season_debut") else
                     f"{_cap(who)} was back in the lineup after missing {num(x['missed'])} games.")
-            items.append({"tag": "Back", "text": text, "score": 44})
+            # a regular back after five or more games is a lead item on outside recaps (Tavares after nine, Nov 7)
+            # (a depth player back from five games stays below the night's other items: Unger Sörum, Nov 9 run)
+            r_ = night.filter(pl.col("player_id") == pid)
+            big = r_.height and (int(r_["pts"].sum()) or int(r_["sec"].sum()) >= BACK_TOI)
+            items.append({"tag": "Back", "text": text, "score": 58 if big and (x.get("missed") or 0) >= 5 else 44})
         elif k == "club_debut":
             club = W.nick.get(x["team"], x["team"])
             n = x.get("seasons") or 0
@@ -3174,7 +3181,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     # the Blackhawks" for a 5-2 win, "The Blackhawks handle the Blues" when St. Louis had more of the play)
     en_last = bool(goals) and goals[-1]["strength"] == "en" and side(goals[-1]) == winner
     real = ws - ls - (1 if en_last else 0)  # the margin before an empty-net goal
-    if real <= 1:
+    if real <= 1 and ws - ls == 2:
+        # one goal until the empty-netter: "hold off", not "squeak past" a 4-2 or 3-1 final (outside notes, Nov 3 and 7)
+        base = [f"{W_} beat {L_}", f"{W_} get past {L_}", f"{W_} hold off {L_}"]
+    elif real <= 1:
         base = [f"{W_} beat {L_}", f"{W_} get past {L_}", f"{W_} edge {L_}", f"{W_} squeak past {L_}"]
     elif real == 2:
         base = [f"{W_} beat {L_}", f"{W_} take down {L_}"]
@@ -3184,7 +3194,7 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     star = _star_line(night, winner, last, N)
     if star:  # "The Flames beat the Red Wings" was the stiffest headline of the night when Farabee had three points (Oct 24)
         # the verb keeps what the plain headline said about the margin ("edge" for one goal, "handle" for a romp)
-        verbs = ["beat", "edge", "get past"] if real <= 1 else ["beat", "take down"] if real == 2 else \
+        verbs = ["beat", "get past", "hold off"] if real <= 1 and ws - ls == 2 else ["beat", "edge", "get past"] if real <= 1 else ["beat", "take down"] if real == 2 else \
             ["beat", "take down"] + (["handle"] if share is None or share >= 0.5 else [])
         heads.append((30, f"{star} as {W.the(winner)} {pk(verbs, 'base2')} {L_}"))
     from pipeline.export import goalie_streaks
@@ -3229,7 +3239,9 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
                 out_.append(f"{_cap(name(pid))} finished with a hat trick." if n_ == 3 else f"{_cap(name(pid))} finished with {num(n_)} goals.")
             run_ = _hat_run(P, pid, gid)
             if run_ >= 2:  # Brady Tkachuk's second straight natural hat trick (NHL.com and AP both led with it, 2026-10-15)
-                out_.append(f"It was his {ORDINALS.get(run_, str(run_) + 'th')} straight hat trick.")
+                # "his" only right after a sentence about him; else it read as the last scorer's (DeBrusk, Nov 3)
+                his = "his" if out_ else grammar.possessive(surname)
+                out_.append(f"It was {his} {ORDINALS.get(run_, str(run_) + 'th')} straight hat trick.")
             helper = storylines.set_up_all(goals, pid)
             if helper and N.get(helper):  # one teammate on every goal; a brother is the story (the Tkachuks, 2026-10-13)
                 kin = "His brother " if helper in storylines.siblings().get(pid, set()) else ""
@@ -3271,11 +3283,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if any(x["kind"] == "debut" and x not in later_firsts and x not in after_goals for x in found):
         # a debut told up front keeps the night's other debuts beside it ("Bauer and Björck both played their first NHL game")
         after_goals = [x for x in after_goals if not (x["kind"] == "debut" and not x.get("points"))]
+    # a first NHL point that came on an assist rides on that goal (timeline.attachments)
+    point_rides = [x for x in found if x["kind"] == "first_point" and any(x["pid"] in (g.get("p2"), g.get("p3")) for g in goals)]
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first,
                        found=[x for x in found if x not in later_firsts and x not in after_goals
                               # a games-played milestone of a goal scorer rides on his goal ("in his 700th NHL game")
                               and not (x["kind"] == "milestone" and x.get("what") == "game" and any(g["p1"] == x["pid"] for g in goals))
-                              and not (timeline.rides_on_goal(x) and any(g["p1"] == x["pid"] for g in goals))],
+                              and not (timeline.rides_on_goal(x) and any(g["p1"] == x["pid"] for g in goals))
+                              and x not in point_rides],
                        kinds=("debut", "return", "club_debut", "first_point", "milestone", "first_win", "first_shutout", "first_start", "win_since"),
                        goals_told=True, saves=saves_, in_net=net_firsts)
     # goalie changes: "started" is whoever was in net at puck drop; both teams can change goalies. A change reads as
@@ -3292,6 +3307,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
             came = relief.get("came_in") or {}
             ga = first_g.get("ga", 0)
             pulled = not came.get("back") and came.get("how") != "mid" and (ga >= 3 or (ga >= 2 and came.get("how") == "intermission"))
+            if pulled and ga == 2:
+                # two goals and a change at the break is as often a goalie who got hurt as one who was pulled (Gibson,
+                # who left with an injury, read "Detroit pulled John Gibson": outside notes, Nov 3), so it says neither
+                pulled = "break"
             changes.append((t, first_g, relief, pulled))
     exits = [x for x in (r.get("left") or []) if x.get("regular", True) and x["id"] in N][:2]
     season_goals = {pid: int(g_) for pid, g_ in P.filter((pl.col("season") == season) & (pl.col("date") < r["date"]))
@@ -3326,6 +3345,10 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     if not goals and end == "SO":
         s1.append("No goal counted through overtime." if gone else "Nobody scored through overtime.")
     s1 += timeline.paragraph(gm)
+    unplaced = [x for x in point_rides if x["pid"] not in attached]
+    if unplaced:  # its goal already carried another note
+        s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=unplaced,
+                           kinds=("first_point",), goals_told=True, saves=saves_, in_net=net_firsts)
     # a first goal the chronology could not place (no goal of his on the sheet, say) is told the old way
     s1 += _first_lines(gid, season, G, P, N, W, name, said, winner, loser, told=told_first, found=found,
                        kinds=("first_goal", "club_goal"), skip=attached, goals=goals)
@@ -3969,15 +3992,23 @@ def _clutch_heads(goals: list[dict], side, winner: str, end: str, W, W_: str, L_
     reg = [g for g in goals if g["period"] <= 3]
     if end == "REG" and reg:
         # the goal that put them ahead for good, in the last two minutes of the third
+        tight = sum(side(h) == winner and h["strength"] != "en" for h in reg) - sum(side(h) != winner for h in reg) <= 1
         for i, g in enumerate(reg):
-            if side(g) == winner and g["period"] == 3 and g["sec"] >= LATE_WINNER and g["strength"] != "en" and g["p1"] in N:
+            if side(g) == winner and g["period"] == 3 and g["strength"] != "en" and g["p1"] in N:
                 before = (g["hs"] - (1 if g["home"] else 0), g["as"] - (0 if g["home"] else 1))
                 if before[0] == before[1] and all(side(h) == winner or h["strength"] == "en" for h in reg[i + 1:]):
                     left = grammar.time_left(1200 - g["sec"])
-                    # Eller's go-ahead with 2:23 left went under "The Panthers beat the Blackhawks" (outside notes, Oct 25)
-                    out.append((92 if g["sec"] >= 1140 else 88 if g["sec"] >= 1080 else 86,
-                                pk([f"{last(g['p1'])} wins it with {left} left", f"{last(g['p1'])} scores with {left} left to lift {W.the(winner)}"], "late")))
-                break
+                    if g["sec"] >= LATE_WINNER:
+                        # Eller's go-ahead with 2:23 left went under "The Panthers beat the Blackhawks" (outside notes, Oct 25)
+                        out.append((92 if g["sec"] >= 1140 else 88 if g["sec"] >= 1080 else 86,
+                                    pk([f"{last(g['p1'])} wins it with {left} left", f"{last(g['p1'])} scores with {left} left to lift {W.the(winner)}"], "late")))
+                    elif tight:
+                        # a one-goal game decided in the third leads with who decided it, over "The Hurricanes edge the
+                        # Islanders" (outside notes, Nov 3-5: Carrier, Kartye, Amadio)
+                        when_ = "late goal" if g["sec"] >= 900 else "third-period goal"
+                        # (an earlier third-period goal stays under a two-goal night: Hutson over Tuch, Nov 9 run)
+                        out.append((36 if g["sec"] >= 900 else 28, f"{last(g['p1'])}’s {when_} lifts {W.the(winner)} past {L_}"))
+                    break
     ot = next((g for g in goals if g["period"] > 3), None)
     if end == "OT" and ot and ot["p1"] in N:
         tie = next((g for g in reversed(reg) if g["hs"] == g["as"] and g["period"] == 3 and g["sec"] >= 900 and g["p1"] == ot["p1"]), None)
@@ -4014,7 +4045,8 @@ def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], 
         elif x["kind"] == "milestone" and x["what"] == "point" and x["mark"] >= 500:
             heads.append((90, f"{who} reaches {x['mark']:,} points{as_}"))
         elif x["kind"] == "milestone" and x["what"] == "game" and x["mark"] >= 1000:
-            heads.append((88, f"{who} plays his {timeline.th(x['mark'])} game{as_}"))
+            # below a four-point night (85): Vilmanis's four over Eller's 1,200th game (Nov 9 run)
+            heads.append((84, f"{who} plays his {timeline.th(x['mark'])} game{as_}"))
         elif x["kind"] == "first_goal" and (x.get("goals") or 0) >= 2:
             # NHL.com led with Knuble's first two NHL goals; ours led with the goalie (outside notes, Oct 21)
             many = "two" if x["goals"] == 2 else num(x["goals"])
@@ -4025,7 +4057,9 @@ def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], 
         if row["pts"] >= 4 and row["g"] < 3 and row["player_id"] in N:
             who = last(row["player_id"])
             as_ = f" as {beat}" if row["team"] == winner else f", but {W.the(row['team'])} lose"
-            heads.append((85, f"{_cap(num(int(row['pts'])))} points for {who}{as_}"))
+            # a winner's four-point night over a 1,200th game (Vilmanis, outside notes, Nov 4); a loser's only over the
+            # plain headlines, since the story never tells his night (McDavid's four in a loss, Nov 5)
+            heads.append((85 if row["team"] == winner else 40, f"{_cap(num(int(row['pts'])))} points for {who}{as_}"))
     for x in rare or []:
         who = last(x["pid"])
         as_ = f" as {beat}" if x["team"] == winner else f", but {W.the(x['team'])} lose"
