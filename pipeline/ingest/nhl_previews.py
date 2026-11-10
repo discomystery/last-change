@@ -71,6 +71,23 @@ def _article(html: str) -> dict:
     return {}
 
 
+def _teams_of(body: str, away: str, home: str, names: dict[str, str] | None) -> list[str]:
+    """Which club each projected-lineup block is about, by its heading ("**Hurricanes projected lineup**"), away then
+    home when the heading names neither. A preview with one block missing put Carolina's lineup and goalie under
+    Chicago (CHI at CAR, 2026-11-07: "Kochetkov ... a rock in net for Chicago")."""
+    heads = [m.group(0) for m in LINEUP.finditer(body)][:2]
+    order = [away, home][:len(heads)]
+    if not names:
+        return order
+    word = {t: fold(names[t].split(" ")[-1]) for t in (away, home) if names.get(t)}
+    got = [next((t for t in (home, away) if word.get(t) and word[t] in fold(h)), None) for h in heads]
+    if all(got) and len(set(got)) == len(got):
+        return got
+    if len(heads) == 1 and got[0]:
+        return got
+    return order
+
+
 def goalie_names(body: str) -> list[list[str]]:
     """The lines of each projected lineup (away first, then home) that are a single name, in order: the goalies, plus
     the odd seventh defenseman listed alone. Forward lines and pairs are joined by dashes."""
@@ -166,12 +183,12 @@ def _resolve(row: list[list[tuple[int, str]]], used: set[int]) -> list[tuple[int
     return list(max(itertools.product(*row), key=score))
 
 
-def lineups_from(body: str, away: str, home: str, known: dict) -> dict[str, dict]:
+def lineups_from(body: str, away: str, home: str, known: dict, names: dict[str, str] | None = None) -> dict[str, dict]:
     """Each team's projected lineup as player ids: rows with dashes are forward lines or defense pairs (told apart by
     the players' listed positions, a two-forward row being the fourth line of an 11-forward lineup), names alone are
     goalies or a seventh defenseman."""
     out = {}
-    for team, part in zip((away, home), _sections(body)):
+    for team, part in zip(_teams_of(body, away, home, names), _sections(body)):
         rows = []
         for ln in part.split("\n"):
             ln = ln.replace("\xa0", " ").strip(" *_ ")
@@ -296,10 +313,10 @@ def known_goalies(season: int) -> dict[str, dict[str, int]]:
     return out
 
 
-def starters_from(body: str, away: str, home: str, known: dict[str, dict[str, int]]) -> dict[str, int]:
+def starters_from(body: str, away: str, home: str, known: dict[str, dict[str, int]], teams: dict[str, str] | None = None) -> dict[str, int]:
     """{team: player id} for the first listed name in each lineup that is a goalie we know."""
     out = {}
-    for team, names in zip((away, home), goalie_names(body)):
+    for team, names in zip(_teams_of(body, away, home, teams), goalie_names(body)):
         for n in names:
             pid = known.get(team, {}).get(fold(n)) or known["*"].get(fold(n))
             if pid:
@@ -336,8 +353,8 @@ def update(season: int = CURRENT_SEASON, now: datetime | None = None) -> dict:
             art = {}
         text = art.get("articleBody") or ""
         body = {"fetched": now.isoformat(timespec="seconds"), "url": url, "published": art.get("datePublished"),
-                "starters": starters_from(text, g["away"], g["home"], known),
-                **({"lineups": lineups_from(text, g["away"], g["home"], skaters), "status": status_text(text)} if text else {})}
+                "starters": starters_from(text, g["away"], g["home"], known, names),
+                **({"lineups": lineups_from(text, g["away"], g["home"], skaters, names), "status": status_text(text)} if text else {})}
         if old.get("starters") and not body["starters"]:  # a page that failed to load doesn't undo an earlier find
             continue
         found += len(body["starters"]) == 2

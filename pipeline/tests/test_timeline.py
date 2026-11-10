@@ -176,3 +176,39 @@ def test_late_tie_keeps_its_own_sentence_and_a_quick_answer_drops_the_closer():
     gm = _game([(1, 100, True, 3, "ev"), (1, 900, False, 1, "ev"), (1, 990, False, 2, "ev"), (1, 1044, True, 4, "ev"), (2, 300, True, 3, "ev")])
     out = " ".join(timeline.paragraph(gm))
     assert "all they would get" not in out and "didn’t score again" not in out
+
+
+def test_comeback_go_ahead_says_first_time_or_back_ahead():
+    # down 2-0, tied, then ahead: they never led, so "ahead for the first time", not "to complete the comeback" (Nov 1)
+    gm = _game([(1, 300, False, 1, "ev"), (1, 900, False, 2, "ev"), (1, 1100, True, 3, "ev"), (2, 100, True, 4, "ev"), (2, 1100, True, 5, "ev"),
+                (3, 300, True, 4, "ev"), (3, 1000, True, 3, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "Nick Suzuki put the Rangers ahead for the first time late in the period." in text
+    # led 1-0, fell behind 3-1, then in front again
+    gm = _game([(1, 300, True, 3, "ev"), (1, 700, False, 1, "ev"), (1, 1000, False, 2, "ev"), (2, 100, False, 1, "ev"), (2, 300, True, 4, "ev"),
+                (2, 500, True, 3, "ev"), (2, 1150, True, 5, "ev"), (3, 300, True, 4, "ev"), (3, 1000, True, 3, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "Nick Suzuki put the Rangers back ahead late in the second" in text and "complete the comeback" not in text
+
+
+def test_a_close_regulation_winner_says_whose_goal_won_it():
+    # a tying goal and the winner 90 s apart late in a 3-2 game are not one "scored ... apart" run (Kartye, Nov 5)
+    gm = _game([(1, 300, False, 1, "ev"), (2, 300, True, 3, "ev"), (2, 900, False, 2, "ev"), (3, 820, True, 4, "ev"), (3, 910, True, 5, "ev")])
+    out = timeline.paragraph(gm)
+    assert "Nick Suzuki put the Rangers ahead for good" in out[-1] and " apart " not in out[-1]
+
+
+def test_a_goalie_replaced_at_the_break_after_two_is_not_pulled():
+    # DET at TBL, Nov 7: Tarasov came in for the second after Gibson gave up two
+    gm = _game([(1, 300, True, 3, "ev"), (1, 900, True, 4, "ev")])
+    gm.W.places["DET"] = "Detroit"
+    c = ("DET", {"id": 1, "name": "John Gibson", "ga": 2}, {"id": 2, "name": "Daniil Tarasov", "came_in": {"sec": 1200}}, "break")
+    assert timeline._change(gm, c) == "Cole Caufield took over from Alex Newhook in net for Detroit to start the second, after two goals against."
+
+
+def test_a_first_point_rides_on_the_goal_he_set_up():
+    # "Viggo Björck picked up his first NHL point." opened a story before any goal had been told (Nov 5)
+    gm = _game([(1, 300, True, 3, "ev"), (2, 500, True, 4, "ev")])
+    gm.goals[1]["p2"] = 5
+    att, told = timeline.attachments(gm, [{"kind": "first_point", "pid": 5, "team": "NYR"}], {})
+    assert 5 in told and att[1]["tail"] == "with \x005\x00 picking up his first NHL point on the goal"

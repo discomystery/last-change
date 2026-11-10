@@ -85,3 +85,15 @@ def test_milestones():
     assert stories.milestone(_career(450, 120, 317), "2026-10-11") is None
     # games on or after the day don't count
     assert stories.milestone(_career(450, 399, 600) + [("2026-10-11", 1, 1)], "2026-10-11")[1] == "is one goal from 400"
+
+
+def test_a_lone_lineup_block_goes_to_the_club_its_heading_names():
+    # CHI at CAR, Nov 7: only Carolina's block was up, and Kochetkov was read as Chicago's starter
+    body = BODY.split("**Flyers projected lineup**")[0].replace("Hurricanes projected lineup\n\n", "", 1)
+    names = {"CHI": "Chicago Blackhawks", "CAR": "Carolina Hurricanes"}
+    known = {"CAR": {"frederik andersen": 1}, "CHI": {}, "*": {}}
+    assert nhl_previews.starters_from(body, "CHI", "CAR", known, names) == {"CAR": 1}
+    # with both blocks, headings decide even if the article lists the home club first
+    names = {"PHI": "Philadelphia Flyers", "CAR": "Carolina Hurricanes"}
+    assert nhl_previews.starters_from(BODY, "CAR", "PHI", KNOWN, names) == {"CAR": 1, "PHI": 3}
+    assert nhl_previews.starters_from(BODY, "PHI", "CAR", KNOWN, names) == {"CAR": 1, "PHI": 3}
