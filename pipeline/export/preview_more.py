@@ -408,7 +408,7 @@ def _them(ln: str, t: str, W) -> str:
     pinned", "against them", "when they are shorthanded")."""
     the, poss = W.the(t), W.poss(t)
     ln = ln.replace(f" {the} are ", " they’re ").replace(f" {the} aren’t ", " they aren’t ")
-    ln = re.sub(re.escape(poss) + r"(?= not\b|[,.])", "theirs", ln)  # "and the Kings’ not so much" -> "theirs"
+    ln = re.sub(re.escape(poss) + r"(?= not\b| (?:doesn|isn|hasn)’t\b|[,.])", "theirs", ln)  # "and the Kings’ not so much", "but the Blues’ doesn’t" -> "theirs"
     ln = ln.replace(poss, "their").replace(f" {the}", " them")
     return ln
 
