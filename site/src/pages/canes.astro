@@ -1,0 +1,338 @@
+---
+// The Hurricanes room (Sora, 2026-10-27): an unlinked page of in-the-weeds Carolina analysis, and the place to keep
+// answers to the questions she asks the data. Nothing links here and it is not in any menu. Data from canes.json
+// (pipeline/export/canes.py): how Hurricane-y every skater is, the Carolina type, and how much each club collects a type.
+// The meter and the lists are drawn in the browser from the JSON embedded below; the rest is built here.
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import SectionNav from '../components/SectionNav.astro';
+import { TRAITS, EDGE } from '../lib/players';
+import { teamPaint } from '../lib/teams';
+import { playerHref } from '../lib/playerLinks';
+import '../styles/blocks.css';
+
+type Prof = { m: number; sd: number; n: number; w: number; dir: 1 | -1 };
+type Row = { id: number; name: string; team: string; group: 'F' | 'D'; pos: string; age: number | null; gp: number; score: number; near: string[]; far: string[]; v: Record<string, number>; ex?: [number, number] };
+type Tight = { tight: number; beat: number; n: number };
+type Club = { team: string; tight: number; rank: number; F?: Tight; D?: Tight };
+type Data = { generated_at: string; profiles: Record<'F' | 'D', Record<string, Prof>>; players: Row[]; typey: Club[]; of: Record<'F' | 'D', number> };
+
+// Read through a glob so the page still builds (with a note) before the pipeline has written the file.
+const found = import.meta.glob('../../public/data/canes.json', { eager: true, import: 'default' });
+const data = (Object.values(found)[0] ?? null) as Data | null;
+const base = import.meta.env.BASE_URL;
+const CAR = 'CAR';
+
+const info = (k: string) => (k.startsWith('e_') ? EDGE[k.slice(2)] : TRAITS[k]);
+const label = (k: string) => info(k)?.label ?? k;
+// The end word on Carolina's side of a scale ("Fires away", "Rarely blocks").
+const caneWord = (k: string, p: Prof) => (p.dir > 0 ? info(k)?.hi : info(k)?.lo) ?? label(k);
+const groupWord = { F: 'forwards', D: 'defensemen' } as const;
+const ordinal = (n: number) => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`;
+const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+const players = data?.players ?? [];
+const others = (g: 'F' | 'D') => players.filter((p) => p.group === g && p.team !== CAR);
+const canes = (g: 'F' | 'D') => players.filter((p) => p.group === g && p.team === CAR);
+const exCanes = players.filter((p) => p.ex);
+const club = (t: string) => data?.typey.find((c) => c.team === t);
+const car = club(CAR);
+const defining = (g: 'F' | 'D') => Object.entries(data?.profiles[g] ?? {}).filter(([, p]) => p.w > 0).sort((a, b) => b[1].w - a[1].w);
+const updated = data ? new Date(data.generated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+
+// Every Carolina skater as a faint dot on each trait, Carolina's average as the filled one.
+const typeRows = (g: 'F' | 'D') => Object.entries(data?.profiles[g] ?? {}).map(([k, p]) => ({
+  k, p, dots: canes(g).filter((r) => r.v[k] !== undefined).map((r) => ({ v: r.v[k], name: r.name })),
+})).sort((a, b) => (b.p.w - a.p.w) || (Math.abs(b.p.m - 50) - Math.abs(a.p.m - 50)));
+
+// Type-y-ness bars run from -0.4 to +0.4 (40% more or less spread out than random clubs of the same players).
+const SPAN = 0.45;
+const bar = (t?: Tight) => {
+  if (!t) return '';
+  const v = Math.max(-SPAN, Math.min(SPAN, t.tight));
+  return `--a:50;--b:${50 + (50 * v) / SPAN}`;
+};
+const tightWord = (t?: Tight) => !t ? '–' : t.beat >= 0.9 ? 'clearly alike' : t.beat >= 0.75 ? 'somewhat alike' : t.beat <= 0.1 ? 'clearly mixed' : t.beat <= 0.25 ? 'somewhat mixed' : 'like chance';
+const pctWord = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
+
+// Live answers for the question log.
+const topNames = (g: 'F' | 'D', n: number) => others(g).slice(0, n);
+const exFit = exCanes.filter((p) => p.score >= 75);
+const exMiss = exCanes.filter((p) => p.score < 50);
+const carF = car?.F, carD = car?.D;
+
+const boot = data ? {
+  base, car: CAR,
+  colors: Object.fromEntries([...new Set(players.map((p) => p.team))].map((t) => [t, teamPaint(t)])),
+  profiles: data.profiles, of: data.of,
+  labels: Object.fromEntries([...new Set(Object.values(data.profiles).flatMap((p) => Object.keys(p)))].map((k) => [k, { label: label(k), lo: info(k)?.lo ?? '', hi: info(k)?.hi ?? '' }])),
+  players: players.map((p) => ({ ...p, href: playerHref(p.id) })),
+} : null;
+const nav: [string, string][] = [['meter', 'Meter'], ['lists', 'Lists'], ['type', 'The type'], ['typey', 'Type-y clubs'], ['questions', 'Questions']];
+---
+<Base title="Hurricanes room" description="In-the-weeds Carolina analysis: how Hurricane-y every skater is, and answers to questions asked of the data.">
+  <header class="page-top"><p class="eyebrow">Not linked anywhere</p><h1>Hurricanes room</h1></header>
+  <p class="lede">The Carolina corner of the site: how Hurricane-y every skater in the league is, what the Hurricane type actually looks like in the data, and a running log of the questions we've asked about it.{updated && <> Numbers as of {updated}, updated with every nightly run.</>}</p>
+  <SectionNav items={nav} />
+
+  {!data ? <p class="note">The numbers for this page haven't been built yet. They arrive with the next nightly update.</p> : <>
+
+  <Section id="meter" title="How Hurricane-y is he?" placeholder={false} takeaway="Pick any skater with 30+ games this season and last. His score is where he sits among every regular at his position, from 0 to 100, by how close his style is to Carolina's skaters at that position.">
+    <Fragment slot="explain">
+      <p>It's built from the player-page style ratings (this season and last together), not from how good he is: shooting, chances from his own shots, setting up goals, threat while killing penalties, hits, blocks, takeaways, drawing and taking penalties, faceoffs, and NHL EDGE speed, bursts, shot speed and distance. The traits where Carolina's players sit well away from the middle define the type, and the ones they agree on most count most. Falling short of Carolina on one of those costs a lot; going past them (shooting even more) costs very little. Time in the offensive zone is left out of the score: every Hurricane is near the top of it, which is the system, not the player.</p>
+    </Fragment>
+    <div class="cn-pick cmp-pick">
+      <label for="cn-q">How Hurricane-y is</label>
+      <input id="cn-q" list="cn-names" autocomplete="off" spellcheck="false" placeholder="Type a name" />
+    </div>
+    <datalist id="cn-names"></datalist>
+    <div class="card cn-card" id="cn-card" hidden></div>
+  </Section>
+
+  <Section id="lists" title="The lists" placeholder={false} takeaway="Every scored skater, most Hurricane-y first. Tap a name for his meter.">
+    <p class="cn-pick pick">
+      <label for="cn-who">Show</label>
+      <select id="cn-who"><option value="others">Hurricanes on other teams</option><option value="canes">the actual Hurricanes</option><option value="ex">former Hurricanes</option></select>
+      <label for="cn-grp">among</label>
+      <select id="cn-grp"><option value="F">forwards</option><option value="D">defensemen</option></select>
+    </p>
+    <ol class="card cn-list" id="cn-list"></ol>
+    <p class="fold-wrap"><button type="button" class="fold" id="cn-more" aria-expanded="false"><span>Show more</span></button></p>
+  </Section>
+
+  <Section id="type" title="The Carolina type" placeholder={false} takeaway="Each lane is one rating on the player pages. The faint dots are Carolina's current skaters, the filled dot is their average (weighted by games). Tagged traits are the ones that define the type.">
+    <div class="cn-types">
+      {(['D', 'F'] as const).map((g) => (
+        <div class="card cn-type" style={`--team:${teamPaint(CAR)}`}>
+          <h3 class="chart-title">The {g === 'D' ? 'defensemen' : 'forwards'}</h3>
+          <p class="cn-say">{g === 'D'
+            ? <>The clearest type in the league: {list(defining('D').slice(0, 4).map(([k, p]) => caneWord(k, p).toLowerCase()))}.</>
+            : <>A looser type: {list(defining('F').slice(0, 4).map(([k, p]) => caneWord(k, p).toLowerCase()))}.</>}</p>
+          <ul class="cn-rows">
+            {typeRows(g).map(({ k, p, dots }) => (
+              <li class:list={['cn-row', { faint: !p.w && !k.endsWith('oz') }]}>
+                <span class="cn-rl">{label(k)}{p.w > 0 && <span class="chip">Defines the type</span>}{k === 'e_oz' && <span class="chip" data-tip="Every Hurricane is near the top here, whoever he is, so it's left out of the score.">System</span>}</span>
+                <span class="cn-ends"><span>{info(k)?.lo}</span><span>{info(k)?.hi}</span></span>
+                <span class="lane cn-lane" style={`--v:${p.m}`}>
+                  {dots.map((d) => <i class="cn-mate" style={`--x:${d.v}`} data-tip={`${d.name}: ${ordinal(d.v)} percentile`}></i>)}
+                  <span class="dot" data-tip={`Carolina average: ${Math.round(p.m)}th percentile`}></span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </Section>
+
+  <Section id="typey" title="Which clubs collect a type?" placeholder={false} takeaway="For each club, how alike its regulars' styles are, against the same players dealt to random clubs 400 times. Right of the middle line = more alike than chance.">
+    <p class="cn-take">{car && <>Carolina ranks <strong>{ordinal(car.rank)}</strong> of {data.typey.length}. Their defensemen are {carD ? `${pctWord(carD.tight)} ${carD.tight >= 0 ? 'more alike' : 'less alike'} than chance would give (${tightWord(carD)})` : 'not rated'}, and their forwards {carF ? `${pctWord(carF.tight)} ${carF.tight >= 0 ? 'more alike' : 'less alike'} (${tightWord(carF)})` : 'not rated'}.</>}</p>
+    <div class="card cn-clubs">
+      <div class="cn-ch"><span></span><span>Forwards</span><span>Defensemen</span></div>
+      <ol>
+        {data.typey.map((c) => (
+          <li class:list={['cn-club', { me: c.team === CAR }]} style={`--team:${teamPaint(c.team)}`}>
+            <span class="cn-ct"><span class="rk">{c.rank}</span><a class="tlink" href={`${base}team/${c.team.toLowerCase()}/`}>{c.team}</a></span>
+            {(['F', 'D'] as const).map((g) => (
+              <span class="cn-cb" data-tip={c[g] ? `${c.team} ${groupWord[g]}: ${c[g]!.tight >= 0 ? `${pctWord(c[g]!.tight)} more alike` : `${pctWord(c[g]!.tight)} less alike`} than random clubs of the same players (${c[g]!.n} regulars; ${Math.round(c[g]!.beat * 100)}% of random deals were more spread out)` : 'Too few regulars'}>
+                <span class="lane cn-bar" style={bar(c[g])}><span class="gap"></span></span>
+              </span>
+            ))}
+          </li>
+        ))}
+      </ol>
+      <p class="cn-foot">The middle line is chance. Defense groups are only five to eight players, so a club's defense bar moves a lot with one player.</p>
+    </div>
+  </Section>
+
+  <Section id="questions" title="Questions we've asked" placeholder={false} takeaway="Each question, when we asked it and what the data said. Answers marked live update with the nightly numbers.">
+    <div class="cn-qs">
+      <article class="card cn-q">
+        <p class="eyebrow">Oct 27, 2026 · live</p>
+        <h3>Who are the Hurricanes who aren't on the Hurricanes?</h3>
+        <p>On the defense side it's {list(topNames('D', 5).map((p) => `${p.name} (${p.team})`))}. Up front, {list(topNames('F', 5).map((p) => `${p.name} (${p.team})`))}.</p>
+        <p>Most former Canes don't fit anymore: {exMiss.length} of the {exCanes.length} still in the league score under 50{exFit.length > 0 && <>, while {list(exFit.map((p) => `${p.name} (${p.score})`))} still {exFit.length === 1 ? 'looks' : 'look'} the part</>}. That fits the October finding below that about half of Carolina's look comes from the system.</p>
+      </article>
+      <article class="card cn-q">
+        <p class="eyebrow">Oct 27, 2026 · live</p>
+        <h3>Are the Hurricanes more type-y than other teams?</h3>
+        <p>{car && <>By how alike their regulars' styles are, Carolina is {ordinal(car.rank)} of {data.typey.length}. </>}{carD && carF && <>It's the defense: their defensemen are {pctWord(carD.tight)} {carD.tight >= 0 ? 'more' : 'less'} alike than random groups of the same players, among the tightest groups in the league, while the forwards are {Math.abs(carF.tight) < 0.06 ? 'about as alike as chance' : `${pctWord(carF.tight)} ${carF.tight >= 0 ? 'more' : 'less'} alike`}.</>} {data.typey[0] && data.typey[0].team !== CAR && <>The most type-y club right now is {data.typey[0].team}.</>}</p>
+      </article>
+      <article class="card cn-q">
+        <p class="eyebrow">Oct 10, 2026</p>
+        <h3>Do teams collect a type of player, or is it the system?</h3>
+        <p>Over 2023-26, real differences between teams' rosters show up in shot attempts, chances and blocks, but players who changed teams moved about halfway toward their new team's habits, so roughly half of it is the system.</p>
+        <p>Carolina's defensemen shot the most in the league by a distance. Three who joined went from about average to well above it, and five who left came back down: that's the system. Carolina's forwards were tied with Edmonton's for the most chances created, and eight who joined were already creating that much before they arrived, a small hint that Carolina picks chance creators. Few blocks, lots of takeaways from the defense, and not a speed outlier.</p>
+      </article>
+      <article class="card cn-q">
+        <p class="eyebrow">Oct 10, 2026</p>
+        <h3>Which teams play the hardest? (a "DAWG per 60" test)</h3>
+        <p>Five effort habits (drawing penalties, hits, blocks, takeaways and shots from right in front), each against players with similar ice time, over 2025-26. Carolina ranked 4th of 32. Seth Jarvis was the top Hurricane (93rd percentile among forwards), then Sean Walker and William Carrier. It repeats well from one half of a season to the other, but takeaways are the noisiest part.</p>
+      </article>
+    </div>
+  </Section>
+  </>}
+  {boot && <script type="application/json" id="cn-boot" set:html={JSON.stringify(boot)}></script>}
+</Base>
+
+<style>
+  .cn-pick { margin: 6px 0 16px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+  .cn-pick input { min-width: 12ch; }
+  .cn-card { display: grid; gap: 14px; }
+  .cn-card[hidden] { display: none; }
+  :global(.cn-head) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: end; }
+  :global(.cn-name) { font: 600 22px/1.2 var(--display); font-variation-settings: 'SOFT' 100; margin: 0; }
+  :global(.cn-sub) { font: 500 14px/1.4 var(--ui); color: var(--ink-3); margin: 2px 0 0; }
+  :global(.cn-score) { text-align: right; }
+  :global(.cn-score b) { display: block; font: 600 52px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--team); }
+  :global(.cn-score span) { font: 600 11px/1.3 var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  :global(.cn-line) { margin: 0; font-size: 17px; }
+  :global(.cn-chips) { display: flex; flex-wrap: wrap; gap: 6px; }
+  :global(.cn-lanes) { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  :global(.cn-lanes li) { display: grid; gap: 4px; }
+  :global(.cn-lanes .lane) { display: block; margin: 0 7px; }
+  :global(.cn-ll) { display: flex; justify-content: space-between; gap: 8px; font: 600 14px/1.3 var(--ui); }
+  :global(.cn-ll em) { font-style: normal; font-weight: 500; color: var(--ink-3); }
+  :global(.cn-ref) { position: absolute; top: -2px; bottom: -2px; left: calc(var(--r) * 1%); border-left: 2px dotted var(--ink-3); z-index: 1; }
+  :global(.cn-key) { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 13px/1.4 var(--ui); color: var(--ink-3); margin: 0; }
+
+  .cn-list { list-style: none; margin: 0; padding: 4px 18px; }
+  :global(.cn-li) { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--rule); }
+  :global(.cn-li:first-child) { border-top: 0; }
+  :global(.cn-li .rk) { font: 600 14px/1.4 var(--ui); color: var(--ink-3); }
+  :global(.cn-li .nm) { font: 600 17px/1.3 var(--ui); background: none; border: 0; padding: 0; color: var(--ink); text-align: left; cursor: pointer; }
+  :global(.cn-li .nm:hover) { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+  :global(.cn-li .tm) { font: 600 13px/1 var(--ui); color: var(--team); margin-left: 6px; }
+  :global(.cn-li .fits) { grid-column: 2; font: 400 14px/1.4 var(--ui); color: var(--ink-3); }
+  :global(.cn-li .sc) { grid-row: 1 / span 2; grid-column: 3; font: 600 24px/1 var(--display); font-variation-settings: 'SOFT' 100; color: var(--team); align-self: center; }
+  .fold-wrap { margin: 10px 0 0; }
+  .fold-wrap[hidden] { display: none; }
+
+  .cn-types { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cn-say { margin: 0 0 12px; font-size: 17px; }
+  .cn-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .cn-row { display: grid; gap: 4px; }
+  .cn-row.faint { opacity: 0.6; }
+  .cn-rl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font: 600 14px/1.3 var(--ui); }
+  :global(.cn-ends) { display: flex; justify-content: space-between; font: 500 12px/1.2 var(--ui); color: var(--ink-3); }
+  .cn-lane { margin: 0 7px; }
+  .cn-mate { position: absolute; top: 3px; left: calc(var(--x) * 1%); width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: color-mix(in oklab, var(--team) 45%, transparent); }
+
+  .cn-take { font-size: 17px; margin: 0 0 14px; }
+  .cn-clubs { padding: 14px 18px; }
+  .cn-clubs ol { list-style: none; margin: 0; padding: 0; }
+  .cn-ch, .cn-club { display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: center; }
+  .cn-ch { font: 600 11px/1.3 var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 6px; }
+  .cn-club { padding: 5px 0; }
+  .cn-club.me { background: color-mix(in oklab, var(--team) 10%, transparent); border-radius: 8px; margin: 0 -8px; padding: 5px 8px; }
+  .cn-ct { display: flex; gap: 8px; align-items: baseline; font: 600 14px/1.3 var(--ui); }
+  .cn-ct .rk { width: 20px; color: var(--ink-3); font-weight: 500; }
+  .cn-cb { position: relative; }
+  .cn-bar { display: block; margin: 0 7px; }
+  .cn-bar::after { content: ''; position: absolute; left: 50%; top: -1px; bottom: -1px; border-left: 2px solid var(--ink); opacity: 0.5; }
+  .cn-bar .gap { background: var(--team); }
+  .cn-type .lane, .cn-club .lane { --team: inherit; }
+  :global(.cn-card .lane) { --team: inherit; }
+  .cn-foot { margin: 10px 0 0; font: 400 13px/1.45 var(--ui); color: var(--ink-3); }
+
+  .cn-qs { display: grid; gap: 16px; }
+  .cn-q h3 { font: 600 20px/1.25 var(--display); font-variation-settings: 'SOFT' 100; margin: 4px 0 8px; }
+  .cn-q p:not(.eyebrow) { margin: 0 0 8px; font-size: 17px; }
+  .cn-q p:last-child { margin-bottom: 0; }
+
+  @media (max-width: 899px) { .cn-types { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .cn-ch, .cn-club { grid-template-columns: 62px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+    .cn-list { padding: 4px 14px; }
+  }
+</style>
+
+<script>
+  type Prof = { m: number; sd: number; n: number; w: number; dir: 1 | -1 };
+  type Row = { id: number; name: string; team: string; group: 'F' | 'D'; pos: string; age: number | null; gp: number; score: number; near: string[]; far: string[]; v: Record<string, number>; ex?: [number, number]; href: string | null };
+  type Boot = { base: string; car: string; colors: Record<string, string>; profiles: Record<'F' | 'D', Record<string, Prof>>; of: Record<'F' | 'D', number>; labels: Record<string, { label: string; lo: string; hi: string }>; players: Row[] };
+  const el = document.getElementById('cn-boot');
+  if (el) {
+    const B = JSON.parse(el.textContent!) as Boot;
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').replace(/ł/g, 'l').trim();
+    const ord = (n: number) => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`;
+    const yrs = (e: [number, number]) => `${e[0]}-${String(e[1] + 1).slice(2)}`;
+    const word = (k: string, p: Prof) => (p.dir > 0 ? B.labels[k]?.hi : B.labels[k]?.lo) || B.labels[k]?.label || k;
+    const grp = { F: 'forwards', D: 'defensemen' };
+    const posName: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman' };
+    const tag = (r: Row) => `${r.name} (${r.team})`;
+    const rows = B.players;
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const dl = document.getElementById('cn-names')!;
+    [...rows].sort((a, b) => a.name.localeCompare(b.name)).forEach((r) => dl.append(new Option(tag(r))));
+    const find = (v: string) => {
+      const f = fold(v);
+      if (!f) return undefined;
+      return rows.find((r) => fold(tag(r)) === f) ?? rows.find((r) => fold(r.name) === f) ?? rows.find((r) => fold(r.name).split(' ').some((w) => w.startsWith(f)));
+    };
+    const verdict = (s: number) => s >= 95 ? 'Basically a Hurricane already' : s >= 85 ? 'A Hurricane at heart' : s >= 70 ? 'Hurricane-ish' : s >= 45 ? 'Some of the type' : s >= 20 ? 'Not really the type' : 'The opposite of a Hurricane';
+
+    const card = document.getElementById('cn-card')!;
+    const q = document.getElementById('cn-q') as HTMLInputElement;
+    const show = (r: Row, push = true) => {
+      const prof = B.profiles[r.group];
+      const keys = Object.entries(prof).filter(([, p]) => p.w > 0).sort((a, b) => b[1].w - a[1].w);
+      const ranked = rows.filter((x) => x.group === r.group).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+      const rank = 1 + ranked.filter((x) => x.score > r.score).length;
+      const tied = ranked.filter((x) => x.score === r.score).length > 1;
+      const team = B.colors[r.team] ?? 'var(--ink)';
+      const isCane = r.team === B.car;
+      const name = r.href ? `<a class="plink" href="${r.href}">${esc(r.name)}</a>` : esc(r.name);
+      const sub = `${posName[r.pos] ?? r.pos} · ${r.team}${r.ex ? ` · a Hurricane in ${yrs(r.ex)}` : ''}`;
+      const near = r.near.map((k) => `<span class="chip phrase">${esc(word(k, prof[k]))}</span>`).join('');
+      const far = r.far.length ? `<p class="cn-line">Where he isn't one: ${r.far.map((k) => esc(B.labels[k].label.toLowerCase())).join(' and ')}.</p>` : '';
+      card.style.setProperty('--team', team);
+      card.innerHTML = `
+        <div class="cn-head"><div><p class="cn-name">${name}</p><p class="cn-sub">${esc(sub)}</p></div>
+          <div class="cn-score"><b>${r.score}</b><span>Hurricane-y</span></div></div>
+        <p class="cn-line"><strong>${verdict(r.score)}.</strong> ${tied ? 'Tied for ' : ''}${ord(rank)} of ${ranked.length} ${grp[r.group]}${isCane ? ', and he is one' : ''}.</p>
+        ${near ? `<div class="cn-chips">${near}</div>` : ''}
+        ${far}
+        <ul class="cn-lanes">${keys.map(([k, p]) => {
+          const v = r.v[k];
+          return `<li><span class="cn-ll">${esc(B.labels[k].label)}<em>${v === undefined ? 'not rated' : `${ord(v)} percentile`}</em></span>
+            <span class="lane" style="--v:${v ?? 50}">${`<span class="cn-ref" style="--r:${p.m}" data-tip="Carolina ${grp[r.group]}: ${Math.round(p.m)}th percentile on average"></span>`}${v === undefined ? '' : '<span class="dot"></span>'}</span>
+            <span class="cn-ends"><span>${esc(B.labels[k].lo)}</span><span>${esc(B.labels[k].hi)}</span></span></li>`;
+        }).join('')}</ul>
+        <p class="cn-key"><span class="k-dot">${esc(r.name.split(' ').slice(-1)[0])}</span><span class="k-ref">Carolina ${grp[r.group]} on average</span></p>`;
+      card.hidden = false;
+      q.value = tag(r);
+      if (push) history.replaceState(null, '', `#${r.id}`);
+    };
+    q.addEventListener('change', () => { const r = find(q.value); if (r) show(r); });
+    q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { const r = find(q.value); if (r) show(r); } });
+    const start = byId.get(location.hash.slice(1)) ?? rows.find((r) => r.team !== B.car && r.group === 'D');
+    if (start) show(start, false);
+
+    // The lists.
+    const list = document.getElementById('cn-list')!;
+    const who = document.getElementById('cn-who') as HTMLSelectElement, g = document.getElementById('cn-grp') as HTMLSelectElement;
+    const more = document.getElementById('cn-more')!;
+    let n = 15;
+    const draw = () => {
+      const pick = rows.filter((r) => r.group === g.value && (who.value === 'canes' ? r.team === B.car : who.value === 'ex' ? !!r.ex : r.team !== B.car));
+      const prof = B.profiles[g.value as 'F' | 'D'];
+      const shown = pick.slice(0, n);
+      list.innerHTML = shown.map((r, i) => `<li class="cn-li" style="--team:${B.colors[r.team] ?? 'var(--ink)'}"><span class="rk">${i + 1}</span>
+        <span><button type="button" class="nm" data-id="${r.id}">${esc(r.name)}</button><span class="tm">${r.team}</span>${r.ex && who.value !== 'ex' ? '<span class="chip">Ex-Cane</span>' : ''}</span>
+        <span class="sc">${r.score}</span>
+        <span class="fits">${who.value === 'ex' ? `In Carolina ${yrs(r.ex!)}. ` : ''}${r.near.map((k) => esc(word(k, prof[k]))).join(' · ') || 'Matches on little'}</span></li>`).join('') || '<li class="cn-li"><span></span><span>Nobody to show.</span></li>';
+      more.parentElement!.hidden = pick.length <= n;
+    };
+    who.addEventListener('change', () => { n = 15; draw(); });
+    g.addEventListener('change', () => { n = 15; draw(); });
+    more.addEventListener('click', () => { n += 30; draw(); });
+    list.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('.nm');
+      const r = b && byId.get(b.dataset.id!);
+      if (r) { show(r); document.getElementById('meter')!.scrollIntoView({ behavior: 'smooth' }); }
+    });
+    draw();
+  }
+</script>
