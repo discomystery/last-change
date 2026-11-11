@@ -81,6 +81,7 @@ KNOWN = {
     "pk": ("kill penalties well", "leak on the penalty kill"),
     "powerKill": ("create chances shorthanded", None),
     "discipline": ("stay out of the box", "spend a lot of time in the box"),
+    "rough": ("get into a lot of chippy games", "keep things calm after the whistle"),
 }
 ROUND = {0: "missed the playoffs", 1: "went out in the first round", 2: "went out in the second round",
          3: "went out in the conference final", 4: "lost in the Final", 5: "won the Stanley Cup"}
@@ -204,7 +205,7 @@ def then_now(then: dict[str, dict], now: dict, stab: dict) -> list[dict]:
         row = {"key": dim, "then": t, "now": {k: s[k] for k in ("v", "pct", "lo", "hi", "rank")}, "gap": abs(s["pct"] - t["pct"])}
         if settled and row["gap"] >= CHANGED_GAP and not s["lo"] <= t["pct"] <= s["hi"]:
             new.append({**row, "tag": "new"})
-        elif settled and s["lo"] <= t["pct"] <= s["hi"] and abs(t["pct"] - 50) >= 50 - SIGNATURE and KNOWN[dim][0 if t["pct"] > 50 else 1]:
+        elif settled and s["lo"] <= t["pct"] <= s["hi"] and abs(t["pct"] - 50) >= 50 - SIGNATURE and KNOWN.get(dim, (None, None))[0 if t["pct"] > 50 else 1]:
             kept.append({**row, "tag": "kept"})
     new.sort(key=lambda r: -r["gap"])
     kept.sort(key=lambda r: -abs(r["then"]["pct"] - 50))
