@@ -59,6 +59,7 @@ MOVE = {
     "pk": ("killing penalties better", "leaking more on the penalty kill"),
     "powerKill": ("more dangerous shorthanded", "less dangerous shorthanded"),
     "discipline": ("staying out of the box more", "taking more penalties"),
+    "rough": ("getting into more chippy games", "keeping things calmer after the whistle"),
 }
 # What a team was known for, after "they ...": (top of the league, bottom of the league).
 KNOWN = {
@@ -270,11 +271,13 @@ def story(abbr: str, t: dict, g: pl.DataFrame, brk: dict | None, traits: list[di
     kept = [r for r in traits if r["tag"] == "kept"]
     lede = []
     if new:
-        moves = [MOVE[r["key"]][0 if r["now"]["pct"] > r["then"]["pct"] else 1] for r in new]
-        lede.append(f"This season they’re {_and(moves)}.")
+        moves = [m for r in new if (m := MOVE.get(r["key"], (None, None))[0 if r["now"]["pct"] > r["then"]["pct"] else 1])]
+        if moves:
+            lede.append(f"This season they’re {_and(moves)}.")
     if kept:
-        habits = [KNOWN[r["key"]][0 if r["then"]["pct"] > 50 else 1] for r in kept[:2]]
-        lede.append(f"{'They' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
+        habits = [h for r in kept if (h := KNOWN.get(r["key"], (None, None))[0 if r["then"]["pct"] > 50 else 1])][:2]
+        if habits:
+            lede.append(f"{'They' if new else 'Their style hasn’t moved: they'} still {_and(habits)}.")
     notes: dict = {}
     if len(last):
         s = 100 * _share(last["xgf_adj"].to_numpy(), last["xga_adj"].to_numpy())
