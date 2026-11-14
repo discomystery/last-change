@@ -54,6 +54,7 @@ MOVE = {
     "pace": ("playing faster", "slowing games down"),
     "forecheck": ("forechecking harder", "sitting back more"),
     "physical": ("hitting more", "hitting less"),
+    "rough": ("getting into more chippy games", "keeping things calmer after the whistle"),
     "depth": ("rolling all four lines more", "leaning harder on their top players"),
     "pp": ("creating more on the power play", "creating less on the power play"),
     "pk": ("killing penalties better", "leaking more on the penalty kill"),
@@ -203,7 +204,7 @@ def then_now(then: dict[str, dict], now: dict, stab: dict) -> list[dict]:
             continue
         settled = games >= (stab.get(dim, {}).get("k_games") or 999)
         row = {"key": dim, "then": t, "now": {k: s[k] for k in ("v", "pct", "lo", "hi", "rank")}, "gap": abs(s["pct"] - t["pct"])}
-        if settled and row["gap"] >= CHANGED_GAP and not s["lo"] <= t["pct"] <= s["hi"]:
+        if settled and dim in MOVE and row["gap"] >= CHANGED_GAP and not s["lo"] <= t["pct"] <= s["hi"]:
             new.append({**row, "tag": "new"})
         elif settled and s["lo"] <= t["pct"] <= s["hi"] and abs(t["pct"] - 50) >= 50 - SIGNATURE and KNOWN.get(dim, (None, None))[0 if t["pct"] > 50 else 1]:
             kept.append({**row, "tag": "kept"})
