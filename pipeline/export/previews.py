@@ -389,7 +389,9 @@ def _fmt(text: str, **w) -> str:
     """Fill a template and capitalise each sentence's first letter ("the Blues ..." at the start becomes "The Blues")."""
     out = text.format(**w)
     out = _cap(out)
-    return ". ".join(_cap(s) if s else s for s in out.split(". "))
+    # "vs." doesn't end a sentence ("Strength vs. Strength", "Swayman vs. The Golden Knights", outside notes Nov 14)
+    parts = out.split(". ")
+    return ". ".join(_cap(s) if s and not (i and parts[i - 1].endswith(" vs")) else s for i, s in enumerate(parts))
 
 
 # How many power plays a team should get: half from how often the opponent goes shorthanded, half from how often it

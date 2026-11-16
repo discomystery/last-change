@@ -338,6 +338,10 @@ def _flurries(gm: Game) -> tuple[dict, dict]:
     summ, busy = {}, {}
     if not goals:
         return summ, busy
+    # a goalie change inside the run would be told after the whole run ("...Danault scored to make it 5-0. Boston pulled
+    # Jeremy Swayman after four goals", MTL at BOS, outside notes Nov 12), so such a period is told goal by goal
+    swaps = [(c[2].get("came_in") or {}).get("sec") for c in gm.changes]
+    swaps = [s for s in swaps if s is not None]
     for p in (1, 2, 3):
         idx = [i for i, g in enumerate(goals) if g["period"] == p]
         if not idx:
@@ -349,7 +353,8 @@ def _flurries(gm: Game) -> tuple[dict, dict]:
             theirs = [i for i in idx if i not in mine]
             if (len(mine) >= SUMMARY_GOALS and len(goals) >= SUMMARY_GAME and min(leads) >= SUMMARY_LEAD
                     and all(i > mine[-1] for i in theirs) and not any(goals[i]["strength"] in ("en", "ps") for i in mine)
-                    and not any(((gm.attach.get(i) or {}).get("tail") or "").startswith("with ") for i in mine)):
+                    and not any(((gm.attach.get(i) or {}).get("tail") or "").startswith("with ") for i in mine)
+                    and not any(at(goals[mine[0]]) <= s_ < at(goals[mine[-1]]) for s_ in swaps)):
                 summ[p] = (t, mine)
         if p not in summ and len(idx) >= BUSY:
             busy[p] = len(idx)
@@ -458,6 +463,7 @@ def _join(items: list[tuple[str, dict]]) -> list[str]:
 _PERIOD_AT = __import__("re").compile(r"\b(early in|midway through|late in) the (first|second|third)( period)?\b")
 _NAMED = __import__("re").compile(r"\b(?:(first|second|third) period|(?:into|left in) the (first|second|third))\b")
 _INTO = __import__("re").compile(r"\b(into|left in) the (first|second|third)\b(?! period)")
+_EITHER = __import__("re").compile(r"(?P<at>\b(?:early in|midway through|late in) the (?:first|second|third)(?: period)?\b)|(?P<into>\b(?:into|left in) the (?:first|second|third)\b(?! period))")
 
 
 def _periods(sentences: list[str]) -> list[str]:
@@ -478,9 +484,17 @@ def _periods(sentences: list[str]) -> list[str]:
             again = same and part[0] == (w, p) and n - part[1] == 1 and w != "early in"
             last, part = (p, n), ((w, p), n)
             return "later in the period" if again else f"{w} the period" if same else m.group(0)
-        s2 = _PERIOD_AT.sub(swap, s)
-        if last[0] and n - last[1] <= 1:  # "32 seconds into the second ... 1:10 into the period"
-            s2 = _INTO.sub(lambda m: f"{m.group(1)} the period" if m.group(2) == last[0] else m.group(0), s2)
+
+        def into(m):  # "32 seconds into the second ... 1:10 into the period"
+            nonlocal last
+            p = m.group(2)
+            same = last[0] == p and n - last[1] <= 1
+            last = (p, n)
+            return f"{m.group(1)} the period" if same else m.group(0)
+        # one pass in reading order, so a period named later in the sentence can't turn an earlier one into "the
+        # period" ("Raymond pushed the lead to 3-1 just 17 seconds into the period, and ... dropped the gloves early in
+        # the second", DET at FLA, outside notes Nov 12: the goal followed first-period goals)
+        s2 = _EITHER.sub(lambda m: swap(_PERIOD_AT.match(m.group(0))) if m.group("at") else into(_INTO.match(m.group(0))), s)
         named = [a or b for a, b in _NAMED.findall(s)]
         if named and not _PERIOD_AT.search(s):
             last = (named[-1], n)
@@ -705,8 +719,15 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     if att.get("tail"):
         tail.append(gm.names(att["tail"]))
     if gw_i == i and ahead_i != i and margin <= 2 and g["strength"] != "en" and g["period"] <= 3 and gm.end == "REG":
-        # "the eventual winner" hung off the verb (Sora: it should modify a goal), so the goal is named
-        tail.append(gm.pk(["and that one stood up as the winner", "and that goal turned out to be the winner"], "gw", i))
+        # "the eventual winner" hung off the verb (Sora: it should modify a goal), so the goal is named; after an earlier
+        # goal put them ahead for good it is the insurance that turned out to be the winner (two "winners" read as a
+        # contradiction, DET at STL, outside notes Nov 10), and never "stood up" beside "the goal stood" (NYR at EDM, Nov 9)
+        pool = ["and that one stood up as the winner", "and that goal turned out to be the winner"]
+        if ahead_i is not None and 0 < ahead_i < i:
+            pool = ["and that insurance goal turned out to be the winner"]
+        elif (g["period"], g["sec"]) in stood:
+            pool = pool[1:]
+        tail.append(gm.pk(pool, "gw", i))
     # the last goal: a late one that made it close, with the winner holding on
     is_last = i == len(goals) - 1
     if is_last and t == gm.loser and gm.end == "REG" and margin == 1 and g["period"] == 3 and g["sec"] >= 1200 - 240:
@@ -718,7 +739,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
     if not tail and not is_last and _last_word(gm, i, body):
         tail.append(_last_word(gm, i, body))
     if g["strength"] == "en" and any(gm.side(h) != t for h in goals[i + 1:]):  # the scoring wasn't over (Sora, CHI 4-2 STL)
-        tail.append(f"but that didn’t stop {W.place(other)}")
+        # "but that didn’t stop Los Angeles" read as if the goal was meant to stop them (CGY at LAK, outside notes Nov 14)
+        tail.append(f"and {W.place(other)} still answered")
     if tail:
         body += ", " + ", ".join(tail)
     if pulled and not relief:

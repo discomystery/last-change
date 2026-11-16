@@ -195,3 +195,15 @@ def test_clear_starter_who_played_last_may_get_a_rest(monkeypatch, tmp_path):
 def test_shared_net_stays_a_guess(monkeypatch, tmp_path):
     s = _net(monkeypatch, tmp_path, [1, 2, 1, 2, 1, 2])
     assert "split the last six starts" in s and s.endswith(pm.GUESS)
+
+
+def test_a_club_told_as_they_is_never_them_as_a_subject():
+    # MIN at BOS, outside notes Nov 11 and 14: "so the Wild hound the puck, but them sit back"
+    ln = "The Wild hound the puck, but the Jets sit back, so the Jets’ forecheck could do damage against the Jets, who give up plenty of them."
+    out = pm._them(ln, "WPG", W())
+    assert "but they sit back" in out and "their forecheck" in out and out.endswith("against them.")
+
+
+def test_vs_does_not_start_a_new_sentence():
+    from pipeline.export import previews
+    assert previews._fmt("strength vs. strength. the Jets lead.") == "Strength vs. strength. The Jets lead."

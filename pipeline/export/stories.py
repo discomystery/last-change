@@ -799,7 +799,7 @@ def preview_facts(away: str, home: str, before: str, W: Words, season: int = CUR
         item = behind.preview_item(t, season, before, W)
         if item:
             items.append(item)
-    items += behind.luck_items(away, home, season, before, W, book()[2])
+    items += behind.luck_items(away, home, season, before, W, book()[2], skip=out["out"])  # never a player who is out (PHI-CBJ, Nov 14)
     return out
 
 
@@ -963,6 +963,8 @@ def _first_lines(gid: int, season: int, G, P, N, W, name, said: set, winner: str
             else:
                 pts = x.get("points") or 0
                 tail = f" and picked up {'a point' if pts == 1 else num(pts) + ' points'}" if pts else ""
+                if not known and x["team"] != loser:  # "Sam O'Reilly played his first NHL game" never said for whom (TBL 8-3 BUF, Nov 11)
+                    who = f"{W.poss(x['team'])} {who}"
                 out.append(f"{_cap(who)} played his first NHL game{tail}.")
         elif k == "return":
             if returns:
@@ -2814,7 +2816,12 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
             parts.append(f"{nm(lg, True)} made {saves} saves in a losing effort{for_}")
         elif ga >= ROUGH_GOALS and gsax <= -1:
             parts.append(f"{nm(lg)} allowed {num(ga)} goals on {shots} shots{for_}")
-        elif gsax >= KEPT_GSAX:
+        elif ga == 0 and parts and ls == 0 and wg and (wg.get("ga") or 0) == 0:
+            # both goalies blanked it through overtime: "kept the Mammoth in it" undersold a shutout (STL at UTA, Nov 12)
+            parts.append(f"{nm(lg, True)} matched him at the other end, stopping all {saves}")
+        elif gsax >= KEPT_GSAX and not (wg and (wg.get("shots") or 0) - shots >= 10):
+            # not for the goalie of a team that outshot the other by 10+: the one who kept his team in it was at the
+            # other end (Hill "kept the Golden Knights in it" while Vegas outshot Nashville 42-32, outside notes Nov 13)
             # the loser's goalie who held his team in it got the same flat "stopped 28 of 30" as a quiet night (Swayman,
             # 1.9 goals saved above expected in a 2-1 loss; voice loop, 2026-10-30)
             parts.append(f"{nm(lg, True)} kept {W.the(loser)} in it, stopping {saves} of {shots}")
@@ -3070,7 +3077,13 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
     for x in _club_lists(r["date"], tonight_, N, W, season):
         if x.get("rank") == 1 and (x.get("tied") or x.get("led")):
             what = {"points": "points", "goals": "goals", "assists": "assists"}.get(x["stat"], x["stat"])
-            as_ = f" as {beat_}" if x["team"] == winner else ""
+            # the club is in the record's possessive already ("Scheifele sets the Jets’ points record as the Jets beat
+            # the Blackhawks", outside notes Nov 14), so the tail names the place, and a 3+ goal comeback says so
+            pl_ = W.place(winner)
+            one_ = not pl_.startswith("the ")  # "Winnipeg beats", but "the Rangers beat"
+            back_ = f" as {pl_} {'rallies' if one_ else 'rally'} from {num(lead_max[loser])} down" if lead_max[loser] >= 3 else \
+                f" as {pl_} {'beats' if one_ else 'beat'} {L_}"
+            as_ = back_ if x["team"] == winner else ""
             rv = (x.get("rival") or "").split(" ")[-1]
             heads.append((96, f"{last(x['pid'])} ties {rv} for {W.poss(x['team'])} {what} record" if x.get("tied") and rv else
                           f"{last(x['pid'])} sets {W.poss(x['team'])} {what} record{as_}"))
@@ -3462,11 +3475,15 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         elif lopsided:  # close on the chances, far apart on the shots
             s2.append(pk([f"{_cap(W.the(more))} outshot {W.the(fewer)} {hi}-{lo}, but {W.poss(fewer)} looks were better, so the chances came out about even.",
                           f"{_cap(W.the(fewer))} were outshot {hi}-{lo}, but their looks were better, and the chances came out about even."], "even-shots"))
+        elif share <= 0.45 and end == "SO":  # level after overtime, so nobody "had the finish" (STL at UTA, 1-0 in a shootout)
+            s2.append(f"{_cap(Ln)} had a little more of the play, but {Wn} won the shootout.")
         elif share <= 0.45:
             s2.append(pk([f"{_cap(Ln)} had a little more of the play, but {Wn} made their chances count.",
                           f"{_cap(Ln)} had a little more of the play, but {Wn} had the finish."], "fair45"))
         elif ws - ls >= 3:
             s2.append(pk(["The chances were closer than the score.", "Don’t let the score fool you: the chances were a lot closer than that."], "close3"))
+        elif sw and sl and abs(sw - sl) >= 10:  # "could have gone either way" beside 42-32 read as if we missed the pressure (NSH at VGK, outside notes Nov 13)
+            s2.append(f"{_cap(W.the(more))} outshot {W.the(fewer)} {hi}-{lo}, but the chances were close to even.")
         else:
             s2.append(pk(["The chances were close to even, so this one could have gone either way.",
                           "Nothing much separated these two on the chances. This one could have gone either way."], "even"))
