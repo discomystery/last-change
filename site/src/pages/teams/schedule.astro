@@ -24,6 +24,15 @@ const lanes = Object.fromEntries(KINDS.map(([k]) => {
 })) as Record<Kind, { avg: number; lo: number; hi: number }>;
 const pos = (k: Kind, v: number) => Math.max(0, Math.min(100, (100 * (v - lanes[k].lo)) / (lanes[k].hi - lanes[k].lo)));
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
+// How hard each team is to face right now: the same rating its opponents' schedules use, ranked, and shaded like the
+// next-ten tiles (five steps of six or seven teams, darker = tougher).
+const faceOrder = sos ? Object.entries(sos.ratings).sort((a, b) => b[1] - a[1]).map(([a]) => a) : [];
+const face = (abbr: string) => faceOrder.indexOf(abbr) + 1;
+const faceBand = (r: number) => Math.max(0, 4 - Math.floor(((r - 1) * 5) / 32));
+const faceH = [3, 10, 18, 27, 40];
+const faceWords = (r: number) => (r === 1 ? 'The toughest to face' : r === 32 ? 'The easiest to face' : r <= 16 ? `${ord(r)} toughest to face` : `${ord(33 - r)} easiest to face`);
+const chanceLine = (v: number) => Math.abs(v) < 0.005 ? 'They are dead even on chances, with recent games counting most.'
+  : `They ${v > 0 ? 'out-chance opponents' : 'get out-chanced'} by ${Math.abs(v).toFixed(2)} expected goals a game, with recent games counting most.`;
 const homeTerm = sos ? sos.terms.home.toFixed(2) : '';
 const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
 ---
@@ -45,6 +54,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
           <span class="ss-rk">#</span><span class="ss-who">Team</span>
           <span class="ss-ends"><span>Easier</span><span>Harder</span></span>
           {KINDS.map(([k, label]) => <span class={`ss-n ss-n-${k}`}>{label}</span>)}
+          <span class="ss-fh">Tough to face</span>
         </div>
         <ol class="ss-list" id="ss-list">
           {rows.map((t) => (
@@ -65,16 +75,21 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
                   {KINDS.map(([k, label]) => (
                     <span class={`ss-n ss-n-${k}`} aria-label={t[k] ? `${label}: ${rankWords(t[k]!.rank)}` : undefined}>{t[k] ? ord(t[k]!.rank) : '–'}</span>
                   ))}
+                  <span class="ss-fc"><span class:list={['ss-face', faceBand(face(t.team)) >= 4 && 'hot']} style={`--h:${faceH[faceBand(face(t.team))]}`} data-tip={`${faceWords(face(t.team))} right now, by the same rating used for everyone’s opponents. Darker is tougher.`}>{face(t.team)}</span></span>
                   <span class="ss-plus" aria-hidden="true"></span>
                 </summary>
                 <div class="ss-more">
                   <ul class="ss-says">
                     {KINDS.map(([k, label]) => t[k] && (
                       <li>
-                        <p class="ss-say-h"><span class="mini-h">{label}</span><span class="ss-say-rk">{cap(rankWords(t[k]!.rank))} of 32</span></p>
+                        <p class="ss-say-h"><span class="mini-h">{label}</span><span class="ss-say-rk">{cap(rankWords(t[k]!.rank))}</span></p>
                         <p class="ss-say">{sentence(t[k]!, k)}</p>
                       </li>
                     ))}
+                    <li>
+                      <p class="ss-say-h"><span class="mini-h">As an opponent</span><span class="ss-say-rk">{faceWords(face(t.team))}</span></p>
+                      <p class="ss-say">{chanceLine(sos.ratings[t.team] ?? 0)}</p>
+                    </li>
                   </ul>
                   {t.games.length > 0 && (
                     <div class="ss-next">
@@ -90,7 +105,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
         </ol>
         <div class="ss-foot">
           <p class="bh-key"><span class="k-dot">Schedule</span><span class="k-avg">League average</span></p>
-          <p class="sos-note">1st is the hardest schedule, 32nd the easiest.</p>
+          <p class="sos-note">1st is the hardest schedule, 32nd the easiest. Tough to face is each team’s own rank as an opponent right now; darker is tougher.</p>
         </div>
       </div>
       <Section id="how" title="How it’s measured" placeholder={false} lead takeaway="Every game is rated by how hard it would be for an average team, then a schedule is the average of its games.">
@@ -129,7 +144,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
 
 <style is:global>
   .ss-card { padding: 10px 0 14px; margin-top: 20px; }
-  .ss-head, .ss-row summary { display: grid; grid-template-columns: 2.6em minmax(0, 13em) minmax(120px, 1fr) repeat(3, 6.2em) 18px; gap: 12px; align-items: center; padding: 0 20px; }
+  .ss-head, .ss-row summary { display: grid; grid-template-columns: 2.6em minmax(0, 13em) minmax(120px, 1fr) repeat(3, 6.2em) 6.4em 18px; gap: 12px; align-items: center; padding: 0 20px; }
   .ss-head { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
   .ss-ends { display: flex; justify-content: space-between; text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 500; }
   .ss-list { list-style: none; margin: 0; padding: 0; }
@@ -148,6 +163,11 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
   .ss-lane { position: relative; height: 18px; margin: 0 7px; }
   .ss-n { text-align: right; font: 500 14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; }
   .ss-head .ss-n { font: inherit; color: inherit; }
+  .ss-fh { text-align: center; }
+  .ss-fc { display: flex; justify-content: center; }
+  .ss-face { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: 5px; cursor: help;
+    font: 700 12px var(--ui); color: var(--ink); background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); box-shadow: inset 0 0 0 1px var(--rule); font-variant-numeric: tabular-nums; }
+  .ss-face.hot { color: var(--heat-on-hot); box-shadow: none; }
   .ss-for { display: none; }
   #ss[data-kind="past"] .ss-for-past, #ss[data-kind="left"] .ss-for-left, #ss[data-kind="next"] .ss-for-next { display: block; }
   #ss[data-kind="past"] .ss-n-past, #ss[data-kind="left"] .ss-n-left, #ss[data-kind="next"] .ss-n-next { color: var(--ink); font-weight: 700; }
@@ -169,7 +189,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
   .ss-how p { max-width: 760px; margin: 0 0 14px; }
   /* iPad widths: abbreviations instead of full names, so the three rank columns stay in view. */
   @media (min-width: 720px) and (max-width: 1000px) {
-    .ss-head, .ss-row summary { grid-template-columns: 2.2em 4em minmax(120px, 1fr) repeat(3, 6.4em) 18px; gap: 10px; padding: 0 16px; }
+    .ss-head, .ss-row summary { grid-template-columns: 2.2em 4em minmax(120px, 1fr) repeat(3, 5.6em) 5.6em 18px; gap: 10px; padding: 0 16px; }
     .ss-who .full { display: none; }
     .ss-who .ab { display: inline; }
     .ss-more { padding-left: 16px; }
@@ -180,7 +200,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
     .ss-head, .ss-row summary { grid-template-columns: 1.8em 3.6em minmax(0, 1fr) 3.4em 16px; gap: 8px; padding: 0 12px; }
     .ss-who .full { display: none; }
     .ss-who .ab { display: inline; }
-    .ss-n { display: none; }
+    .ss-n, .ss-fh, .ss-fc { display: none; }
     #ss[data-kind="past"] .ss-n-past, #ss[data-kind="left"] .ss-n-left, #ss[data-kind="next"] .ss-n-next { display: block; }
     .ss-head .ss-n { font-size: 10px; letter-spacing: 0.04em; }
     .ss-more { padding: 4px 12px 16px; }
