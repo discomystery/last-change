@@ -15,7 +15,7 @@ const boot = { base, players: skaters.map((p) => [p.id, p.name, p.team, p.pos]),
 ---
 <Base section="players" title="Compare players" description="Any two NHL skaters side by side: their stats this season and last, then how they play.">
   <div class="cmp-page"><header class="page-top"><h1>Players</h1></header>
-  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`}>Leaders</a><a class="ptab pill" href={`${base}players/compare/`} aria-current="page">Compare</a></nav>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`}>Leaders</a><a class="ptab pill" href={`${base}players/compare/`} aria-current="page">Compare</a><a class="ptab pill" href={`${base}players/flashcards/`}>Flash cards</a></nav>
   <p class="lede">Any two skaters side by side: their stats first, then how they play. Type two names, or start from one of the suggestions.</p>
   <div class="cmp-pick">
     <label for="cmp-a">Compare</label>
