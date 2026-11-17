@@ -69,8 +69,11 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
                 </summary>
                 <div class="ss-more">
                   <ul class="ss-says">
-                    {KINDS.map(([k]) => t[k] && (
-                      <li><strong>{cap(rankWords(t[k]!.rank))}.</strong> {sentence(t[k]!, k)}</li>
+                    {KINDS.map(([k, label]) => t[k] && (
+                      <li>
+                        <p class="ss-say-h"><span class="mini-h">{label}</span><span class="ss-say-rk">{cap(rankWords(t[k]!.rank))} of 32</span></p>
+                        <p class="ss-say">{sentence(t[k]!, k)}</p>
+                      </li>
                     ))}
                   </ul>
                   {t.games.length > 0 && (
@@ -153,8 +156,11 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
   .ss-plus::after { transform: rotate(90deg); transition: transform 0.15s; }
   .ss-row details[open] .ss-plus::after { transform: rotate(0); }
   .ss-more { padding: 6px 20px 18px calc(2.6em + 32px); display: grid; gap: 14px; }
-  .ss-says { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font: 16px/1.5 var(--body); color: var(--ink-2); max-width: 760px; }
-  .ss-says strong { color: var(--ink); font-weight: 600; }
+  .ss-says { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; max-width: 760px; }
+  .ss-say-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 2px; }
+  .ss-say-h .mini-h { margin: 0; }
+  .ss-say-rk { font: 600 15px var(--ui); color: var(--ink); }
+  .ss-say { margin: 0; font: 16px/1.5 var(--body); color: var(--ink-2); }
   .ss-next .mini-h { margin: 0 0 6px; }
   .ss-team { font: 600 13px var(--ui); color: var(--ink-2); }
   .ss-foot { padding: 14px 20px 0; display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: center; }
@@ -178,7 +184,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
     #ss[data-kind="past"] .ss-n-past, #ss[data-kind="left"] .ss-n-left, #ss[data-kind="next"] .ss-n-next { display: block; }
     .ss-head .ss-n { font-size: 10px; letter-spacing: 0.04em; }
     .ss-more { padding: 4px 12px 16px; }
-    .ss-says { font-size: 15px; }
+    .ss-say { font-size: 15px; }
     .ss-foot { padding: 12px 12px 0; }
   }
 </style>

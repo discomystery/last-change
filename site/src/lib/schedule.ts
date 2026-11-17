@@ -30,22 +30,22 @@ export function rankWords(rank: number, n = 32) {
 
 const xg = (v: number) => Math.abs(v).toFixed(2);
 const pct = (v: number | null) => (v == null ? null : v.toFixed(3).replace(/^0/, ''));
-/** What a schedule's opponents are like, in words: "opponents who out-chance teams by 0.07 expected goals a game". */
+/** What a schedule's opponents are like, as a sentence: "Their opponents out-chance teams by 0.06 expected goals a
+ * game and have a .558 points percentage between them." Played games read in the past, as the opponents were then. */
 export function opponents(p: Part, kind: Kind) {
-  const then = kind === 'past' ? ', at the time,' : '';
-  const lvl = Math.abs(p.opp) < 0.005 ? `opponents who${then} were dead even on chances`
-    : p.opp > 0 ? `opponents who${then} ${kind === 'past' ? 'were out-chancing' : 'out-chance'} teams by ${xg(p.opp)} expected goals a game`
-      : `opponents who${then} ${kind === 'past' ? 'were getting' : 'get'} out-chanced by ${xg(p.opp)} expected goals a game`;
+  const past = kind === 'past';
+  const lvl = Math.abs(p.opp) < 0.005 ? (past ? 'were dead even on chances at the time' : 'are dead even on chances')
+    : p.opp > 0 ? `${past ? 'were out-chancing' : 'out-chance'} teams by ${xg(p.opp)} expected goals a game${past ? ' at the time' : ''}`
+      : `${past ? 'were getting' : 'get'} out-chanced by ${xg(p.opp)} expected goals a game${past ? ' at the time' : ''}`;
   const rec = pct(p.opp_pct);
-  return rec ? `${lvl}, with a ${rec} points percentage between them${kind === 'past' ? ' today' : ''}` : lvl;
+  return `Their opponents ${lvl}${rec ? `, and have a ${rec} points percentage between them${past ? ' today' : ''}` : ''}.`;
 }
-/** The full sentence for one schedule. */
+/** The games, then the opponents, then rest: the body under a schedule's heading. */
 export function sentence(p: Part, kind: Kind) {
-  const label = KINDS.find((k) => k[0] === kind)![1];
-  const games = `${p.games} game${p.games === 1 ? '' : 's'}, ${p.home} at home`;
+  const games = `${p.games} game${p.games === 1 ? '' : 's'}, ${p.home} at home.`;
   const rest = [p.b2b ? `${p.b2b} back-to-back${p.b2b === 1 ? '' : 's'} of their own` : 'no back-to-backs of their own',
     p.opp_b2b ? `${p.opp_b2b} game${p.opp_b2b === 1 ? '' : 's'} against a team on the second night of one` : null].filter(Boolean).join(', and ');
-  return `${label} (${games}): ${opponents(p, kind)}. ${rest[0].toUpperCase()}${rest.slice(1)}.`;
+  return `${games} ${opponents(p, kind)} ${rest[0].toUpperCase()}${rest.slice(1)}.`;
 }
 
 /** Shade band (0-4) of one upcoming game among every game left in the league. */
