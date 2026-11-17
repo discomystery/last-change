@@ -22,6 +22,8 @@ def run(season: int) -> dict:
     export_goal_sources(season)
     from pipeline.export import trend
     trend.run(season)  # team pages' season trend: history, two seasons game by game, then and now
+    from pipeline.export import schedule_strength
+    schedule_strength.run(season)  # Teams > Schedule strength and team pages: played, rest of season, next ten
     from pipeline.export import behind
     behind.run(season)  # what's behind each record: record against play, shooting, goalies, lines (reads goalies.json)
     from pipeline.export import xg_grid

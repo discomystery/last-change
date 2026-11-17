@@ -1,0 +1,210 @@
+---
+// Teams > Schedule strength (Sora, 2026-11-17): how hard every club's schedule has been, how hard the rest of it is,
+// and how hard the next ten games are. Numbers from pipeline/export/schedule_strength.py: each game is rated by the
+// opponent's chance rating (the win model's, recent games counting most), where it's played and rest, in expected
+// goals a game; never a win chance. Rows are drawn at build time; the menu only reorders them.
+import Base from '../../layouts/Base.astro';
+import TeamTabs from '../../components/TeamTabs.astro';
+import Section from '../../components/Section.astro';
+import SosStrip from '../../components/SosStrip.astro';
+import teams from '../../../public/data/teams.json';
+import { teamPaint } from '../../lib/teams';
+import { sos, KINDS, rankWords, sentence, type Kind } from '../../lib/schedule';
+import '../../styles/blocks.css';
+
+const info = Object.fromEntries((teams as any[]).map((t) => [t.abbr, t]));
+const rows = sos ? [...sos.teams].filter((t) => info[t.team]) : [];
+const ord = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+// Each lane runs the same distance either side of the league average, so the dots spread across it.
+const lanes = Object.fromEntries(KINDS.map(([k]) => {
+  const vals = rows.map((t) => t[k]?.hard).filter((v): v is number => v != null);
+  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  const far = Math.max(0.05, ...vals.map((v) => Math.abs(v - avg))) * 1.08;
+  return [k, { avg, lo: avg - far, hi: avg + far }];
+})) as Record<Kind, { avg: number; lo: number; hi: number }>;
+const pos = (k: Kind, v: number) => Math.max(0, Math.min(100, (100 * (v - lanes[k].lo)) / (lanes[k].hi - lanes[k].lo)));
+const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
+// How hard each team is to face right now: the same rating its opponents' schedules use, told as the share of the
+// chances it gets (50% is even), and shaded like the next-ten tiles (darker = tougher).
+const share = (abbr: string) => sos?.share?.[abbr] ?? 0.5 + (sos?.ratings[abbr] ?? 0) / 12;
+const faceBand = (v: number) => [0.46, 0.485, 0.515, 0.54].filter((c) => v >= c).length;
+const faceH = [3, 10, 18, 27, 40];
+const pc = (v: number) => `${(100 * v).toFixed(1)}%`;
+const faceTip = (abbr: string) => `${info[abbr]?.place ?? abbr} get ${pc(share(abbr))} of the chances lately, with recent games counting most. 50% is even; the higher, the tougher to face.`;
+const chanceLine = (abbr: string) => { const v = sos?.ratings[abbr] ?? 0; return Math.abs(v) < 0.005 ? 'They are dead even on chances lately, with recent games counting most.'
+  : `They get ${pc(share(abbr))} of the chances lately, ${v > 0 ? 'out-chancing opponents' : 'getting out-chanced'} by ${Math.abs(v).toFixed(2)} expected goals a game, with recent games counting most. 50% is even.`; };
+const homeTerm = sos ? sos.terms.home.toFixed(2) : '';
+const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
+---
+<Base section="teams" title="Schedule strength" description="How hard every NHL team’s schedule has been so far, how hard the rest of it is, and how hard their next ten games are.">
+  <header class="page-top"><h1>Schedule strength</h1></header>
+  <p class="lede">How hard each team’s schedule has been, and how hard it gets from here. Tap a team for the details and its next ten games.</p>
+  <TeamTabs current="schedule" />
+  {!sos && <p class="note">The schedule numbers aren’t ready yet. They arrive with the next update.</p>}
+  {sos && (
+    <>
+      <div class="pick" id="ss-pick">
+        <span>Rank teams by</span>
+        <select id="ss-kind" aria-label="Which part of the schedule to rank by">
+          {KINDS.map(([k, , words]) => <option value={k} selected={k === 'left'}>{words}</option>)}
+        </select>
+      </div>
+      <div class="card ss-card" id="ss" data-kind="left">
+        <div class="ss-head" aria-hidden="true">
+          <span class="ss-rk">#</span><span class="ss-who">Team</span>
+          <span class="ss-ends"><span>Easier</span><span>Harder</span></span>
+          {KINDS.map(([k, label]) => <span class={`ss-n ss-n-${k}`}>{label}</span>)}
+          <span class="ss-fh">Tough to face</span>
+        </div>
+        <ol class="ss-list" id="ss-list">
+          {rows.map((t) => (
+            <li class="ss-row" data-team={t.team} data-past={t.past?.rank ?? 99} data-left={t.left?.rank ?? 99} data-next={t.next?.rank ?? 99} style={`--team:${teamPaint(t.team)}`}>
+              <details>
+                <summary>
+                  <span class="ss-rk">{KINDS.map(([k]) => <span class={`ss-for ss-for-${k}`}>{t[k]?.rank ?? '–'}</span>)}</span>
+                  <span class="ss-who"><i aria-hidden="true"></i><span class="full">{info[t.team].name}</span><span class="ab">{t.team}</span></span>
+                  <span class="ss-lanes">
+                    {KINDS.map(([k]) => t[k] && (
+                      <span class={`ss-lane ss-for ss-for-${k}`} aria-hidden="true">
+                        <span class="bh-track"></span>
+                        <span class="bh-avg" style={`--v:${pos(k, lanes[k].avg)}`}></span>
+                        <span class="bh-dot" style={`--v:${pos(k, t[k]!.hard)}`}></span>
+                      </span>
+                    ))}
+                  </span>
+                  {KINDS.map(([k, label]) => (
+                    <span class={`ss-n ss-n-${k}`} aria-label={t[k] ? `${label}: ${rankWords(t[k]!.rank)}` : undefined}>{t[k] ? ord(t[k]!.rank) : '–'}</span>
+                  ))}
+                  <span class="ss-fc"><span class:list={['ss-face', faceBand(share(t.team)) >= 4 && 'hot']} style={`--h:${faceH[faceBand(share(t.team))]}`} data-tip={faceTip(t.team)}>{pc(share(t.team))}</span></span>
+                  <span class="ss-plus" aria-hidden="true"></span>
+                </summary>
+                <div class="ss-more">
+                  <ul class="ss-says">
+                    {KINDS.map(([k, label]) => t[k] && (
+                      <li>
+                        <p class="ss-say-h"><span class="mini-h">{label}</span><span class="ss-say-rk">{cap(rankWords(t[k]!.rank))}</span></p>
+                        <p class="ss-say">{sentence(t[k]!, k)}</p>
+                      </li>
+                    ))}
+                    <li>
+                      <p class="ss-say-h"><span class="mini-h">As an opponent</span><span class="ss-say-rk">{pc(share(t.team))} of the chances</span></p>
+                      <p class="ss-say">{chanceLine(t.team)}</p>
+                    </li>
+                  </ul>
+                  {t.games.length > 0 && (
+                    <div class="ss-next">
+                      <p class="mini-h">Next {t.games.length} games</p>
+                      <SosStrip games={t.games} cuts={sos.cuts} />
+                    </div>
+                  )}
+                  <a class="ss-team" href={`${import.meta.env.BASE_URL}team/${t.team}/#form`}>{info[t.team].nick} schedule ›</a>
+                </div>
+              </details>
+            </li>
+          ))}
+        </ol>
+        <div class="ss-foot">
+          <p class="bh-key"><span class="k-dot">Schedule</span><span class="k-avg">League average</span></p>
+          <p class="sos-note">1st is the hardest schedule, 32nd the easiest. Tough to face is the share of the chances each team gets lately: 50% is even, and the higher, the tougher.</p>
+        </div>
+      </div>
+      <Section id="how" title="How it’s measured" placeholder={false} lead takeaway="Every game is rated by how hard it would be for an average team, then a schedule is the average of its games.">
+        <div class="ss-how">
+          <p><strong>Who they play.</strong> Each opponent is rated by its chances: the expected goals it creates minus the ones it allows, per game, in all situations with empty nets left out. Recent games count most: each game counts 5% less than the one after it, so a game from about 14 games ago counts half as much, and a team on a strong or poor run shows it. It is the same rating our post-game pages use to explain who was favored, and over the last three seasons it said more about the next game than records, goal difference or recent wins.</p>
+          <p><strong>When they played them.</strong> For games already played, an opponent counts as the team it was that day, so meeting a club during a hot stretch counts as hard even if it has cooled off since. Games still to come use each opponent’s rating today.</p>
+          <p><strong>Where and when.</strong> A road game counts as {homeTerm} expected goals a game harder than a neutral-ice game, and a home game that much easier. Playing the second night of a back-to-back counts as {b2bTerm} harder, and facing a team on the second night of one as {b2bTerm} easier. Both figures come from what home ice and back-to-backs have been worth in the league’s results since 2023-24.</p>
+          <p><strong>How much it matters.</strong> Over a whole season, schedules even out: most teams’ remaining schedules sit within a few hundredths of an expected goal a game of each other, worth a point or two in the standings. Ten-game stretches swing much more. Tested on 2024-25 and 2025-26 at the halfway mark, a team’s record adjusted for the schedule it had played was a slightly better guide to the second half than its record alone, in both seasons.</p>
+          <p>Opponents’ points percentages, in the details, are there as a familiar check: they use each opponent’s record today.</p>
+        </div>
+      </Section>
+    </>
+  )}
+</Base>
+
+<script>
+  const sel = document.getElementById('ss-kind') as HTMLSelectElement | null;
+  const card = document.getElementById('ss');
+  const list = document.getElementById('ss-list');
+  if (sel && card && list) {
+    let kind = 'left';
+    try { kind = localStorage.getItem('lc-sos-kind') || 'left'; } catch {}
+    if (![...sel.options].some((o) => o.value === kind)) kind = 'left';
+    sel.value = kind;
+    const paint = () => {
+      card.dataset.kind = kind;
+      const mine = (window as any).lcPrefs?.get('team');
+      const items = [...list.children] as HTMLElement[];
+      items.sort((a, b) => Number(a.dataset[kind]) - Number(b.dataset[kind]) || a.dataset.team!.localeCompare(b.dataset.team!));
+      items.forEach((li) => { li.classList.toggle('mine', li.dataset.team === mine); list.appendChild(li); });
+    };
+    sel.addEventListener('change', () => { kind = sel.value; try { localStorage.setItem('lc-sos-kind', kind); } catch {} paint(); });
+    paint();
+  }
+</script>
+
+<style is:global>
+  .ss-card { padding: 10px 0 14px; margin-top: 20px; }
+  .ss-head, .ss-row summary { display: grid; grid-template-columns: 2.6em minmax(0, 13em) minmax(120px, 1fr) repeat(3, 6.2em) 6.4em 18px; gap: 12px; align-items: center; padding: 0 20px; }
+  .ss-head { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+  .ss-ends { display: flex; justify-content: space-between; text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 500; }
+  .ss-list { list-style: none; margin: 0; padding: 0; }
+  .ss-row + .ss-row { border-top: 1px solid var(--rule); }
+  .ss-row summary { list-style: none; cursor: pointer; min-height: 44px; }
+  .ss-row summary::-webkit-details-marker { display: none; }
+  .ss-row summary:hover { background: color-mix(in oklab, var(--track) 35%, var(--sheet)); }
+  .ss-row.mine summary { background: color-mix(in oklab, var(--track) 60%, var(--sheet)); }
+  .ss-rk { text-align: right; font: 600 12px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .ss-who { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--ui); color: var(--ink); min-width: 0; }
+  .ss-who i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); flex: none; }
+  .ss-who .full { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ss-who .ab { display: none; }
+  .ss-head .ss-who { font: inherit; }
+  .ss-lanes { display: block; }
+  .ss-lane { position: relative; height: 18px; margin: 0 7px; }
+  .ss-n { text-align: right; font: 500 14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .ss-head .ss-n { font: inherit; color: inherit; }
+  .ss-fh { text-align: center; }
+  .ss-fc { display: flex; justify-content: center; }
+  .ss-face { display: inline-flex; align-items: center; justify-content: center; min-width: 50px; height: 22px; padding: 0 5px; border-radius: 5px; cursor: help;
+    font: 700 12px var(--ui); color: var(--ink); background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); box-shadow: inset 0 0 0 1px var(--rule); font-variant-numeric: tabular-nums; }
+  .ss-face.hot { color: var(--heat-on-hot); box-shadow: none; }
+  .ss-for { display: none; }
+  #ss[data-kind="past"] .ss-for-past, #ss[data-kind="left"] .ss-for-left, #ss[data-kind="next"] .ss-for-next { display: block; }
+  #ss[data-kind="past"] .ss-n-past, #ss[data-kind="left"] .ss-n-left, #ss[data-kind="next"] .ss-n-next { color: var(--ink); font-weight: 700; }
+  .ss-plus { width: 18px; height: 18px; position: relative; color: var(--ink-3); }
+  .ss-plus::before, .ss-plus::after { content: ''; position: absolute; left: 4px; right: 4px; top: 8px; height: 2px; border-radius: 1px; background: currentColor; }
+  .ss-plus::after { transform: rotate(90deg); transition: transform 0.15s; }
+  .ss-row details[open] .ss-plus::after { transform: rotate(0); }
+  .ss-more { padding: 6px 20px 18px calc(2.6em + 32px); display: grid; gap: 14px; }
+  .ss-says { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; max-width: 760px; }
+  .ss-say-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 2px; }
+  .ss-say-h .mini-h { margin: 0; }
+  .ss-say-rk { font: 600 15px var(--ui); color: var(--ink); }
+  .ss-say { margin: 0; font: 16px/1.5 var(--body); color: var(--ink-2); }
+  .ss-next .mini-h { margin: 0 0 6px; }
+  .ss-team { font: 600 13px var(--ui); color: var(--ink-2); }
+  .ss-foot { padding: 14px 20px 0; display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: center; }
+  .ss-foot .bh-key { margin: 0; }
+  .sos-note { margin: 0; font: 500 12.5px var(--ui); color: var(--ink-3); }
+  .ss-how p { max-width: 760px; margin: 0 0 14px; }
+  /* iPad widths: abbreviations instead of full names, so the three rank columns stay in view. */
+  @media (min-width: 720px) and (max-width: 1000px) {
+    .ss-head, .ss-row summary { grid-template-columns: 2.2em 4em minmax(120px, 1fr) repeat(3, 5.6em) 5.6em 18px; gap: 10px; padding: 0 16px; }
+    .ss-who .full { display: none; }
+    .ss-who .ab { display: inline; }
+    .ss-more { padding-left: 16px; }
+  }
+  /* Phones: place, team, the lane and the chosen column; the other two are in the details. */
+  @media (max-width: 719px) {
+    .ss-card { padding-top: 8px; }
+    .ss-head, .ss-row summary { grid-template-columns: 1.8em 3.6em minmax(0, 1fr) 3.4em 16px; gap: 8px; padding: 0 12px; }
+    .ss-who .full { display: none; }
+    .ss-who .ab { display: inline; }
+    .ss-n, .ss-fh, .ss-fc { display: none; }
+    #ss[data-kind="past"] .ss-n-past, #ss[data-kind="left"] .ss-n-left, #ss[data-kind="next"] .ss-n-next { display: block; }
+    .ss-head .ss-n { font-size: 10px; letter-spacing: 0.04em; }
+    .ss-more { padding: 4px 12px 16px; }
+    .ss-say { font-size: 15px; }
+    .ss-foot { padding: 12px 12px 0; }
+  }
+</style>
