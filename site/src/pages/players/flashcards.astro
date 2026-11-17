@@ -111,7 +111,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
       <span class="fc-inner"><span class="fc-face fc-front" id="fc-f"></span><span class="fc-face fc-back" id="fc-b"></span></span>
     </button>
     <div class="fc-actions" id="fc-actions"></div>
-    <p class="fc-keys">Keys: space to flip, ← again, ↓ unsure, → know it.</p>
+    <p class="fc-keys">Keys: space to flip, ← again, ↓ almost, → know it.</p>
   </div>
   <div class="card fc-done" id="fc-done" hidden></div>
   </div>
@@ -259,7 +259,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
       stage.hidden = true; done.hidden = false;
       const n = deck.length, k = firstTry.size, weak = new Set([...missed, ...shaky]);
       const nm = missed.size, ns = [...shaky].filter((id) => !missed.has(id)).length;
-      const rest = [nm && `missed ${nm}`, ns && `weren’t sure of ${ns}`].filter(Boolean).join(' and ');
+      const rest = [nm && `missed ${nm}`, ns && `almost had ${ns}`].filter(Boolean).join(' and ');
       done.innerHTML = `<p class="fc-done-h">That’s the whole deck.</p><p>You knew ${k} of ${n} ${n === 1 ? 'card' : 'cards'} right away.${rest ? ` You ${rest}.` : ' Nicely done.'}</p>
         <p class="fc-done-b"><button type="button" class="pill on" data-again="all">Go again</button>${weak.size ? `<button type="button" class="pill" data-again="missed">Practice those ${weak.size}</button>` : ''}</p>`;
       countEl.textContent = `${n} ${n === 1 ? 'card' : 'cards'}`;
@@ -289,10 +289,10 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     card.classList.toggle('flipped', flipped);
     card.setAttribute('aria-label', flipped ? 'Card back.' : 'Card front. Tap to flip.');
     actions.innerHTML = flipped
-      ? `<button type="button" class="pill" data-act="again" data-tip="Didn’t know it. It comes back in a few cards.">Again</button><button type="button" class="pill" data-act="unsure" data-tip="Got it, but not sure. It comes back later in the deck.">Unsure</button><button type="button" class="pill on" data-act="know" data-tip="Know it. Done for this round.">Know it</button>`
+      ? `<button type="button" class="pill" data-act="again" data-tip="Didn’t know it. It comes back in a few cards.">Again</button><button type="button" class="pill" data-act="unsure" data-tip="Almost had it, or got it but not sure. It comes back later in the deck.">Almost</button><button type="button" class="pill on" data-act="know" data-tip="Know it. Done for this round.">Know it</button>`
       : `<button type="button" class="pill on fc-go" data-act="flip">Flip the card</button>`;
   }
-  // Again: back in four cards. Unsure: back about twelve cards later (or at the end). Know it: done for this round.
+  // Again: back in four cards. Almost: back about twelve cards later (or at the end). Know it: done for this round.
   function grade(how: 'again' | 'unsure' | 'know') {
     if (!flipped || !queue.length) return;
     const r = queue.shift()!;
