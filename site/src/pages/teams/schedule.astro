@@ -24,15 +24,15 @@ const lanes = Object.fromEntries(KINDS.map(([k]) => {
 })) as Record<Kind, { avg: number; lo: number; hi: number }>;
 const pos = (k: Kind, v: number) => Math.max(0, Math.min(100, (100 * (v - lanes[k].lo)) / (lanes[k].hi - lanes[k].lo)));
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-// How hard each team is to face right now: the same rating its opponents' schedules use, ranked, and shaded like the
-// next-ten tiles (five steps of six or seven teams, darker = tougher).
-const faceOrder = sos ? Object.entries(sos.ratings).sort((a, b) => b[1] - a[1]).map(([a]) => a) : [];
-const face = (abbr: string) => faceOrder.indexOf(abbr) + 1;
-const faceBand = (r: number) => Math.max(0, 4 - Math.floor(((r - 1) * 5) / 32));
+// How hard each team is to face right now: the same rating its opponents' schedules use, told as the share of the
+// chances it gets (50% is even), and shaded like the next-ten tiles (darker = tougher).
+const share = (abbr: string) => sos?.share?.[abbr] ?? 0.5 + (sos?.ratings[abbr] ?? 0) / 12;
+const faceBand = (v: number) => [0.46, 0.485, 0.515, 0.54].filter((c) => v >= c).length;
 const faceH = [3, 10, 18, 27, 40];
-const faceWords = (r: number) => (r === 1 ? 'The toughest to face' : r === 32 ? 'The easiest to face' : r <= 16 ? `${ord(r)} toughest to face` : `${ord(33 - r)} easiest to face`);
-const chanceLine = (v: number) => Math.abs(v) < 0.005 ? 'They are dead even on chances, with recent games counting most.'
-  : `They ${v > 0 ? 'out-chance opponents' : 'get out-chanced'} by ${Math.abs(v).toFixed(2)} expected goals a game, with recent games counting most.`;
+const pc = (v: number) => `${(100 * v).toFixed(1)}%`;
+const faceTip = (abbr: string) => `${info[abbr]?.place ?? abbr} get ${pc(share(abbr))} of the chances lately, with recent games counting most. 50% is even; the higher, the tougher to face.`;
+const chanceLine = (abbr: string) => { const v = sos?.ratings[abbr] ?? 0; return Math.abs(v) < 0.005 ? 'They are dead even on chances lately, with recent games counting most.'
+  : `They get ${pc(share(abbr))} of the chances lately, ${v > 0 ? 'out-chancing opponents' : 'getting out-chanced'} by ${Math.abs(v).toFixed(2)} expected goals a game, with recent games counting most. 50% is even.`; };
 const homeTerm = sos ? sos.terms.home.toFixed(2) : '';
 const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
 ---
@@ -75,7 +75,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
                   {KINDS.map(([k, label]) => (
                     <span class={`ss-n ss-n-${k}`} aria-label={t[k] ? `${label}: ${rankWords(t[k]!.rank)}` : undefined}>{t[k] ? ord(t[k]!.rank) : '–'}</span>
                   ))}
-                  <span class="ss-fc"><span class:list={['ss-face', faceBand(face(t.team)) >= 4 && 'hot']} style={`--h:${faceH[faceBand(face(t.team))]}`} data-tip={`${faceWords(face(t.team))} right now, by the same rating used for everyone’s opponents. Darker is tougher.`}>{face(t.team)}</span></span>
+                  <span class="ss-fc"><span class:list={['ss-face', faceBand(share(t.team)) >= 4 && 'hot']} style={`--h:${faceH[faceBand(share(t.team))]}`} data-tip={faceTip(t.team)}>{pc(share(t.team))}</span></span>
                   <span class="ss-plus" aria-hidden="true"></span>
                 </summary>
                 <div class="ss-more">
@@ -87,8 +87,8 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
                       </li>
                     ))}
                     <li>
-                      <p class="ss-say-h"><span class="mini-h">As an opponent</span><span class="ss-say-rk">{faceWords(face(t.team))}</span></p>
-                      <p class="ss-say">{chanceLine(sos.ratings[t.team] ?? 0)}</p>
+                      <p class="ss-say-h"><span class="mini-h">As an opponent</span><span class="ss-say-rk">{pc(share(t.team))} of the chances</span></p>
+                      <p class="ss-say">{chanceLine(t.team)}</p>
                     </li>
                   </ul>
                   {t.games.length > 0 && (
@@ -105,7 +105,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
         </ol>
         <div class="ss-foot">
           <p class="bh-key"><span class="k-dot">Schedule</span><span class="k-avg">League average</span></p>
-          <p class="sos-note">1st is the hardest schedule, 32nd the easiest. Tough to face is each team’s own rank as an opponent right now; darker is tougher.</p>
+          <p class="sos-note">1st is the hardest schedule, 32nd the easiest. Tough to face is the share of the chances each team gets lately: 50% is even, and the higher, the tougher.</p>
         </div>
       </div>
       <Section id="how" title="How it’s measured" placeholder={false} lead takeaway="Every game is rated by how hard it would be for an average team, then a schedule is the average of its games.">
@@ -165,7 +165,7 @@ const b2bTerm = sos ? Math.abs(sos.terms.b2b).toFixed(2) : '';
   .ss-head .ss-n { font: inherit; color: inherit; }
   .ss-fh { text-align: center; }
   .ss-fc { display: flex; justify-content: center; }
-  .ss-face { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: 5px; cursor: help;
+  .ss-face { display: inline-flex; align-items: center; justify-content: center; min-width: 50px; height: 22px; padding: 0 5px; border-radius: 5px; cursor: help;
     font: 700 12px var(--ui); color: var(--ink); background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); box-shadow: inset 0 0 0 1px var(--rule); font-variant-numeric: tabular-nums; }
   .ss-face.hot { color: var(--heat-on-hot); box-shadow: none; }
   .ss-for { display: none; }

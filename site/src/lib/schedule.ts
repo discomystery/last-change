@@ -8,7 +8,7 @@ export type Part = {
 };
 export type NextGame = { id: number; date: string; opp: string; home: boolean; b2b: number; opp_b2b: number; hard: number };
 export type SosTeam = { team: string; past: Part | null; left: Part | null; next: Part | null; games: NextGame[] };
-export type Sos = { season: number; next: number; terms: { home: number; b2b: number }; cuts: number[]; ratings: Record<string, number>; teams: SosTeam[] };
+export type Sos = { season: number; next: number; terms: { home: number; b2b: number }; cuts: number[]; ratings: Record<string, number>; share?: Record<string, number>; chances?: number; teams: SosTeam[] };
 
 export const sos = Object.values(files)[0] as Sos | undefined;
 export const sosFor = (abbr: string) => sos?.teams.find((t) => t.team === abbr) ?? null;

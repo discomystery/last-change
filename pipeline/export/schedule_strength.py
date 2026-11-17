@@ -164,9 +164,16 @@ def run(season: int = CURRENT_SEASON) -> dict:
     # Where an upcoming game sits among every game left in the league, for the shading of the next-ten strip.
     left = rows.filter(~pl.col("played"))["hard"].to_numpy()
     cuts = [r3(x) for x in np.quantile(left, [0.2, 0.4, 0.6, 0.8])] if len(left) else []
+    # Each club's rating as the share of the chances it gets (50% is even): its expected-goal difference a game over
+    # the league's expected goals a game for both sides (empty nets out), so a margin reads on a familiar scale.
+    from pipeline.config import TABLES
+    tg = pl.read_parquet(TABLES / str(season) / "team_game.parquet")
+    per = tg.group_by("game_id", "team_id").agg(pl.col("xgf").filter(pl.col("strength") != "EN").sum() + pl.col("xga").filter(pl.col("strength") != "EA").sum())
+    total = float(per.select(pl.all().exclude("game_id", "team_id")).to_series().mean() or 6.0)
     payload = {"season": season, "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "next": NEXT,
                "terms": {k: r3(v) for k, v in terms.items()}, "cuts": cuts,
-               "ratings": {abbr[t]: r3(v) for t, v in sorted(now.items()) if t in abbr}, "teams": teams}
+               "ratings": {abbr[t]: r3(v) for t, v in sorted(now.items()) if t in abbr},
+               "chances": r3(total), "share": {abbr[t]: r3(0.5 + v / (2 * total)) for t, v in sorted(now.items()) if t in abbr}, "teams": teams}
     (SITE_DATA / "schedule_strength.json").write_text(json.dumps(payload, separators=(",", ":")))
     return {"schedule_strength": len(teams)}
 
