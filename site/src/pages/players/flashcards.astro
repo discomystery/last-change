@@ -1,0 +1,370 @@
+---
+// Flash cards for learning players. The visitor picks which facts go on the front and which on the back (or one of the
+// ready-made sets), which players are in the deck, and the order; then flips through, marking each card "Got it" or
+// "Again" (an "Again" card comes back a few cards later). Everything is drawn in the browser from one small list built
+// here from the player files. The choices are remembered on this device (lc-flash); the deck itself is not.
+import Base from '../../layouts/Base.astro';
+import teams from '../../../public/data/teams.json';
+import index from '../../../public/data/players/index.json';
+import goalieStats from '../../../public/data/stats/goalies.json';
+import { matchupTable } from '../../lib/teams';
+import { photoOf } from '../../lib/portraits';
+import { countryName, flagPath } from '../../lib/flags';
+import { ordinal } from '../../lib/format';
+
+type P = { id: number; name: string; last: string; team: string; pos: string; number: number | null };
+const base = import.meta.env.BASE_URL;
+const files = import.meta.glob('../../../public/data/players/*.json', { eager: true, import: 'default' }) as Record<string, any>;
+const byId = new Map(Object.entries(files).filter(([f]) => /\/\d+\.json$/.test(f)).map(([, p]) => [p.id as number, p]));
+
+// This season's goalie lines come from the league's own totals (the player files carry only skaters' lines).
+const gcols = (goalieStats as any).cols as string[];
+const gseason = (goalieStats as any).seasons?.[String(Math.max(...Object.keys((goalieStats as any).seasons ?? { 0: 0 }).map(Number)))] ?? [];
+const goalieLine = new Map<number, Record<string, any>>(gseason.map((r: any[]) => [r[0], Object.fromEntries(gcols.map((c, i) => [c, r[i]]))]));
+const PHOTO_HOST = 'https://assets.nhle.com/mugs/nhl/';
+const short = (u: string | null) => (u && u.startsWith(PHOTO_HOST) ? u.slice(PHOTO_HOST.length) : u);
+const svp = (v: number) => v.toFixed(3).replace(/^0/, '');
+
+const place = (b: any) => {
+  if (!b?.city) return null;
+  const tail = b.country === 'USA' || b.country === 'CAN' ? b.region : countryName(b.country);
+  return tail ? `${b.city}, ${tail}` : b.city;
+};
+const seasonLine = (p: any, x: P) => {
+  if (x.pos === 'G') {
+    const g = goalieLine.get(x.id);
+    if (!g?.gp) return null;
+    return `${g.gp} GP · ${g.w}-${g.l}-${g.otl} · ${g.svpct != null ? svp(g.svpct) : '–'} SV%`;
+  }
+  const s = p?.stats?.season;
+  if (!s?.gp) return null;
+  return `${s.gp} GP · ${s.g} G · ${s.a} A · ${s.p} P`;
+};
+
+// One row a player: [id, name, team, pos, number, photo, shoots, born, birthplace, country, flag, height, weight, drafted, season]
+const rows = (index as P[]).map((x) => {
+  const p = byId.get(x.id) ?? {};
+  const b = p.bio ?? {};
+  const dr = b.draft;
+  const flag = b.country ? flagPath(b.country) : null;
+  return [
+    x.id, x.name, x.team, x.pos, x.number ?? null, short(photoOf(x.id)), p.shoots ?? null, b.born ?? null,
+    place(b), b.country ? countryName(b.country) : null, flag ? `${base}${flag}` : null,
+    b.ht ? `${Math.floor(b.ht / 12)}′${b.ht % 12}″` : null, b.wt ? `${b.wt} lb` : null,
+    dr ? `${dr.year}, ${ordinal(dr.overall)} overall (${dr.team})` : b.born ? 'Undrafted' : null,
+    seasonLine(p, x),
+  ];
+});
+const teamList = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) => [t.abbr, t.name])), colors: matchupTable().c };
+---
+<Base section="players" title="Player flash cards" description="Learn NHL players with flash cards: pick what goes on the front and the back, such as a photo and a name, or a name and a team.">
+  <div class="fc-page">
+  <header class="page-top"><h1>Players</h1></header>
+  <nav class="ptabs" aria-label="Players"><a class="ptab pill" href={`${base}players/`}>Find a player</a><a class="ptab pill" href={`${base}players/rankings/`}>Rankings</a><a class="ptab pill" href={`${base}players/leaders/`}>Leaders</a><a class="ptab pill" href={`${base}players/compare/`}>Compare</a><a class="ptab pill" href={`${base}players/flashcards/`} aria-current="page">Flash cards</a></nav>
+  <p class="lede">Learn who’s who. Pick what goes on each side of the card, flip it to check yourself, and the cards you miss come back until you get them.</p>
+
+  <div class="pick fc-deck">
+    <span>Practice</span>
+    <select id="fc-pos" aria-label="Position">
+      <option value="">every player</option><option value="F">forwards</option><option value="D">defensemen</option><option value="G">goalies</option>
+    </select>
+    <span>on</span>
+    <select id="fc-team" aria-label="Team">
+      <option value="">every team</option>
+      {teamList.map((t) => <option value={t.abbr}>{t.name}</option>)}
+    </select>
+    <select id="fc-order" aria-label="Order">
+      <option value="shuffle">in random order</option><option value="number">by sweater number</option><option value="az">A to Z</option>
+    </select>
+  </div>
+
+  <div class="fc-sides card">
+    <p class="eyebrow">Quick sets</p>
+    <div class="fc-presets" id="fc-presets"></div>
+    <div class="fc-side"><p class="fc-side-h">Front</p><div class="fc-chips" id="fc-front" role="group" aria-label="On the front"></div></div>
+    <div class="fc-side"><p class="fc-side-h">Back</p><div class="fc-chips" id="fc-back" role="group" aria-label="On the back"></div></div>
+    <p class="fc-hint">Tap a fact to put it on that side. A fact can be on one side only.</p>
+  </div>
+
+  <p class="fc-count n" id="fc-count" aria-live="polite"></p>
+  <div class="fc-stage" id="fc-stage">
+    <button type="button" class="fc-card" id="fc-card" aria-live="polite">
+      <span class="fc-inner"><span class="fc-face fc-front" id="fc-f"></span><span class="fc-face fc-back" id="fc-b"></span></span>
+    </button>
+    <div class="fc-actions" id="fc-actions"></div>
+    <p class="fc-keys">Keys: space to flip, ← again, → got it.</p>
+  </div>
+  <div class="card fc-done" id="fc-done" hidden></div>
+  </div>
+  <script type="application/json" id="fc-boot" set:html={JSON.stringify(boot)}></script>
+</Base>
+
+<script>
+  type Row = [number, string, string, string, number | null, string | null, string | null, string | null, string | null, string | null, string | null, string | null, string | null, string | null, string | null];
+  type Boot = { host: string; rows: Row[]; teams: Record<string, string>; colors: Record<string, string> };
+  const boot = JSON.parse(document.getElementById('fc-boot')!.textContent!) as Boot;
+  for (const r of boot.rows) if (r[5] && !/^(https?:|data:)/.test(r[5])) r[5] = boot.host + r[5];
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const POS: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense', G: 'Goalie' };
+
+  const ageOf = (born: string | null) => {
+    if (!born) return null;
+    const b = new Date(`${born}T12:00:00`), now = new Date();
+    let a = now.getFullYear() - b.getFullYear();
+    if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a -= 1;
+    return a;
+  };
+
+  // Each fact a card can show: its name on the chips, and how it is drawn (null = this player doesn't have it).
+  type Field = { key: string; label: string; draw: (r: Row) => string | null };
+  const fact = (label: string, value: string, nospell = false, wide = false) => `<span class="fc-fact${wide ? ' wide' : ''}"><span class="eyebrow">${label}</span><span class="fc-val"${nospell ? ' data-nospell' : ''}>${value}</span></span>`;
+  const FIELDS: Field[] = [
+    { key: 'photo', label: 'Photo', draw: (r) => (r[5] ? `<span class="fc-photo"><img src="${esc(r[5])}" alt="" width="220" height="220" decoding="async" onerror="this.parentNode.classList.add('gone');this.remove()" /></span>` : null) },
+    { key: 'name', label: 'Name', draw: (r) => `<span class="fc-name">${esc(r[1])}</span>` },
+    { key: 'team', label: 'Team', draw: (r) => `<span class="fc-team" style="--team:${boot.colors[r[2]] ?? 'var(--ink-3)'}"><i></i>${esc(boot.teams[r[2]] ?? r[2])}</span>` },
+    { key: 'number', label: 'Number', draw: (r) => (r[4] != null ? `<span class="fc-num">#${r[4]}</span>` : null) },
+    { key: 'pos', label: 'Position', draw: (r) => fact('Position', POS[r[3]] ?? r[3]) },
+    { key: 'shoots', label: 'Shoots / catches', draw: (r) => (r[6] ? fact(r[3] === 'G' ? 'Catches' : 'Shoots', r[6] === 'L' ? 'Left' : 'Right') : null) },
+    { key: 'age', label: 'Age', draw: (r) => { const a = ageOf(r[7]); return a != null ? fact('Age', String(a)) : null; } },
+    { key: 'from', label: 'Birthplace', draw: (r) => (r[8] ? fact('Born in', `${r[10] ? `<img class="fc-flag" src="${esc(r[10])}" alt="" width="20" height="15" />` : ''}${esc(r[8])}`) : null) },
+    { key: 'country', label: 'Country', draw: (r) => (r[9] ? fact('Country of birth', `${r[10] ? `<img class="fc-flag" src="${esc(r[10])}" alt="" width="20" height="15" />` : ''}${esc(r[9])}`) : null) },
+    { key: 'size', label: 'Height and weight', draw: (r) => (r[11] || r[12] ? fact('Size', [r[11], r[12]].filter(Boolean).join(', '), true) : null) },
+    { key: 'draft', label: 'Drafted', draw: (r) => (r[13] ? fact('Drafted', esc(r[13])) : null) },
+    { key: 'season', label: 'This season', draw: (r) => fact('This season', r[14] ? esc(r[14]) : 'Hasn’t played yet', false, true) },
+  ];
+  const FIELD = new Map(FIELDS.map((f) => [f.key, f]));
+  const PRESETS: [string, string[], string[]][] = [
+    ['Face → name', ['photo'], ['name', 'team', 'number']],
+    ['Name → team', ['name'], ['team']],
+    ['Name and face → team', ['name', 'photo'], ['team', 'pos']],
+    ['Name → face', ['name'], ['photo']],
+    ['Team and number → name', ['team', 'number'], ['name', 'photo']],
+    ['Name → everything', ['name', 'photo'], ['team', 'number', 'pos', 'shoots', 'age', 'from', 'size', 'draft', 'season']],
+  ];
+
+  // Settings, remembered on this device. A first visit opens on the visitor's own team, face to name.
+  type Saved = { front: string[]; back: string[]; pos: string; team: string; order: string };
+  let saved: Partial<Saved> = {};
+  try { saved = JSON.parse(localStorage.getItem('lc-flash') ?? '{}') ?? {}; } catch {}
+  const known = (l: unknown) => (Array.isArray(l) ? l.filter((k) => FIELD.has(k)) : null);
+  let front: string[] = known(saved.front)?.length ? known(saved.front)! : [...PRESETS[0][1]];
+  let back: string[] = (known(saved.back) ?? [...PRESETS[0][2]]).filter((k) => !front.includes(k));
+  const posSel = document.getElementById('fc-pos') as HTMLSelectElement, teamSel = document.getElementById('fc-team') as HTMLSelectElement, orderSel = document.getElementById('fc-order') as HTMLSelectElement;
+  posSel.value = saved.pos ?? '';
+  teamSel.value = saved.team ?? ((window as any).lcPrefs?.get('team') || '');
+  if (teamSel.selectedIndex < 0) teamSel.value = '';
+  orderSel.value = saved.order ?? 'shuffle';
+  if (orderSel.selectedIndex < 0) orderSel.value = 'shuffle';
+  const save = () => { try { localStorage.setItem('lc-flash', JSON.stringify({ front, back, pos: posSel.value, team: teamSel.value, order: orderSel.value })); } catch {} };
+
+  // The side menus: one chip per fact on each side; tapping moves it to (or takes it off) that side.
+  const presetBox = document.getElementById('fc-presets')!, frontBox = document.getElementById('fc-front')!, backBox = document.getElementById('fc-back')!;
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((k) => b.includes(k));
+  function drawSides() {
+    presetBox.innerHTML = PRESETS.map(([label, f, b], i) => `<button type="button" class="pill${same(f, front) && same(b, back) ? ' on' : ''}" data-preset="${i}" aria-pressed="${same(f, front) && same(b, back)}">${label}</button>`).join('');
+    const chips = (side: string[], other: string[], name: string) => FIELDS.map((f) => {
+      const on = side.includes(f.key), elsewhere = other.includes(f.key);
+      return `<button type="button" class="fc-chip${on ? ' on' : ''}${elsewhere ? ' away' : ''}" data-side="${name}" data-key="${f.key}" aria-pressed="${on}">${f.label}</button>`;
+    }).join('');
+    frontBox.innerHTML = chips(front, back, 'front');
+    backBox.innerHTML = chips(back, front, 'back');
+  }
+  presetBox.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-preset]');
+    if (!b) return;
+    const [, f, bk] = PRESETS[+b.dataset.preset!];
+    front = [...f]; back = [...bk];
+    changed();
+  });
+  for (const box of [frontBox, backBox]) box.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-key]');
+    if (!b) return;
+    const k = b.dataset.key!, toFront = b.dataset.side === 'front';
+    const mine = toFront ? front : back, other = toFront ? back : front;
+    if (mine.includes(k)) mine.splice(mine.indexOf(k), 1);
+    else { mine.push(k); if (other.includes(k)) other.splice(other.indexOf(k), 1); }
+    // Keep each side in the menu's order, so the card always reads photo, name, team, number, then the rest.
+    const ord = (l: string[]) => l.sort((a, c) => FIELDS.findIndex((f) => f.key === a) - FIELDS.findIndex((f) => f.key === c));
+    ord(front); ord(back);
+    changed();
+  });
+
+  // The deck: every player in the menus who has everything the front needs and something for the back.
+  const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  let deck: Row[] = [], queue: Row[] = [], firstTry = new Set<number>(), missed = new Set<number>(), flipped = false;
+  const countEl = document.getElementById('fc-count')!;
+  const shuffle = <T,>(a: T[]) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function build(only?: Set<number>) {
+    const pos = posSel.value, team = teamSel.value;
+    const inMenu = boot.rows.filter((r) => (!pos || (pos === 'F' ? 'CLR'.includes(r[3]) : r[3] === pos)) && (!team || r[2] === team));
+    deck = inMenu.filter((r) => front.every((k) => FIELD.get(k)!.draw(r) != null) && back.some((k) => FIELD.get(k)!.draw(r) != null));
+    if (only) deck = deck.filter((r) => only.has(r[0]));
+    const left = inMenu.length - deck.length;
+    if (orderSel.value === 'number') deck.sort((a, b) => (a[4] ?? 999) - (b[4] ?? 999) || fold(a[1]).localeCompare(fold(b[1])));
+    else if (orderSel.value === 'az') deck.sort((a, b) => fold(a[1].split(' ').slice(1).join(' ')).localeCompare(fold(b[1].split(' ').slice(1).join(' '))) || fold(a[1]).localeCompare(fold(b[1])));
+    else shuffle(deck);
+    queue = [...deck];
+    firstTry = new Set(); missed = new Set();
+    countEl.dataset.left = left && !only ? `${left} ${left === 1 ? 'player is' : 'players are'} left out because ${left === 1 ? 'he doesn’t' : 'they don’t'} have ${front.length === 1 ? 'that fact' : 'those facts'} yet.` : '';
+    show();
+  }
+  function changed() { save(); drawSides(); build(); }
+
+  const card = document.getElementById('fc-card')!, faceF = document.getElementById('fc-f')!, faceB = document.getElementById('fc-b')!;
+  const actions = document.getElementById('fc-actions')!, stage = document.getElementById('fc-stage')!, done = document.getElementById('fc-done')!;
+  const faceOf = (r: Row, keys: string[]) => {
+    const parts = keys.map((k) => FIELD.get(k)!.draw(r)).filter(Boolean) as string[];
+    const big = keys.filter((k) => ['photo', 'name', 'team', 'number'].includes(k));
+    const facts = parts.filter((p) => p.startsWith('<span class="fc-fact'));
+    const heads = parts.filter((p) => !p.startsWith('<span class="fc-fact'));
+    const lone = !big.length && facts.length === 1 ? ' lone' : '';
+    const solo = parts.length === 1 ? '<span class="fc-solo" hidden></span>' : '';
+    return `${solo}${heads.join('')}${facts.length ? `<span class="fc-facts${lone}">${facts.join('')}</span>` : ''}`;
+  };
+  function show() {
+    if (!front.length || !back.length) {
+      stage.hidden = true; done.hidden = false;
+      done.innerHTML = `<p class="fc-done-h">Pick at least one fact for each side.</p><p>Tap the facts above, or start from one of the quick sets.</p>`;
+      countEl.textContent = '';
+      return;
+    }
+    if (!deck.length) {
+      stage.hidden = true; done.hidden = false;
+      done.innerHTML = `<p class="fc-done-h">No cards to show.</p><p>${countEl.dataset.left || 'No player matches the menus.'} Try another team or position.</p>`;
+      countEl.textContent = '';
+      return;
+    }
+    if (!queue.length) {
+      stage.hidden = true; done.hidden = false;
+      const n = deck.length, k = firstTry.size;
+      done.innerHTML = `<p class="fc-done-h">That’s the whole deck.</p><p>You got ${k} of ${n} ${n === 1 ? 'card' : 'cards'} on the first try${k === n ? '. Nicely done.' : '.'}</p>
+        <p class="fc-done-b"><button type="button" class="pill on" data-again="all">Go again</button>${missed.size ? `<button type="button" class="pill" data-again="missed">Practice the ${missed.size} I missed</button>` : ''}</p>`;
+      countEl.textContent = `${n} ${n === 1 ? 'card' : 'cards'}`;
+      return;
+    }
+    stage.hidden = false; done.hidden = true;
+    const r = queue[0];
+    flipped = false;
+    card.classList.remove('flipped');
+    card.classList.add('instant');
+    faceF.innerHTML = faceOf(r, front) + `<span class="fc-tap">Tap to flip</span>`;
+    faceB.innerHTML = faceOf(r, back);
+    void card.offsetWidth;
+    card.classList.remove('instant');
+    card.setAttribute('aria-label', 'Card front. Tap to flip.');
+    const left = new Set(queue.map((q) => q[0]));
+    const again = [...left].filter((id) => missed.has(id)).length;
+    countEl.textContent = `${deck.length - left.size} of ${deck.length} done${again ? ` · ${again} to try again` : ''}${countEl.dataset.left ? `. ${countEl.dataset.left}` : ''}`;
+    actions.innerHTML = `<button type="button" class="pill on fc-go" data-act="flip">Flip the card</button>`;
+    // Load the next photo now, so it is there when the card comes up.
+    const next = queue[1]?.[5];
+    if (next && (front.includes('photo') || back.includes('photo'))) { const im = new Image(); im.src = next; }
+  }
+  function flip() {
+    if (!queue.length) return;
+    flipped = !flipped;
+    card.classList.toggle('flipped', flipped);
+    card.setAttribute('aria-label', flipped ? 'Card back.' : 'Card front. Tap to flip.');
+    actions.innerHTML = flipped
+      ? `<button type="button" class="pill" data-act="again">Again</button><button type="button" class="pill on" data-act="got">Got it</button>`
+      : `<button type="button" class="pill on fc-go" data-act="flip">Flip the card</button>`;
+  }
+  function grade(ok: boolean) {
+    if (!flipped || !queue.length) return;
+    const r = queue.shift()!;
+    if (ok) { if (!missed.has(r[0])) firstTry.add(r[0]); }
+    else { missed.add(r[0]); queue.splice(Math.min(queue.length, 4), 0, r); }
+    show();
+  }
+  card.addEventListener('click', flip);
+  actions.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
+    if (a === 'flip') flip(); else if (a === 'got') grade(true); else if (a === 'again') grade(false);
+  });
+  done.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLElement>('[data-again]')?.dataset.again;
+    if (a === 'all') build(); else if (a === 'missed') build(new Set(missed));
+  });
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input, select, textarea') || (t.closest('button') && t !== card && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); grade(true); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); grade(false); }
+  });
+  for (const s of [posSel, teamSel, orderSel]) s.addEventListener('change', () => { save(); build(); });
+  drawSides();
+  build();
+</script>
+
+<style is:global>
+  .fc-page .ptabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
+  .fc-page .lede { margin-top: 18px; }
+  .fc-sides { display: grid; gap: 12px; margin-top: 14px; }
+  .fc-presets, .fc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fc-side { display: grid; grid-template-columns: 4.2em 1fr; align-items: baseline; gap: 10px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .fc-side-h { font: 600 16px var(--ui); color: var(--ink); }
+  .fc-chip { font: 500 14px/1 var(--ui); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--rule); background: none; color: var(--ink-2); cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s; }
+  .fc-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+  .fc-chip.on { background: var(--ink); border-color: var(--ink); color: var(--sheet); font-weight: 600; }
+  .fc-chip.away { color: var(--ink-3); border-style: dashed; }
+  .fc-hint { font: 400 13px var(--ui); color: var(--ink-3); }
+  .fc-count { margin-top: 22px; font: 500 14px var(--ui); color: var(--ink-2); text-align: center; min-height: 1.4em; }
+  .fc-stage { display: grid; justify-items: center; gap: 16px; margin-top: 10px; }
+  .fc-stage[hidden], .fc-done[hidden] { display: none; }
+
+  /* The card: both faces sit in one grid cell, so it is as tall as its fuller side. It turns over only when the site's
+     motion is on; otherwise the back simply replaces the front. */
+  .fc-card { width: min(100%, 440px); padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; perspective: 1400px; -webkit-tap-highlight-color: transparent; }
+  .fc-card:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 6px; border-radius: 22px; }
+  .fc-inner { display: grid; transform-style: preserve-3d; }
+  .fc-face { grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 340px; padding: 28px 24px 22px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 22px; box-shadow: 0 1px 2px rgb(15 28 43 / 0.05), 0 8px 28px rgb(15 28 43 / 0.07); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .fc-back { transform: rotateY(180deg); }
+  html.motion .fc-inner { transition: transform 0.5s cubic-bezier(0.3, 0.8, 0.25, 1); }
+  html.motion .fc-card.instant .fc-inner { transition: none; }
+  .fc-card.flipped .fc-inner { transform: rotateY(180deg); }
+  html:not(.motion) .fc-inner { transform: none !important; }
+  html:not(.motion) .fc-back { transform: none; visibility: hidden; }
+  html:not(.motion) .fc-card.flipped .fc-back { visibility: visible; }
+  html:not(.motion) .fc-card.flipped .fc-front { visibility: hidden; }
+  @media (prefers-reduced-motion: reduce) { html.motion .fc-inner { transition: none; } }
+
+  .fc-photo { display: block; width: 200px; height: 200px; margin-bottom: -4px; border-bottom: 1px solid var(--rule); }
+  .fc-photo.gone { display: none; }
+  .fc-photo img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; filter: var(--portrait-filter, brightness(1.1) contrast(1.03)); user-select: none; pointer-events: none; }
+  .fc-name { font: 700 32px/1.1 var(--display); color: var(--ink); text-wrap: balance; }
+  .fc-team { display: inline-flex; align-items: center; gap: 9px; font: 600 20px/1.2 var(--ui); color: var(--ink); }
+  .fc-team i { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--team); }
+  .fc-num { font: 700 44px/1 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .fc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 18px; width: 100%; margin-top: 4px; text-align: left; }
+  .fc-fact { display: grid; gap: 3px; align-content: start; }
+  .fc-fact.wide { grid-column: 1 / -1; }
+  .fc-val { display: inline-flex; align-items: center; gap: 7px; font: 500 17px/1.3 var(--ui); color: var(--ink); }
+  .fc-flag { flex: none; width: 20px; height: 15px; border-radius: 2px; box-shadow: 0 0 0 1px var(--rule); }
+  .fc-facts.lone { grid-template-columns: 1fr; text-align: center; }
+  .fc-facts.lone .fc-fact { justify-items: center; }
+  .fc-facts.lone .fc-val { font: 700 28px/1.2 var(--display); }
+  .fc-facts.lone .fc-flag { width: 28px; height: 21px; }
+  /* A side with one fact on it shows that fact bigger. */
+  .fc-face:has(.fc-solo) .fc-team { font-size: 28px; gap: 12px; }
+  .fc-face:has(.fc-solo) .fc-team i { width: 16px; height: 16px; }
+  .fc-face:has(.fc-solo) .fc-name { font-size: 38px; }
+  .fc-face:has(.fc-solo) .fc-num { font-size: 72px; }
+  .fc-tap { margin-top: auto; padding-top: 8px; font: 500 12px var(--ui); color: var(--ink-3); }
+  .fc-actions { display: flex; gap: 10px; justify-content: center; }
+  .fc-actions .pill { font-size: 16px; padding: 12px 24px; min-width: 8.5em; }
+  .fc-keys { font: 400 13px var(--ui); color: var(--ink-3); }
+  @media (pointer: coarse) { .fc-keys { display: none; } }
+  .fc-done { margin: 18px auto 0; max-width: 520px; text-align: center; display: grid; gap: 10px; font: 400 17px/1.5 var(--body); }
+  .fc-done-h { font: 700 24px/1.2 var(--display); }
+  .fc-done-b { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+  .fc-done-b .pill { font-size: 15px; padding: 10px 18px; }
+  @media (max-width: 560px) {
+    .fc-side { grid-template-columns: 1fr; gap: 8px; }
+    .fc-face { min-height: 300px; padding: 22px 16px 16px; }
+    .fc-photo { width: 170px; height: 170px; }
+    .fc-name { font-size: 28px; }
+    .fc-facts { grid-template-columns: 1fr 1fr; }
+  }
+</style>
