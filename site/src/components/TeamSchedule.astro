@@ -1,0 +1,49 @@
+---
+// A team page's schedule strength, under the season map: where the season so far, the rest of it and the next ten
+// games rank among the 32 schedules, and the next ten as a shaded strip. Leaves itself out without the data.
+import SosStrip from './SosStrip.astro';
+import { sos, sosFor, KINDS, rankWords, sentence } from '../lib/schedule';
+interface Props { abbr: string }
+const { abbr } = Astro.props;
+const t = sosFor(abbr);
+const base = import.meta.env.BASE_URL;
+---
+{sos && t && (
+  <div class="card tsos">
+    <div class="tsos-top">
+      <p class="mini-h">Schedule strength</p>
+      <a class="tsos-all" href={`${base}teams/schedule/`}>Every team ›</a>
+    </div>
+    <div class="tsos-tiles">
+      {KINDS.map(([k, label]) => t[k] && (
+        <div class="tsos-tile" data-tip={sentence(t[k]!, k)}>
+          <span class="tsos-l">{label}</span>
+          <span class="tsos-v">{rankWords(t[k]!.rank).replace(/^the /, '')}</span>
+          <span class="tsos-s">{t[k]!.rank} of 32<span class="tsos-g"> · {t[k]!.games} games</span></span>
+        </div>
+      ))}
+    </div>
+    {t.games.length > 0 && <SosStrip games={t.games} cuts={sos.cuts} key />}
+  </div>
+)}
+
+<style is:global>
+  .tsos { padding: 18px 22px 20px; margin-top: 20px; display: grid; gap: 14px; }
+  .tsos-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .tsos-top .mini-h { margin: 0; }
+  .tsos-all { font: 600 13px var(--ui); color: var(--ink-2); }
+  .tsos-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 640px; }
+  .tsos-tile { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: color-mix(in oklab, var(--track) 45%, var(--sheet)); cursor: help; }
+  .tsos-l { font: 600 11px var(--ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); }
+  .tsos-v { font: 600 20px/1.2 var(--display); color: var(--ink); }
+  .tsos-v::first-letter { text-transform: uppercase; }
+  .tsos-s { font: 500 12.5px var(--ui); color: var(--ink-3); }
+  @media (max-width: 719px) {
+    .tsos { padding: 16px; }
+    .tsos-tiles { gap: 6px; }
+    .tsos-tile { padding: 8px 9px; }
+    .tsos-v { font-size: 16px; }
+    .tsos-s { font-size: 11.5px; }
+    .tsos-g { display: none; }
+  }
+</style>

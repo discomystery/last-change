@@ -47,6 +47,7 @@ import { doublesNote } from '../../lib/lineShape';
 import { twoColumns } from '../../lib/masonry';
 import SeasonTrend from '../../components/SeasonTrend.astro';
 import SeasonMap from '../../components/SeasonMap.astro';
+import TeamSchedule from '../../components/TeamSchedule.astro';
 import ShareTeam from '../../components/ShareTeam.astro';
 import ShareGoalies from '../../components/ShareGoalies.astro';
 import ShareButton from '../../components/ShareButton.astro';
@@ -182,8 +183,10 @@ const coachSince = coach && (team as any).coach_since
   <Section id="form" title="Results and schedule" placeholder={false} takeaway={`Every game of ${team.place}’s season beside a map of where it’s played. The map plays the season so far, the next road trip, a trip abroad or the full season; the list opens at today.`}>
     <Fragment slot="explain">
       <p>Each game is placed where it’s played, so a game abroad, like the Global Series in Europe, gets its own city even when the league lists it as a home game. Distances are straight-line flights between arenas: from home to the first game, game to game, and back home at the end of a trip or the season. A road trip is a run of games away from home. A back-to-back is a game the day after another one.</p>
+      <p>Schedule strength rates each game by how hard it would be for an average team: the opponent’s chances lately, where it’s played and rest. 1st of 32 is the hardest schedule. The strip shades each of the next ten games among every game left in the league. Teams &gt; Schedule strength explains the method.</p>
     </Fragment>
     <SeasonMap abbr={abbr!} recaps={recapIds} previews={previewIds} />
+    <TeamSchedule abbr={abbr!} />
   </Section>
 
   <TeamStats abbr={abbr!} place={team.place} />

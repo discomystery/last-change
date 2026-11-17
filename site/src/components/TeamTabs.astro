@@ -1,10 +1,10 @@
 ---
 // The Teams section's tabs, like the Players section's: every club, the standings, and the league-wide rankings
 // (what used to be the League page).
-interface Props { current: 'all' | 'standings' | 'rankings' }
+interface Props { current: 'all' | 'standings' | 'schedule' | 'rankings' }
 const { current } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const tabs: [Props['current'], string, string][] = [['all', 'All teams', 'teams/'], ['standings', 'Standings', 'teams/standings/'], ['rankings', 'Rankings', 'teams/rankings/']];
+const tabs: [Props['current'], string, string][] = [['all', 'All teams', 'teams/'], ['standings', 'Standings', 'teams/standings/'], ['schedule', 'Schedule strength', 'teams/schedule/'], ['rankings', 'Rankings', 'teams/rankings/']];
 ---
 <nav class="ptabs" aria-label="Teams">
   {tabs.map(([id, label, href]) => <a class="ptab pill" href={`${base}${href}`} aria-current={id === current ? 'page' : undefined}>{label}</a>)}

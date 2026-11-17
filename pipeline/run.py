@@ -176,6 +176,8 @@ def quick(season: int = CURRENT_SEASON) -> dict:
     out["availability"] = availability.build(season)
     out["nhl_previews"] = nhl_previews.update(season)
     out["teams_and_schedule"] = site_json.export_teams_and_schedule(season)  # standings, and which games are final
+    from pipeline.export import schedule_strength
+    out["schedule_strength"] = schedule_strength.run(season)  # Teams > Schedule strength: tonight's results move it
     roster.run(season)
     out["previews"] = previews.run(within=timedelta(hours=18))
     pending.games.cache_clear()

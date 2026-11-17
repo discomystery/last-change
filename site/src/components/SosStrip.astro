@@ -1,0 +1,62 @@
+---
+// The next ten games as a strip of tiles, shaded by how hard each one is among every game left in the league
+// (Teams > Schedule strength and team pages). A dot marks the second night of a back-to-back.
+import { band, BAND_H, BAND_WORDS, day, type NextGame } from '../lib/schedule';
+import teams from '../../public/data/teams.json';
+interface Props { games: NextGame[]; cuts: number[]; key?: boolean }
+const { games, cuts, key = false } = Astro.props;
+const place = Object.fromEntries((teams as any[]).map((t) => [t.abbr, t.place]));
+const base = import.meta.env.BASE_URL;
+const tip = (g: NextGame) => {
+  const rest = [g.b2b ? 'Second night of a back-to-back for them.' : '', g.opp_b2b ? `${place[g.opp] ?? g.opp} on the second night of a back-to-back.` : ''].filter(Boolean).join(' ');
+  return `${day(g.date)}, ${g.home ? 'home to' : 'at'} ${place[g.opp] ?? g.opp}. ${BAND_WORDS[band(g.hard, cuts)]}.${rest ? ' ' + rest : ''}`;
+};
+---
+{games.length > 0 && (
+  <div class="sos-strip-wrap">
+    <ol class="sos-strip" aria-label="Next games, shaded by how hard each one is">
+      {games.map((g) => {
+        const b = band(g.hard, cuts);
+        return (
+          <li class:list={['sos-g', b >= 4 && 'hot']} style={`--h:${BAND_H[b]}`}>
+            <a href={`${base}games/#${g.date}`} data-tip={tip(g)} aria-label={tip(g)}>
+              <span class="sos-at">{g.home ? 'vs' : 'at'}</span>
+              <span class="sos-ab">{g.opp}</span>
+              {g.b2b === 1 && <i class="sos-b2b" aria-hidden="true"></i>}
+            </a>
+          </li>
+        );
+      })}
+    </ol>
+    {key && (
+      <p class="sos-key">
+        <span class="sos-ramp" aria-hidden="true">{BAND_H.map((h, i) => <i class:list={[i >= 4 && 'hot']} style={`--h:${h}`}></i>)}</span>
+        <span>Easier to harder, among every game left</span>
+        <span class="sos-kb"><i class="sos-b2b" aria-hidden="true"></i>Second night of a back-to-back</span>
+      </p>
+    )}
+  </div>
+)}
+
+<style is:global>
+  .sos-strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; max-width: 520px; }
+  .sos-g a { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: 44px; border-radius: 6px;
+    text-decoration: none; color: var(--ink); background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); box-shadow: inset 0 0 0 1px var(--rule); }
+  .sos-g.hot a { color: var(--heat-on-hot); box-shadow: none; }
+  .sos-g a:hover, .sos-g a:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 1px; }
+  .sos-at { font: 500 10px/1 var(--ui); opacity: 0.75; }
+  .sos-ab { font: 700 13px/1 var(--ui); letter-spacing: 0.02em; }
+  .sos-b2b { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.8; }
+  .sos-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 0 0; font: 500 12.5px var(--ui); color: var(--ink-3); }
+  .sos-ramp { display: inline-flex; gap: 2px; }
+  .sos-ramp i { width: 14px; height: 10px; border-radius: 2px; background: color-mix(in oklab, var(--heat) calc(var(--h, 0) * 1.5%), var(--sheet)); box-shadow: inset 0 0 0 1px var(--rule); }
+  .sos-ramp i.hot { box-shadow: none; }
+  .sos-kb { display: inline-flex; align-items: center; gap: 6px; }
+  .sos-kb .sos-b2b { position: static; color: var(--ink-3); }
+  @media (max-width: 420px) {
+    .sos-strip { gap: 3px; }
+    .sos-g a { height: 40px; border-radius: 5px; }
+    .sos-ab { font-size: 11px; letter-spacing: 0; }
+    .sos-at { font-size: 9px; }
+  }
+</style>
