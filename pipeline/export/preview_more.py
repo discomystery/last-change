@@ -27,7 +27,7 @@ HABITS = {
     "qualityAllowed": ("keep dangerous shots away", "give up a lot of dangerous shots"),
     "breakdowns": ("rarely break down in front of their goalie", "break down in front of their goalie a lot"),
     "longShifts": ("rarely get pinned in their own end", "get pinned in their own end on long shifts"),
-    "blocking": ("block a lot of shots", "rarely block shots"),
+    "blocking": ("block a lot of shots", "don’t block many shots"),
     "pointAllowed": ("let the point shots come and guard the net", "take away shots from the point"),
     "icing": ("rarely ice the puck", "ice the puck a lot"),
     "goalie": ("have had some of the best goaltending in the league", "have had shaky goaltending"),
