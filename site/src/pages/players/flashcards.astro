@@ -111,7 +111,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
       <span class="fc-inner"><span class="fc-face fc-front" id="fc-f"></span><span class="fc-face fc-back" id="fc-b"></span></span>
     </button>
     <div class="fc-actions" id="fc-actions"></div>
-    <p class="fc-keys">Keys: space to flip, ← again, → got it.</p>
+    <p class="fc-keys">Keys: space to flip, ← again, ↓ unsure, → know it.</p>
   </div>
   <div class="card fc-done" id="fc-done" hidden></div>
   </div>
@@ -212,7 +212,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
 
   // The deck: every player in the menus who has everything the front needs and something for the back.
   const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  let deck: Row[] = [], queue: Row[] = [], firstTry = new Set<number>(), missed = new Set<number>(), flipped = false;
+  let deck: Row[] = [], queue: Row[] = [], firstTry = new Set<number>(), missed = new Set<number>(), shaky = new Set<number>(), flipped = false;
   const countEl = document.getElementById('fc-count')!;
   const shuffle = <T,>(a: T[]) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   function build(only?: Set<number>) {
@@ -225,7 +225,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     else if (orderSel.value === 'az') deck.sort((a, b) => fold(a[1].split(' ').slice(1).join(' ')).localeCompare(fold(b[1].split(' ').slice(1).join(' '))) || fold(a[1]).localeCompare(fold(b[1])));
     else shuffle(deck);
     queue = [...deck];
-    firstTry = new Set(); missed = new Set();
+    firstTry = new Set(); missed = new Set(); shaky = new Set();
     countEl.dataset.left = left && !only ? `${left} ${left === 1 ? 'player is' : 'players are'} left out because ${left === 1 ? 'he doesn’t' : 'they don’t'} have ${front.length === 1 ? 'that fact' : 'those facts'} yet.` : '';
     show();
   }
@@ -257,9 +257,11 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     }
     if (!queue.length) {
       stage.hidden = true; done.hidden = false;
-      const n = deck.length, k = firstTry.size;
-      done.innerHTML = `<p class="fc-done-h">That’s the whole deck.</p><p>You got ${k} of ${n} ${n === 1 ? 'card' : 'cards'} on the first try${k === n ? '. Nicely done.' : '.'}</p>
-        <p class="fc-done-b"><button type="button" class="pill on" data-again="all">Go again</button>${missed.size ? `<button type="button" class="pill" data-again="missed">Practice the ${missed.size} I missed</button>` : ''}</p>`;
+      const n = deck.length, k = firstTry.size, weak = new Set([...missed, ...shaky]);
+      const nm = missed.size, ns = [...shaky].filter((id) => !missed.has(id)).length;
+      const rest = [nm && `missed ${nm}`, ns && `weren’t sure of ${ns}`].filter(Boolean).join(' and ');
+      done.innerHTML = `<p class="fc-done-h">That’s the whole deck.</p><p>You knew ${k} of ${n} ${n === 1 ? 'card' : 'cards'} right away.${rest ? ` You ${rest}.` : ' Nicely done.'}</p>
+        <p class="fc-done-b"><button type="button" class="pill on" data-again="all">Go again</button>${weak.size ? `<button type="button" class="pill" data-again="missed">Practice those ${weak.size}</button>` : ''}</p>`;
       countEl.textContent = `${n} ${n === 1 ? 'card' : 'cards'}`;
       return;
     }
@@ -274,7 +276,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     card.classList.remove('instant');
     card.setAttribute('aria-label', 'Card front. Tap to flip.');
     const left = new Set(queue.map((q) => q[0]));
-    const again = [...left].filter((id) => missed.has(id)).length;
+    const again = [...left].filter((id) => missed.has(id) || shaky.has(id)).length;
     countEl.textContent = `${deck.length - left.size} of ${deck.length} done${again ? ` · ${again} to try again` : ''}${countEl.dataset.left ? `. ${countEl.dataset.left}` : ''}`;
     actions.innerHTML = `<button type="button" class="pill on fc-go" data-act="flip">Flip the card</button>`;
     // Load the next photo now, so it is there when the card comes up.
@@ -287,31 +289,34 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     card.classList.toggle('flipped', flipped);
     card.setAttribute('aria-label', flipped ? 'Card back.' : 'Card front. Tap to flip.');
     actions.innerHTML = flipped
-      ? `<button type="button" class="pill" data-act="again">Again</button><button type="button" class="pill on" data-act="got">Got it</button>`
+      ? `<button type="button" class="pill" data-act="again" data-tip="Didn’t know it. It comes back in a few cards.">Again</button><button type="button" class="pill" data-act="unsure" data-tip="Got it, but not sure. It comes back later in the deck.">Unsure</button><button type="button" class="pill on" data-act="know" data-tip="Know it. Done for this round.">Know it</button>`
       : `<button type="button" class="pill on fc-go" data-act="flip">Flip the card</button>`;
   }
-  function grade(ok: boolean) {
+  // Again: back in four cards. Unsure: back about twelve cards later (or at the end). Know it: done for this round.
+  function grade(how: 'again' | 'unsure' | 'know') {
     if (!flipped || !queue.length) return;
     const r = queue.shift()!;
-    if (ok) { if (!missed.has(r[0])) firstTry.add(r[0]); }
+    if (how === 'know') { if (!missed.has(r[0]) && !shaky.has(r[0])) firstTry.add(r[0]); }
+    else if (how === 'unsure') { shaky.add(r[0]); queue.splice(Math.min(queue.length, 12), 0, r); }
     else { missed.add(r[0]); queue.splice(Math.min(queue.length, 4), 0, r); }
     show();
   }
   card.addEventListener('click', flip);
   actions.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (a === 'flip') flip(); else if (a === 'got') grade(true); else if (a === 'again') grade(false);
+    if (a === 'flip') flip(); else if (a === 'know' || a === 'unsure' || a === 'again') grade(a);
   });
   done.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest<HTMLElement>('[data-again]')?.dataset.again;
-    if (a === 'all') build(); else if (a === 'missed') build(new Set(missed));
+    if (a === 'all') build(); else if (a === 'missed') build(new Set([...missed, ...shaky]));
   });
   document.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement;
-    if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input, select, textarea') || (t.closest('button') && t !== card && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input, select, textarea') || (t.closest('button') && t !== card && !['ArrowLeft', 'ArrowRight', 'ArrowDown'].includes(e.key))) return;
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); grade(true); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); grade(false); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); grade('know'); }
+    else if (e.key === 'ArrowDown' && flipped) { e.preventDefault(); grade('unsure'); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); grade('again'); }
   });
   for (const s of [posSel, teamSel, whoSel, orderSel]) s.addEventListener('change', () => { save(); build(); });
   drawSides();
@@ -374,7 +379,9 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
   .fc-face:has(.fc-solo) .fc-num { font-size: 72px; }
   .fc-tap { margin-top: auto; padding-top: 8px; font: 500 12px var(--ui); color: var(--ink-3); }
   .fc-actions { display: flex; gap: 10px; justify-content: center; }
-  .fc-actions .pill { font-size: 16px; padding: 12px 24px; min-width: 8.5em; }
+  .fc-actions { flex-wrap: wrap; }
+  .fc-actions .pill { font-size: 16px; padding: 12px 22px; min-width: 7.5em; }
+  @media (max-width: 420px) { .fc-actions { gap: 8px; width: 100%; } .fc-actions .pill { min-width: 0; flex: 1 1 0; padding: 12px 10px; } .fc-actions .pill.fc-go { flex: none; padding: 12px 24px; } }
   .fc-keys { font: 400 13px var(--ui); color: var(--ink-3); }
   @media (pointer: coarse) { .fc-keys { display: none; } }
   .fc-done { margin: 18px auto 0; max-width: 520px; text-align: center; display: grid; gap: 10px; font: 400 17px/1.5 var(--body); }
