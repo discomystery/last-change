@@ -27,7 +27,7 @@ HABITS = {
     "qualityAllowed": ("keep dangerous shots away", "give up a lot of dangerous shots"),
     "breakdowns": ("rarely break down in front of their goalie", "break down in front of their goalie a lot"),
     "longShifts": ("rarely get pinned in their own end", "get pinned in their own end on long shifts"),
-    "blocking": ("block a lot of shots", "don't block many shots"),
+    "blocking": ("block a lot of shots", "don’t block many shots"),
     "pointAllowed": ("let the point shots come and guard the net", "take away shots from the point"),
     "icing": ("rarely ice the puck", "ice the puck a lot"),
     "goalie": ("have had some of the best goaltending in the league", "have had shaky goaltending"),
@@ -409,7 +409,12 @@ def _them(ln: str, t: str, W) -> str:
     the, poss = W.the(t), W.poss(t)
     ln = ln.replace(f" {the} are ", " they’re ").replace(f" {the} aren’t ", " they aren’t ")
     ln = re.sub(re.escape(poss) + r"(?= not\b| (?:doesn|isn|hasn)’t\b|[,.])", "theirs", ln)  # "and the Kings’ not so much", "but the Blues’ doesn’t" -> "theirs"
+    # the club as a clause's subject is "they", not "them" ("so the Wild hound the puck, but them sit back", MIN at BOS,
+    # outside notes Nov 11 and 14)
+    ln = re.sub(r"\b(but|and|while|so|though) " + re.escape(the) + r"\b(?!’)", r"\1 they", ln)
     ln = ln.replace(poss, "their").replace(f" {the}", " them")
+    # "against them, who give up plenty of them" only says the habit told just before it again (MTL at BOS, Nov 12)
+    ln = re.sub(r" them, who [^,.;]+", " them", ln)
     return ln
 
 

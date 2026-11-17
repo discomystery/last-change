@@ -212,3 +212,22 @@ def test_a_first_point_rides_on_the_goal_he_set_up():
     gm.goals[1]["p2"] = 5
     att, told = timeline.attachments(gm, [{"kind": "first_point", "pid": 5, "team": "NYR"}], {})
     assert 5 in told and att[1]["tail"] == "with \x005\x00 picking up his first NHL point on the goal"
+
+
+def test_insurance_that_became_the_official_winner_is_not_a_second_winner():
+    # DET at STL, outside notes Nov 10: "put the Blues ahead for good" then "... and that one stood up as the winner"
+    gm = _game([(1, 300, False, 1, "ev"), (2, 300, True, 3, "ev"), (2, 420, True, 4, "ev"), (3, 900, True, 5, "ev"), (3, 1150, False, 2, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "stood up as the winner" not in text and "that insurance goal turned out to be the winner" in text
+
+
+def test_a_period_named_later_in_a_sentence_does_not_rename_an_earlier_one():
+    # DET at FLA, Nov 12: "17 seconds into the period, and ... dropped the gloves early in the second"
+    out = timeline._periods(["Raymond pushed the lead to 3-1 just 17 seconds into the second, and they dropped the gloves early in the second."])
+    assert out == ["Raymond pushed the lead to 3-1 just 17 seconds into the second, and they dropped the gloves early in the period."]
+
+
+def test_an_empty_net_goal_the_other_side_answered():
+    gm = _game([(1, 300, True, 3, "ev"), (2, 300, True, 4, "ev"), (3, 1100, True, 5, "en"), (3, 1150, False, 2, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "didn’t stop" not in text and "Montréal still answered" in text

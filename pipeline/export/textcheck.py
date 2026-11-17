@@ -36,7 +36,8 @@ ERRORS = [
     (r"\b\d+\.\d+ minutes\b", "ice time as decimal minutes (write m:ss)"),
     (r"\b\d{1,2}:\d{2} ?(?:ET|EST|EDT|PT|CT|MT)\b", "time zone beside a time"),
     (r" ,|\s{2,}|\.\.(?!\.)", "stray space or punctuation"),
-    (r"[a-z]'s\b", "straight apostrophe (use ’)"),
+    (r"[a-z]'s\b|[a-z]n't\b", "straight apostrophe (use ’)"),
+    (r"\b(?:but|while) them\b|\bthem, who\b", "\"them\" as a clause's subject (say \"they\")"),
     (r"\beven\b[^.]*\beven\b", "\"even\" twice in one sentence"),
 ]
 ERRORS = [(re.compile(p, re.I if not any(c.isupper() for c in p.replace("\\b", "")) else 0), why) for p, why in ERRORS]

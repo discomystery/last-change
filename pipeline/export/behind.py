@@ -478,7 +478,7 @@ def _finishing(season: int) -> dict[int, float]:
     return {r["player_id"]: (r["g"] + FINISH_K) / (r["xg"] + FINISH_K) for r in f.iter_rows(named=True)}
 
 
-def luck_items(away: str, home: str, season: int, before: str, W, names: dict[int, str]) -> list[dict]:
+def luck_items(away: str, home: str, season: int, before: str, W, names: dict[int, str], skip: set | None = None) -> list[dict]:
     """Who to watch: a shooter on either club scoring far above or below his chances, counted against his own usual
     finishing so a sniper is not called lucky for being a sniper (Sora, 2026-10-30: "whose luck may turn"). Only
     players who dressed in their club's last game, from games before the preview's day."""
@@ -502,7 +502,7 @@ def luck_items(away: str, home: str, season: int, before: str, W, names: dict[in
             exp = r["xg"] * fin.get(r["player_id"], 1.0)
             d = r["g"] - exp
             ok = (d >= LUCK_HOT and r["g"] >= 1.6 * exp) or (d <= -LUCK_COLD and r["xg"] >= LUCK_MIN_XG)
-            if ok and r["player_id"] in names and (best is None or abs(d) > abs(best[0])):
+            if ok and r["player_id"] in names and r["player_id"] not in (skip or ()) and (best is None or abs(d) > abs(best[0])):
                 best = (d, r)
         if best:
             d, r = best
