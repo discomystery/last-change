@@ -12,7 +12,8 @@ import PlayerJobs from '../../components/PlayerJobs.astro';
 import GameSwing from '../../components/GameSwing.astro';
 import GameFlow from '../../components/GameFlow.astro';
 import LineMatchups from '../../components/LineMatchups.astro';
-import { existsSync } from 'node:fs';
+import PowerPlays from '../../components/PowerPlays.astro';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SectionNav from '../../components/SectionNav.astro';
 import CallCard from '../../components/CallCard.astro';
@@ -218,6 +219,9 @@ const hasImpact = !!scoresFor<{ players: unknown[] }>(r.game_id)?.players.length
 const story = r.story;
 // How it unfolded: the shots and shifts are read in the browser from data/flow/{id}.json when the file exists.
 const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_id}.json`));
+// Power plays: data/powerplays/{id}.json (export/power_plays.py), read at build time; none when neither team had one.
+const ppFile = resolve(process.cwd(), 'public/data/powerplays', `${r.game_id}.json`);
+const hasPP = existsSync(ppFile) && JSON.parse(readFileSync(ppFile, 'utf8')).list.length > 0;
 const nav = [
   ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'Flow']] : []), ['preview', 'Preview review'],
   ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'Goalies'],
@@ -285,6 +289,7 @@ import GameSwitch from '../../components/GameSwitch.astro';
   {hasFlow && (
     <Section id="flow" title="Game flow" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
       <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
+      {hasPP && <PowerPlays id={r.game_id} place={place} side={side} />}
       <LineMatchups id={r.game_id} awayPlace={place(away)} homePlace={place(home)} />
     </Section>
   )}
