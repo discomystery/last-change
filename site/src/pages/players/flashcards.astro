@@ -8,6 +8,7 @@ import teams from '../../../public/data/teams.json';
 import index from '../../../public/data/players/index.json';
 import goalieStats from '../../../public/data/stats/goalies.json';
 import skaterStats from '../../../public/data/stats/skaters.json';
+import rosterData from '../../../public/data/roster.json';
 import { matchupTable } from '../../lib/teams';
 import { photoOf } from '../../lib/portraits';
 import { countryName, flagPath } from '../../lib/flags';
@@ -31,10 +32,19 @@ const sseason = (skaterStats as any).seasons?.[String(Math.max(...Object.keys((s
 const skaterGp = new Map<number, number>(sseason.map((r: any[]) => [r[0], r[scols.indexOf('gp')] ?? 0]));
 const clubGames = new Map(teams.map((t) => [t.abbr, t.gp ?? 0]));
 const REGULAR_SHARE = { skater: 0.5, goalie: 0.2 };
+// A player who is hurt, suspended or on leave keeps his place when he was a regular before it (half the games his club
+// played before his current run of missed ones), or was one of the club's key players last season (roster.json `key`).
+const AWAY = new Set(['injured', 'suspended', 'personal']);
+const away = new Map<number, { missed: number; key: boolean }>();
+for (const list of Object.values((rosterData as any).teams ?? {}) as any[][])
+  for (const r of list) if (AWAY.has(r.status)) away.set(r.id, { missed: r.missed ?? 0, key: !!r.key });
 const regular = (x: P) => {
   const gp = (x.pos === 'G' ? goalieLine.get(x.id)?.gp : skaterGp.get(x.id)) ?? 0;
   const club = clubGames.get(x.team) ?? 0;
-  return gp > 0 && gp >= (x.pos === 'G' ? REGULAR_SHARE.goalie : REGULAR_SHARE.skater) * club ? 1 : 0;
+  const share = x.pos === 'G' ? REGULAR_SHARE.goalie : REGULAR_SHARE.skater;
+  if (gp > 0 && gp >= share * club) return 1;
+  const out = away.get(x.id);
+  return out && (out.key || (gp > 0 && gp >= share * Math.max(club - out.missed, 1))) ? 1 : 0;
 };
 const svp = (v: number) => v.toFixed(3).replace(/^0/, '');
 
@@ -95,7 +105,7 @@ const boot = { host: PHOTO_HOST, rows, teams: Object.fromEntries(teams.map((t) =
     </select>
   </div>
 
-  <p class="fc-hint fc-rule">Players who play regularly have dressed for at least half their team’s games this season (goalies a fifth). The rest, including players who haven’t played yet, play less often.</p>
+  <p class="fc-hint fc-rule">Players who play regularly have dressed for at least half their team’s games this season (goalies a fifth). Injured or suspended players count too if they were regulars before they went out, or key players last season. The rest, including players who haven’t played yet, play less often.</p>
 
   <div class="fc-sides card">
     <p class="eyebrow">Quick sets</p>
