@@ -205,6 +205,8 @@ const base = import.meta.env.BASE_URL;
     let T = Infinity; // the moment on show (Infinity = the final)
     let soN = Infinity; // shootout attempts on show
     let shiftOpen = false;
+    let ppSel: { a: number; b: number; h: number } | null = null; // a power play picked in the Power plays card below
+    let atSent: number | null = -1; // the moment last told to that card
 
     // Live games (live/{id}/ pages, data-live): the file comes from the live feed (pipeline/live) and is fetched again every
     // minute; a new version is drawn unless the reader is playing the game back or has picked a moment.
@@ -366,9 +368,11 @@ const base = import.meta.env.BASE_URL;
       const clip = mk('rect', { x: 0, y: 0, width: W, height: VH }, mk('clipPath', { id: `gf-cc-${g.away}${g.home}` }, mk('defs', {}, svg)));
       for (const c of curves) c.setAttribute('clip-path', `url(#gf-cc-${g.away}${g.home})`);
       const goalMarks: [Shot, any][] = goals.map((s) => [s, mk('circle', { cx: X(s.t), cy: yAt(s), r: 6, fill: 'var(--sheet)', stroke: C[s.h], 'stroke-width': 3, class: 'gf-gp', 'data-shot': g.shots.indexOf(s), style: 'cursor:pointer' }, svg)]);
+      // the power play picked in the card below, outlined over its band
+      const ppMark = mk('rect', { y: T0 + 0.75, height: B - T0 - 1.5, rx: 3, 'fill-opacity': 0.12, 'stroke-width': 1.5, 'pointer-events': 'none', opacity: 0 }, svg);
       const fx = mk('g', {}, svg);
       const cur = mk('line', { y1: T0, y2: B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: 0, 'pointer-events': 'none' }, svg);
-      return { W, L, R, X, T: T0, B, VH, curves, clip, names, goalMarks, fx, cur, cum, yAt };
+      return { W, L, R, X, T: T0, B, VH, curves, clip, names, goalMarks, ppMark, fx, cur, cum, yAt };
     }
 
     function draw() {
@@ -516,6 +520,12 @@ const base = import.meta.env.BASE_URL;
         svg.querySelectorAll('.gf-son').forEach((e: any) => e.style.opacity = t >= END ? 1 : 0);
         CH.cur.setAttribute('opacity', t < END ? 1 : 0); CH.cur.setAttribute('x1', CH.X(Math.min(t, END))); CH.cur.setAttribute('x2', CH.X(Math.min(t, END)));
         board(t); setPP(t); slide(t);
+        const m = CH.ppMark;
+        if (ppSel) { const x0 = CH.X(ppSel.a), x1 = CH.X(Math.min(ppSel.b, END)); m.setAttribute('x', x0); m.setAttribute('width', Math.max(3, x1 - x0)); m.setAttribute('fill', C[ppSel.h]); m.setAttribute('stroke', C[ppSel.h]); m.setAttribute('opacity', 1); }
+        else m.setAttribute('opacity', 0);
+        // tell the Power plays card where the chart is, so the power play under this moment lights up there
+        const now = t >= END ? null : Math.floor(t);
+        if (now !== atSent) { atSent = now; document.dispatchEvent(new CustomEvent('lc-flow-at', { detail: { t: now } })); }
       };
       const showAt = (t: number) => {
         T = t;
@@ -592,6 +602,7 @@ const base = import.meta.env.BASE_URL;
         if (anim) return;
         if ((e.target as Element).closest('[data-so]')) { $('gf-so').scrollIntoView({ behavior: CALM ? 'auto' : 'smooth', block: 'center' }); return; }
         const s = shotOf(e.target as Element); pinned = s ? s.t : tAt(e);
+        if (ppSel) letGoPP();
         if (s && s.g) goalCard(s, true);
       });
       svg.addEventListener('pointermove', (e: PointerEvent) => {
@@ -775,7 +786,7 @@ const base = import.meta.env.BASE_URL;
       if (!S) return;
       if (anim) { stop(true); return; }
       if (CALM) { soN = g.so.length; S.showAt(S.END); return; }
-      const from = paused; paused = null; pinned = null; S.iceAt(null); S.tip.hide();
+      const from = paused; paused = null; pinned = null; S.iceAt(null); S.tip.hide(); if (ppSel) letGoPP();
       const shots = g.shots as Shot[];
       if (!from) { soN = 0; S.showAt(0); }
       anim = { raf: 0, t0: performance.now() - (from ? from.ms : 0), i: shots.filter((s) => s.t <= (from ? from.t : -1)).length, t: from ? from.t : 0 }; done = false; setBtn(true);
@@ -795,6 +806,19 @@ const base = import.meta.env.BASE_URL;
       io.observe(stage.querySelector('svg')!);
     }
     btn.addEventListener('click', play);
+    // A power play picked in the Power plays card (PowerPlays.astro): outline its band and stop the chart at its end, with
+    // who was on the ice then, bringing the chart into view if it is off screen. Picking it again (detail null) lets go.
+    function letGoPP() { ppSel = null; document.dispatchEvent(new CustomEvent('lc-flow-pp-clear')); }
+    document.addEventListener('lc-flow-pp', (e: Event) => {
+      const d = (e as CustomEvent).detail as { a: number; b: number; h: number } | null;
+      ppSel = d;
+      if (!S) return;  // drawn with the chart once it loads
+      stop(); paused = null;
+      if (!d) { pinned = null; S.showAt(S.END); S.iceAt(null); return; }
+      pinned = Math.max(d.a, Math.min(d.b, g.NOW) - 0.5); S.showAt(pinned); S.iceAt(pinned);
+      const r = (stage.querySelector('svg') ?? stage).getBoundingClientRect();
+      if (r.top < 96 || r.bottom > innerHeight) window.scrollBy({ top: r.top - 150, behavior: CALM ? 'auto' : 'smooth' });
+    });
     selV.addEventListener('change', () => { if (!g) return; draw(); play(); });
     selB.addEventListener('change', () => { if (!g) return; draw(); });
     let drawnAt = host.clientWidth; addEventListener('resize', () => { const w = host.clientWidth; if (g && !anim && (narrow() !== drawnAt < 560 || Math.abs(w - drawnAt) > 120)) { drawnAt = w; draw(); } });

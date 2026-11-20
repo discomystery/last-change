@@ -223,7 +223,7 @@ const hasFlow = existsSync(resolve(process.cwd(), 'public/data/flow', `${r.game_
 const ppFile = resolve(process.cwd(), 'public/data/powerplays', `${r.game_id}.json`);
 const hasPP = existsSync(ppFile) && JSON.parse(readFileSync(ppFile, 'utf8')).list.length > 0;
 const nav = [
-  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'Flow']] : []), ...(hasPP ? [['powerplays', 'Power plays']] : []), ['preview', 'Preview review'],
+  ['story', 'Overview'], ...(dw ? [['replays', 'Run it back']] : []), ...(hasFlow ? [['flow', 'Flow']] : []), ['preview', 'Preview review'],
   ...(hasImpact ? [['swing', 'Swing']] : []), ...(hasJobs ? [['jobs', 'Players']] : []), ['goalies', 'Goalies'],
 ];
 const dots = replays ? [...Array(replays.away).fill('away'), ...Array(replays.tie).fill('tie'), ...Array(replays.home).fill('home')] : [];
@@ -289,11 +289,10 @@ import GameSwitch from '../../components/GameSwitch.astro';
   {hasFlow && (
     <Section id="flow" title="Game flow" placeholder={false} takeaway="Every shot on goal or wide of the net, in game time. Press play, or tap the chart to stop at a moment and see who was on the ice.">
       <GameFlow id={r.game_id} away={away} home={home} awayName={T[away]?.name ?? away} homeName={T[home]?.name ?? home} score={[r.score[away], r.score[home]]} end={r.end} />
+      {hasPP && <PowerPlays id={r.game_id} place={place} side={side} />}
       <LineMatchups id={r.game_id} awayPlace={place(away)} homePlace={place(home)} />
     </Section>
   )}
-
-  {hasPP && <PowerPlays id={r.game_id} place={place} side={side} />}
 
   <Section id="preview" title="Preview review" placeholder={false} takeaway={takeaway} lead>
     <Fragment slot="explain">
