@@ -2,8 +2,7 @@
 save percentage, power-play and penalty-kill percentages (Sora, 2026-10-14: fans fact-check against NHL.com, so the
 plain counting stats should be the league's official ones, not rebuilt from the play-by-play).
 
-One request per report per season from the NHL stats API (`api.nhle.com/stats/rest/en/{report}`, every row with
-`limit=-1`): the current season on every update, a finished season once. Saved as returned, gzipped, in
+The NHL stats API (`api.nhle.com/stats/rest/en/{report}`, every row, in pages of 100: `client.stats_rows`): the current season on every update, a finished season once. Saved as returned, gzipped, in
 data/raw/official/{season}/{report}.json.gz; offline runs read what is saved.
 """
 import gzip
@@ -13,7 +12,7 @@ from datetime import date
 import httpx
 
 from pipeline.config import CURRENT_SEASON, NHL_STATS, OFFLINE, PLAYOFFS, RAW, REGULAR, season_id
-from pipeline.ingest.client import get
+from pipeline.ingest.client import stats_rows
 
 REPORTS = ("skater/summary", "skater/realtime", "skater/timeonice", "skater/faceoffwins", "goalie/summary",
            "team/summary", "team/powerplay", "team/penaltykill", "team/realtime")
@@ -27,13 +26,11 @@ def path(season: int, report: str, game_type: int = REGULAR):
 
 
 def _fetch(season: int, report: str, game_type: int) -> bool:
-    url = f"{NHL_STATS}/{report}?limit=-1&cayenneExp=seasonId={season_id(season)}%20and%20gameTypeId={game_type}"
+    exp = f"seasonId={season_id(season)} and gameTypeId={game_type}"
     try:
-        rows = get(url).json().get("data")
+        rows = stats_rows(f"{NHL_STATS}/{report}", {"cayenneExp": exp}, "teamId" if report.startswith("team/") else "playerId")
     except (httpx.HTTPError, RuntimeError, ValueError):
         return False  # the saved copy stays; tried again next run
-    if rows is None:
-        return False
     p = path(season, report, game_type)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(gzip.compress(json.dumps(rows).encode()))

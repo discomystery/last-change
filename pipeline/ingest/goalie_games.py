@@ -22,11 +22,10 @@ from __future__ import annotations
 import gzip
 import json
 from functools import lru_cache
-from urllib.parse import urlencode
 
 from pipeline.config import CURRENT_SEASON, NHL_STATS, OFFLINE, RAW
 from pipeline.ingest.records import BASE as RECORDS
-from pipeline.ingest.client import get
+from pipeline.ingest.client import get, stats_rows
 
 DIR = RAW / "records" / "goalie_games"
 LOCKOUT = 2004  # 2004-05 was never played, so it is no gap
@@ -42,11 +41,10 @@ def _season_id(season: int) -> int:
 
 def _fetch(fid: int) -> dict:
     exp = f"franchiseId={fid} and gameTypeId=2 and seasonId<{_season_id(CURRENT_SEASON)}"
-    q = {"isAggregate": "false", "isGame": "true", "limit": -1, "start": 0, "cayenneExp": exp,
+    q = {"isAggregate": "false", "isGame": "true", "cayenneExp": exp,
          "sort": json.dumps([{"property": "gameDate", "direction": "ASC"}, {"property": "gameId", "direction": "ASC"}])}
-    rows = get(f"{NHL_STATS}/goalie/summary?{urlencode(q)}").json()["data"]
-    teams = get(f"{NHL_STATS}/team/summary?" + urlencode({"isAggregate": "false", "isGame": "false", "limit": -1,
-                                                          "cayenneExp": exp})).json()["data"]
+    rows = stats_rows(f"{NHL_STATS}/goalie/summary", q, "playerId")
+    teams = stats_rows(f"{NHL_STATS}/team/summary", {"isAggregate": "false", "isGame": "false", "cayenneExp": exp}, "seasonId")
     out, per = [], {}
     for r in rows:
         dec = "W" if r.get("wins") else "L" if r.get("losses") else "O" if r.get("otLosses") else "T" if r.get("ties") else None
