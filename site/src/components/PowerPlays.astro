@@ -32,6 +32,7 @@ const cls = (a: string) => `t-${side(a)}`;
 const clock = (s: number) => `${Math.floor(Math.round(s) / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`;
 const xg = (v: number) => v.toFixed(2);
 const poss = (p: string) => (p.endsWith('s') ? `${p}’` : `${p}’s`);
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // One shared scale for every lane in the section, so a long bar means the same thing everywhere.
@@ -60,14 +61,15 @@ const start = order[0];
         const n = Math.max(t.opps, t.rows);
         return (
           <div class={`ppx-team ${cls(a)}`}>
-            <p class="ppx-t"><i></i>{a}</p>
+            <p class="ppx-t"><i></i>{place(a)}</p>
             {n > 0 ? (
               <>
-                <p class="ppx-rec"><strong>{t.pp_goals} for {n}</strong><span>{clock(t.sec)} · {t.sog} on goal</span></p>
-                <div class="ppl-lane" role="img" aria-label={`${xg(t.xg)} expected goals; a typical power play makes ${xg(t.typical)} in that time`}>
+                <p class="ppx-rec"><strong>{t.pp_goals} for {n}</strong> <span>in {clock(t.sec)} on the power play</span></p>
+                <div class="ppx-lane" role="img" aria-label={`${xg(t.xg)} expected goals; a typical power play makes ${xg(t.typical)} in that time`}>
                   <span class="lane"><b style={`width:${atT(t.xg)}`}></b><em class="term" tabindex="0" style={`left:${atT(t.typical)}`} data-tip={typicalTip(t.typical, t.sec)}></em></span>
-                  <span class="ppl-xg">{xg(t.xg)}</span>
+                  <span class="ppx-xg"><strong>{xg(t.xg)}</strong> expected goals</span>
                 </div>
+                <p class="ppx-shots"><strong>{t.sog}</strong> {t.sog === 1 ? 'shot' : 'shots'} on goal, <strong>{t.against.sog}</strong> given up shorthanded{t.against.goals > 0 && <> ({plural(t.against.goals, 'goal')})</>}</p>
               </>
             ) : <p class="ppx-none">No power plays</p>}
           </div>
@@ -75,9 +77,19 @@ const start = order[0];
       })}
     </div>
 
+    <p class="ppl-key"><span class="lane key"><b style="width:46%"></b><em style="left:62%"></em></span> Bars are expected goals, what the chances were worth; the dotted mark is a typical power play of the same length. Tap a row to see it on the chart, or its arrow for more.</p>
+    <div class="ppl-head" aria-hidden="true"><span>When</span><span>Penalty</span><span>Shots</span><span>Expected goals</span><span>How it ended</span><span></span></div>
     <ol class="ppl">
       {pp.list.map((r) => {
         const note = strengthNote(r);
+        const opp = r.team === pp.away ? pp.home : pp.away;
+        const mid = `ppm-${r.start}`;
+        const lines: [string, string, string][] = [
+          ['Shots on goal', String(r.sog), String(r.against.sog)],
+          ['All shots', String(r.att), String(r.against.att)],
+          ['Expected goals', xg(r.xg), xg(r.against.xg)],
+          ['Goals', String(r.scorers.length), String(r.against.scorers.length)],
+        ];
         return (
           <li class={cls(r.team)} data-a={r.start} data-b={r.start + r.sec} data-h={r.h}>
             <button type="button" class="ppl-go" aria-label={`Show this ${r.team} power play on the chart`}><span class="ppl-t"><i></i>{r.team}</span><span class="ppl-clock">{r.period} {r.clock}</span></button>
@@ -87,7 +99,7 @@ const start = order[0];
                 : <span class="ppl-by">After offsetting penalties</span>}
               <span class="ppl-len">{clock(r.sec)}{note && ` · ${note}`}</span>
             </p>
-            <p class="ppl-shots"><strong>{r.sog}</strong> on goal</p>
+            <p class="ppl-shots"><span><strong>{r.sog}</strong> on goal</span><span class="ppl-ag">{r.against.sog} against</span></p>
             <div class="ppl-lane" role="img" aria-label={`${xg(r.xg)} expected goals; a typical power play of that length makes ${xg(r.typical)}`}>
               <span class="lane"><b style={`width:${at(r.xg)}`}></b><em class="term" tabindex="0" style={`left:${at(r.typical)}`} data-tip={typicalTip(r.typical, r.sec)}></em></span>
               <span class="ppl-xg">{xg(r.xg)}</span>
@@ -98,11 +110,22 @@ const start = order[0];
                 : <span class="ppl-quiet">{result(r)}</span>}
               {r.against.scorers.map((s) => <span class="ppl-sh">Shorthanded goal, <PLink id={s.id} name={s.by} /></span>)}
             </p>
+            <button type="button" class="ppl-x" aria-expanded="false" aria-controls={mid} aria-label="More about this power play"><svg viewBox="0 0 11 7" aria-hidden="true"><path d="M1 1l4.5 4.5L10 1" /></svg></button>
+            <div class="ppl-more" id={mid} hidden>
+              <table class="stbl ppl-tbl">
+                <thead><tr><th scope="col"></th><th scope="col"><span class="ppl-t"><i></i>{r.team}</span><span class="ppl-w"> power play</span></th><th scope="col"><span class={`ppl-t ${cls(opp)}`}><i></i>{opp}</span><span class="ppl-w"> shorthanded</span></th></tr></thead>
+                <tbody>{lines.map(([k, f, g]) => <tr><th scope="row">{k}</th><td>{f}</td><td>{g}</td></tr>)}</tbody>
+              </table>
+              <ul class="ppl-notes">
+                {r.scorers.map((s) => <li><PLink id={s.id} name={s.by} /> scored {s.at} into the power play{s.assists.length ? `, from ${s.assists.join(' and ')}` : ', unassisted'}.</li>)}
+                {r.against.scorers.map((s) => <li><PLink id={s.id} name={s.by} /> scored shorthanded {s.at} in.</li>)}
+                <li>A typical power play makes about {xg(r.typical)} expected goals in {clock(r.sec)}{r.strength.length > 1 || r.strength[0]?.[0] !== '5-on-4' ? ` (${r.strength.map(([k, x]) => `${k} for ${clock(x)}`).join(', ')})` : ''}{r.xg >= r.typical * 1.15 ? ', so this one made more than usual' : r.xg <= r.typical * 0.85 ? ', so this one made less than usual' : ', about what this one made'}.</li>
+              </ul>
+            </div>
           </li>
         );
       })}
     </ol>
-    <p class="ppl-key"><span class="lane key"><b style="width:46%"></b><em style="left:62%"></em></span> Expected goals. The dotted mark is what a typical power play makes in the same time. Tap a power play to see it on the chart.</p>
 
     {hasUnits && (
       <details class="fold ppx-fold">
@@ -173,7 +196,13 @@ const start = order[0];
       const d = chosen ? { a: +chosen.dataset.a, b: +chosen.dataset.b, h: +chosen.dataset.h } : null;
       document.dispatchEvent(new CustomEvent('lc-flow-pp', { detail: d }));
     };
-    rows.forEach((li) => li.addEventListener('click', (e) => { if (e.target.closest('a, .term')) return; choose(li); }));
+    rows.forEach((li) => li.addEventListener('click', (e) => {
+      // the arrow opens the power play's shots, chances and goals both ways; it doesn't move the chart
+      const x = e.target.closest('.ppl-x');
+      if (x) { const open = x.getAttribute('aria-expanded') !== 'true'; x.setAttribute('aria-expanded', String(open)); li.querySelector('.ppl-more').hidden = !open; li.classList.toggle('open', open); return; }
+      if (e.target.closest('a, .term, .ppl-more')) return;
+      choose(li);
+    }));
     // the chart's moment back here: the power play under it lights up
     document.addEventListener('lc-flow-at', (e) => {
       const t = e.detail?.t;
@@ -184,33 +213,44 @@ const start = order[0];
 </script>
 
 <style>
+  /* Spacing and type follow the post-game cards: 18 px between cards, 20 px card title, 14 px rows like the site's
+     tables with 13 px quiet second lines, 11 px small-caps labels (.mini-h's style), team dots 9 px. */
   .ppx { margin-top: 18px; }
-  .ppx > .h { margin: 0 0 12px; }
-  .ppx-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
-  .ppx-team { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 4px 14px; }
+  .ppx > .h { font: 600 20px/1.15 var(--display); margin: 0 0 14px; }
+  .ppx-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+  .ppx-team { display: grid; gap: 6px; align-content: start; }
   .ppx-team p { margin: 0; }
   .ppx-t, .ppl-t { display: inline-flex; align-items: center; gap: 7px; font: 700 14px var(--ui); color: var(--ink); }
-  .ppx-t i, .ppl-t i { width: 9px; height: 9px; border-radius: 50%; background: var(--team); }
-  .ppx-rec { display: grid; font: 400 13px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .ppx-rec strong { font: 700 18px/1.15 var(--display); color: var(--ink); }
-  .ppx-none { grid-column: 2 / -1; font: 400 14px var(--ui); color: var(--ink-3); }
+  .ppx-t i, .ppl-t i { width: 9px; height: 9px; border-radius: 50%; background: var(--team); flex: none; }
+  .ppx-rec { font: 400 14px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .ppx-rec strong { font: 600 20px/1.15 var(--display); color: var(--ink); margin-right: 4px; }
+  .ppx-lane { display: flex; align-items: center; gap: 12px; }
+  .ppx-lane .lane { flex: 1 1 auto; }
+  .ppx-xg, .ppx-shots { font: 400 14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ppx-shots { white-space: normal; }
+  .ppx-xg strong, .ppx-shots strong { font-weight: 700; color: var(--ink); }
+  .ppx-none { font: 400 14px var(--ui); color: var(--ink-3); }
 
+  .ppl-key { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; font: 400 13px/1.4 var(--ui); color: var(--ink-3); }
+  .lane.key { flex: 0 0 56px; --team: var(--ink-3); }
+  .ppl-head, .ppl > li { display: grid; grid-template-columns: 7.6em minmax(0, 1.5fr) 6.4em minmax(110px, 1fr) minmax(0, 1.1fr) 28px; column-gap: 16px; align-items: center; }
+  .ppl-head { font: 600 11px var(--ui); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); padding: 0 8px 8px; margin: 0 -8px; border-bottom: 1px solid var(--rule); }
   .ppl { list-style: none; margin: 0; padding: 0; }
-  .ppl > li { display: grid; grid-template-columns: 7.6em minmax(0, 1.5fr) 5.4em minmax(110px, 1fr) minmax(0, 1.1fr); gap: 4px 16px; align-items: center;
-    padding: 8px 8px; margin: 0 -8px; border-bottom: 1px solid var(--rule); border-radius: 8px; font: 400 14px/1.35 var(--ui); color: var(--ink-2); cursor: pointer; transition: background 0.2s; }
+  .ppl > li { row-gap: 4px; padding: 10px 8px; margin: 0 -8px; border-bottom: 1px solid var(--rule); border-radius: 8px; font: 400 14px/1.4 var(--ui); color: var(--ink-2); cursor: pointer; transition: background 0.2s; }
   .ppl > li:last-child { border-bottom: 0; }
   .ppl > li:hover { background: var(--ice); }
   .ppl > li.now { background: color-mix(in oklab, var(--team) 9%, transparent); }
   .ppl > li.sel { background: color-mix(in oklab, var(--team) 15%, transparent); }
   .ppl p { margin: 0; }
-  .ppl-go { display: grid; gap: 1px; justify-items: start; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
-  .ppl-go:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+  .ppl-go { display: grid; gap: 2px; justify-items: start; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .ppl-go:focus-visible, .ppl-x:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
   .ppl-clock { font-size: 13px; color: var(--ink-3); padding-left: 16px; font-variant-numeric: tabular-nums; }
   .ppl-why { color: var(--ink); }
   .ppl-by { color: var(--ink-2); }
   .ppl-len { display: block; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-  .ppl-shots { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ppl-shots { display: grid; gap: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ppl-shots strong { color: var(--ink); font-weight: 700; }
+  .ppl-ag { font-size: 13px; color: var(--ink-3); }
   .ppl-lane { display: flex; align-items: center; gap: 10px; }
   .ppl-xg { font: 700 14px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; min-width: 2.6em; text-align: right; }
   .lane { position: relative; flex: 1; height: 8px; border-radius: 4px; background: var(--track); display: block; }
@@ -222,43 +262,56 @@ const start = order[0];
   .ppl-goal { color: var(--ink); font-weight: 600; }
   .ppl-sh { color: var(--ink); }
   .ppl-quiet { color: var(--ink-3); }
-  .ppl-key { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; font: 400 13px/1.4 var(--ui); color: var(--ink-3); }
-  .lane.key { flex: 0 0 56px; --team: var(--ink-3); }
+  .ppl-x { justify-self: end; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; display: grid; place-items: center; color: var(--ink-3); }
+  .ppl-x:hover { background: var(--track); color: var(--ink); }
+  .ppl-x svg { width: 11px; height: 7px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.2s; }
+  .ppl-x[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .ppl-more { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: start; padding: 10px 0 4px; cursor: auto; }
+  .ppl-more[hidden] { display: none; }
+  .ppl-tbl { flex: 0 1 380px; }
+  .ppl-tbl th, .ppl-tbl td { padding: 6px 10px; }
+  .ppl-tbl th[scope='row'] { text-align: left; font-weight: 500; color: var(--ink-2); padding-left: 0; }
+  .ppl-tbl thead th { font-weight: 600; }
+  .ppl-tbl thead .ppl-t { font-size: 13px; }
+  .ppl-notes { flex: 1 1 260px; margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
 
-  .ppx-fold { margin-top: 14px; }
-  .ppx-pick { margin: 0 0 12px; }
+  .ppx-fold { margin-top: 18px; }
+  .ppx-pick { margin: 0 0 14px; }
   .ppu-t, .ppk-t { width: 100%; }
-  .ppu-t th[scope='row'] { font-weight: 500; }
+  .ppu-t th[scope='row'] { font-weight: 500; white-space: normal; text-align: left; }
   .ppu-t td:last-child { min-width: 150px; }
   .ppu-label { display: block; font: 700 14px var(--ui); color: var(--ink); }
-  .ppu-label::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--team); margin-right: 7px; vertical-align: 1px; }
+  .ppu-label::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--team); margin-right: 7px; vertical-align: 1px; }
   .ppu-names { font: 400 14px/1.45 var(--ui); color: var(--ink-2); }
   .ppu-names .sep, .ppu-qb { color: var(--ink-3); }
-  .ppk-h { margin: 18px 0 4px; }
+  .ppk-h { margin: 22px 0 8px; }
   .ppk-t th[scope='row'] { font-weight: 500; }
   .ppk-pos { font: 600 11px var(--ui); color: var(--ink-3); margin-left: 4px; }
-  .ppx-note { margin-top: 14px; }
+  .ppx-note { margin-top: 16px; }
 
+  /* iPad widths: two lines a power play, the penalty and how it ended, then the chances and shots; shots against in the arrow */
   @media (max-width: 900px) {
-    /* iPad widths: two lines, the penalty and how it ended, then the chances and shots */
-    .ppl > li { grid-template-columns: 6.6em minmax(0, 1fr) 9.5em; grid-template-areas: 'go why end' 'go lane shots'; gap: 4px 16px; }
-    .ppl-end, .ppl-shots { text-align: right; }
-    .ppl-len { display: inline; margin-left: 6px; }
+    .ppl-head { display: none; }
+    .ppl > li { grid-template-columns: 6.6em minmax(0, 1fr) 9.5em 28px; grid-template-areas: 'go why end x' 'go lane shots x' 'more more more more'; column-gap: 14px; }
     .ppl-go { grid-area: go; align-self: start; }
     .ppl-why { grid-area: why; }
-    .ppl-shots { grid-area: shots; }
+    .ppl-shots { grid-area: shots; text-align: right; }
     .ppl > li > .ppl-lane { grid-area: lane; }
-    .ppl-end { grid-area: end; }
+    .ppl-end { grid-area: end; text-align: right; }
+    .ppl-x { grid-area: x; }
+    .ppl-more { grid-area: more; }
+    .ppl-ag { display: none; }
+    .ppl-len { display: inline; margin-left: 6px; }
   }
+  /* phones: three short lines, who and when with how it ended, then the penalty, then the chances and shots */
   @media (max-width: 560px) {
     .ppx-sum { grid-template-columns: 1fr; }
-    /* phones: three short lines, who and when with how it ended, then the penalty, then shots and chances */
-    .ppl > li { grid-template-columns: minmax(0, 1fr) auto 5.2em; grid-template-areas: 'go end end' 'why why why' 'lane lane shots'; gap: 3px 14px; }
+    .ppl > li { grid-template-columns: minmax(0, 1fr) auto 5.2em 28px; grid-template-areas: 'go end end x' 'why why why why' 'lane lane shots shots' 'more more more more'; column-gap: 10px; }
     .ppl-go { display: flex; align-items: baseline; gap: 8px; }
     .ppl-clock { padding-left: 0; }
-    .ppl-end { text-align: right; }
-    .ppl-shots { text-align: right; }
-    .ppl-len { display: inline; margin-left: 6px; }
+    .ppl-x { align-self: start; margin-top: -4px; }
+    .ppl-tbl { flex-basis: 100%; width: 100%; }
+    .ppl-w { display: none; }
     .ppu-t, .ppk-t { font-size: 13px; }
     .ppu-t thead th:nth-child(4), .ppu-t td:nth-child(4), .ppk-t thead th:nth-child(3), .ppk-t td:nth-child(3) { display: none; }
     .ppu-t td:last-child { min-width: 96px; }
