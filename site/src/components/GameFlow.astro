@@ -582,7 +582,7 @@ const base = import.meta.env.BASE_URL;
       const onAt = <P extends { s: [number, number][] }>(list: P[], t: number) => list.filter((p) => p.s.some((sp) => covers(sp, t)));
       const iceAt = (t: number | null, atShot = t != null && shotSecs.has(t)) => {
         shotT = atShot;
-        if (t == null || t >= END || shiftOpen || !g.players.length) { ice.classList.remove('on'); return; }
+        if (t == null || (atShot ? t > END : t >= END) || shiftOpen || !g.players.length) { ice.classList.remove('on'); return; } // an overtime winner sits on the final second
         const cols = [0, 1].map((h) => {
           const gk = onAt(g.gk.filter((p: any) => p.h === h), t)[0] as any;
           // on a change the shift records can overlap by a second; keep the most recent arrivals
