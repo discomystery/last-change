@@ -18,7 +18,8 @@ mark beside each row.
 Units are tonight's, built the way the team page builds them (`units._quarterback_units`): PP1 is anchored on the
 defenseman with the most 5-on-4 time tonight, PP2 on the one with the most time while the first was off, each with the
 four skaters most often out with him. Each moment of the power play goes to the unit whose quarterback is on the ice,
-else the unit sharing most players, else "other". The other side's penalty killers are listed with their time and the
+else the unit sharing most players, else "other". The two are then numbered by tonight's time, so a five-forward top
+unit (Vegas, Chicago) is PP1 even though the busiest defenseman plays on the other. The other side's penalty killers are listed with their time and the
 chances against while they were out.
 """
 import json
@@ -173,6 +174,21 @@ def _ending(pp: dict, goals_for: list, pens: list[dict], period_end: bool, game_
     return "killed"
 
 
+def number_by_time(members: list, anchors: list, stints: list, credit) -> tuple[list, list]:
+    """Units are built around their quarterbacks, but numbered by tonight's time.
+
+    A five-forward top unit leaves the busiest defenseman on the second unit, and he would otherwise make his unit PP1.
+    """
+    if len(members) != 2:
+        return members, anchors
+    used = [0.0, 0.0]
+    for a, b, _, _, on, _ in stints:
+        k = credit(on)
+        if k is not None:
+            used[k] += b - a
+    return (members[::-1], anchors[::-1]) if used[1] > used[0] else (members, anchors)
+
+
 def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame, roster: pl.DataFrame, stats: dict[str, dict],
          rates: dict[str, float], place=None) -> dict | None:
     abbr = {0: g["away"], 1: g["home"]}
@@ -259,6 +275,8 @@ def game(gid: int, g: dict, ev: pl.DataFrame, xg: pl.DataFrame, st: pl.DataFrame
                 return there.index(True)
             counts = [len(m & on) for m in members]
             return counts.index(max(counts)) if counts and max(counts) >= 3 else None
+
+        members, anchors = number_by_time(members, anchors, [st for r in mine for st in r["pp"]["stints"]], credit)
 
         n = len(members)
         secs, shots_for, shots_against = [0.0] * (n + 1), [[] for _ in range(n + 1)], [[] for _ in range(n + 1)]
