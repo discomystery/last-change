@@ -421,8 +421,9 @@ const base = import.meta.env.BASE_URL;
       mk('path', { d: RINK, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 0.9 }, rk);
       const ringG = mk('g', { 'pointer-events': 'none' }, rk);
       const rfx = mk('g', {}, rk);
-      // home shots attack the right-hand net, visitors' the left
-      const at = (h: number, x: number, y: number) => [h ? x : -x, h ? y : -y];
+      // home shots attack the right-hand net, visitors' the left. The NHL's y is the shooter's left (checked against
+      // EDGE), which is up on screen for a shooter skating right and down for one skating left; SVG y grows downward
+      const at = (h: number, x: number, y: number) => [h ? x : -x, h ? -y : y];
       const dots: [Shot, any, number, number][] = g.shots.map((s: Shot, i: number) => {
         const [x, y] = at(s.h, s.x, s.y);
         const c = mk('circle', { cx: x, cy: y, r: (1.1 + Math.sqrt(s.xg) * 5.2).toFixed(2), class: 'gf-shot', fill: C[s.h], 'fill-opacity': s.g ? 0.25 : s.en ? 0 : 0.6, stroke: s.g || s.en ? C[s.h] : 'none', 'stroke-width': s.g ? 2 : 0.7, 'stroke-dasharray': s.en && !s.g ? '1.6 1.2' : 'none', 'data-shot': i, style: 'cursor:pointer' }, dotsG);
