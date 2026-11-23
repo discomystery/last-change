@@ -48,6 +48,7 @@ LABELS = {"volume": "shot volume", "quality": "shot quality", "rebounds": "secon
           "icing": "avoiding icings", "goalie": "goaltending", "pace": "pace", "forecheck": "forecheck pressure",
           "physical": "physicality", "rough": "rough stuff", "pp": "the power play", "pk": "the penalty kill",
           "powerKill": "shorthanded threat", "discipline": "discipline", "depth": "depth"}
+MOST_LOW = {"depth", "inClose"}  # their low-end words say "more of" something: stars leaned on, shots from distance
 NEUTRAL = {"pointAllowed", "dShots", "inClose", "pace", "volume", "rough", "physical", "forecheck", "turnover", "depth"}  # no "worst" wording
 BOUNCY = {"rebounds", "turnover", "breakdowns"}  # habits that take a hundred games or more to settle: mostly bounces
 STYLE_PCT = 80  # a habit is told at the 80th percentile or the 20th and beyond
@@ -130,10 +131,13 @@ def rank_tag(k: str, b: dict, tips: dict | None, words: str = "", recorded: tupl
     if not r or tips is None:
         return ""
     low = k in NEUTRAL and b["pct"] < 50
-    tag = ("lowest" if r == 32 else f"{ordinal(33 - r)} lowest") if low else ordinal(r)
+    lowest = ("lowest" if r == 32 else f"{ordinal(33 - r)} lowest") if low else ordinal(r)
+    # a low end said as having more of something reads its pill that way too: "lean on their stars as much as almost
+    # anyone (2nd most)", never "(2nd lowest)" (outside notes Nov 16 and 19)
+    tag = ("most" if r == 32 else f"{ordinal(33 - r)} most") if low and k in MOST_LOW else lowest
     fig = CHIP[k][1](b) if k in CHIP and b.get("v") is not None else ""
     fig += " (100 is average)" if "score" in fig else ""
-    tip = f"{tag if low else ordinal(r)} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
+    tip = f"{lowest} of 32 in {LABELS.get(k, k)}" + (f": {fig}" if fig else "")
     if recorded:  # the recorded figure behind the habit, with its own rank ("scoring on 10.0% of their chances, second worst")
         tip += f". Recorded: {recorded[0]}, {recorded[1]}"
     tips.setdefault("_found", []).append((f"{words} ({tag})", tip))  # put in reading order once the paragraph is written
@@ -319,7 +323,7 @@ MEETS = [
     ("quality", "qualityAllowed", "{A} could find some good looks against {B}, who give up plenty of them",
      "{Ap} good looks will be harder to come by against {B}", "good looks are likely to be hard to come by for {A}"),
     ("forecheck", "longShifts", "{Ap} forecheck could keep {B} pinned in their own end", None, None),
-    ("shotsThrough", "blocking", None, "{Ap} knack for getting shots through meets a team that blocks a lot",
+    ("shotsThrough", "blocking", None, "{Ap} knack for getting shots through meets {Bp} shot blockers",
      "{B} are likely to get in the way of a lot of {Ap} shots"),
 ]
 MEET_HI, MEET_LO = 70, 30
@@ -365,7 +369,7 @@ def _about(t: str, k: str, ks: set) -> bool:
 
 DEFEND = {"pk", "suppression", "qualityAllowed", "longShifts", "blocking", "powerKill"}  # the side a pairing's attack meets
 SH_THREAT = 80  # a penalty kill this dangerous going the other way is worth naming beside the power play it faces
-FACE_OFF = ("strength against strength", "has to give", "meets a team")  # two strengths meeting: a face-off, not a result
+FACE_OFF = ("strength against strength", "has to give", "shots through meets")  # two strengths meeting: a face-off, not a result
 
 
 def consequences(away: str, home: str, fp: dict, W, covered: set) -> list[tuple[float, str, set]]:
@@ -504,8 +508,16 @@ def how_they_play(away: str, home: str, fp: dict, season: int, day: str, W, gist
             lines[i] = (ln.replace(", so ", f", especially {W.the(t)}{rank_tag(k, x[2], tips, 'especially ' + W.the(t))}, so ", 1), ks)
     # pair a line with the club whose list tells one of its habits (the later club when both do)
     paired = {}
+    paired_kinds = {k for m_ in MEETS for k in m_[:2]}
     for i, (ln, ks) in enumerate(lines):
         if ln.startswith("Both"):
+            continue
+        if len(_names(ks)) == 1 and not _names(ks) & paired_kinds:
+            # a contrast of one habit ("the Kings hound the puck, but the Bruins sit back") already tells both clubs:
+            # tied to one club's habit with "so" it read in circles ("They also sit back ..., so the Kings hound the
+            # puck, but they sit back", outside notes Nov 15 and 17), so it stands alone and the habit leaves both lists
+            k = next(iter(_names(ks)))
+            picks = {t: [x for x in v if x[1] != k] for t, v in picks.items()}
             continue
         # the side that meets the habit goes first (the kill that faces a power play), so the attack keeps its own list
         options = [(t, x) for t in (home, away) for x in picks[t] if _about(t, x[1], ks) and t not in paired and len(picks[t]) > 1]

@@ -422,3 +422,22 @@ def test_a_third_period_winner_in_a_one_goal_game_names_its_scorer():
     # an empty-netter after it still leaves a one-goal game; a real two-goal win does not get the line
     assert any("lifts" in h for _, h in stories._clutch_heads(tie + [g(950, 7, 2, 1), g(1170, 8, 3, 1, "en")], *args))
     assert not any("lifts" in h for _, h in stories._clutch_heads(tie + [g(400, 7, 2, 1), g(900, 8, 3, 1)], *args))
+
+
+def test_a_challenged_puck_over_glass_penalty_is_not_a_goal_taken_off(tmp_path, monkeypatch):
+    # SEA at SJS, Nov 21: San Jose challenged a delay-of-game penalty and the story printed a Seattle goal taken off
+    import gzip as _gz
+    import json as _js
+    from pipeline.export import stories as st
+    (tmp_path / "2026" / "pbp").mkdir(parents=True)
+    plays = [{"typeDescKey": "stoppage", "timeInPeriod": "08:22", "periodDescriptor": {"number": 3}, "homeTeamDefendingSide": "left",
+              "details": {"reason": "puck-in-crowd", "secondaryReason": "chlg-hm-puck-over-glass"}},
+             {"typeDescKey": "faceoff", "timeInPeriod": "08:22", "periodDescriptor": {"number": 3}, "details": {"xCoord": -69}}]
+    with _gz.open(tmp_path / "2026" / "pbp" / "1.json.gz", "wt") as f:
+        _js.dump({"plays": plays, "homeTeam": {"id": 28}}, f)
+    monkeypatch.setattr(st, "RAW", tmp_path)
+    assert st._overturned(1, 2026) == []
+    plays[0]["details"] = {"reason": "chlg-hm-goal-interference"}
+    with _gz.open(tmp_path / "2026" / "pbp" / "1.json.gz", "wt") as f:
+        _js.dump({"plays": plays, "homeTeam": {"id": 28}}, f)
+    assert len(st._overturned(1, 2026)) == 1

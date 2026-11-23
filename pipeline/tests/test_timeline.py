@@ -102,7 +102,7 @@ def test_runs_stay_inside_one_period():
     # CAR at CHI: a goal late in the first and two early in the second were told as "three goals in 4:25 late in the first"
     gm = _game([(1, 1150, True, 3, "ev"), (2, 60, True, 4, "ev"), (2, 140, True, 5, "ev")])
     out = " ".join(timeline.paragraph(gm))
-    assert "three goals" not in out and "late in the first" in out
+    assert "three goals" not in out and "left in the first" in out  # the final minute by the clock (Nov 16)
 
 
 def test_return_rides_on_his_goal_unless_a_star():
@@ -188,7 +188,7 @@ def test_comeback_go_ahead_says_first_time_or_back_ahead():
     gm = _game([(1, 300, True, 3, "ev"), (1, 700, False, 1, "ev"), (1, 1000, False, 2, "ev"), (2, 100, False, 1, "ev"), (2, 300, True, 4, "ev"),
                 (2, 500, True, 3, "ev"), (2, 1150, True, 5, "ev"), (3, 300, True, 4, "ev"), (3, 1000, True, 3, "ev")])
     text = " ".join(timeline.paragraph(gm))
-    assert "Nick Suzuki put the Rangers back ahead late in the second" in text and "complete the comeback" not in text
+    assert "Nick Suzuki put the Rangers back ahead with just under a minute left in the second" in text and "complete the comeback" not in text
 
 
 def test_a_close_regulation_winner_says_whose_goal_won_it():
@@ -230,4 +230,41 @@ def test_a_period_named_later_in_a_sentence_does_not_rename_an_earlier_one():
 def test_an_empty_net_goal_the_other_side_answered():
     gm = _game([(1, 300, True, 3, "ev"), (2, 300, True, 4, "ev"), (3, 1100, True, 5, "en"), (3, 1150, False, 2, "ev")])
     text = " ".join(timeline.paragraph(gm))
-    assert "didn’t stop" not in text and "Montréal still answered" in text
+    assert "didn’t stop" not in text and "still answered" not in text
+
+
+def test_a_power_play_goal_keeps_its_own_sentence_beside_an_even_strength_one():
+    # VAN at VGK, Nov 15: "Pettersson and Karlsson scored four and a half minutes apart" dropped the power play
+    gm = _game([(1, 300, True, 3, "pp"), (1, 500, True, 4, "ev"), (3, 600, False, 5, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "apart" not in text and "on the power play" in text
+
+
+def test_a_run_that_spills_into_the_next_part_of_the_period_is_placed_by_both_ends():
+    # EDM at PHI, Nov 15: 12:13 to 17:12 read "midway through the second"
+    gm = _game([(1, 100, True, 3, "ev"), (2, 733, False, 1, "ev"), (2, 1032, False, 2, "ev"), (3, 900, True, 4, "ev"), (3, 1000, True, 5, "ev")], end="REG")
+    text = " ".join(timeline.paragraph(gm))
+    assert "in the second half of the second" in text and "midway through the second" not in text
+
+
+def test_a_late_overtime_winner_gives_the_clock():
+    # CHI at CGY, Nov 21: Rinzel won it with 15 seconds left in overtime
+    assert timeline.when({"period": 4, "sec": 285}) == "with 15 seconds left in overtime"
+    assert timeline.when({"period": 4, "sec": 120}).endswith("into overtime")
+
+
+def test_one_sides_big_period_is_theirs():
+    # EDM at CAR, Nov 21: "seven goals in the second period alone" hid the Hurricanes' five
+    gm = _game([(2, 60, True, 3, "ev"), (2, 200, False, 1, "ev"), (2, 400, True, 4, "ev"), (2, 700, True, 5, "ev"),
+                (2, 1000, False, 2, "ev"), (2, 1100, True, 3, "ev"), (2, 1150, True, 4, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    assert "The Rangers scored five times in the second." in text and "period alone" not in text
+
+
+def test_the_side_that_stopped_scoring_is_named():
+    # CBJ at TOR, Nov 21: "Blueger stretched the lead to 3-1, but they didn’t score again"
+    gm = _game([(1, 300, False, 1, "ev"), (1, 600, False, 2, "ev"), (3, 300, True, 3, "ev"), (3, 600, True, 4, "ev"), (3, 900, True, 5, "ev")])
+    text = " ".join(timeline.paragraph(gm))
+    # "they" only when the sentence already named that side and not the other one
+    sent = next(x for x in text.split(". ") if "score again" in x or "would get" in x)
+    assert "Canadiens" in sent and "Rangers" not in sent
