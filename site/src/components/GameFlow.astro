@@ -573,18 +573,25 @@ const base = import.meta.env.BASE_URL;
       // who was on the ice at a moment: shown when the game is paused, or at a moment the reader picks on the chart;
       // the full shift chart already says so while it is open, so the table stays away then
       const ORDER = ['L1', 'L2', 'L3', 'L4', 'XF', 'P1', 'P2', 'P3', 'XD'];
-      const onAt = <P extends { s: [number, number][] }>(list: P[], t: number) => list.filter((p) => p.s.some(([a, b]) => t >= a && t < b));
-      const iceAt = (t: number | null) => {
+      // at a shot or goal (pointed at, tapped, stepped to with the keys, or a goal chip) the shifts that end on that second
+      // count and the ones that start on it don't, since the faceoff after a goal comes on the same second (KJ, 2026-11-23);
+      // the shift fold's flash already works this way
+      const shotSecs = new Set((g.shots as Shot[]).map((q) => q.t));
+      let shotT = false;
+      const covers = ([a, b]: [number, number], t: number) => (shotT ? t > a && t <= b : t >= a && t < b);
+      const onAt = <P extends { s: [number, number][] }>(list: P[], t: number) => list.filter((p) => p.s.some((sp) => covers(sp, t)));
+      const iceAt = (t: number | null, atShot = t != null && shotSecs.has(t)) => {
+        shotT = atShot;
         if (t == null || t >= END || shiftOpen || !g.players.length) { ice.classList.remove('on'); return; }
         const cols = [0, 1].map((h) => {
           const gk = onAt(g.gk.filter((p: any) => p.h === h), t)[0] as any;
           // on a change the shift records can overlap by a second; keep the most recent arrivals
-          const startOf = (p: Skater) => p.s.find(([a, b]) => t >= a && t < b)![0];
+          const startOf = (p: Skater) => p.s.find((sp) => covers(sp, t))![0];
           const sk = onAt(g.players.filter((p: Skater) => p.h === h) as Skater[], t).sort((a, b) => startOf(b) - startOf(a)).slice(0, gk ? 5 : 6).sort((a, b) => ORDER.indexOf(a.grp) - ORDER.indexOf(b.grp) || (a.o ?? 9) - (b.o ?? 9));
           const fw = sk.filter((p) => p.grp[0] === 'L' || p.grp === 'XF'), dd = sk.filter((p) => p.grp[0] === 'P' || p.grp === 'XD');
           const tags = (ps: Skater[]) => [...new Set(ps.map((p) => p.grp).filter((x) => x[0] !== 'X'))].map((x) => `<span class="ltag chip">${x}</span>`).join('');
           const list = (ps: Skater[]) => ps.map((p) => last(p.n)).join(' · ') || '<span class="none">none</span>';
-          const box = (g.pens as Pen[]).filter((p) => p.h === h && p.who && p.code !== 'BEN' && t >= p.t && t < p.end).map((p) => last(p.who));
+          const box = (g.pens as Pen[]).filter((p) => p.h === h && p.who && p.code !== 'BEN' && (atShot ? t > p.t && t <= p.end : t >= p.t && t < p.end)).map((p) => last(p.who));
           return `<div class="ic" style="--c:${C[h]}"><p class="ic-h">${h ? g.hn : g.an}<span>${sk.length} skaters${gk ? '' : ', net empty'}</span></p>
             <p><b>F</b>${list(fw)}${tags(fw)}</p><p><b>D</b>${list(dd)}${tags(dd)}</p><p><b>G</b>${gk ? last(gk.n) : '<span class="none">pulled for an extra skater</span>'}</p>${box.length ? `<p class="bx">In the box: ${[...new Set(box)].join(', ')}</p>` : ''}</div>`;
         });
