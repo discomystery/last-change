@@ -864,9 +864,9 @@ EDGE_BODIES = ["{plain} {topc} is {wt} for {name}, and {botc} is {wbs}.",
 # Why the gap matters tonight, so an edge has stakes (Sora, 2026-10-12: "why care about this difference").
 EDGE_STAKES = {
     "volume": "Expect {top} to spend more of the night in the attacking zone.",
-    "quality": "The more dangerous chances should be {topp}.",
+    "quality": "The more dangerous chances are likely to be {topp}.",
     "suppression": "Expect {bot} to give up the bigger pile of shots.",
-    "qualityAllowed": "The more dangerous chances should come at {botp} net.",
+    "qualityAllowed": "The more dangerous chances are likely to come at {botp} net.",
     "point": "Watch {topp} defensemen let it go from the blue line.",
     "dShots": "Watch {topp} defensemen jump into the play.",
     "inClose": "Shots from in close tend to be more dangerous, so expect {top} to do more of their damage around the net.",
@@ -874,7 +874,7 @@ EDGE_STAKES = {
     "physical": "Expect most of the big hits to come from {top}.",
     "depth": "If this one comes down to the bottom six, that suits {top}.",
     "pp": "Every penalty {bot} take could cost them.",
-    "pk": "Penalties should hurt {bot} more than {top}.",
+    "pk": "Penalties are likely to hurt {bot} more than {top}.",
 }
 _FILLER = {"the", "a", "an", "and", "but", "of", "to", "in", "on", "is", "are", "for", "their", "they", "it", "mostly", "a lot"}
 
@@ -1147,12 +1147,12 @@ def league_shares(before: str, season: int | None = None) -> dict[str, float]:
 
 # Who controls the chances (Sora approved it 2026-10-30, thread "Improve game previews and automate tuning"): the
 # same rule as an edge call on each club's usual share of the 5-on-5 expected goals, which held 69% over 2024-27 in the
-# blind-spots replay. It is the main input to the hidden win chance, so it is only ever told as who should have more of
+# blind-spots replay ("should" reads as a value statement: "are likely to", outside notes Nov 19). It is the main input to the hidden win chance, so it is only ever told as who should have more of
 # the puck and the better looks, never as who wins (no "favored", no result words).
-CONTROL_HEADS = ["{top} should tilt the ice", "Who drives the play: {top}", "Expect {top} to have the puck more",
-                 "{top} should drive the play", "Tilted ice, toward {botp} net"]
+CONTROL_HEADS = ["{top} are likely to tilt the ice", "Who drives the play: {top}", "Expect {top} to have the puck more",
+                 "{top} are likely to drive the play", "Tilted ice, toward {botp} net"]
 CONTROL_BODIES = ["{top} have been {wt} at controlling the chances at 5-on-5, and {bot} {wbs}. Expect {top} to spend more of the night in {botp} end. That’s about the puck, not the scoreboard: goalies and finishing decide plenty of games the chances don’t.",
-                  "At 5-on-5, {top} have been {wt} at getting more of the chances than they give up, and {bot} {wbs}. The ice should tilt {topp} way, even if goaltending and bounces have the final say on the score."]
+                  "At 5-on-5, {top} have been {wt} at getting more of the chances than they give up, and {bot} {wbs}. The ice is likely to tilt {topp} way, even if goaltending and bounces have the final say on the score."]
 
 
 def control_claim(gid: int, away: str, home: str, places: dict, shares: dict | None) -> dict | None:

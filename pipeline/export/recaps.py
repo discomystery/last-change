@@ -26,7 +26,7 @@ PP_STRENGTHS = {"5v4", "5v3", "4v3"}
 MIN_PP_SEC = 60  # less power-play time than this and a power-play call can't be judged
 MIN_CLOSE_SEC = 600  # hit rates need some close-game time
 MIN_MATCHUP_SEC = 180
-EXIT_SEC = 1200  # a skater with no shift in the game's last 20 minutes or more left it (see Season.exits)
+EXIT_SEC = 900  # a skater with no shift in the game's last 15 minutes or more left it (see Season.exits); 20 missed Bedard, hurt 54 s into the third (TOR at CHI, outside notes Nov 17)
 NEWS_DAYS = 2  # an injury report the day after the game or the day after that is told on the player who left it (Sora, 2026-10-29)
 # most telling first: a placement on injured reserve says more than "day to day", which says more than a bare "out"
 NEWS_RANK = {"season": 6, "long": 5, "ir": 4, "week": 3, "day": 2, "out": 1}

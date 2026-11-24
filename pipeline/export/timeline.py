@@ -34,7 +34,7 @@ HOW = {"pp": " on the power play", "sh": " shorthanded", "ps": " on a penalty sh
 DROUGHT_PP = 90  # seconds of power play inside a stretch without a shot worth "even with a power play"
 DROUGHT_TAIL = 8  # the other team's shots on goal in it worth a clause
 KEEP = "\x01"  # a sentence _periods leaves as written
-PERIOD_END = 30  # a goal this close to the end of the first or second is told by the clock ("with 12 seconds left in the first")
+PERIOD_END = 60  # the final minute reads by the clock ("with 57 seconds left in the second", outside notes Nov 16); a goal this close to the end of the first or second is told by the clock ("with 12 seconds left in the first")
 SEASON_MARKS = (20, 30, 40, 50, 60, 70)  # a scorer's nth goal of the season worth a clause
 
 
@@ -62,6 +62,8 @@ def when(g: dict) -> str:
     minutes left" (the last five minutes of the third), "in overtime"."""
     p, s = g["period"], g["sec"]
     if p > 3:
+        if 270 <= s < 300:  # "with 15 seconds left in overtime" (Rinzel, CHI at CGY, outside notes Nov 21); regular-season overtime is five minutes
+            return f"with {left_(300 - s)} left in overtime"
         return f"{span(s)} into overtime" if s < 180 else "in overtime"
     if p == 3 and s >= 1200 - LATE:
         return f"with {left_(1200 - s)} left"
@@ -195,6 +197,12 @@ def paragraph(gm: Game) -> list[str]:
                 n_ = busy[p_now]
                 sides = {gm.side(g) for g in goals if g["period"] == p_now}
                 owned = [f"The {PERIODS[p_now]} period belonged to {W.the(sides.pop())}."] if len(sides) == 1 and p_now <= 3 else []
+                per_side = {t_: sum(1 for g in goals if g["period"] == p_now and gm.side(g) == t_) for t_ in (gm.home, gm.away)}
+                big_t = max(per_side, key=per_side.get)
+                if not owned and per_side[big_t] >= 4 and p_now <= 3:
+                    # one side's big period said as theirs, not both teams' total (EDM at CAR, outside notes Nov 21:
+                    # "seven goals in the second period alone" hid the Hurricanes' five)
+                    owned = [f"{_cap(W.the(big_t))} scored {num(per_side[big_t])} times in the {PERIODS[p_now]}."]
                 pool = owned or ([f"It was a busy {PERIODS[p_now]} period.", f"The {PERIODS[p_now]} period was a wild one."] if n_ == 4 else
                         [f"The {PERIODS[p_now]} period brought {num(n_)} goals.", f"There were {num(n_)} goals in the {PERIODS[p_now]} period alone."])
                 # each wording once a story: "was a wild one" for both the second and the third read canned (outside
@@ -291,6 +299,9 @@ def paragraph(gm: Game) -> list[str]:
                     or (j == ahead_i and b["period"] == 3 and gm.end == "REG" and margin <= 2)
                     # a shorthanded goal keeps its own sentence (Cowan's read as even strength inside a run, Oct 20)
                     or ("sh" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
+                    # so does a power-play goal beside an even-strength one: "Pettersson and Karlsson scored four and a
+                    # half minutes apart" dropped the power play (VAN at VGK, Nov 15; Dahlin, Olofsson, Nelson, Bolduc)
+                    or ("pp" in (a["strength"], b["strength"]) and a["strength"] != b["strength"])
                     or j in gm.relief or run[-1] in gm.relief or got_back in (run[-1], j)
                     or (b["period"], b["sec"]) in stood or (a["period"], a["sec"]) in stood):
                 break
@@ -738,9 +749,8 @@ def _one(gm: Game, i: int, prev: dict | None, prev_team: str | None, scored_befo
         tail.append(gm.pk(["but by then the game was long gone", "far too late to matter"], "late", i))
     if not tail and not is_last and _last_word(gm, i, body):
         tail.append(_last_word(gm, i, body))
-    if g["strength"] == "en" and any(gm.side(h) != t for h in goals[i + 1:]):  # the scoring wasn't over (Sora, CHI 4-2 STL)
-        # "but that didn’t stop Los Angeles" read as if the goal was meant to stop them (CGY at LAK, outside notes Nov 14)
-        tail.append(f"and {W.place(other)} still answered")
+    # an empty-netter the other side answered gets no tail: the next sentence tells the answer ("but that didn’t stop
+    # Los Angeles" and "and Anaheim still answered" both read oddly; outside notes Nov 14 and Nov 21)
     if tail:
         body += ", " + ", ".join(tail)
     if pulled and not relief:
@@ -792,9 +802,11 @@ def _last_word(gm: Game, i: int, body: str = "") -> str:
     # the team named, not "they": "Lafrenière tied it for the Rangers, but they didn’t score again" read as either side
     # (outside notes, Oct 22). No "luck ran out" on a goal: a tie that never broke their way isn't luck (goal-tracking
     # study, 2026-10-25); the stopped penalty shot keeps it.
+    # the team named: "they" right after a scorer's name reads as the player's side either way ("Blueger stretched the
+    # lead to 3-1, but they didn’t score again", CBJ at TOR, outside notes Nov 21)
     other = gm.winner
-    names = {W.the(other), W.place(other), W.nick.get(other, other)}
-    T = W.the(t) if any(n and n in body for n in names) else "they"  # "they" only when no other team is named before it
+    named = lambda x: any(n and n in body for n in {W.the(x), W.place(x), W.nick.get(x, x)})
+    T = "they" if named(t) and not named(other) else W.the(t)  # "they" only right after their own team, never after a bare scorer
     if m > th_:  # still ahead
         nxt = rest[0] if rest else None
         if nxt and gm.side(nxt) != t and at(nxt) - at(g) <= LEAD_LASTED and gm.score(nxt, t)[0] == gm.score(nxt, t)[1]:
@@ -807,6 +819,8 @@ def _last_word(gm: Game, i: int, body: str = "") -> str:
         return ""  # the go-ahead came right back; "they didn’t score again" then reads oddly (PIT at WPG, Oct 20)
     if m == th_:  # level: "they didn't score again" could be either side, so the team is named
         return gm.pk([f"but {W.the(t)} didn’t score again", f"but that was the last goal {W.the(t)} would get"], "lastw", i)
+    if m == th_ - 1 and at(rest[0]) - at(g) <= 120:
+        return ""  # answered right away: the answer's own "24 seconds later" tells it (Stone's 4-3, VAN at VGK, Nov 15)
     if m == th_ - 1:
         # "got no closer" can only be the side that was behind, so "they" stays clear there
         return gm.pk(["but that was as close as they got", "but they got no closer"], "lastw", i)
@@ -860,6 +874,12 @@ def _run(gm: Game, run: list[int], prev: dict | None, prev_team: str | None, ahe
     how = HOW.get(kinds.pop(), "") if len(kinds) == 1 else ""
     names = [g["p1"] for g in gs]
     tm = "later in the period" if prev is not None and prev["period"] == first["period"] and when(prev) == when(first) else when(first)
+    if tm == when(first) and when(last_) != tm and first["period"] == last_["period"] <= 3 and tm.split(" the ")[0] in ("early in", "midway through", "late in") \
+            and when(last_).split(" the ")[0] in ("early in", "midway through", "late in"):
+        # a run that spills from one part of the period into the next is placed by both ends: 12:13 to 17:12 read
+        # "midway through the second" (EDM at PHI, outside notes Nov 15), 4:02 to 10:11 "early in the first" (Nov 19)
+        half = "in the first half of" if last_["sec"] < 600 else "in the second half of" if first["sec"] >= 600 else "in"
+        tm = f"{half} the {PERIODS[first['period']]}"
     if tm.endswith(" in") or " into the " in tm:  # "scored 2:56 apart 1:06 in" reads badly
         tm = f"early in the {PERIODS[first['period']]}"
     gap = grammar.span(span)
@@ -950,7 +970,9 @@ def _change(gm: Game, c: tuple) -> str:
     if pulled:
         return f"{_cap(W.place(t))} pulled {who(f)} after {goals_n(f['ga'])} and turned to {who(rl)}{rest}."
     if came.get("how") == "mid":
-        return f"{who(f)} left the game{per}, and {who(rl)} finished it in net for {W.place(t)}."
+        # never "finished it": a starter can come back once the reliever is pulled for an extra attacker (Husso, ANA at
+        # STL, outside notes Nov 17), and the box doesn't say who was in the crease at the horn
+        return f"{who(rl)} replaced {who(f)} in net for {W.place(t)}{per}."
     return f"{who(rl)} took over from {who(f)} in net for {W.place(t)}{rest}."
 
 

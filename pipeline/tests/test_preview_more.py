@@ -207,3 +207,10 @@ def test_a_club_told_as_they_is_never_them_as_a_subject():
 def test_vs_does_not_start_a_new_sentence():
     from pipeline.export import previews
     assert previews._fmt("strength vs. strength. the Jets lead.") == "Strength vs. strength. The Jets lead."
+
+
+def test_a_low_end_said_as_more_of_something_reads_its_pill_that_way():
+    # NYR at MTL, Nov 16: "lean on their stars as much as almost anyone (2nd lowest)"
+    tips = {}
+    assert pm.rank_tag("depth", {"rank": 31, "pct": 3}, tips, "lean on their stars") == " (2nd most)"
+    assert pm.rank_tag("physical", {"rank": 31, "pct": 3}, tips, "rarely throw hits") == " (2nd lowest)"

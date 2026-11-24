@@ -1756,6 +1756,8 @@ def _overturned(gid: int, season: int) -> list[dict]:
             out.append({"home": home_goal, "why": REVIEW_WHY.get(why, "after a video review"), "period": p["periodDescriptor"]["number"],
                         "sec": int(m) * 60 + int(sec), "league": True})
             continue
+        if why.endswith("puck-over-glass"):  # a challenged delay-of-game penalty, not a goal (SEA-SJS, 2026-11-21)
+            continue
         if "-hm-" in why or "-vis-" in why:  # a coach only challenges the other team's goal (eye test on 2025-26:
             home_goal = "-vis-" in why        # the restart dot named Carolina for Montréal's goal)
         elif defends in ("left", "right"):
@@ -2783,6 +2785,11 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
     paragraph already named (pulled, or "the difference") is left out, so nothing is told twice. A winner's goalie who
     allowed 2+ goals within his first 10 shots and then stopped 15+ "settled in after a shaky start" (Blackwood, 2026-10-16)."""
     gl = {x["team"]: x for x in r.get("goalies", []) if x.get("started")}
+    # a starter the first paragraph named only because someone filled in for him for a few minutes still gets his
+    # night told (Saros, PIT at NSH, outside notes Nov 21: Annunen's 2:07 knocked him out of this sentence)
+    back = {x["team"] for x in r.get("goalies", []) if not x.get("started") and ((x.get("came_in") or {}).get("back") or (x.get("came_in") or {}).get("how") == "mid")}
+    # (and one who left mid-play: the change names him, but his saves went untold; Husso, ANA at STL, Nov 17)
+    said = said - {g["id"] for t, g in gl.items() if t in back}
     pk = pk or (lambda pool, *k: pool[0])
     parts = []
     wg, lg = gl.get(winner), gl.get(loser)
@@ -2803,8 +2810,9 @@ def _goalie_lines(r: dict, winner: str, loser: str, W, name, said: set, head: st
                              f"{n_} was perfect for {W.the(winner)}, {saves} saves on {saves} shots"], "so-saves"))
         elif early:
             n_, at_, after_ = early
-            parts.append(pk([f"{nm(wg)} settled in after a shaky start for {W.the(winner)}: he gave up {num(n_)} goals on the first {num(at_)} shots, then stopped the last {after_}",
-                             f"{nm(wg)} shook off a shaky start for {W.the(winner)}, allowing {num(n_)} goals on the first {num(at_)} shots and none on the last {after_}"], "settled"))
+            g_ = nm(wg)  # once: a second call gives the last name only, and the pool's second entry read "Fowler shook off ..." (MTL at NJD, Nov 18)
+            parts.append(pk([f"{g_} settled in after a shaky start for {W.the(winner)}: he gave up {num(n_)} goals on the first {num(at_)} shots, then stopped the last {after_}",
+                             f"{g_} shook off a shaky start for {W.the(winner)}, allowing {num(n_)} goals on the first {num(at_)} shots and none on the last {after_}"], "settled"))
         elif wg.get("shots", 0) <= QUIET_SHOTS and (wg.get("ga") or 0) <= 1:  # 14 shots: "made 14 saves" said nothing (voice loop)
             parts.append(f"{nm(wg)} needed only {saves} saves for {W.the(winner)}")
         else:
@@ -3210,6 +3218,14 @@ def recap_story(r: dict, places: dict, season: int = CURRENT_SEASON) -> dict | N
         verbs = ["beat", "get past", "hold off"] if real <= 1 and ws - ls == 2 else ["beat", "edge", "get past"] if real <= 1 else ["beat", "take down"] if real == 2 else \
             ["beat", "take down"] + (["handle"] if share is None or share >= 0.5 else [])
         heads.append((30, f"{star} as {W.the(winner)} {pk(verbs, 'base2')} {L_}"))
+    else:
+        # nothing bigger: the winners' best two-point night with a goal leads over the bare "The Bruins beat the Red
+        # Wings" (Pastrňák's goal and assist, BOS at DET, outside notes Nov 18)
+        two = [r_ for r_ in night.iter_rows(named=True) if r_["team"] == winner and r_["player_id"] in N and r_["g"] >= 1 and r_["pts"] >= 2]
+        if two:
+            r_ = max(two, key=lambda r_: (r_["pts"], r_["g"]))
+            verbs = ["beat", "get past", "hold off"] if real <= 1 and ws - ls == 2 else ["beat", "edge", "get past"] if real <= 1 else ["beat", "take down"]
+            heads.append((20, f"{last(r_['player_id'])} has {_pts_words(int(r_['g']), int(r_['pts'] - r_['g']))} as {W.the(winner)} {pk(verbs, 'base2')} {L_}"))
     from pipeline.export import goalie_streaks
     heads += goalie_streaks.story(gid, season, N, lambda pid: N.get(pid, ""), W, winner, loser, pk)["heads"]
     head = max(heads, key=lambda h: h[0])[1]
@@ -4057,13 +4073,16 @@ def _fact_heads(found: list[dict], night, res_w: list[dict], res_l: list[dict], 
         who = last(x["pid"])
         team = x["team"]
         as_ = f" as {beat}" if team == winner else f", but {W.the(team)} lose"
+        # a loser's milestone leads only below an overtime or shootout winner (80): "Robertson wins it in overtime",
+        # not "Tkachuk reaches 700 points, but the Panthers lose" (FLA at DAL, outside notes Nov 15)
+        mark = (lambda v: v) if team == winner else (lambda v: min(v, 79))
         if x["kind"] == "milestone" and x["what"] == "goal" and x["mark"] >= 300:
-            heads.append((93, f"{who} scores his {timeline.th(x['mark'])}{as_}"))
+            heads.append((mark(93), f"{who} scores his {timeline.th(x['mark'])}{as_}"))
         elif x["kind"] == "milestone" and x["what"] == "point" and x["mark"] >= 500:
-            heads.append((90, f"{who} reaches {x['mark']:,} points{as_}"))
+            heads.append((mark(90), f"{who} reaches {x['mark']:,} points{as_}"))
         elif x["kind"] == "milestone" and x["what"] == "game" and x["mark"] >= 1000:
             # below a four-point night (85): Vilmanis's four over Eller's 1,200th game (Nov 9 run)
-            heads.append((84, f"{who} plays his {timeline.th(x['mark'])} game{as_}"))
+            heads.append((mark(84), f"{who} plays his {timeline.th(x['mark'])} game{as_}"))
         elif x["kind"] == "first_goal" and (x.get("goals") or 0) >= 2:
             # NHL.com led with Knuble's first two NHL goals; ours led with the goalie (outside notes, Oct 21)
             many = "two" if x["goals"] == 2 else num(x["goals"])
