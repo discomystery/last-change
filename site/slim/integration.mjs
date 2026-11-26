@@ -49,6 +49,23 @@ function* walk(dir, skip = new Set()) {
 }
 
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
+// Counts how many pages carry each text, keyed by a digest so the build never holds every page's unique blocks (a
+// match is a slice that keeps its whole page alive; on 2026-11-26 that ran Node out of memory). The text itself is
+// copied out only once it reaches `min` pages, so only the ones that will move out are kept.
+const tally = (min) => {
+  const m = new Map();
+  return {
+    add(s) {
+      const k = createHash('sha256').update(s).digest('base64');
+      const e = m.get(k) ?? { n: 0, s: null };
+      e.n += 1;
+      if (e.s === null && e.n >= min) e.s = Buffer.from(s, 'utf8').toString('utf8');
+      m.set(k, e);
+    },
+    // [text, pages] for every text on `min` pages or more, in the order first seen.
+    kept() { return [...m.values()].filter((e) => e.s !== null).map((e) => [e.s, e.n]); },
+  };
+};
 const BLOCK = /<(script|style)>([\s\S]*?)<\/\1>/g;
 const CID = /data-astro-cid-([a-z0-9]+)/g;
 const TIP = / data-tip="([^"]*)"/g;
@@ -86,24 +103,23 @@ export default function slim() {
         for (const f of files) for (const m of readFileSync(f, 'utf8').matchAll(CID)) cids.add(m[1]);
         const short = new Map([...cids].sort().map((c, i) => [c, i.toString(36)]));
         const rename = (text) => text.replace(CID, (_, c) => `data-s-${short.get(c)}`);
-        const seen = new Map();
-        const svgPages = new Map();
+        const seen = tally(MIN_PAGES);
+        const svgPages = tally(MIN_SVG_PAGES);
         for (const f of pages) {
           const once = new Set();
           const text = rename(readFileSync(f, 'utf8'));
           for (const m of text.matchAll(BLOCK)) {
             if (m[2].length < MIN_BYTES || once.has(m[0])) continue;
             once.add(m[0]);
-            seen.set(m[0], (seen.get(m[0]) ?? 0) + 1);
+            seen.add(m[0]);
           }
           const drawings = new Set();
           outsideAll(text, (part) => { for (const m of part.matchAll(SVG)) if (m[0].length >= MIN_SVG_BYTES) drawings.add(m[0]); return part; });
-          for (const v of drawings) svgPages.set(v, (svgPages.get(v) ?? 0) + 1);
+          for (const v of drawings) svgPages.add(v);
         }
         const shared = new Map();
         const out = join(root, '_shared');
-        for (const [block, n] of seen) {
-          if (n < MIN_PAGES) continue;
+        for (const [block] of seen.kept()) {
           const [, kind, body] = block.match(/^<(script|style)>([\s\S]*)<\/\1>$/);
           const name = `${hash(body)}.${kind === 'script' ? 'js' : 'css'}`;
           mkdirSync(out, { recursive: true });
@@ -114,13 +130,13 @@ export default function slim() {
         }
 
         // Tooltip texts that repeat across pages, most used first so they get the shortest keys.
-        const tipPages = new Map();
+        const tipPages = tally(MIN_TIP_PAGES);
         for (const f of pages) {
           const once = new Set();
           outside(readFileSync(f, 'utf8'), (part) => { for (const m of part.matchAll(TIP)) once.add(m[1]); return part; });
-          for (const t of once) tipPages.set(t, (tipPages.get(t) ?? 0) + 1);
+          for (const t of once) tipPages.add(t);
         }
-        const tips = [...tipPages].filter(([t, n]) => n >= MIN_TIP_PAGES && unescape(t).length >= MIN_TIP_CHARS)
+        const tips = tipPages.kept().filter(([t]) => unescape(t).length >= MIN_TIP_CHARS)
           .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([t]) => t);
         const tipKey = new Map(tips.map((t, i) => [t, i.toString(36)]));
         let tipTag = '';
@@ -146,8 +162,7 @@ export default function slim() {
 
         // Each repeated drawing as a script that writes it in at its own place.
         const frags = new Map();
-        for (const [v, n] of svgPages) {
-          if (n < MIN_SVG_PAGES) continue;
+        for (const [v] of svgPages.kept()) {
           const body = `document.currentScript.insertAdjacentHTML('beforebegin',${JSON.stringify(v).replace(/</g, '\\u003c')});document.currentScript.remove();\n`;
           const name = `svg-${hash(body)}.js`;
           mkdirSync(out, { recursive: true });

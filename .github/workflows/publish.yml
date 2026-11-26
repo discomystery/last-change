@@ -67,7 +67,8 @@ jobs:
       - name: Build the site
         run: |
           npm ci --prefix site
-          npm --prefix site run build
+          # Headroom for the post-build steps, which read every page (Node's default heap ran out on 2026-11-26).
+          NODE_OPTIONS=--max-old-space-size=6144 npm --prefix site run build
 
       - name: Save data to the data branch
         run: |
