@@ -33,6 +33,9 @@ jobs:
           repository: discomystery/last-change
           ref: main
           path: app
+          # The main repository is private, so reading it needs a token with read access to it (a repository secret
+          # named MAIN_REPO_TOKEN). This repository's own token only works while the main one is public.
+          token: ${{ secrets.MAIN_REPO_TOKEN || github.token }}
           sparse-checkout: pipeline
 
       - uses: astral-sh/setup-uv@v6
@@ -40,12 +43,17 @@ jobs:
           python-version: "3.12"
 
       - name: Get the live chance model and name spellings
+        env:
+          TOKEN: ${{ secrets.MAIN_REPO_TOKEN || github.token }}
         run: |
           mkdir -p app/data/models app/data/raw/names
-          curl -fsSL -o app/data/models/xg_live_v1.pkl https://raw.githubusercontent.com/discomystery/last-change/data/models/xg_live_v1.pkl \
+          # From the main repository's data branch, through the API so it works when that repository is private.
+          get() { curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github.raw" \
+            -o "$2" "https://api.github.com/repos/discomystery/last-change/contents/$1?ref=data"; }
+          get models/xg_live_v1.pkl app/data/models/xg_live_v1.pkl \
             || echo "::notice::The live model is not on the data branch yet (the first full update after the live code merges saves it)"
           for f in countries wikidata; do
-            curl -fsSL -o "app/data/raw/names/$f.json" "https://raw.githubusercontent.com/discomystery/last-change/data/raw/names/$f.json" || true
+            get "raw/names/$f.json" "app/data/raw/names/$f.json" || true
           done
 
       - name: Follow tonight's games
