@@ -1,0 +1,419 @@
+{
+ "generated_at": "2026-10-30T21:05:09+00:00",
+ "season": 2026,
+ "checks": {
+  "text": {
+   "level": "ok",
+   "pages": 474,
+   "problems": [],
+   "count": 0,
+   "frozen": 0,
+   "style": {
+    "previews": {
+     "stories": 261,
+     "median_words": 13,
+     "name_openers": 0.69,
+     "same phrase twice in one story": 374,
+     "same sentence": 181,
+     "two sentences in a row open the same way": 79
+    },
+    "recaps": {
+     "stories": 213,
+     "median_words": 17,
+     "name_openers": 0.71,
+     "same phrase twice in one story": 317,
+     "same sentence": 132,
+     "two sentences in a row open the same way": 46,
+     "more than one contrast word in a sentence": 10
+    }
+   }
+  },
+  "hindsight": {
+   "level": "problem",
+   "problems": [
+    {
+     "what": "34 players named in 164 Out items in the last 14 days dressed for the game after all: the absence notes may be going stale"
+    }
+   ],
+   "starters": {
+    "nhl": {
+     "right": 176,
+     "picks": 187
+    },
+    "model": {
+     "right": 2,
+     "picks": 3
+    }
+   },
+   "starters_season": {
+    "nhl": {
+     "right": 242,
+     "picks": 257
+    },
+    "model": {
+     "right": 94,
+     "picks": 123
+    }
+   },
+   "out_items": 164,
+   "said_out_but_played": [
+    {
+     "game": 2026020124,
+     "date": "2026-10-17",
+     "player": 8479985,
+     "name": "cale fleury",
+     "text": "The Kraken are newly without Brandon Montour, and have been without Cale Fleury since Oct 6."
+    },
+    {
+     "game": 2026020126,
+     "date": "2026-10-17",
+     "player": 8482775,
+     "name": "oliver kapanen",
+     "text": "The Canadiens are newly without Mike Matheson, have been without Ivan Demidov and Samuel Montembeault for several games, and have had to make do without Oliver Kapanen all season."
+    },
+    {
+     "game": 2026020127,
+     "date": "2026-10-17",
+     "player": 8477498,
+     "name": "darnell nurse",
+     "text": "The Sharks are newly without Darnell Nurse."
+    },
+    {
+     "game": 2026020130,
+     "date": "2026-10-17",
+     "player": 8482740,
+     "name": "wyatt johnston",
+     "text": "The Stars are newly without Wyatt Johnston, and have had to make do without Matt Duchene all season."
+    },
+    {
+     "game": 2026020132,
+     "date": "2026-10-17",
+     "player": 8481219,
+     "name": "jonathan aspirot",
+     "text": "The Bruins are newly without Connor Clifton and Pavel Zacha, and have been without Jonathan Aspirot since Oct 3."
+    },
+    {
+     "game": 2026020133,
+     "date": "2026-10-17",
+     "player": 8475786,
+     "name": "zach hyman",
+     "text": "The Oilers are newly without Frederik Andersen, have been without Zach Hyman since Sep 29, and have had to make do without Ryan Nugent-Hopkins and Matt Savoie all season."
+    },
+    {
+     "game": 2026020138,
+     "date": "2026-10-19",
+     "player": 8476461,
+     "name": "sean couturier",
+     "text": "The Flyers are newly without Sean Couturier, Owen Tippett and Tyson Foerster, and have been without Cam York since Oct 8."
+    },
+    {
+     "game": 2026020139,
+     "date": "2026-10-19",
+     "player": 8477939,
+     "name": "william nylander",
+     "text": "The Maple Leafs are newly without Chris Tanev, John Tavares and William Nylander."
+    },
+    {
+     "game": 2026020140,
+     "date": "2026-10-19",
+     "player": 8482475,
+     "name": "egor chinakhov",
+     "text": "The Penguins are newly without Egor Chinakhov, and have been without Trevor van Riemsdyk since Oct 9."
+    },
+    {
+     "game": 2026020142,
+     "date": "2026-10-20",
+     "player": 8477015,
+     "name": "connor brown",
+     "text": "The Devils are newly without Luke Evangelista, and have had to make do without Connor Brown all season."
+    },
+    {
+     "game": 2026020142,
+     "date": "2026-10-20",
+     "player": 8482146,
+     "name": "luke evangelista",
+     "text": "The Devils are newly without Luke Evangelista, and have had to make do without Connor Brown all season."
+    },
+    {
+     "game": 2026020145,
+     "date": "2026-10-20",
+     "player": 8477939,
+     "name": "william nylander",
+     "text": "The Maple Leafs are newly without John Tavares and William Nylander, and have been without Chris Tanev since Oct 10."
+    },
+    {
+     "game": 2026020147,
+     "date": "2026-10-20",
+     "player": 8482740,
+     "name": "wyatt johnston",
+     "text": "The Stars are newly without Esa Lindell and Wyatt Johnston, and have had to make do without Matt Duchene all season."
+    },
+    {
+     "game": 2026020152,
+     "date": "2026-10-21",
+     "player": 8475722,
+     "name": "jason zucker",
+     "text": "The Sabres have been without Alex Lyon and Jason Zucker all season."
+    },
+    {
+     "game": 2026020152,
+     "date": "2026-10-21",
+     "player": 8482159,
+     "name": "tyson foerster",
+     "text": "The Flyers are newly without Owen Tippett and Tyson Foerster, and have been without Cam York and Travis Konecny for several games."
+    },
+    {
+     "game": 2026020153,
+     "date": "2026-10-21",
+     "player": 8482105,
+     "name": "jake sanderson",
+     "text": "The Senators are newly without Thomas Chabot, and have been without Jonas Johansson, Jake Sanderson and William Eklund for several games."
+    },
+    {
+     "game": 2026020154,
+     "date": "2026-10-22",
+     "player": 8482145,
+     "name": "mavrik bourque",
+     "text": "The Predators have been without Mavrik Bourque since Oct 8."
+    },
+    {
+     "game": 2026020162,
+     "date": "2026-10-22",
+     "player": 8474716,
+     "name": "jared spurgeon",
+     "text": "The Wild are newly without Maxim Shabanov, have been without Marcus Foligno and Jared Spurgeon for several games, and have had to make do without Filip Gustavsson and Brock Faber all season."
+    },
+    {
+     "game": 2026020163,
+     "date": "2026-10-22",
+     "player": 8476454,
+     "name": "ryan nugent-hopkins",
+     "text": "The Oilers have been without Frederik Andersen for several games, and have had to make do without Ryan Nugent-Hopkins and Matt Savoie all season."
+    },
+    {
+     "game": 2026020163,
+     "date": "2026-10-22",
+     "player": 8482093,
+     "name": "seth jarvis",
+     "text": "The Hurricanes are newly without Mark Jankowski and Taylor Hall, and have had to make do without Seth Jarvis and Alexander Nikishin all season."
+    },
+    {
+     "game": 2026020166,
+     "date": "2026-10-23",
+     "player": 8476875,
+     "name": "mike matheson",
+     "text": "The Canadiens are newly without Nick Suzuki, and have been without Samuel Montembeault, Ivan Demidov and Mike Matheson for several games."
+    },
+    {
+     "game": 2026020173,
+     "date": "2026-10-24",
+     "player": 8479400,
+     "name": "pierre-luc dubois",
+     "text": "The Capitals are newly without Logan Thompson, and have been without Pierre-Luc Dubois and Rasmus Sandin for several games."
+    },
+    {
+     "game": 2026020180,
+     "date": "2026-10-25",
+     "player": 8478055,
+     "name": "gustav forsling",
+     "text": "The Panthers are newly without Jacob Markström and Gustav Forsling, and have been without Aleksander Barkov and Brad Marchand for several games."
+    },
+    {
+     "game": 2026020185,
+     "date": "2026-10-26",
+     "player": 8482124,
+     "name": "quinton byfield",
+     "text": "The Kings are newly without Quinton Byfield and Mats Zuccarello, have been without Alex Turcotte since Oct 6, and have had to make do without Kevin Fiala all season."
+    },
+    {
+     "game": 2026020186,
+     "date": "2026-10-26",
+     "player": 8474150,
+     "name": "mikael backlund",
+     "text": "The Flames are newly without Mikael Backlund, and have been without Samuel Honzek, Maxim Tsyplakov and Joel Hanley for several games."
+    },
+    {
+     "game": 2026020188,
+     "date": "2026-10-27",
+     "player": 8481546,
+     "name": "cam york",
+     "text": "The Flyers have been without Owen Tippett, Cam York and Travis Konecny for several games."
+    },
+    {
+     "game": 2026020189,
+     "date": "2026-10-27",
+     "player": 8476873,
+     "name": "mark jankowski",
+     "text": "The Hurricanes have been without Mark Jankowski and Taylor Hall for several games."
+    },
+    {
+     "game": 2026020196,
+     "date": "2026-10-27",
+     "player": 8478483,
+     "name": "mitch marner",
+     "text": "The Golden Knights are newly without Mitch Marner."
+    },
+    {
+     "game": 2026020199,
+     "date": "2026-10-28",
+     "player": 8479400,
+     "name": "pierre-luc dubois",
+     "text": "The Capitals are newly without Logan Thompson and Pierre-Luc Dubois, and have been without Rasmus Sandin for several games."
+    },
+    {
+     "game": 2026020199,
+     "date": "2026-10-28",
+     "player": 8480313,
+     "name": "logan thompson",
+     "text": "The Capitals are newly without Logan Thompson and Pierre-Luc Dubois, and have been without Rasmus Sandin for several games."
+    },
+    {
+     "game": 2026020203,
+     "date": "2026-10-29",
+     "player": 8481568,
+     "name": "alex vlasic",
+     "text": "The Blackhawks are newly without Alex Vlasic, and have been without Bowen Byram since Oct 13."
+    },
+    {
+     "game": 2026020205,
+     "date": "2026-10-29",
+     "player": 8471215,
+     "name": "evgeni malkin",
+     "text": "The Penguins are newly without Elmer Söderblom, Evgeni Malkin and Bryan Rust, and have been without Trevor van Riemsdyk since Oct 9."
+    },
+    {
+     "game": 2026020207,
+     "date": "2026-10-29",
+     "player": 8477365,
+     "name": "connor clifton",
+     "text": "The Bruins have been without Jonathan Aspirot and Connor Clifton for several games, and have had to make do without Michael Eyssimont and Henri Jokiharju all season."
+    },
+    {
+     "game": 2026020212,
+     "date": "2026-10-29",
+     "player": 8478469,
+     "name": "thomas chabot",
+     "text": "The Senators are newly without Linus Ullmark, and have been without Thomas Chabot and William Eklund for several games."
+    }
+   ],
+   "starter_misses": [
+    {
+     "game": 2026020123,
+     "date": "2026-10-17",
+     "team": "VAN",
+     "source": "nhl",
+     "projected": 8482447,
+     "started": 8480947
+    },
+    {
+     "game": 2026020141,
+     "date": "2026-10-20",
+     "team": "SJS",
+     "source": "nhl",
+     "projected": 8482137,
+     "started": 8477968
+    },
+    {
+     "game": 2026020149,
+     "date": "2026-10-20",
+     "team": "SEA",
+     "source": "nhl",
+     "projected": 8478916,
+     "started": 8475831
+    },
+    {
+     "game": 2026020154,
+     "date": "2026-10-22",
+     "team": "NSH",
+     "source": "nhl",
+     "projected": 8477424,
+     "started": 8481020
+    },
+    {
+     "game": 2026020164,
+     "date": "2026-10-22",
+     "team": "SEA",
+     "source": "nhl",
+     "projected": 8478916,
+     "started": 8475831
+    },
+    {
+     "game": 2026020176,
+     "date": "2026-10-24",
+     "team": "TOR",
+     "source": "nhl",
+     "projected": 8475683,
+     "started": 8476932
+    },
+    {
+     "game": 2026020180,
+     "date": "2026-10-25",
+     "team": "CHI",
+     "source": "nhl",
+     "projected": 8482821,
+     "started": 8481519
+    },
+    {
+     "game": 2026020181,
+     "date": "2026-10-25",
+     "team": "NYI",
+     "source": "nhl",
+     "projected": 8473575,
+     "started": 8478009
+    },
+    {
+     "game": 2026020194,
+     "date": "2026-10-27",
+     "team": "WPG",
+     "source": "nhl",
+     "projected": 8479973,
+     "started": 8483532
+    },
+    {
+     "game": 2026020199,
+     "date": "2026-10-28",
+     "team": "WSH",
+     "source": "model",
+     "projected": 8479292,
+     "started": 8480313
+    },
+    {
+     "game": 2026020205,
+     "date": "2026-10-29",
+     "team": "UTA",
+     "source": "nhl",
+     "projected": 8478872,
+     "started": 8482657
+    },
+    {
+     "game": 2026020211,
+     "date": "2026-10-29",
+     "team": "ANA",
+     "source": "nhl",
+     "projected": 8480843,
+     "started": 8478024
+    }
+   ]
+  },
+  "official": {
+   "level": "ok",
+   "compared": {
+    "teams": 32,
+    "skaters": 732
+   },
+   "count": 0,
+   "problems": [],
+   "refetch": []
+  },
+  "outside": {
+   "level": "ok",
+   "compared": {
+    "games": 26,
+    "teams": 32
+   },
+   "problems": [],
+   "watch": []
+  }
+ },
+ "problems": 1
+}

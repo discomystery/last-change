@@ -1,0 +1,274 @@
+{
+ "generated_at": "2026-11-28T05:18:01+00:00",
+ "season": 2026,
+ "checks": {
+  "text": {
+   "level": "problem",
+   "pages": 877,
+   "problems": [
+    {
+     "page": "preview 2026020405",
+     "what": "straight apostrophe (use ’)",
+     "text": "Matvei Michkov is out (coach's decision injury), reported after he played in their last game."
+    },
+    {
+     "page": "recap 2026020234",
+     "what": "\"a\" before a vowel",
+     "text": "Kadri sparks a Avalanche comeback"
+    }
+   ],
+   "count": 2,
+   "frozen": 33,
+   "style": {
+    "previews": {
+     "stories": 463,
+     "median_words": 18,
+     "name_openers": 0.63,
+     "same phrase twice in one story": 2184,
+     "same sentence": 478,
+     "two sentences in a row open the same way": 135
+    },
+    "recaps": {
+     "stories": 414,
+     "median_words": 17,
+     "name_openers": 0.71,
+     "same phrase twice in one story": 428,
+     "same sentence": 239,
+     "two sentences in a row open the same way": 68,
+     "more than one contrast word in a sentence": 15
+    }
+   }
+  },
+  "hindsight": {
+   "level": "watch",
+   "problems": [],
+   "starters": {
+    "nhl": {
+     "right": 186,
+     "picks": 201
+    },
+    "model": {
+     "right": 3,
+     "picks": 3
+    }
+   },
+   "starters_season": {
+    "nhl": {
+     "right": 567,
+     "picks": 616
+    },
+    "model": {
+     "right": 115,
+     "picks": 152
+    }
+   },
+   "out_items": 183,
+   "said_out_but_played": [
+    {
+     "game": 2026020363,
+     "date": "2026-11-21",
+     "player": 8475718,
+     "name": "justin holl",
+     "text": "The Capitals have been without Justin Holl and Rasmus Sandin for several games."
+    },
+    {
+     "game": 2026020371,
+     "date": "2026-11-21",
+     "player": 8483678,
+     "name": "elias pettersson",
+     "text": "The Canucks are newly without Elias Pettersson (#40), and have had to make do without Thatcher Demko all season."
+    },
+    {
+     "game": 2026020377,
+     "date": "2026-11-22",
+     "player": 8483678,
+     "name": "elias pettersson",
+     "text": "The Canucks are newly without Elias Pettersson (#40), and have had to make do without Thatcher Demko all season."
+    },
+    {
+     "game": 2026020394,
+     "date": "2026-11-25",
+     "player": 8483678,
+     "name": "elias pettersson",
+     "text": "The Canucks are newly without Elias Pettersson (#40), and have had to make do without Thatcher Demko all season."
+    },
+    {
+     "game": 2026020401,
+     "date": "2026-11-27",
+     "player": 8480028,
+     "name": "morgan frost",
+     "text": "The Flames are newly without Morgan Frost, and have been without Kevin Bahl since Nov 4."
+    },
+    {
+     "game": 2026020405,
+     "date": "2026-11-27",
+     "player": 8483678,
+     "name": "elias pettersson",
+     "text": "The Canucks have been without Elias Pettersson (#40) since Nov 19, and have had to make do without Thatcher Demko all season."
+    }
+   ],
+   "starter_misses": [
+    {
+     "game": 2026020329,
+     "date": "2026-11-15",
+     "team": "VAN",
+     "source": "nhl",
+     "projected": 8480947,
+     "started": 8482447
+    },
+    {
+     "game": 2026020340,
+     "date": "2026-11-17",
+     "team": "NSH",
+     "source": "nhl",
+     "projected": 8477424,
+     "started": 8481020
+    },
+    {
+     "game": 2026020354,
+     "date": "2026-11-19",
+     "team": "WPG",
+     "source": "nhl",
+     "projected": 8479973,
+     "started": 8482076
+    },
+    {
+     "game": 2026020357,
+     "date": "2026-11-19",
+     "team": "SEA",
+     "source": "nhl",
+     "projected": 8478916,
+     "started": 8475831
+    },
+    {
+     "game": 2026020359,
+     "date": "2026-11-21",
+     "team": "EDM",
+     "source": "nhl",
+     "projected": 8477465,
+     "started": 8482221
+    },
+    {
+     "game": 2026020360,
+     "date": "2026-11-21",
+     "team": "CHI",
+     "source": "nhl",
+     "projected": 8482123,
+     "started": 8481519
+    },
+    {
+     "game": 2026020372,
+     "date": "2026-11-21",
+     "team": "SEA",
+     "source": "nhl",
+     "projected": 8478916,
+     "started": 8475831
+    },
+    {
+     "game": 2026020374,
+     "date": "2026-11-22",
+     "team": "TBL",
+     "source": "nhl",
+     "projected": 8476883,
+     "started": 8483710
+    },
+    {
+     "game": 2026020401,
+     "date": "2026-11-27",
+     "team": "CGY",
+     "source": "nhl",
+     "projected": 8481692,
+     "started": 8482445
+    },
+    {
+     "game": 2026020402,
+     "date": "2026-11-27",
+     "team": "UTA",
+     "source": "nhl",
+     "projected": 8482657,
+     "started": 8478872
+    },
+    {
+     "game": 2026020402,
+     "date": "2026-11-27",
+     "team": "NSH",
+     "source": "nhl",
+     "projected": 8481020,
+     "started": 8477424
+    },
+    {
+     "game": 2026020403,
+     "date": "2026-11-27",
+     "team": "DAL",
+     "source": "nhl",
+     "projected": 8479979,
+     "started": 8479193
+    },
+    {
+     "game": 2026020404,
+     "date": "2026-11-27",
+     "team": "OTT",
+     "source": "nhl",
+     "projected": 8481035,
+     "started": 8476999
+    },
+    {
+     "game": 2026020408,
+     "date": "2026-11-27",
+     "team": "MIN",
+     "source": "nhl",
+     "projected": 8479406,
+     "started": 8482661
+    },
+    {
+     "game": 2026020411,
+     "date": "2026-11-27",
+     "team": "CHI",
+     "source": "nhl",
+     "projected": 8482123,
+     "started": 8481519
+    }
+   ]
+  },
+  "official": {
+   "level": "problem",
+   "compared": {
+    "teams": 32,
+    "skaters": 793
+   },
+   "count": 1,
+   "problems": [
+    {
+     "what": "Chandler Stephenson: our goals and assists differ from the NHL's report",
+     "detail": {
+      "ours": [
+       2,
+       11
+      ],
+      "nhl": [
+       2,
+       12
+      ],
+      "player": 8476905,
+      "games": [
+       2026020414
+      ]
+     }
+    }
+   ],
+   "refetch": [
+    2026020414
+   ]
+  },
+  "outside": {
+   "level": "ok",
+   "compared": {
+    "games": 29,
+    "teams": 32
+   },
+   "problems": [],
+   "watch": []
+  }
+ },
+ "problems": 3
+}
